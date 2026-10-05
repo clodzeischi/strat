@@ -4,7 +4,7 @@ import {
   type BuildingDef, type BuildingType, type Tag, type Team, type UnitDef, type UnitType,
 } from './config';
 import type { Game } from './game';
-import { SPICE, type Cell } from './map';
+import { SPICE, type Cell, type MoveClass } from './map';
 import { disposeParts, makeBuildingModel, makeLevelKit, makeUnitModel, makeUpgradeKit } from './models';
 import { findPath, type Point } from './pathfinding';
 
@@ -142,6 +142,7 @@ export class Unit extends Entity {
   readonly kind = 'unit';
   readonly def: UnitDef;
   readonly radius: number;
+  readonly moveClass: MoveClass;
   heading: number;
   turretHeading: number;
   order: Order = { kind: 'idle' };
@@ -175,6 +176,7 @@ export class Unit extends Entity {
     super(id, team, def.hp, Math.max(1.2, def.radius * 1.8), def.infantry ? 1.6 : 2.0, def.radius + 0.25, false);
     this.def = def;
     this.radius = def.radius;
+    this.moveClass = def.infantry ? 'foot' : 'vehicle';
     this.x = x;
     this.z = z;
     this.lastX = x;
@@ -243,7 +245,7 @@ export class Unit extends Entity {
   }
 
   setPath(game: Game, x: number, z: number): void {
-    this.path = findPath(game.map, this.x, this.z, x, z);
+    this.path = findPath(game.map, this.x, this.z, x, z, this.moveClass);
     this.progressTimer = 0;
     this.lastX = this.x;
     this.lastZ = this.z;
@@ -321,7 +323,7 @@ export class Unit extends Entity {
       this.followPath(game, dt);
       return false;
     }
-    if (d <= w.range) {
+    if (d <= game.rangeFor(this, w, target)) {
       this.path = [];
       let aligned: boolean;
       if (this.turret) {
@@ -365,8 +367,16 @@ export class Unit extends Entity {
     const align = this.def.infantry ? 1 : Math.max(0, Math.cos(diff));
     if (diff < 1.3 || this.def.infantry) {
       const step = Math.min(d, this.speed(game) * dt * align);
-      this.x += (dx / d) * step;
-      this.z += (dz / d) * step;
+      const nx = this.x + (dx / d) * step;
+      const nz = this.z + (dz / d) * step;
+      if (!game.canMove(this, nx, nz)) {
+        // Pushed off the planned line and now facing a level edge: plan again from here.
+        const goal = this.path[this.path.length - 1];
+        this.setPath(game, goal.x, goal.z);
+        return false;
+      }
+      this.x = nx;
+      this.z = nz;
     }
     return false;
   }

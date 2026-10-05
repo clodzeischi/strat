@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  ARMOR_BONUS, BUILDINGS, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
+  ARMOR_BONUS, BUILDINGS, HIGH_GROUND_RANGE, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
   type LevelUpType, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
   type WeaponDef, type UnitType, type UpgradeType,
@@ -210,9 +210,35 @@ export class Game {
     return best;
   }
 
-  dockCell(refinery: Building): Cell {
-    const f = refinery.frontCell();
-    return this.map.nearestPassable(f.cx, f.cz) ?? f;
+  /** Where units leave a building and harvesters dock: the nearest open cell in front, on the building's level. */
+  dockCell(b: Building): Cell {
+    const f = b.frontCell();
+    const m = this.map;
+    const level = m.level[m.idx(b.cx, b.cz)];
+    return m.nearestCell(f.cx, f.cz, (x, z) => m.canEnter(x, z, 'vehicle') && (m.ramp[m.idx(x, z)] !== 0 || m.level[m.idx(x, z)] === level), 16) ?? f;
+  }
+
+  /** Whether a unit may move from where it is to a nearby point without crossing a level edge or blocked cell. */
+  canMove(u: Unit, x: number, z: number): boolean {
+    const m = this.map;
+    const fx = m.cellOf(u.x);
+    const fz = m.cellOf(u.z);
+    const tx = m.cellOf(x);
+    const tz = m.cellOf(z);
+    if (fx === tx && fz === tz) return true;
+    if (!m.canEnter(fx, fz, u.moveClass)) return true; // already stuck somewhere blocked: let it walk out
+    return m.inBounds(tx, tz) && Math.abs(tx - fx) <= 1 && Math.abs(tz - fz) <= 1 && m.canStep(fx, fz, tx, tz, u.moveClass);
+  }
+
+  /** Level an entity stands on: 0 low, 1 high, 0.5 on a ramp. */
+  levelOf(e: Entity): number {
+    return e instanceof Building ? this.map.level[this.map.idx(e.cx, e.cz)] : this.map.levelAt(e.x, e.z);
+  }
+
+  /** Weapon range after the high-ground modifier: longer shooting down, shorter shooting up. */
+  rangeFor(u: Unit, w: WeaponDef, target: Entity): number {
+    const diff = this.levelOf(u) - this.levelOf(target);
+    return w.range * (diff >= 1 ? 1 + HIGH_GROUND_RANGE : diff <= -1 ? 1 - HIGH_GROUND_RANGE : 1);
   }
 
   findSpice(cx: number, cz: number, self: Unit): Cell | null {
@@ -231,12 +257,19 @@ export class Game {
 
   canPlace(type: BuildingType, team: Team, cx: number, cz: number): boolean {
     const size = BUILDINGS[type].size;
+    const m = this.map;
+    if (!m.inBounds(cx, cz)) return false;
+    const level = m.level[m.idx(cx, cz)];
     for (let z = cz; z < cz + size; z++) {
       for (let x = cx; x < cx + size; x++) {
-        if (!this.map.inBounds(x, z)) return false;
-        const i = this.map.idx(x, z);
-        if (this.map.tiles[i] !== ROCK || this.map.occupied[i] !== 0) return false;
+        if (!m.inBounds(x, z)) return false;
+        const i = m.idx(x, z);
+        if (m.tiles[i] !== ROCK || m.occupied[i] !== 0 || m.level[i] !== level || m.ramp[i]) return false;
       }
+    }
+    // Flat footprint only, and ramps (plus the cell around them) stay clear.
+    for (let z = cz - 1; z <= cz + size; z++) {
+      for (let x = cx - 1; x <= cx + size; x++) if (m.inBounds(x, z) && m.ramp[m.idx(x, z)]) return false;
     }
     const x0 = cx * TILE;
     const z0 = cz * TILE;
@@ -287,7 +320,7 @@ export class Game {
     const ts = this.teams[team];
     const site = sites[ts.spawnTurn[producer]++ % sites.length];
     const front = site.frontCell();
-    const cell = this.map.nearestPassable(front.cx, front.cz) ?? front;
+    const cell = this.dockCell(site);
     const u = this.spawnUnit(type, team, this.map.center(cell.cx), this.map.center(cell.cz), Math.PI / 2);
     ts.stats.unitsBuilt++;
     if (type === 'harvester') {
@@ -641,12 +674,19 @@ export class Game {
     }
   }
 
+  /** Moves a unit by a push, axis by axis, unless that would put it somewhere it can't walk (or off a level edge). */
   private nudge(u: Unit, dx: number, dz: number): void {
     const m = this.map;
-    const inBlocked = !m.passable(m.cellOf(u.x), m.cellOf(u.z));
-    if (inBlocked || m.passable(m.cellOf(u.x + dx), m.cellOf(u.z))) u.x += dx;
-    if (inBlocked || m.passable(m.cellOf(u.x), m.cellOf(u.z + dz))) u.z += dz;
+    const step = (fx: number, fz: number, tx: number, tz: number) =>
+      (fx === tx && fz === tz) || (m.inBounds(tx, tz) && m.canStep(fx, fz, tx, tz, u.moveClass));
+    const cx = m.cellOf(u.x);
+    const cz = m.cellOf(u.z);
+    const inBlocked = !m.canEnter(cx, cz, u.moveClass);
+    if (inBlocked || step(cx, cz, m.cellOf(u.x + dx), cz)) u.x += dx;
+    const cx2 = m.cellOf(u.x);
+    if (inBlocked || step(cx2, cz, cx2, m.cellOf(u.z + dz))) u.z += dz;
   }
+
 }
 
 /** Base damage plus the weapon's bonus for each of the target's tags, before upgrades. */

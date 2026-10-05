@@ -163,6 +163,9 @@ export const HARVEST_UPGRADE = { capacity: 1.2, speed: 1.2 };
 
 export const BUILDING_TAGS: Tag[] = ['structure'];
 
+/** Range bonus for shooting down from high ground, and penalty for shooting up at it. */
+export const HIGH_GROUND_RANGE = 0.1;
+
 export const HARVESTER = {
   capacity: 500,
   rate: 60, // spice per second while harvesting

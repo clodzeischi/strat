@@ -20,6 +20,10 @@ Brutal waits because timing builds and micro depend on exact numbers (speeds, ra
 - Buildings can be built on high ground.
 - Three ramp types: narrow (infantry only), normal (vehicles in single file) and large (several vehicles side by side). Ramps are generous: Dune-style games have no drops and little need to expand, so a plateau must not be a fortress you can hold forever.
 
+**Status: done.** Ramp widths are narrow 1, normal 2, large 5 tiles; high ground is 1.1 units up. Ramps are carved into plateau edges in mirrored pairs; every plateau gets at least one vehicle ramp. Checks: `npx tsx sim/maps.ts <seed>` (ASCII map), `CHECK=60 QUIET=1 npx tsx sim/maps.ts` (vehicle route on 60 seeds), `npx tsx sim/terrain-check.ts 3` (illegal steps, stuck units).
+
+Follow-ups: the AI still uses straight-line distance (`pickTarget`) and knows nothing about chokepoints; jams on normal ramps haven't shown up in sims, but sims don't stress them.
+
 **Design**
 - `GameMap` gets a `level` per cell (0 low, 1 high) and ramp cells that join the two levels.
 - Movement between cells of different levels is only allowed through a ramp. This check is about the edge between two cells, not the cell itself, so the cliff edge needs no wall tiles.
@@ -33,6 +37,7 @@ Brutal waits because timing builds and micro depend on exact numbers (speeds, ra
 
 - Based on the two discrete levels, not raw height, so players can read it at a glance. A unit on a ramp counts as being on neither level.
 - Minimum range is unaffected.
+- **Status: done** (`Game.rangeFor`, `HIGH_GROUND_RANGE` in `config.ts`; check with `npx tsx sim/range-check.ts`). The visual cue is still to do.
 - Needs a visual cue (for example, a range ring or an icon on units with the advantage); otherwise players won't understand why they lose a fight.
 
 ## 3. Procedural maps
