@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Strat</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="view">
+        <canvas id="c"></canvas>
+        <div id="selbox"></div>
+        <div id="messages"></div>
+        <div id="info"></div>
+        <div id="overlay" hidden>
+          <div class="panel">
+            <h1></h1>
+            <button id="restart">Play again</button>
+          </div>
+        </div>
+      </div>
+      <aside id="sidebar">
+        <div class="credits"><span class="label">CREDITS</span><span id="credits">0</span></div>
+        <canvas id="minimap" width="240" height="240"></canvas>
+        <div class="col-heads"><span>STRUCTURES</span><span>UNITS</span></div>
+        <div class="columns">
+          <div class="col" id="col-build"></div>
+          <div class="col" id="col-units"></div>
+        </div>
+        <div class="help">
+          <b>LMB</b> select / drag box &nbsp; <b>RMB</b> move, attack, harvest<br />
+          <b>WASD</b>/arrows/edges pan<br />
+          <b>F</b> attack-move &nbsp; <b>X</b> stop &nbsp; <b>H</b> home &nbsp; <b>P</b> pause<br />
+          <b>Ctrl+1-9</b> set group &nbsp; <b>1-9</b> select group
+        </div>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
