@@ -21,6 +21,21 @@ interface ParticleSpec {
   drag?: number;
 }
 
+/**
+ * Lets an instanced particle cast a shadow as thick as it is opaque. The shadow pass ignores transparency,
+ * so instead each shadow pixel is kept with probability equal to the particle's opacity (a dithered
+ * shadow); the shadow map's filtering smooths the noise into a soft, partial shadow.
+ */
+function ditheredShadow<T extends THREE.Material>(material: T): T {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = 'attribute float instanceAlpha;\nvarying float vInstanceAlpha;\n' +
+      shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvInstanceAlpha = instanceAlpha;');
+    shader.fragmentShader = 'varying float vInstanceAlpha;\n' + shader.fragmentShader.replace('void main() {',
+      'void main() {\n  if (fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233))) * 43758.5453) > vInstanceAlpha) discard;');
+  };
+  return material;
+}
+
 const tmpA = new THREE.Color();
 const tmpB = new THREE.Color();
 
@@ -43,7 +58,8 @@ class ParticlePool {
   private grav: Float32Array;
   private drag: Float32Array;
 
-  constructor(scene: THREE.Scene, geometry: THREE.BufferGeometry, private capacity: number, additive: boolean) {
+  /** `additive` particles glow (fire); the others are drawn normally and, with `shadows`, cast shadows. */
+  constructor(scene: THREE.Scene, geometry: THREE.BufferGeometry, private capacity: number, additive: boolean, shadows = false) {
     const material = new THREE.MeshBasicMaterial({
       transparent: true,
       depthWrite: false,
@@ -63,6 +79,11 @@ class ParticlePool {
     this.alpha = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1).setUsage(THREE.DynamicDrawUsage);
     geometry.setAttribute('instanceAlpha', this.alpha);
     this.mesh.frustumCulled = false; // particles are spread over the map; the bounds would always be stale
+    if (shadows) {
+      this.mesh.castShadow = true;
+      this.mesh.customDepthMaterial = ditheredShadow(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }));
+      this.mesh.customDistanceMaterial = ditheredShadow(new THREE.MeshDistanceMaterial());
+    }
     this.mesh.count = 0;
     this.mesh.renderOrder = additive ? 2 : 1;
     scene.add(this.mesh);
@@ -189,25 +210,75 @@ class TracerPool {
 
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
+/** Whether fire lights cast shadows. Each shadowed point light renders nearby shadow casters six more times a frame. */
+export const FIRE_LIGHT_SHADOWS = false;
+
+/**
+ * A fixed set of point lights handed out to explosions. The count never changes: three.js recompiles every
+ * lit shader when the number of lights changes, which would stutter mid-fight. Idle lights sit at zero intensity.
+ */
+class FireLights {
+  private static readonly COUNT = 4;
+  private lights: { light: THREE.PointLight; age: number; life: number; peak: number }[] = [];
+
+  constructor(scene: THREE.Scene) {
+    for (let k = 0; k < FireLights.COUNT; k++) {
+      const light = new THREE.PointLight(0xff8a30, 0, 1, 2);
+      if (FIRE_LIGHT_SHADOWS) {
+        light.castShadow = true;
+        light.shadow.mapSize.set(256, 256);
+        light.shadow.camera.near = 0.1;
+        light.shadow.bias = -0.002;
+      }
+      scene.add(light);
+      this.lights.push({ light, age: 1, life: 0, peak: 0 });
+    }
+  }
+
+  /** Lights up an explosion: takes an idle light, or the one closest to burning out. */
+  flare(p: THREE.Vector3, size: number): void {
+    const slot = this.lights.reduce((best, l) => (l.life - l.age < best.life - best.age ? l : best));
+    slot.age = 0;
+    slot.life = 0.25 + size * 0.15;
+    slot.peak = 25 * size * size;
+    slot.light.position.set(p.x, p.y + 0.8 + size * 0.3, p.z);
+    slot.light.distance = 5 + size * 4;
+    if (FIRE_LIGHT_SHADOWS) slot.light.shadow.camera.far = slot.light.distance;
+  }
+
+  update(dt: number): void {
+    for (const l of this.lights) {
+      l.age += dt;
+      const t = l.life > 0 ? Math.min(1, l.age / l.life) : 1;
+      // Quick flash, then a flickering fade.
+      l.light.intensity = t >= 1 ? 0 : l.peak * (1 - t) * (1 - t) * (0.85 + Math.random() * 0.3);
+    }
+  }
+}
+
 /** Short-lived visual effects, drawn from pools. They don't affect gameplay. */
 export class Effects {
   private glow: ParticlePool;
   private smoke: ParticlePool;
   private debris: ParticlePool;
   private tracers: TracerPool;
+  private lights: FireLights;
   /** Command feedback rings, reused. */
   private rings: { mesh: THREE.Mesh; life: number }[] = [];
 
   constructor(private scene: THREE.Scene) {
     this.glow = new ParticlePool(scene, new THREE.IcosahedronGeometry(1, 0), 2048, true);
-    this.smoke = new ParticlePool(scene, new THREE.IcosahedronGeometry(1, 0), 2048, false);
-    this.debris = new ParticlePool(scene, new THREE.TetrahedronGeometry(1, 0), 768, false);
+    // Fire glows and casts no shadow; smoke and debris are solid stuff in the air and do.
+    this.smoke = new ParticlePool(scene, new THREE.IcosahedronGeometry(1, 0), 2048, false, true);
+    this.debris = new ParticlePool(scene, new THREE.TetrahedronGeometry(1, 0), 768, false, true);
+    this.lights = new FireLights(scene);
     this.tracers = new TracerPool(scene, 512);
   }
 
   /** Fireball, sparks, flying debris and a column of dark smoke; `size` scales all of it. */
   explosion(p: THREE.Vector3, size: number): void {
     this.glow.spawn({ x: p.x, y: p.y, z: p.z, life: 0.35, size: [size * 0.4, size * 1.3], color: [0xffa040, 0x701800], alpha: [1, 0] });
+    this.lights.flare(p, size);
     for (let k = 0; k < 3 + size * 3; k++) {
       this.glow.spawn({
         x: p.x, y: p.y, z: p.z, vx: rand(-3, 3) * size, vy: rand(0.5, 3) * size, vz: rand(-3, 3) * size, drag: 4,
@@ -277,6 +348,7 @@ export class Effects {
     this.smoke.update(dt);
     this.debris.update(dt);
     this.tracers.update(dt);
+    this.lights.update(dt);
     for (const r of this.rings) {
       if (r.life <= 0) continue;
       r.life -= dt;

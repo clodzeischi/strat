@@ -59,7 +59,7 @@ const input = new Input(game, rts, canvas, document.getElementById('selbox')!, d
 const sidebar = new Sidebar(game, input, rts);
 game.onMessage = (t) => sidebar.showMessage(t);
 const ai = new AI(game, ENEMY);
-if (import.meta.env.DEV) Object.assign(window, { game, ai, input, rts });
+if (import.meta.env.DEV) Object.assign(window, { game, ai, input, rts, renderer });
 
 const home = game.buildings.find((b) => b.team === PLAYER)!;
 rts.lookAt(home.x + 6, home.z - 6);
