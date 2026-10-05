@@ -86,7 +86,7 @@ export const UPGRADE_ORDER: UpgradeType[] = ['weapons1', 'weapons2', 'armor1', '
 
 export const UNITS: Record<UnitType, UnitDef> = {
   harvester: {
-    name: 'Harvester', producer: 'factory', cost: 300, buildTime: 10, hp: 600, speed: 3, turnRate: 3, radius: 1.1, sight: 8,
+    name: 'Harvester', producer: 'factory', cost: 800, buildTime: 10, hp: 600, speed: 3, turnRate: 3, radius: 1.1, sight: 8,
     turret: false, infantry: false, tags: ['mechanical', 'light'], weapon: null, requires: ['factory', 'refinery'],
     desc: 'Collects spice and brings it to a Refinery.',
   },
