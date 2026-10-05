@@ -2,7 +2,7 @@
 // Usage: npx tsx sim/match.ts <variant> <games> [startSeed] [opponentVariant]
 import * as THREE from 'three';
 import { AI, NORMAL_PROFILE, type AIProfile } from '../src/ai';
-import type { Team } from '../src/config';
+import { UNITS, type Team } from '../src/config';
 import { Game } from '../src/game';
 import { VARIANTS } from './variants';
 
@@ -12,6 +12,8 @@ const opponent: AIProfile = { ...NORMAL_PROFILE, ...VARIANTS[oppName] };
 const games = Number(gamesArg ?? 20);
 const offset = Number(offsetArg ?? 0);
 const MAX_TIME = 30 * 60;
+// Balance experiments: HARV_COST=600 npx tsx sim/match.ts ...
+if (process.env.HARV_COST) UNITS.harvester.cost = Number(process.env.HARV_COST);
 const AT = 300; // economy snapshot time
 
 for (let k = 0; k < games; k++) {
