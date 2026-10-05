@@ -5,6 +5,7 @@ import { ENEMY, MAP_SIZES, PLAYER, TILE, type MapSize } from './config';
 import { Game, type Difficulty } from './game';
 import { Input } from './input';
 import { loadMapSize, Menus } from './menu';
+import { ViewShadows } from './shadows';
 import { Sidebar } from './ui';
 import './style.css';
 
@@ -51,12 +52,8 @@ const mapSize = autostart?.size ?? loadMapSize();
 const rts = new RTSCamera(mapSize * TILE);
 const game = new Game(scene, rts.camera, mapSize);
 
-// The sun covers the whole map with one shadow camera.
-const half = game.map.worldSize() / 2;
-sun.position.set(half - 50, 90, half + 30);
-sun.target.position.set(half, 0, half);
-Object.assign(sun.shadow.camera, { left: -half * 1.3, right: half * 1.3, top: half * 1.3, bottom: -half * 1.3, near: 1, far: 260 });
-sun.shadow.camera.updateProjectionMatrix();
+// The sun's shadow map follows whatever the active camera is looking at.
+const shadows = new ViewShadows(sun);
 
 const input = new Input(game, rts, canvas, document.getElementById('selbox')!, document.getElementById('info')!);
 const sidebar = new Sidebar(game, input, rts);
@@ -173,6 +170,7 @@ function frame(now: number): void {
 
   if (mode === 'title') {
     updateTitleCam(dt);
+    shadows.fit(titleCam, titleFog.far);
     renderer.render(scene, titleCam);
   } else {
     if (mode === 'playing') {
@@ -189,6 +187,7 @@ function frame(now: number): void {
       game.update(dt); // let the last explosions play out behind the stats
     }
     sidebar.update(dt);
+    shadows.fit(rts.camera, gameFog.far);
     renderer.render(scene, rts.camera);
   }
   requestAnimationFrame(frame);

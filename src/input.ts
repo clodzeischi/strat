@@ -6,7 +6,7 @@ import type { Game } from './game';
 import { SPICE } from './map';
 import { cellsAround } from './pathfinding';
 
-const EDGE = 12; // px from the view edge that triggers scrolling
+const EDGE = 12; // px from the screen edge that triggers scrolling
 const PAN_SPEED = 45;
 
 /** Mouse and keyboard: camera control, selection, commands and building placement. */
@@ -22,6 +22,8 @@ export class Input {
 
   private keys = new Set<string>();
   private mouse = { x: 0, y: 0, inside: false };
+  /** Cursor in window coordinates, for edge scrolling. */
+  private screen = { x: 0, y: 0, inside: false };
   private dragStart: { x: number; y: number } | null = null;
   private dragging = false;
   private groups = new Map<string, Entity[]>();
@@ -49,6 +51,10 @@ export class Input {
     canvas.addEventListener('mouseenter', () => (this.mouse.inside = true));
     canvas.addEventListener('mouseleave', () => (this.mouse.inside = false));
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Edge scrolling uses the whole window, so the right edge is the screen edge, past the sidebar.
+    document.addEventListener('mouseout', (e) => {
+      if (!e.relatedTarget) this.screen.inside = false;
+    });
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
     window.addEventListener('blur', () => this.keys.clear());
@@ -131,6 +137,7 @@ export class Input {
   }
 
   private onMouseMove(e: MouseEvent): void {
+    this.screen = { x: e.clientX, y: e.clientY, inside: true };
     const p = this.local(e);
     this.mouse.x = p.x;
     this.mouse.y = p.y;
@@ -342,11 +349,11 @@ export class Input {
     if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
     if (this.keys.has('w') || this.keys.has('arrowup')) dy += 1;
     if (this.keys.has('s') || this.keys.has('arrowdown')) dy -= 1;
-    if (this.mouse.inside && !this.dragStart) {
-      if (this.mouse.x < EDGE) dx -= 1;
-      if (this.mouse.x > this.canvas.clientWidth - EDGE) dx += 1;
-      if (this.mouse.y < EDGE) dy += 1;
-      if (this.mouse.y > this.canvas.clientHeight - EDGE) dy -= 1;
+    if (this.screen.inside && !this.dragStart) {
+      if (this.screen.x < EDGE) dx -= 1;
+      if (this.screen.x > window.innerWidth - EDGE) dx += 1;
+      if (this.screen.y < EDGE) dy += 1;
+      if (this.screen.y > window.innerHeight - EDGE) dy -= 1;
     }
     if (dx || dy) this.cam.pan(Math.sign(dx) * PAN_SPEED * dt, Math.sign(dy) * PAN_SPEED * dt);
     this.cam.apply();
