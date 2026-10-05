@@ -55,6 +55,7 @@ export abstract class Entity {
     this.barFg.renderOrder = 999;
     this.bar.add(bg, this.barFg);
     this.bar.position.y = barHeight;
+    this.bar.visible = false; // shown by updateBar once the game runs
     this.bar.userData.width = barWidth;
     this.root.add(this.bar);
 
@@ -144,6 +145,8 @@ export class Unit extends Entity {
   heading: number;
   turretHeading: number;
   order: Order = { kind: 'idle' };
+  /** Enemy units and structures destroyed by this unit. */
+  kills = 0;
   target: Entity | null = null;
   path: Point[] = [];
   private body: THREE.Group;
@@ -490,6 +493,7 @@ export class Unit extends Entity {
         const amount = Math.min(this.cargo, HARVESTER.unloadRate * dt);
         this.cargo -= amount;
         team.credits += amount;
+        team.stats.spiceHarvested += amount;
         if (this.cargo <= 0.01) {
           this.cargo = 0;
           this.hstate = 'seek';

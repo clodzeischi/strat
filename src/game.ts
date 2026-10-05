@@ -12,8 +12,25 @@ import { mat } from './models';
 import { cellsAround, type Point } from './pathfinding';
 import { Terrain } from './terrain';
 
+/** Running totals for the end-of-game screen. */
+export interface TeamStats {
+  unitsBuilt: number;
+  unitsLost: number;
+  unitsKilled: number;
+  structuresBuilt: number;
+  structuresLost: number;
+  structuresDestroyed: number;
+  spiceHarvested: number;
+  creditsSpent: number;
+}
+
+export type Difficulty = 'normal' | 'hard' | 'brutal';
+
 export interface TeamState {
   team: Team;
+  stats: TeamStats;
+  /** This team's unit with the most kills so far (may be dead). */
+  hero: Unit | null;
   credits: number;
   upgrades: Set<UpgradeType>;
   /** The one structure being built at the Construction Yard. */
@@ -56,6 +73,7 @@ export class Game {
   teams: TeamState[];
   time = 0;
   winner: Team | null = null;
+  difficulty: Difficulty = 'normal';
   /** Called with player-facing notifications. */
   onMessage: (text: string) => void = () => {};
   private nextId = 1;
@@ -68,7 +86,11 @@ export class Game {
     scene.add(this.terrain.mesh);
     this.effects = new Effects(scene);
     this.teams = ([0, 1] as Team[]).map((team) => ({
-      team, credits: START_CREDITS, upgrades: new Set<UpgradeType>(),
+      team, credits: START_CREDITS, upgrades: new Set<UpgradeType>(), hero: null,
+      stats: {
+        unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
+        spiceHarvested: 0, creditsSpent: 0,
+      },
       building: null, queues: { barracks: [], factory: [] }, research: null,
       rally: { barracks: null, factory: null }, spawnTurn: { barracks: 0, factory: 0 }, levelUps: {},
     }));
@@ -267,6 +289,7 @@ export class Game {
     const front = site.frontCell();
     const cell = this.map.nearestPassable(front.cx, front.cz) ?? front;
     const u = this.spawnUnit(type, team, this.map.center(cell.cx), this.map.center(cell.cz), Math.PI / 2);
+    ts.stats.unitsBuilt++;
     if (type === 'harvester') {
       u.commandHarvest(this, null);
       return;
@@ -288,6 +311,16 @@ export class Game {
     return this.count(team, p);
   }
 
+  private spend(ts: TeamState, amount: number): void {
+    ts.credits -= amount;
+    ts.stats.creditsSpent += amount;
+  }
+
+  private refund(ts: TeamState, amount: number): void {
+    ts.credits += amount;
+    ts.stats.creditsSpent -= amount;
+  }
+
   private notify(team: Team, text: string): void {
     if (team === PLAYER) this.onMessage(text);
   }
@@ -300,7 +333,7 @@ export class Game {
       this.notify(team, 'Insufficient funds.');
       return false;
     }
-    ts.credits -= cost;
+    this.spend(ts, cost);
     ts.building = { type, progress: 0, ready: false };
     return true;
   }
@@ -308,7 +341,7 @@ export class Game {
   cancelBuilding(team: Team): void {
     const ts = this.teams[team];
     if (!ts.building) return;
-    ts.credits += BUILDINGS[ts.building.type].cost;
+    this.refund(ts, BUILDINGS[ts.building.type].cost);
     ts.building = null;
   }
 
@@ -317,6 +350,7 @@ export class Game {
     const ts = this.teams[team];
     if (!ts.building?.ready || !this.canPlace(ts.building.type, team, cx, cz)) return false;
     this.placeBuilding(ts.building.type, team, cx, cz);
+    ts.stats.structuresBuilt++;
     ts.building = null;
     return true;
   }
@@ -334,7 +368,7 @@ export class Game {
       this.notify(team, 'Insufficient funds.');
       return false;
     }
-    ts.credits -= cost;
+    this.spend(ts, cost);
     queue.push({ type, progress: 0 });
     return true;
   }
@@ -344,7 +378,7 @@ export class Game {
     for (let i = q.length - 1; i >= 0; i--) {
       if (q[i].type === type) {
         q.splice(i, 1);
-        this.teams[team].credits += UNITS[type].cost;
+        this.refund(this.teams[team], UNITS[type].cost);
         return;
       }
     }
@@ -358,7 +392,7 @@ export class Game {
       this.notify(team, 'Insufficient funds.');
       return false;
     }
-    ts.credits -= cost;
+    this.spend(ts, cost);
     ts.research = { type, progress: 0 };
     return true;
   }
@@ -372,7 +406,7 @@ export class Game {
       this.notify(team, 'Insufficient funds.');
       return false;
     }
-    ts.credits -= cost;
+    this.spend(ts, cost);
     ts.levelUps[type] = { building, progress: 0 };
     return true;
   }
@@ -380,14 +414,14 @@ export class Game {
   cancelLevelUp(team: Team, type: LevelUpType): void {
     const ts = this.teams[team];
     if (!ts.levelUps[type]) return;
-    ts.credits += BUILDINGS[type].levelUp!.cost;
+    this.refund(ts, BUILDINGS[type].levelUp!.cost);
     delete ts.levelUps[type];
   }
 
   cancelResearch(team: Team): void {
     const ts = this.teams[team];
     if (!ts.research) return;
-    ts.credits += UPGRADES[ts.research.type].cost;
+    this.refund(ts, UPGRADES[ts.research.type].cost);
     ts.research = null;
   }
 
@@ -517,11 +551,24 @@ export class Game {
       this.lastAlert = this.time;
       this.onMessage(target instanceof Building ? 'Our base is under attack!' : 'Harvester under attack!');
     }
-    if (target.hp <= 0) this.kill(target);
+    if (target.hp <= 0) this.kill(target, attacker);
   }
 
-  private kill(e: Entity): void {
+  private kill(e: Entity, attacker: Unit | null): void {
     e.dead = true;
+    const victim = this.teams[e.team].stats;
+    const killer = attacker && attacker.team !== e.team ? this.teams[attacker.team] : null;
+    if (e instanceof Building) {
+      victim.structuresLost++;
+      if (killer) killer.stats.structuresDestroyed++;
+    } else {
+      victim.unitsLost++;
+      if (killer) killer.stats.unitsKilled++;
+    }
+    if (killer && attacker) {
+      attacker.kills++;
+      if (!killer.hero || attacker.kills > killer.hero.kills) killer.hero = attacker;
+    }
     e.setSelected(false);
     this.scene.remove(e.root);
     if (e instanceof Building) {

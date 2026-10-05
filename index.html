@@ -4,23 +4,23 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Strat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&display=swap" rel="stylesheet" />
   </head>
-  <body>
+  <body class="in-menu">
     <div id="app">
       <div id="view">
         <canvas id="c"></canvas>
         <div id="selbox"></div>
         <div id="messages"></div>
         <div id="info"></div>
-        <div id="overlay" hidden>
-          <div class="panel">
-            <h1></h1>
-            <button id="restart">Play again</button>
-          </div>
-        </div>
       </div>
       <aside id="sidebar">
-        <div class="credits"><span class="label">CREDITS</span><span id="credits">0</span></div>
+        <div class="credits">
+          <span class="label">CREDITS</span><span id="credits">0</span>
+          <button id="menu-btn" title="Menu (Esc)">MENU</button>
+        </div>
         <canvas id="minimap" width="240" height="240"></canvas>
         <div class="col-heads"><span>STRUCTURES</span><span>UNITS</span><span>UPGRADES</span></div>
         <div class="columns">
@@ -31,10 +31,78 @@
         <div class="help">
           <b>LMB</b> select / drag box &nbsp; <b>RMB</b> move, attack, harvest<br />
           <b>WASD</b>/arrows/edges pan<br />
-          <b>F</b> attack-move &nbsp; <b>X</b> stop &nbsp; <b>H</b> home &nbsp; <b>P</b> pause<br />
+          <b>F</b> attack-move &nbsp; <b>X</b> stop &nbsp; <b>H</b> home &nbsp; <b>Esc</b> menu<br />
           <b>Ctrl+1-9</b> set group &nbsp; <b>1-9</b> select group
         </div>
       </aside>
+    </div>
+
+    <div id="fps" hidden></div>
+
+    <!-- Title screen: the map flies by behind it. -->
+    <div id="title" class="screen">
+      <div class="title-col">
+        <h1 class="logo">STRAT</h1>
+        <div class="tagline">War for the spice</div>
+
+        <div class="menu-page" data-page="main">
+          <button class="mbtn" data-action="play">Play</button>
+          <button class="mbtn" disabled title="Coming soon">Multiplayer <span class="soon">soon</span></button>
+          <button class="mbtn" data-action="controls">Controls</button>
+        </div>
+
+        <div class="menu-page" data-page="difficulty" hidden>
+          <div class="page-head">Choose difficulty</div>
+          <button class="mbtn diff" data-difficulty="normal">Normal <span>A fair fight</span></button>
+          <button class="mbtn diff" data-difficulty="hard">Hard <span>The enemy plays to win</span></button>
+          <button class="mbtn diff" data-difficulty="brutal">Brutal <span>No mercy</span></button>
+          <button class="mbtn back" data-action="back">Back</button>
+        </div>
+
+        <div class="menu-page" data-page="controls" hidden>
+          <div class="page-head">Controls</div>
+          <dl class="controls">
+            <dt>Left click / drag</dt><dd>Select units</dd>
+            <dt>Right click</dt><dd>Move, attack, harvest</dd>
+            <dt>WASD / arrows / edges</dt><dd>Pan the map</dd>
+            <dt>F</dt><dd>Attack-move</dd>
+            <dt>X</dt><dd>Stop</dd>
+            <dt>H</dt><dd>Jump to base</dd>
+            <dt>Ctrl + 1-9</dt><dd>Set control group</dd>
+            <dt>1-9 (twice)</dt><dd>Select group (and jump to it)</dd>
+            <dt>Right click a Barracks / Factory</dt><dd>Set rally point</dd>
+            <dt>Esc</dt><dd>Menu</dd>
+          </dl>
+          <button class="mbtn back" data-action="back">Back</button>
+        </div>
+
+        <label class="fps-toggle"><input type="checkbox" class="fps-check" /> Show FPS</label>
+      </div>
+    </div>
+
+    <!-- In-game menu: the game is paused while it is open. -->
+    <div id="pause" class="screen dim" hidden>
+      <div class="panel">
+        <h2>Paused</h2>
+        <button class="mbtn" data-action="resume">Resume</button>
+        <button class="mbtn" data-action="restart">Restart</button>
+        <button class="mbtn" data-action="quit">Quit</button>
+        <label class="fps-toggle"><input type="checkbox" class="fps-check" /> Show FPS</label>
+      </div>
+    </div>
+
+    <!-- End of game: result, stats and the hero of the battle. -->
+    <div id="end" class="screen dim" hidden>
+      <div class="panel wide">
+        <h2 class="result"></h2>
+        <div class="sub"></div>
+        <table class="stats"></table>
+        <div class="heroes"></div>
+        <div class="row">
+          <button class="mbtn" data-action="restart">Play again</button>
+          <button class="mbtn" data-action="quit">Main menu</button>
+        </div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

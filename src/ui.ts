@@ -134,6 +134,7 @@ export class Sidebar {
   }
 
   private onCardClick(key: string): void {
+    this.input.actions++;
     const [kind, type] = key.split(':');
     const g = this.game;
     const ts = g.teams[PLAYER];

@@ -15,6 +15,10 @@ export class Input {
   placing: BuildingType | null = null;
   attackMode = false;
   paused = false;
+  /** Clicks and hotkeys issued, for APM on the end screen. */
+  actions = 0;
+  /** Called when Esc has nothing else to cancel (opens the in-game menu). */
+  onMenu: () => void = () => {};
 
   private keys = new Set<string>();
   private mouse = { x: 0, y: 0, inside: false };
@@ -119,6 +123,7 @@ export class Input {
 
   private onMouseDown(e: MouseEvent): void {
     const p = this.local(e);
+    this.actions++;
     if (e.button === 0) {
       this.dragStart = p;
       this.dragging = false;
@@ -288,6 +293,7 @@ export class Input {
     const k = e.key.toLowerCase();
     this.keys.add(k);
     const g = this.game;
+    if (/^[0-9xfh]$/.test(k)) this.actions++;
     if (/^[0-9]$/.test(k)) {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
@@ -308,7 +314,7 @@ export class Input {
       case 'escape':
         if (this.placing) this.placing = null;
         else if (this.attackMode) this.attackMode = false;
-        else this.setSelection([]);
+        else this.onMenu();
         break;
       case 'x':
         for (const u of this.ownUnits()) u.command(g, { kind: 'idle' });
