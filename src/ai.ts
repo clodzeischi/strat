@@ -5,6 +5,22 @@ import type { Cell } from './map';
 
 const RESEARCH_ORDER: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
 
+/** Economy knobs that differ between difficulties. Experimental: tuned with the sims in `sim/`. */
+export interface AIProfile {
+  /** Opening structures, built in this order before anything else. */
+  opening: BuildingType[];
+  /** Harvesters wanted: 'perRefinery' keeps one per refinery, a number is a total target. */
+  harvesters: 'perRefinery' | number;
+  /** When to add a second refinery: always, only after harvester losses or refinery damage, or never. */
+  extraRefinery: 'always' | 'threat' | 'never';
+  /** Total army (combat units) the AI wants before it starts spending on tech. */
+  techArmy: number;
+  /** Hold back unit spending until the next opening structure is affordable. */
+  saveForOpening: boolean;
+}
+
+export const NORMAL_PROFILE: AIProfile = { opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false };
+
 /** A simple scripted opponent: builds an economy, trains counters to the enemy army, raids and attacks in waves. */
 export class AI {
   private thinkTimer = 2;
@@ -16,12 +32,41 @@ export class AI {
   /** Tech path for this game: economy and anti-armor first, or heavy army first. */
   private readonly techOrder: LevelUpType[] = Math.random() < 0.5 ? ['conyard', 'factory'] : ['factory', 'conyard'];
 
-  constructor(private game: Game, private team: Team) {}
+  /** Game time of the last harvester or refinery loss / damage, for the 'threat' refinery rule. */
+  private lastEconHit = -Infinity;
+  private harvesterIds = new Set<number>();
+
+  constructor(private game: Game, private team: Team, private profile: AIProfile = NORMAL_PROFILE) {}
+
+  /** The first opening structure we don't have yet (a type listed twice needs two of it). */
+  private openingStep(): BuildingType | null {
+    const opening = this.profile.opening;
+    return opening.find((t, i) => this.game.count(this.team, t) < opening.slice(0, i + 1).filter((o) => o === t).length) ?? null;
+  }
+
+  private trackHarvesterLosses(): void {
+    const alive = new Set(this.game.units.filter((u) => u.team === this.team && u.type === 'harvester').map((u) => u.id));
+    for (const id of this.harvesterIds) if (!alive.has(id)) this.lastEconHit = this.game.time;
+    this.harvesterIds = alive;
+  }
+
+  private wantRefineries(): number {
+    if (this.profile.extraRefinery !== 'threat') return this.profile.extraRefinery === 'always' ? 2 : 1;
+    const g = this.game;
+    const damaged = g.buildings.some((b) => b.team === this.team && b.type === 'refinery' && b.hp < b.maxHp * 0.7);
+    return damaged || g.time - this.lastEconHit < 120 ? 2 : 1;
+  }
+
+  private wantHarvesters(): number {
+    const h = this.profile.harvesters;
+    return h === 'perRefinery' ? this.game.count(this.team, 'refinery') : h;
+  }
 
   update(dt: number): void {
     this.thinkTimer -= dt;
     if (this.thinkTimer > 0) return;
     this.thinkTimer = 1;
+    this.trackHarvesterLosses();
     this.manageConstruction();
     this.manageProduction();
     this.manageTech();
@@ -40,7 +85,7 @@ export class AI {
   private techGoal(): { kind: 'level'; type: LevelUpType; cost: number } | { kind: 'research'; type: UpgradeType; cost: number } | null {
     const g = this.game;
     const ts = this.ts;
-    if (!g.has(this.team, 'factory') || g.count(this.team, 'refinery') < 2) return null;
+    if (!g.has(this.team, 'factory') || g.count(this.team, 'refinery') < this.wantRefineries()) return null;
     if (!ts.levelUps.conyard && !ts.levelUps.factory) {
       const level = this.techOrder.find((t) => g.canLevelUp(this.team, t));
       if (level) return { kind: 'level', type: level, cost: BUILDINGS[level].levelUp!.cost };
@@ -70,11 +115,10 @@ export class AI {
     const refineries = g.count(this.team, 'refinery');
     const barracks = g.count(this.team, 'barracks');
     const factories = g.count(this.team, 'factory');
-    let want: BuildingType | null = null;
-    if (refineries === 0) want = 'refinery';
-    else if (barracks === 0) want = 'barracks';
-    else if (factories === 0) want = 'factory';
-    else if (refineries < 2) want = 'refinery';
+    let want = this.openingStep();
+    if (want) {
+      // still in the opening
+    } else if (refineries < this.wantRefineries()) want = 'refinery';
     else if (barracks < 2 && ts.credits > 1500) want = 'barracks';
     else if (factories < 2 && ts.credits > 2500) want = 'factory';
     else if (g.count(this.team, 'conyard') < 2 && ts.credits > 4000) want = 'conyard';
@@ -90,8 +134,10 @@ export class AI {
     const refineries = g.count(this.team, 'refinery');
     // Keep money aside for a second refinery early on; later, once there's a decent army, save for the next tech step.
     const army = g.units.filter((u) => u.team === this.team && u.def.weapon).length;
-    const reserve = refineries < 2 ? 800 : army >= 8 ? (this.techGoal()?.cost ?? 0) : 0;
-    if (harvesters < refineries && g.canTrain(this.team, 'harvester')) {
+    const step = this.profile.saveForOpening && !ts.building ? this.openingStep() : null;
+    const reserve = step ? BUILDINGS[step].cost
+      : refineries < this.wantRefineries() ? 800 : army >= this.profile.techArmy ? (this.techGoal()?.cost ?? 0) : 0;
+    if (harvesters < this.wantHarvesters() && g.canTrain(this.team, 'harvester')) {
       if (!full('factory') && ts.credits >= UNITS.harvester.cost) g.queueUnit(this.team, 'harvester');
       return;
     }
