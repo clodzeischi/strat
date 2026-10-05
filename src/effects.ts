@@ -1,103 +1,289 @@
 import * as THREE from 'three';
 
-interface Effect {
-  obj: THREE.Object3D;
+/** Everything a particle needs at spawn; anything left out uses the defaults in `ParticlePool.spawn`. */
+interface ParticleSpec {
+  x: number;
+  y: number;
+  z: number;
+  vx?: number;
+  vy?: number;
+  vz?: number;
   life: number;
-  max: number;
-  tick: (t: number, obj: THREE.Object3D) => void; // t goes 0 -> 1
+  /** Size at birth and death (scale of the unit-radius shape). */
+  size: [number, number];
+  /** Color at birth and death. */
+  color: [number, number];
+  /** Opacity at birth and death. */
+  alpha?: [number, number];
+  /** Downward acceleration (negative floats upward). */
+  gravity?: number;
+  /** Fraction of velocity lost per second. */
+  drag?: number;
 }
 
-const sphereGeo = new THREE.IcosahedronGeometry(1, 0);
+const tmpA = new THREE.Color();
+const tmpB = new THREE.Color();
 
-function basic(color: number, opacity = 1): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false });
+/**
+ * A fixed-size pool of particles drawn as one InstancedMesh: one draw call however many are alive,
+ * and nothing allocated per particle. Particles live in flat arrays; dead ones swap with the last live one.
+ */
+class ParticlePool {
+  readonly mesh: THREE.InstancedMesh;
+  private count = 0;
+  private readonly alpha: THREE.InstancedBufferAttribute;
+  // Per-particle state, one slot per instance.
+  private pos: Float32Array;
+  private vel: Float32Array;
+  private age: Float32Array;
+  private life: Float32Array;
+  private size: Float32Array; // birth, death
+  private col: Float32Array; // birth rgb, death rgb
+  private fade: Float32Array; // birth, death opacity
+  private grav: Float32Array;
+  private drag: Float32Array;
+
+  constructor(scene: THREE.Scene, geometry: THREE.BufferGeometry, private capacity: number, additive: boolean) {
+    const material = new THREE.MeshBasicMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      fog: !additive, // fog would brighten additive glow in the distance
+    });
+    // Per-instance opacity: three.js has per-instance color but not alpha, so patch it into the shader.
+    material.onBeforeCompile = (shader) => {
+      shader.vertexShader = 'attribute float instanceAlpha;\nvarying float vInstanceAlpha;\n' +
+        shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvInstanceAlpha = instanceAlpha;');
+      shader.fragmentShader = 'varying float vInstanceAlpha;\n' +
+        shader.fragmentShader.replace('vec4 diffuseColor = vec4( diffuse, opacity );', 'vec4 diffuseColor = vec4( diffuse, opacity * vInstanceAlpha );');
+    };
+    this.mesh = new THREE.InstancedMesh(geometry, material, capacity);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3).setUsage(THREE.DynamicDrawUsage);
+    this.alpha = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1).setUsage(THREE.DynamicDrawUsage);
+    geometry.setAttribute('instanceAlpha', this.alpha);
+    this.mesh.frustumCulled = false; // particles are spread over the map; the bounds would always be stale
+    this.mesh.count = 0;
+    this.mesh.renderOrder = additive ? 2 : 1;
+    scene.add(this.mesh);
+
+    this.pos = new Float32Array(capacity * 3);
+    this.vel = new Float32Array(capacity * 3);
+    this.age = new Float32Array(capacity);
+    this.life = new Float32Array(capacity);
+    this.size = new Float32Array(capacity * 2);
+    this.col = new Float32Array(capacity * 6);
+    this.fade = new Float32Array(capacity * 2);
+    this.grav = new Float32Array(capacity);
+    this.drag = new Float32Array(capacity);
+  }
+
+  /** Adds a particle; when the pool is full the new one is dropped (effects are cosmetic). */
+  spawn(p: ParticleSpec): void {
+    if (this.count >= this.capacity) return;
+    const i = this.count++;
+    this.pos.set([p.x, p.y, p.z], i * 3);
+    this.vel.set([p.vx ?? 0, p.vy ?? 0, p.vz ?? 0], i * 3);
+    this.age[i] = 0;
+    this.life[i] = p.life;
+    this.size.set(p.size, i * 2);
+    tmpA.setHex(p.color[0]);
+    tmpB.setHex(p.color[1]);
+    this.col.set([tmpA.r, tmpA.g, tmpA.b, tmpB.r, tmpB.g, tmpB.b], i * 6);
+    this.fade.set(p.alpha ?? [1, 0], i * 2);
+    this.grav[i] = p.gravity ?? 0;
+    this.drag[i] = p.drag ?? 0;
+  }
+
+  update(dt: number): void {
+    const m = this.mesh.instanceMatrix.array as Float32Array;
+    const c = this.mesh.instanceColor!.array as Float32Array;
+    const a = this.alpha.array as Float32Array;
+    let i = 0;
+    while (i < this.count) {
+      this.age[i] += dt;
+      if (this.age[i] >= this.life[i]) {
+        this.moveSlot(--this.count, i); // the last live particle takes this slot; process it next
+        continue;
+      }
+      const t = this.age[i] / this.life[i];
+      const k = Math.max(0, 1 - this.drag[i] * dt);
+      this.vel[i * 3] *= k;
+      this.vel[i * 3 + 1] = (this.vel[i * 3 + 1] - this.grav[i] * dt) * k;
+      this.vel[i * 3 + 2] *= k;
+      const x = (this.pos[i * 3] += this.vel[i * 3] * dt);
+      const y = (this.pos[i * 3 + 1] += this.vel[i * 3 + 1] * dt);
+      const z = (this.pos[i * 3 + 2] += this.vel[i * 3 + 2] * dt);
+      const s = this.size[i * 2] + (this.size[i * 2 + 1] - this.size[i * 2]) * t;
+      // Uniform scale plus translation, written straight into the instance matrix.
+      m.set([s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, x, y, z, 1], i * 16);
+      for (let ch = 0; ch < 3; ch++) c[i * 3 + ch] = this.col[i * 6 + ch] + (this.col[i * 6 + 3 + ch] - this.col[i * 6 + ch]) * t;
+      a[i] = this.fade[i * 2] + (this.fade[i * 2 + 1] - this.fade[i * 2]) * t;
+      i++;
+    }
+    this.mesh.count = this.count;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.mesh.instanceColor!.needsUpdate = true;
+    this.alpha.needsUpdate = true;
+  }
+
+  private moveSlot(from: number, to: number): void {
+    if (from === to) return;
+    for (const [arr, n] of [[this.pos, 3], [this.vel, 3], [this.age, 1], [this.life, 1], [this.size, 2], [this.col, 6], [this.fade, 2], [this.grav, 1], [this.drag, 1]] as const) {
+      arr.copyWithin(to * n, from * n, from * n + n);
+    }
+  }
 }
 
-/** Short-lived visual effects. They don't affect gameplay. */
+/** Tracer lines, all in one LineSegments; they fade by darkening, which under additive blending is fading out. */
+class TracerPool {
+  readonly lines: THREE.LineSegments;
+  private count = 0;
+  private age: Float32Array;
+  private ends: Float32Array;
+  private readonly color = new THREE.Color(0xffe08a);
+  private static readonly LIFE = 0.08;
+
+  constructor(scene: THREE.Scene, private capacity: number) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(capacity * 6), 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(capacity * 6), 3).setUsage(THREE.DynamicDrawUsage));
+    geo.setDrawRange(0, 0);
+    this.lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false }));
+    this.lines.frustumCulled = false;
+    scene.add(this.lines);
+    this.age = new Float32Array(capacity);
+    this.ends = new Float32Array(capacity * 6);
+  }
+
+  spawn(a: THREE.Vector3, b: THREE.Vector3): void {
+    if (this.count >= this.capacity) return;
+    const i = this.count++;
+    this.age[i] = 0;
+    this.ends.set([a.x, a.y, a.z, b.x, b.y, b.z], i * 6);
+  }
+
+  update(dt: number): void {
+    const geo = this.lines.geometry;
+    const pos = geo.getAttribute('position') as THREE.BufferAttribute;
+    const col = geo.getAttribute('color') as THREE.BufferAttribute;
+    let i = 0;
+    while (i < this.count) {
+      this.age[i] += dt;
+      if (this.age[i] >= TracerPool.LIFE) {
+        const last = --this.count;
+        this.age[i] = this.age[last];
+        this.ends.copyWithin(i * 6, last * 6, last * 6 + 6);
+        continue;
+      }
+      const f = 1 - this.age[i] / TracerPool.LIFE;
+      (pos.array as Float32Array).set(this.ends.subarray(i * 6, i * 6 + 6), i * 6);
+      for (let v = 0; v < 2; v++) (col.array as Float32Array).set([this.color.r * f, this.color.g * f, this.color.b * f], i * 6 + v * 3);
+      i++;
+    }
+    geo.setDrawRange(0, this.count * 2);
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
+  }
+}
+
+const rand = (a: number, b: number) => a + Math.random() * (b - a);
+
+/** Short-lived visual effects, drawn from pools. They don't affect gameplay. */
 export class Effects {
-  private list: Effect[] = [];
+  private glow: ParticlePool;
+  private smoke: ParticlePool;
+  private debris: ParticlePool;
+  private tracers: TracerPool;
+  /** Command feedback rings, reused. */
+  private rings: { mesh: THREE.Mesh; life: number }[] = [];
 
-  constructor(private scene: THREE.Scene) {}
-
-  private add(obj: THREE.Object3D, life: number, tick: Effect['tick']): void {
-    this.scene.add(obj);
-    this.list.push({ obj, life, max: life, tick });
+  constructor(private scene: THREE.Scene) {
+    this.glow = new ParticlePool(scene, new THREE.IcosahedronGeometry(1, 0), 2048, true);
+    this.smoke = new ParticlePool(scene, new THREE.IcosahedronGeometry(1, 0), 2048, false);
+    this.debris = new ParticlePool(scene, new THREE.TetrahedronGeometry(1, 0), 768, false);
+    this.tracers = new TracerPool(scene, 512);
   }
 
+  /** Fireball, sparks, flying debris and a column of dark smoke; `size` scales all of it. */
   explosion(p: THREE.Vector3, size: number): void {
-    const fire = new THREE.Mesh(sphereGeo, basic(0xffa030, 0.95));
-    fire.position.copy(p);
-    this.add(fire, 0.45, (t, o) => {
-      o.scale.setScalar(size * (0.3 + t));
-      ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.95 * (1 - t);
-      ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).color.setHex(t < 0.4 ? 0xffd060 : 0xff6020);
-    });
-    const smoke = new THREE.Mesh(sphereGeo, basic(0x302a26, 0.6));
-    smoke.position.copy(p);
-    this.add(smoke, 1.2, (t, o) => {
-      o.scale.setScalar(size * (0.4 + t * 1.2));
-      o.position.y = p.y + t * size * 1.5;
-      ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - t);
-    });
+    this.glow.spawn({ x: p.x, y: p.y, z: p.z, life: 0.35, size: [size * 0.4, size * 1.3], color: [0xffa040, 0x701800], alpha: [1, 0] });
+    for (let k = 0; k < 3 + size * 3; k++) {
+      this.glow.spawn({
+        x: p.x, y: p.y, z: p.z, vx: rand(-3, 3) * size, vy: rand(0.5, 3) * size, vz: rand(-3, 3) * size, drag: 4,
+        life: rand(0.3, 0.5), size: [size * rand(0.3, 0.5), size * 0.1], color: [0xd06010, 0x501000],
+      });
+    }
+    for (let k = 0; k < 4 + size * 6; k++) {
+      const speed = rand(6, 14);
+      const yaw = rand(0, Math.PI * 2);
+      this.glow.spawn({
+        x: p.x, y: p.y, z: p.z, vx: Math.cos(yaw) * speed, vy: rand(3, 9), vz: Math.sin(yaw) * speed, gravity: 20, drag: 1.5,
+        life: rand(0.3, 0.6), size: [0.08, 0.03], color: [0xffe080, 0xff6020],
+      });
+    }
+    for (let k = 0; k < 2 + size * 3; k++) {
+      const yaw = rand(0, Math.PI * 2);
+      const speed = rand(2, 6);
+      this.debris.spawn({
+        x: p.x, y: p.y, z: p.z, vx: Math.cos(yaw) * speed, vy: rand(4, 9), vz: Math.sin(yaw) * speed, gravity: 22,
+        life: rand(0.6, 1), size: [rand(0.1, 0.2) * Math.min(size, 2), 0.05], color: [0x2a2420, 0x2a2420], alpha: [1, 0.6],
+      });
+    }
+    for (let k = 0; k < 2 + size * 2; k++) {
+      this.smoke.spawn({
+        x: p.x + rand(-0.4, 0.4) * size, y: p.y + 0.2, z: p.z + rand(-0.4, 0.4) * size, vx: rand(-0.4, 0.4), vy: rand(1, 2) * size, vz: rand(-0.4, 0.4), drag: 0.8,
+        life: rand(1.2, 2.2), size: [size * 0.4, size * rand(1.2, 1.8)], color: [0x3a322c, 0x6a625a], alpha: [0.65, 0],
+      });
+    }
   }
 
+  /** Muzzle flash. */
   flash(p: THREE.Vector3, size = 0.25): void {
-    const m = new THREE.Mesh(sphereGeo, basic(0xfff0a0));
-    m.position.copy(p);
-    m.scale.setScalar(size);
-    this.add(m, 0.06, () => {});
+    this.glow.spawn({ x: p.x, y: p.y, z: p.z, life: 0.07, size: [size, size * 0.6], color: [0xfff0a0, 0xffa040] });
   }
 
   tracer(a: THREE.Vector3, b: THREE.Vector3): void {
-    const geo = new THREE.BufferGeometry().setFromPoints([a, b]);
-    const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: 0xffe08a, transparent: true }));
-    this.add(line, 0.08, (t, o) => {
-      ((o as THREE.Line).material as THREE.LineBasicMaterial).opacity = 1 - t;
-    });
+    this.tracers.spawn(a, b);
   }
 
+  /** A small rising puff: rocket trails, harvester spice spray. */
   puff(p: THREE.Vector3, color: number): void {
-    const m = new THREE.Mesh(sphereGeo, basic(color, 0.7));
-    m.position.copy(p);
-    const dx = (Math.random() - 0.5) * 0.8;
-    const dz = (Math.random() - 0.5) * 0.8;
-    this.add(m, 0.8, (t, o) => {
-      o.scale.setScalar(0.2 + t * 0.4);
-      o.position.set(p.x + dx * t, p.y + t * 1.2, p.z + dz * t);
-      ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 0.7 * (1 - t);
+    this.smoke.spawn({
+      x: p.x, y: p.y, z: p.z, vx: rand(-0.5, 0.5), vy: 1.2, vz: rand(-0.5, 0.5),
+      life: 0.8, size: [0.2, 0.6], color: [color, color], alpha: [0.7, 0],
     });
   }
 
   /** Command feedback ring on the ground. */
   marker(p: THREE.Vector3, color: number): void {
-    const geo = new THREE.RingGeometry(0.7, 0.95, 20);
-    geo.rotateX(-Math.PI / 2);
-    const m = new THREE.Mesh(geo, basic(color));
-    m.position.set(p.x, p.y + 0.1, p.z);
-    this.add(m, 0.5, (t, o) => {
-      o.scale.setScalar(1.4 - t);
-      ((o as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = 1 - t;
-    });
+    let ring = this.rings.find((r) => r.life <= 0);
+    if (!ring) {
+      const geo = new THREE.RingGeometry(0.7, 0.95, 20);
+      geo.rotateX(-Math.PI / 2);
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+      this.scene.add(mesh);
+      ring = { mesh, life: 0 };
+      this.rings.push(ring);
+    }
+    ring.life = 0.5;
+    ring.mesh.visible = true;
+    ring.mesh.position.set(p.x, p.y + 0.1, p.z);
+    (ring.mesh.material as THREE.MeshBasicMaterial).color.setHex(color);
   }
 
   update(dt: number): void {
-    for (let i = this.list.length - 1; i >= 0; i--) {
-      const e = this.list[i];
-      e.life -= dt;
-      if (e.life <= 0) {
-        this.scene.remove(e.obj);
-        disposeObject(e.obj);
-        this.list.splice(i, 1);
-      } else {
-        e.tick(1 - e.life / e.max, e.obj);
-      }
+    this.glow.update(dt);
+    this.smoke.update(dt);
+    this.debris.update(dt);
+    this.tracers.update(dt);
+    for (const r of this.rings) {
+      if (r.life <= 0) continue;
+      r.life -= dt;
+      const t = 1 - Math.max(0, r.life) / 0.5;
+      r.mesh.visible = r.life > 0;
+      r.mesh.scale.setScalar(1.4 - t);
+      (r.mesh.material as THREE.MeshBasicMaterial).opacity = 1 - t;
     }
-  }
-}
-
-function disposeObject(o: THREE.Object3D): void {
-  if (o instanceof THREE.Mesh || o instanceof THREE.Line) {
-    if (o.geometry !== sphereGeo) o.geometry.dispose();
-    (o.material as THREE.Material).dispose();
   }
 }
