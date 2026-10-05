@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   ARMOR_BONUS, BUILDINGS, HIGH_GROUND_RANGE, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
-  type LevelUpType, type Producer, type Req,
+  type LevelUpType, type MapSize, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
   type WeaponDef, type UnitType, type UpgradeType,
 } from './config';
@@ -65,7 +65,7 @@ const rocketGeo = new THREE.ConeGeometry(0.12, 0.6, 5);
 rocketGeo.rotateX(Math.PI / 2); // point along +Z so lookAt aims it
 
 export class Game {
-  readonly map = new GameMap(7);
+  readonly map: GameMap;
   readonly terrain: Terrain;
   readonly effects: Effects;
   units: Unit[] = [];
@@ -81,7 +81,8 @@ export class Game {
   private lastAlert = -100;
   private victoryTimer = 0;
 
-  constructor(readonly scene: THREE.Scene, private camera: THREE.Camera) {
+  constructor(readonly scene: THREE.Scene, private camera: THREE.Camera, size: MapSize = 64) {
+    this.map = new GameMap(size);
     this.terrain = new Terrain(this.map);
     scene.add(this.terrain.mesh);
     this.effects = new Effects(scene);

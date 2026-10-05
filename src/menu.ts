@@ -1,9 +1,9 @@
-import { PLAYER, ENEMY, UNITS, type Team } from './config';
+import { MAP_SIZE_NAMES, MAP_SIZES, PLAYER, ENEMY, UNITS, type MapSize, type Team } from './config';
 import type { Difficulty, Game, TeamStats } from './game';
 import { heroTitle } from './heroes';
 
 export interface MenuHandlers {
-  onPlay: (difficulty: Difficulty) => void;
+  onPlay: (difficulty: Difficulty, size: MapSize) => void;
   onResume: () => void;
   onRestart: () => void;
   onQuit: () => void;
@@ -11,6 +11,25 @@ export interface MenuHandlers {
 }
 
 const FPS_KEY = 'strat.showFps';
+const SIZE_KEY = 'strat.mapSize';
+
+/** The map size picked last time, so the menu remembers it. */
+export function loadMapSize(): MapSize {
+  try {
+    const v = Number(localStorage.getItem(SIZE_KEY));
+    return (MAP_SIZES as readonly number[]).includes(v) ? (v as MapSize) : 64;
+  } catch {
+    return 64;
+  }
+}
+
+function saveMapSize(v: MapSize): void {
+  try {
+    localStorage.setItem(SIZE_KEY, String(v));
+  } catch {
+    // Storage unavailable: the choice just won't persist.
+  }
+}
 
 function loadFps(): boolean {
   try {
@@ -42,8 +61,10 @@ export class Menus {
   readonly pause = document.getElementById('pause')!;
   readonly end = document.getElementById('end')!;
   showFps = loadFps();
+  mapSize = loadMapSize();
 
   constructor(private h: MenuHandlers) {
+    this.showMapSize();
     for (const box of document.querySelectorAll<HTMLInputElement>('.fps-check')) {
       box.checked = this.showFps;
       box.addEventListener('change', () => this.setFps(box.checked));
@@ -52,7 +73,11 @@ export class Menus {
     this.title.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('button');
       if (!btn || btn.disabled) return;
-      if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty);
+      if (btn.dataset.size) {
+        this.mapSize = Number(btn.dataset.size) as MapSize;
+        saveMapSize(this.mapSize);
+        this.showMapSize();
+      } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize);
       else if (btn.dataset.action === 'play') this.page('difficulty');
       else if (btn.dataset.action === 'controls') this.page('controls');
       else if (btn.dataset.action === 'back') this.page('main');
@@ -72,6 +97,12 @@ export class Menus {
     saveFps(v);
     for (const box of document.querySelectorAll<HTMLInputElement>('.fps-check')) box.checked = v;
     this.h.onFps(v);
+  }
+
+  private showMapSize(): void {
+    for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-size]')) {
+      b.classList.toggle('picked', Number(b.dataset.size) === this.mapSize);
+    }
   }
 
   private page(name: string): void {
@@ -96,7 +127,7 @@ export class Menus {
     const result = this.end.querySelector('.result')!;
     result.textContent = won ? 'Victory' : 'Defeat';
     result.className = `result ${won ? 'victory' : 'defeat'}`;
-    this.end.querySelector('.sub')!.textContent = `${formatTime(game.time)}  ·  ${DIFFICULTY_NAMES[game.difficulty]}`;
+    this.end.querySelector('.sub')!.textContent = `${formatTime(game.time)}  ·  ${DIFFICULTY_NAMES[game.difficulty]}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map`;
 
     const you = game.teams[PLAYER];
     const foe = game.teams[ENEMY];

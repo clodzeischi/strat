@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { AI } from '../src/ai';
 import { Game } from '../src/game';
 import { Unit } from '../src/entities';
+import type { MapSize } from '../src/config';
 
 // Wrap the two places units move, so each single step is checked (a frame can hold several legal steps).
 let g!: Game;
@@ -26,10 +27,10 @@ const nudge = (Game.prototype as any).nudge;
 
 let illegal = 0, stuckEvents = 0, wrongLevelSpawns = 0;
 for (let k = 0; k < Number(process.argv[2] ?? 4); k++) {
-  g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera());
+  g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize);
   const ais = [new AI(g, 0), new AI(g, 1)];
   const last = new Map<number, { cx: number; cz: number; still: number; x: number; z: number }>();
-  while (g.winner === null && g.time < 900) {
+  while (g.winner === null && g.time < 1500) {
     g.update(0.05);
     for (const a of ais) a.update(0.05);
     const m = g.map;

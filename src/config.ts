@@ -1,7 +1,10 @@
 // All game data lives here. Distances are in world units; one map tile is TILE world units.
 
 export const TILE = 2;
-export const MAP_SIZE = 64; // tiles per side
+/** Map sizes in tiles per side, chosen before each game. */
+export const MAP_SIZES = [64, 96, 128] as const;
+export type MapSize = (typeof MAP_SIZES)[number];
+export const MAP_SIZE_NAMES: Record<MapSize, string> = { 64: 'Small', 96: 'Medium', 128: 'Large' };
 
 export type Team = 0 | 1;
 export const PLAYER: Team = 0;

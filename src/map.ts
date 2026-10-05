@@ -1,4 +1,4 @@
-import { MAP_SIZE, SPICE_MAX, TILE } from './config';
+import { SPICE_MAX, TILE } from './config';
 
 export const SAND = 0;
 export const ROCK = 1;
@@ -57,25 +57,32 @@ function percentile(values: number[], fraction: number): number {
 }
 
 export class GameMap {
-  readonly size = MAP_SIZE;
-  tiles = new Uint8Array(MAP_SIZE * MAP_SIZE);
-  spice = new Float32Array(MAP_SIZE * MAP_SIZE);
-  heights = new Float32Array(MAP_SIZE * MAP_SIZE);
+  tiles: Uint8Array;
+  spice: Float32Array;
+  heights: Float32Array;
   /** 0 = low ground, 1 = high ground. Units only cross between levels on ramp cells. */
-  level = new Uint8Array(MAP_SIZE * MAP_SIZE);
+  level: Uint8Array;
   /** Ramp kind per cell (NARROW / NORMAL / LARGE), 0 if not a ramp. */
-  ramp = new Uint8Array(MAP_SIZE * MAP_SIZE);
+  ramp: Uint8Array;
   /** Uphill direction of each ramp cell, an index into DIR4. */
-  rampDir = new Uint8Array(MAP_SIZE * MAP_SIZE);
+  rampDir: Uint8Array;
   /** Building id occupying each cell, 0 if free. */
-  occupied = new Int32Array(MAP_SIZE * MAP_SIZE);
+  occupied: Int32Array;
   /** Base centers for team 0 and team 1. */
   bases: Cell[];
   /** Incremented whenever spice tiles change, so the minimap knows to redraw. */
   version = 0;
 
-  constructor(seed = 7) {
-    const N = this.size;
+  /** `size` is tiles per side. */
+  constructor(readonly size = 64, seed = 7) {
+    const N = size;
+    this.tiles = new Uint8Array(N * N);
+    this.spice = new Float32Array(N * N);
+    this.heights = new Float32Array(N * N);
+    this.level = new Uint8Array(N * N);
+    this.ramp = new Uint8Array(N * N);
+    this.rampDir = new Uint8Array(N * N);
+    this.occupied = new Int32Array(N * N);
     this.bases = [{ cx: 10, cz: N - 11 }, { cx: N - 11, cz: 10 }];
     for (let attempt = 0; attempt < 20; attempt++) {
       if (this.generate(seed + attempt * 101)) break;

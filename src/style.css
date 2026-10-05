@@ -428,6 +428,45 @@ body.in-menu #info {
   text-transform: uppercase;
 }
 
+.size-pick {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sbtn {
+  flex: 1;
+  padding: 8px 6px;
+  background: rgba(30, 22, 14, 0.55);
+  border: 1px solid rgba(224, 144, 42, 0.35);
+  color: var(--muted);
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.sbtn span {
+  display: block;
+  font-family: 'Trebuchet MS', system-ui, sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+}
+
+.sbtn:hover {
+  background: rgba(224, 144, 42, 0.22);
+  color: var(--text);
+}
+
+.sbtn.picked {
+  background: rgba(224, 144, 42, 0.3);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
 .mbtn.back {
   margin-top: 6px;
   font-size: 13px;

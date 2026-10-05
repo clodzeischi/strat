@@ -1,9 +1,10 @@
-// Prints generated maps as ASCII and checks basic properties. Usage: npx tsx sim/maps.ts [seed...]
+// Prints generated maps as ASCII and checks basic properties. Usage: [SIZE=96] npx tsx sim/maps.ts [seed...]
 import { GameMap, CLIFF, SPICE, ROCK, NARROW, NORMAL, LARGE } from '../src/map';
 
 const seeds = process.argv.slice(2).map(Number);
+const SIZE = Number(process.env.SIZE ?? 64);
 for (const seed of seeds.length ? seeds : [7]) {
-  const m = new GameMap(seed);
+  const m = new GameMap(SIZE, seed);
   const N = m.size;
   const ramps: Record<number, number> = { [NARROW]: 0, [NORMAL]: 0, [LARGE]: 0 };
   let high = 0;
@@ -37,7 +38,7 @@ if (process.env.CHECK) {
   const { findPath } = await import('../src/pathfinding');
   let bad = 0;
   for (let seed = 1; seed <= Number(process.env.CHECK); seed++) {
-    const m = new GameMap(seed);
+    const m = new GameMap(SIZE, seed);
     const [a, b] = m.bases;
     const path = findPath(m, m.center(a.cx), m.center(a.cz), m.center(b.cx), m.center(b.cz), 'vehicle');
     const end = path[path.length - 1];

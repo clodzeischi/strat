@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { AI } from './ai';
 import { RTSCamera } from './camera';
-import { ENEMY, MAP_SIZE, PLAYER, TILE } from './config';
+import { ENEMY, MAP_SIZES, PLAYER, TILE, type MapSize } from './config';
 import { Game, type Difficulty } from './game';
 import { Input } from './input';
-import { Menus } from './menu';
+import { loadMapSize, Menus } from './menu';
 import { Sidebar } from './ui';
 import './style.css';
 
@@ -30,8 +30,26 @@ sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.05;
 scene.add(sun, sun.target);
 
-const rts = new RTSCamera(MAP_SIZE * TILE);
-const game = new Game(scene, rts.camera);
+// Restart and changing map size reload the page; the next game's settings ride along in session storage.
+const AUTOSTART_KEY = 'strat.autostart';
+interface Autostart { difficulty: Difficulty; size: MapSize }
+function readAutostart(): Autostart | null {
+  try {
+    const raw = sessionStorage.getItem(AUTOSTART_KEY);
+    sessionStorage.removeItem(AUTOSTART_KEY);
+    const [difficulty, size] = (raw ?? '').split(':');
+    const okDifficulty = difficulty === 'normal' || difficulty === 'hard' || difficulty === 'brutal';
+    const okSize = (MAP_SIZES as readonly number[]).includes(Number(size));
+    return okDifficulty && okSize ? { difficulty, size: Number(size) as MapSize } : null;
+  } catch {
+    return null;
+  }
+}
+const autostart = readAutostart();
+const mapSize = autostart?.size ?? loadMapSize();
+
+const rts = new RTSCamera(mapSize * TILE);
+const game = new Game(scene, rts.camera, mapSize);
 
 // The sun covers the whole map with one shadow camera.
 const half = game.map.worldSize() / 2;
@@ -87,7 +105,6 @@ resize();
 
 type Mode = 'title' | 'playing' | 'paused' | 'ended';
 let mode: Mode = 'title';
-const AUTOSTART_KEY = 'strat.autostart';
 const fpsEl = document.getElementById('fps')!;
 
 function startGame(difficulty: Difficulty): void {
@@ -99,10 +116,10 @@ function startGame(difficulty: Difficulty): void {
   sidebar.showMessage('Build a Refinery and a Barracks, then a Factory. Destroy the red base.');
 }
 
-/** Restart and Quit reload the page for a clean match; Restart skips the title. */
-function reload(autostart: Difficulty | null): void {
+/** Restart, Quit and a new map size reload the page for a clean match; with `next` set, the title is skipped. */
+function reload(next: Autostart | null): void {
   try {
-    if (autostart) sessionStorage.setItem(AUTOSTART_KEY, autostart);
+    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}`);
   } catch {
     // Without session storage, Restart falls back to the title screen.
   }
@@ -116,9 +133,9 @@ function setPaused(paused: boolean): void {
 }
 
 const menus = new Menus({
-  onPlay: startGame,
+  onPlay: (difficulty, size) => (size === game.map.size ? startGame(difficulty) : reload({ difficulty, size })),
   onResume: () => setPaused(false),
-  onRestart: () => reload(game.difficulty),
+  onRestart: () => reload({ difficulty: game.difficulty, size: mapSize }),
   onQuit: () => reload(null),
   onFps: (show) => (fpsEl.hidden = !show),
 });
@@ -133,14 +150,7 @@ window.addEventListener('keydown', (e) => {
   }
 }, { capture: true });
 
-let autostart: string | null = null;
-try {
-  autostart = sessionStorage.getItem(AUTOSTART_KEY);
-  sessionStorage.removeItem(AUTOSTART_KEY);
-} catch {
-  autostart = null;
-}
-if (autostart === 'normal' || autostart === 'hard' || autostart === 'brutal') startGame(autostart);
+if (autostart) startGame(autostart.difficulty);
 else menus.showTitle();
 
 // ---- Main loop -------------------------------------------------------------------
