@@ -14,6 +14,9 @@ export const RAMP_WIDTH: Record<number, number> = { [NARROW]: 1, [NORMAL]: 2, [L
 /** How high the high ground sits above the low ground: a low rise, not a wall, so units below can still shoot up. */
 export const HIGH_Y = 1.1;
 
+/** Vertices per tile edge in the smooth ground surface (the visual mesh, and what units ride on). */
+export const SURFACE_RES = 2;
+
 /** Infantry can use narrow ramps; vehicles can't. */
 export type MoveClass = 'foot' | 'vehicle';
 
@@ -66,6 +69,11 @@ export class GameMap {
   ramp: Uint8Array;
   /** Uphill direction of each ramp cell, an index into DIR4. */
   rampDir: Uint8Array;
+  /**
+   * Smooth ground heights on a grid of SURFACE_RES vertices per tile, (size * SURFACE_RES + 1)^2 values.
+   * Purely visual: gameplay still uses the per-tile levels. Built from the tile heights plus dune and rock noise.
+   */
+  surface: Float32Array;
   /** Building id occupying each cell, 0 if free. */
   occupied: Int32Array;
   /** Base centers for team 0 and team 1. */
@@ -83,9 +91,87 @@ export class GameMap {
     this.ramp = new Uint8Array(N * N);
     this.rampDir = new Uint8Array(N * N);
     this.occupied = new Int32Array(N * N);
+    this.surface = new Float32Array((N * SURFACE_RES + 1) ** 2);
     this.bases = [{ cx: 10, cz: N - 11 }, { cx: N - 11, cz: 10 }];
     for (let attempt = 0; attempt < 20; attempt++) {
       if (this.generate(seed + attempt * 101)) break;
+    }
+    this.buildSurface(seed);
+  }
+
+  /** Vertices per side of the surface grid. */
+  get surfaceSize(): number {
+    return this.size * SURFACE_RES + 1;
+  }
+
+  /** Which diagonal splits surface grid square (i, j): mixed per square so the mesh doesn't look striped. */
+  flipped(i: number, j: number): boolean {
+    return hash(i, j, 97) < 0.5;
+  }
+
+  /**
+   * Height of the smooth ground at a world point, matching the visual mesh exactly: each grid square
+   * is split into two triangles along the diagonal `flipped` picks.
+   */
+  surfaceAt(x: number, z: number): number {
+    const V = this.surfaceSize;
+    const step = TILE / SURFACE_RES;
+    const gx = Math.min(Math.max(x / step, 0), V - 1.001);
+    const gz = Math.min(Math.max(z / step, 0), V - 1.001);
+    const i = Math.floor(gx);
+    const j = Math.floor(gz);
+    const fx = gx - i;
+    const fz = gz - j;
+    const s = this.surface;
+    const h00 = s[j * V + i];
+    const h11 = s[(j + 1) * V + i + 1];
+    if (this.flipped(i, j)) {
+      // Split along (1,0)-(0,1).
+      const h10 = s[j * V + i + 1];
+      const h01 = s[(j + 1) * V + i];
+      if (fx + fz <= 1) return h00 + (h10 - h00) * fx + (h01 - h00) * fz;
+      return h11 + (h01 - h11) * (1 - fx) + (h10 - h11) * (1 - fz);
+    }
+    if (fx >= fz) {
+      const h10 = s[j * V + i + 1];
+      return h00 + (h10 - h00) * fx + (h11 - h10) * fz;
+    }
+    const h01 = s[(j + 1) * V + i];
+    return h00 + (h11 - h01) * fx + (h01 - h00) * fz;
+  }
+
+  /**
+   * Smooths the stepped tile heights into rolling ground: each vertex averages the tile heights just around
+   * it, so plateau edges become short slopes about a tile wide. Then sand gets low dunes and rocky outcrops
+   * get jagged.
+   */
+  private buildSurface(seed: number): void {
+    const V = this.surfaceSize;
+    const step = TILE / SURFACE_RES;
+    const o = TILE * 0.25; // sample offset: a vertex on a tile corner averages the four tiles that meet there
+    for (let j = 0; j < V; j++) {
+      for (let i = 0; i < V; i++) {
+        const x = i * step;
+        const z = j * step;
+        let h = 0;
+        let sand = 0;
+        let cliff = 0;
+        for (const [dx, dz] of [[-o, -o], [o, -o], [-o, o], [o, o]]) {
+          h += this.heightAt(x + dx, z + dz) / 4;
+          const cx = this.cellOf(x + dx);
+          const cz = this.cellOf(z + dz);
+          if (!this.inBounds(cx, cz)) continue;
+          const k = this.idx(cx, cz);
+          const t = this.tiles[k];
+          if ((t === SAND || t === SPICE) && !this.ramp[k]) sand += 0.25;
+          if (t === CLIFF) cliff += 0.25;
+        }
+        // Dunes only where the ground around is all sand, so slopes and ramps keep their shape.
+        if (sand === 1) h += (fbm(x / 14 + 300, z / 9 + 300, seed + 41) - 0.45) * 0.7;
+        if (cliff > 0) h += hash(i, j, seed + 43) * 0.9 * cliff;
+        else h += (hash(i, j, seed + 44) - 0.5) * 0.22; // unevenness everywhere, so the facets catch the light
+        this.surface[j * V + i] = h;
+      }
     }
   }
 

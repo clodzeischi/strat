@@ -292,7 +292,7 @@ export class Game {
 
   spawnUnit(type: UnitType, team: Team, x: number, z: number, heading = 0): Unit {
     const u = new Unit(this.nextId++, team, type, x, z, heading);
-    u.y = this.map.heightAt(x, z);
+    u.y = this.map.surfaceAt(x, z);
     u.syncVisual(this, 0);
     this.scene.add(u.root);
     this.units.push(u);
@@ -300,7 +300,7 @@ export class Game {
   }
 
   placeBuilding(type: BuildingType, team: Team, cx: number, cz: number): Building {
-    const b = new Building(this.nextId++, team, type, cx, cz, this.map.heightAt((cx + 0.5) * TILE, (cz + 0.5) * TILE));
+    const b = new Building(this.nextId++, team, type, cx, cz, this.map.surfaceAt((cx + BUILDINGS[type].size / 2) * TILE, (cz + BUILDINGS[type].size / 2) * TILE));
     for (let z = cz; z < cz + b.size; z++) {
       for (let x = cx; x < cx + b.size; x++) this.map.occupied[this.map.idx(x, z)] = b.id;
     }
@@ -630,6 +630,7 @@ export class Game {
     this.updateProjectiles(dt);
     for (const b of this.buildings) if (b.spinner) b.spinner.rotation.y += dt * (b.type === 'factory' ? 1.5 : 0.25);
     this.effects.update(dt);
+    this.terrain.flush();
     this.units = this.units.filter((u) => !u.dead);
     this.buildings = this.buildings.filter((b) => !b.dead);
     for (const u of this.units) u.updateBar(this.camera);

@@ -538,7 +538,7 @@ export class Unit extends Entity {
 
   syncVisual(game: Game, dt: number): void {
     this.refreshKit(game);
-    const groundY = game.map.heightAt(this.x, this.z);
+    const groundY = game.map.surfaceAt(this.x, this.z);
     this.y += (groundY - this.y) * Math.min(1, dt * 10);
     this.root.position.set(this.x, this.y, this.z);
     this.body.rotation.y = -this.heading;

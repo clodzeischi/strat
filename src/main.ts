@@ -71,7 +71,7 @@ let titleTime = Math.random() * 100;
 function flightPoint(t: number): THREE.Vector3 {
   const x = world * (0.5 + 0.34 * Math.sin(t * 0.021));
   const z = world * (0.5 + 0.34 * Math.sin(t * 0.034 + 1.3));
-  return new THREE.Vector3(x, game.map.heightAt(x, z), z);
+  return new THREE.Vector3(x, game.map.surfaceAt(x, z), z);
 }
 let titleAlt = -1;
 function updateTitleCam(dt: number): void {
