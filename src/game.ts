@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
-  ARMOR_BONUS, BUILDINGS, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
-  type Producer,
+  ARMOR_BONUS, BUILDINGS, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
+  type LevelUpType, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
   type WeaponDef, type UnitType, type UpgradeType,
 } from './config';
@@ -22,6 +22,8 @@ export interface TeamState {
   queues: Record<Producer, { type: UnitType; progress: number }[]>;
   research: { type: UpgradeType; progress: number } | null;
   rally: Record<Producer, Point | null>;
+  /** Building being upgraded to level 2, per upgradable type. */
+  levelUps: Partial<Record<LevelUpType, { building: Building; progress: number }>>;
   /** Round-robin counter so units leave from each building of a type in turn. */
   spawnTurn: Record<Producer, number>;
 }
@@ -68,7 +70,7 @@ export class Game {
     this.teams = ([0, 1] as Team[]).map((team) => ({
       team, credits: START_CREDITS, upgrades: new Set<UpgradeType>(),
       building: null, queues: { barracks: [], factory: [] }, research: null,
-      rally: { barracks: null, factory: null }, spawnTurn: { barracks: 0, factory: 0 },
+      rally: { barracks: null, factory: null }, spawnTurn: { barracks: 0, factory: 0 }, levelUps: {},
     }));
     this.setupStart();
   }
@@ -101,8 +103,22 @@ export class Game {
     return n;
   }
 
-  requirementsMet(team: Team, reqs: BuildingType[]): boolean {
-    return reqs.every((r) => this.has(team, r));
+  /** Whether a requirement is satisfied: the building exists (at level 2 for 'conyard2' / 'factory2'). */
+  meets(team: Team, r: Req): boolean {
+    if (r === 'conyard2' || r === 'factory2') {
+      const type = r === 'conyard2' ? 'conyard' : 'factory';
+      return this.buildings.some((b) => b.team === team && b.type === type && b.level >= 2 && !b.dead);
+    }
+    return this.has(team, r);
+  }
+
+  requirementsMet(team: Team, reqs: Req[]): boolean {
+    return reqs.every((r) => this.meets(team, r));
+  }
+
+  /** A level-1 building of this type exists, nobody of that type is level 2, and none is mid-upgrade. */
+  canLevelUp(team: Team, type: LevelUpType): boolean {
+    return !this.teams[team].levelUps[type] && !this.meets(team, `${type}2`) && this.has(team, type);
   }
 
   canBuild(team: Team, type: BuildingType): boolean {
@@ -347,6 +363,27 @@ export class Game {
     return true;
   }
 
+  startLevelUp(team: Team, type: LevelUpType): boolean {
+    const ts = this.teams[team];
+    const building = this.buildings.find((b) => b.team === team && b.type === type && b.level < 2 && !b.dead);
+    if (!building || !this.canLevelUp(team, type)) return false;
+    const cost = BUILDINGS[type].levelUp!.cost;
+    if (ts.credits < cost) {
+      this.notify(team, 'Insufficient funds.');
+      return false;
+    }
+    ts.credits -= cost;
+    ts.levelUps[type] = { building, progress: 0 };
+    return true;
+  }
+
+  cancelLevelUp(team: Team, type: LevelUpType): void {
+    const ts = this.teams[team];
+    if (!ts.levelUps[type]) return;
+    ts.credits += BUILDINGS[type].levelUp!.cost;
+    delete ts.levelUps[type];
+  }
+
   cancelResearch(team: Team): void {
     const ts = this.teams[team];
     if (!ts.research) return;
@@ -376,6 +413,21 @@ export class Game {
           this.spawnFromProducer(ts.team, q.type);
           this.notify(ts.team, `${UNITS[q.type].name} ready.`);
         }
+      }
+    }
+    for (const type of LEVEL_UP_ORDER) {
+      const l = ts.levelUps[type];
+      if (!l) continue;
+      if (l.building.dead) {
+        delete ts.levelUps[type]; // lost with the building
+        continue;
+      }
+      const up = BUILDINGS[type].levelUp!;
+      l.progress += dt / up.time;
+      if (l.progress >= 1) {
+        l.building.setLevel(2);
+        delete ts.levelUps[type];
+        this.notify(ts.team, `${up.name} complete.`);
       }
     }
     const r = ts.research;

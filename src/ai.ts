@@ -1,7 +1,9 @@
-import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type Producer, type Team, type UnitType, type UpgradeType } from './config';
+import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType } from './config';
 import { Building, type Unit } from './entities';
 import type { Game } from './game';
 import type { Cell } from './map';
+
+const RESEARCH_ORDER: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
 
 /** A simple scripted opponent: builds an economy, trains counters to the enemy army, raids and attacks in waves. */
 export class AI {
@@ -11,6 +13,8 @@ export class AI {
   /** Unit we're saving up for, so expensive units still get built. */
   private nextUnit: UnitType | null = null;
   private nextRaidTime = 200;
+  /** Tech path for this game: economy and anti-armor first, or heavy army first. */
+  private readonly techOrder: LevelUpType[] = Math.random() < 0.5 ? ['conyard', 'factory'] : ['factory', 'conyard'];
 
   constructor(private game: Game, private team: Team) {}
 
@@ -20,8 +24,32 @@ export class AI {
     this.thinkTimer = 1;
     this.manageConstruction();
     this.manageProduction();
-    this.manageResearch();
+    this.manageTech();
     this.manageArmy();
+  }
+
+  /** Buys the next tech step once we can afford it. */
+  private manageTech(): void {
+    const goal = this.techGoal();
+    if (!goal || this.ts.credits < goal.cost) return;
+    if (goal.kind === 'level') this.game.startLevelUp(this.team, goal.type);
+    else this.game.startResearch(this.team, goal.type);
+  }
+
+  /** The next tech step worth saving for: a level-up along our path (one at a time), else research. */
+  private techGoal(): { kind: 'level'; type: LevelUpType; cost: number } | { kind: 'research'; type: UpgradeType; cost: number } | null {
+    const g = this.game;
+    const ts = this.ts;
+    if (!g.has(this.team, 'factory') || g.count(this.team, 'refinery') < 2) return null;
+    if (!ts.levelUps.conyard && !ts.levelUps.factory) {
+      const level = this.techOrder.find((t) => g.canLevelUp(this.team, t));
+      if (level) return { kind: 'level', type: level, cost: BUILDINGS[level].levelUp!.cost };
+    }
+    if (!ts.research) {
+      const research = RESEARCH_ORDER.find((u) => g.canResearch(this.team, u));
+      if (research) return { kind: 'research', type: research, cost: UPGRADES[research].cost };
+    }
+    return null;
   }
 
   private get ts() {
@@ -60,8 +88,9 @@ export class AI {
     const full = (p: Producer) => ts.queues[p].length >= g.activeLines(this.team, p) + 1;
     const harvesters = g.count(this.team, 'harvester') + ts.queues.factory.filter((q) => q.type === 'harvester').length;
     const refineries = g.count(this.team, 'refinery');
-    // Keep money aside for a second refinery early on.
-    const reserve = refineries < 2 ? 800 : 0;
+    // Keep money aside for a second refinery early on; later, once there's a decent army, save for the next tech step.
+    const army = g.units.filter((u) => u.team === this.team && u.def.weapon).length;
+    const reserve = refineries < 2 ? 800 : army >= 8 ? (this.techGoal()?.cost ?? 0) : 0;
     if (harvesters < refineries && g.canTrain(this.team, 'harvester')) {
       if (!full('factory') && ts.credits >= UNITS.harvester.cost) g.queueUnit(this.team, 'harvester');
       return;
@@ -87,20 +116,14 @@ export class AI {
       ['tank', 1 + value.trike + value.rocket],
       ['rocket', 0.6 + value.infantry],
     ];
-    let r = Math.random() * weights.reduce((sum, [, w]) => sum + w, 0);
-    for (const [type, w] of weights) {
+    const options = weights.filter(([t]) => g.requirementsMet(this.team, UNITS[t].requires));
+    if (options.length === 0) return 'infantry';
+    let r = Math.random() * options.reduce((sum, [, w]) => sum + w, 0);
+    for (const [type, w] of options) {
       r -= w;
       if (r <= 0) return type;
     }
-    return 'tank';
-  }
-
-  private manageResearch(): void {
-    const g = this.game;
-    if (this.ts.research) return;
-    const order: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
-    const next = order.find((u) => g.canResearch(this.team, u));
-    if (next && this.ts.credits >= UPGRADES[next].cost + 400) g.startResearch(this.team, next);
+    return options[0][0];
   }
 
   private manageArmy(): void {

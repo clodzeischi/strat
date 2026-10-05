@@ -17,6 +17,11 @@ export type BuildingType = 'conyard' | 'refinery' | 'barracks' | 'factory';
 export type Producer = 'barracks' | 'factory';
 export const PRODUCERS: Producer[] = ['barracks', 'factory'];
 export const QUEUE_MAX = 5; // per producer type
+/** Buildings that can be upgraded to level 2 to unlock more tech. */
+export type LevelUpType = 'conyard' | 'factory';
+export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory'];
+/** A tech requirement: a building, or a level-2 Construction Yard / Factory. */
+export type Req = BuildingType | 'conyard2' | 'factory2';
 export type UpgradeType = 'weapons1' | 'weapons2' | 'armor1' | 'armor2' | 'rockets' | 'nitro' | 'harvest';
 /** StarCraft-style attributes. Weapons deal bonus (or reduced) damage against specific tags. */
 export type Tag = 'biological' | 'mechanical' | 'light' | 'armored' | 'structure';
@@ -49,7 +54,7 @@ export interface UnitDef {
   weapon: WeaponDef | null;
   /** Used instead of `weapon` against Armored targets once the Infantry Rockets upgrade is done. */
   antiArmor?: WeaponDef;
-  requires: BuildingType[];
+  requires: Req[];
   desc: string;
 }
 
@@ -60,8 +65,9 @@ export interface BuildingDef {
   buildTime: number;
   hp: number;
   size: number; // footprint in tiles (square)
-  requires: BuildingType[];
+  requires: Req[];
   desc: string;
+  levelUp?: { name: string; short: string; cost: number; time: number; desc: string };
 }
 
 export interface UpgradeDef {
@@ -69,7 +75,7 @@ export interface UpgradeDef {
   short: string; // label on the research card
   cost: number;
   time: number;
-  requires: BuildingType[];
+  requires: Req[];
   after?: UpgradeType; // previous tier that must be researched first
   desc: string;
 }
@@ -105,7 +111,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   },
   rocket: {
     name: 'Rocket Launcher', producer: 'factory', cost: 500, buildTime: 11, hp: 200, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
-    turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory'],
+    turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory2'],
     weapon: { range: 17, minRange: 6, damage: 40, bonus: { biological: 35, structure: 35 }, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 2.5 },
     desc: 'Long-range artillery. Devastating vs infantry and buildings. Fragile and can\'t fire up close.',
   },
@@ -115,6 +121,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   conyard: {
     name: 'Construction Yard', short: 'Const. Yard', cost: 2500, buildTime: 25, hp: 1600, size: 3, requires: [],
     desc: 'Builds structures, one at a time. Lose all of these and you cannot build.',
+    levelUp: { name: 'HQ Level 2', short: 'HQ Level 2', cost: 1500, time: 45, desc: 'Upgrades a Construction Yard. Unlocks Harvesting and Infantry Rockets.' },
   },
   refinery: {
     name: 'Refinery', short: 'Refinery', cost: 1200, buildTime: 14, hp: 1000, size: 3, requires: [],
@@ -125,20 +132,28 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     desc: 'Trains infantry. Each Barracks adds a production line.',
   },
   factory: {
-    name: 'Factory', short: 'Factory', cost: 1000, buildTime: 14, hp: 1100, size: 3, requires: ['refinery'],
+    name: 'Factory', short: 'Factory', cost: 1000, buildTime: 14, hp: 1100, size: 3, requires: ['refinery', 'barracks'],
     desc: 'Builds vehicles. Each Factory adds a production line.',
+    levelUp: { name: 'Factory Level 2', short: 'Factory Lv 2', cost: 1200, time: 40, desc: 'Upgrades a Factory. Unlocks Rocket Launchers, Weapons II and Armor II.' },
   },
 };
 
 export const UPGRADES: Record<UpgradeType, UpgradeDef> = {
   weapons1: { name: 'Weapons I', short: 'Weapons I', cost: 700, time: 25, requires: ['factory'], desc: '+20% damage for all units.' },
-  weapons2: { name: 'Weapons II', short: 'Weapons II', cost: 1200, time: 35, requires: ['factory'], after: 'weapons1', desc: '+40% damage for all units (total).' },
+  weapons2: { name: 'Weapons II', short: 'Weapons II', cost: 1200, time: 45, requires: ['factory2'], after: 'weapons1', desc: '+40% damage for all units (total).' },
   armor1: { name: 'Armor I', short: 'Armor I', cost: 700, time: 25, requires: ['factory'], desc: 'Units and buildings take 15% less damage.' },
-  armor2: { name: 'Armor II', short: 'Armor II', cost: 1200, time: 35, requires: ['factory'], after: 'armor1', desc: 'Units and buildings take 30% less damage (total).' },
-  rockets: { name: 'Infantry Rockets', short: 'Inf. Rockets', cost: 600, time: 20, requires: ['barracks'], desc: 'Infantry switch to rocket launchers against Armored targets.' },
+  armor2: { name: 'Armor II', short: 'Armor II', cost: 1200, time: 45, requires: ['factory2'], after: 'armor1', desc: 'Units and buildings take 30% less damage (total).' },
+  rockets: { name: 'Infantry Rockets', short: 'Inf. Rockets', cost: 600, time: 25, requires: ['conyard2', 'barracks'], desc: 'Infantry switch to rocket launchers against Armored targets.' },
   nitro: { name: 'Trike Nitro', short: 'Trike Nitro', cost: 500, time: 20, requires: ['factory'], desc: 'Trikes move 40% faster and fire 50% faster.' },
-  harvest: { name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['factory', 'refinery'], desc: 'Harvesters carry 20% more and move 20% faster.' },
+  harvest: { name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['conyard2', 'refinery'], desc: 'Harvesters carry 20% more and move 20% faster.' },
 };
+
+/** Display name for a requirement. */
+export function reqName(r: Req): string {
+  if (r === 'conyard2') return BUILDINGS.conyard.levelUp!.name;
+  if (r === 'factory2') return BUILDINGS.factory.levelUp!.name;
+  return BUILDINGS[r].name;
+}
 
 /** Upgrade effects. */
 export const WEAPONS_BONUS = 0.2; // damage per Weapons tier

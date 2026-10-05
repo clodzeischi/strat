@@ -5,7 +5,7 @@ import {
 } from './config';
 import type { Game } from './game';
 import { SPICE, type Cell } from './map';
-import { makeBuildingModel, makeUnitModel } from './models';
+import { disposeParts, makeBuildingModel, makeLevelKit, makeUnitModel, makeUpgradeKit } from './models';
 import { findPath, type Point } from './pathfinding';
 
 const barGeo = new THREE.PlaneGeometry(1, 1);
@@ -96,6 +96,7 @@ export class Building extends Entity {
   readonly radius: number;
   readonly size: number;
   readonly spinner: THREE.Object3D | null;
+  level = 1;
 
   constructor(id: number, team: Team, readonly type: BuildingType, readonly cx: number, readonly cz: number, groundY: number) {
     const def = BUILDINGS[type];
@@ -113,7 +114,12 @@ export class Building extends Entity {
   }
 
   get name(): string {
-    return this.def.name;
+    return this.level >= 2 && this.def.levelUp ? this.def.levelUp.name : this.def.name;
+  }
+
+  setLevel(level: number): void {
+    this.level = level;
+    if (level >= 2) this.root.add(makeLevelKit(this.type, TEAM_COLORS[this.team]));
   }
 
   /** Cell in front of the building where units exit / harvesters dock. */
@@ -142,6 +148,8 @@ export class Unit extends Entity {
   path: Point[] = [];
   private body: THREE.Group;
   private turret: THREE.Group | null;
+  /** Parts showing researched upgrades, rebuilt when the team's upgrades change. */
+  private kit: { key: string; body: THREE.Group; turret: THREE.Group } | null = null;
   private muzzle: THREE.Object3D;
   private cooldown = 0;
   private scanTimer = Math.random() * 0.5;
@@ -491,7 +499,31 @@ export class Unit extends Entity {
     }
   }
 
+  private refreshKit(game: Game): void {
+    const ts = game.teams[this.team];
+    const look = {
+      weapons: game.tier(this.team, 'weapons'),
+      armor: game.tier(this.team, 'armor'),
+      rockets: ts.upgrades.has('rockets'),
+      nitro: ts.upgrades.has('nitro'),
+      harvest: ts.upgrades.has('harvest'),
+    };
+    const key = `${look.weapons}${look.armor}${+look.rockets}${+look.nitro}${+look.harvest}`;
+    if (this.kit?.key === key) return;
+    if (this.kit) {
+      this.kit.body.removeFromParent();
+      this.kit.turret.removeFromParent();
+      disposeParts(this.kit.body);
+      disposeParts(this.kit.turret);
+    }
+    const parts = makeUpgradeKit(this.type, look, TEAM_COLORS[this.team]);
+    this.body.add(parts.body);
+    (this.turret ?? this.body).add(parts.turret);
+    this.kit = { key, ...parts };
+  }
+
   syncVisual(game: Game, dt: number): void {
+    this.refreshKit(game);
     const groundY = game.map.heightAt(this.x, this.z);
     this.y += (groundY - this.y) * Math.min(1, dt * 10);
     this.root.position.set(this.x, this.y, this.z);

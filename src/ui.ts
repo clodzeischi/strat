@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import type { RTSCamera } from './camera';
 import {
-  BUILDING_ORDER, BUILDINGS, PLAYER, TEAM_CSS, TILE, UNIT_ORDER, UNITS, UPGRADE_ORDER, UPGRADES,
-  type BuildingType, type UnitType, type UpgradeType, type WeaponDef,
+  BUILDING_ORDER, BUILDINGS, LEVEL_UP_ORDER, PLAYER, TEAM_CSS, TILE, UNIT_ORDER, UNITS, UPGRADE_ORDER, UPGRADES,
+  reqName, type BuildingType, type LevelUpType, type Req, type UnitType, type UpgradeType, type WeaponDef,
 } from './config';
 import type { Game } from './game';
 import type { Input } from './input';
@@ -37,6 +37,10 @@ const ICONS: Record<BuildingType | UnitType | UpgradeType, string> = {
   harvest: `<rect x="6" y="18" width="28" height="14" fill="#d08a3a"/><polygon points="20,4 30,16 24,16 24,22 16,22 16,16 10,16" fill="#7cff7c"/>`,
 };
 
+/** Green chevrons over the building icon mark a level-2 upgrade. */
+const CHEVRON = `<polyline points="26,14 32,8 38,14" fill="none" stroke="#7cff7c" stroke-width="2.5"/><polyline points="26,20 32,14 38,20" fill="none" stroke="#7cff7c" stroke-width="2.5"/>`;
+const ALL_ICONS = { ...ICONS, conyard2: ICONS.conyard + CHEVRON, factory2: ICONS.factory + CHEVRON };
+
 const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
 
 function weaponLine(w: WeaponDef): string {
@@ -45,8 +49,10 @@ function weaponLine(w: WeaponDef): string {
   return `Damage ${w.damage}${bonus ? ` (${bonus})` : ''}  Range ${range} tiles`;
 }
 
-function icon(key: keyof typeof ICONS): string {
-  return `<svg viewBox="0 0 40 40" style="color:${TEAM_CSS[PLAYER]}">${ICONS[key]}</svg>`;
+const reqList = (reqs: Req[]) => reqs.map(reqName).join(', ');
+
+function icon(key: keyof typeof ALL_ICONS): string {
+  return `<svg viewBox="0 0 40 40" style="color:${TEAM_CSS[PLAYER]}">${ALL_ICONS[key]}</svg>`;
 }
 
 interface Card {
@@ -84,6 +90,10 @@ export class Sidebar {
     const upgradeCol = document.getElementById('col-upgrades')!;
     for (const t of BUILDING_ORDER) buildCol.appendChild(this.makeCard(`b:${t}`, t, BUILDINGS[t].short, BUILDINGS[t].cost, this.tooltipBuilding(t)));
     for (const t of UNIT_ORDER) unitCol.appendChild(this.makeCard(`u:${t}`, t, UNITS[t].name, UNITS[t].cost, this.tooltipUnit(t)));
+    for (const t of LEVEL_UP_ORDER) {
+      const up = BUILDINGS[t].levelUp!;
+      upgradeCol.appendChild(this.makeCard(`l:${t}`, `${t}2`, up.short, up.cost, `${up.name} ($${up.cost})\n${up.desc}\nRight-click to cancel.`));
+    }
     for (const t of UPGRADE_ORDER) upgradeCol.appendChild(this.makeCard(`g:${t}`, t, UPGRADES[t].short, UPGRADES[t].cost, this.tooltipUpgrade(t)));
 
     this.setupMinimapInput();
@@ -101,7 +111,7 @@ export class Sidebar {
 
   // ---- Cards -------------------------------------------------------------------
 
-  private makeCard(key: string, type: keyof typeof ICONS, name: string, cost: number, tip: string): HTMLElement {
+  private makeCard(key: string, type: keyof typeof ALL_ICONS, name: string, cost: number, tip: string): HTMLElement {
     const el = document.createElement('div');
     el.className = 'card';
     el.title = tip;
@@ -141,6 +151,9 @@ export class Sidebar {
       const t = type as UpgradeType;
       if (ts.research && ts.research.type !== t) this.showMessage(`Already researching ${UPGRADES[ts.research.type].name}.`);
       else if (!ts.research) g.startResearch(PLAYER, t);
+    } else if (kind === 'l') {
+      const t = type as LevelUpType;
+      if (!ts.levelUps[t]) g.startLevelUp(PLAYER, t);
     }
   }
 
@@ -155,12 +168,14 @@ export class Sidebar {
       g.dequeueUnit(PLAYER, type as UnitType);
     } else if (kind === 'g' && ts.research?.type === type) {
       g.cancelResearch(PLAYER);
+    } else if (kind === 'l') {
+      g.cancelLevelUp(PLAYER, type as LevelUpType);
     }
   }
 
   private tooltipBuilding(t: BuildingType): string {
     const d = BUILDINGS[t];
-    const req = d.requires.length ? `\nRequires: ${d.requires.map((r) => BUILDINGS[r].name).join(', ')}` : '';
+    const req = d.requires.length ? `\nRequires: ${reqList(d.requires)}` : '';
     return `${d.name} ($${d.cost})\n${d.desc}\nHP ${d.hp}${req}\nRight-click to cancel.`;
   }
 
@@ -174,19 +189,21 @@ export class Sidebar {
 
   private tooltipUpgrade(t: UpgradeType): string {
     const d = UPGRADES[t];
-    const reqs = [...d.requires.map((r) => BUILDINGS[r].name), ...(d.after ? [UPGRADES[d.after].name] : [])];
-    return `${d.name} upgrade ($${d.cost})\n${d.desc}\nRequires: ${reqs.join(', ')}`;
+    const after = d.after ? `, ${UPGRADES[d.after].name}` : '';
+    return `${d.name} upgrade ($${d.cost})\n${d.desc}\nRequires: ${reqList(d.requires)}${after}`;
   }
 
-  private setCard(key: string, opts: { disabled: boolean; progress: number | null; badge: string; status: string; extra: string; cost: number }): void {
+  /** Hidden cards are ones not yet unlocked or already finished. */
+  private setCard(key: string, opts: { hidden: boolean; disabled: boolean; progress: number | null; badge: string; status: string; extra: string; cost: number }): void {
     const c = this.cards.get(key)!;
     const ts = this.game.teams[PLAYER];
     const poor = ts.credits < opts.cost;
     const p = opts.progress === null ? -1 : Math.floor(opts.progress * 72);
-    const state = `${opts.disabled}|${p}|${opts.badge}|${opts.status}|${opts.extra}|${poor}`;
+    const state = `${opts.hidden}|${opts.disabled}|${p}|${opts.badge}|${opts.status}|${opts.extra}|${poor}`;
     if (state === c.state) return;
     c.state = state;
     c.el.className = `card${opts.disabled ? ' disabled' : ''}${opts.extra ? ` ${opts.extra}` : ''}`;
+    c.el.style.display = opts.hidden ? 'none' : '';
     c.cost.classList.toggle('poor', poor);
     if (opts.progress === null) {
       c.wipe.style.display = 'none';
@@ -216,6 +233,7 @@ export class Sidebar {
       const b = ts.building;
       const mine = b?.type === t;
       this.setCard(`b:${t}`, {
+        hidden: !mine && !g.requirementsMet(PLAYER, BUILDINGS[t].requires),
         disabled: !g.canBuild(PLAYER, t) || (!!b && !mine),
         progress: mine && !b!.ready ? b!.progress : null,
         badge: '',
@@ -231,6 +249,7 @@ export class Sidebar {
       const queued = queue.filter((q) => q.type === t).length;
       const building = queue.slice(0, lines).filter((q) => q.type === t);
       this.setCard(`u:${t}`, {
+        hidden: !queued && !g.requirementsMet(PLAYER, UNITS[t].requires),
         disabled: !g.canTrain(PLAYER, t),
         progress: queued ? Math.max(0, ...building.map((q) => q.progress)) : null,
         badge: queued > 1 ? `${queued}` : '',
@@ -239,17 +258,29 @@ export class Sidebar {
         cost: UNITS[t].cost,
       });
     }
+    for (const t of LEVEL_UP_ORDER) {
+      const l = ts.levelUps[t];
+      this.setCard(`l:${t}`, {
+        hidden: !l && !g.canLevelUp(PLAYER, t),
+        disabled: false,
+        progress: l ? l.progress : null,
+        badge: '',
+        status: '',
+        extra: '',
+        cost: BUILDINGS[t].levelUp!.cost,
+      });
+    }
     for (const t of UPGRADE_ORDER) {
-      const done = ts.upgrades.has(t);
       const r = ts.research;
       const mine = r?.type === t;
       this.setCard(`g:${t}`, {
-        disabled: !done && (!g.canResearch(PLAYER, t) || (!!r && !mine)),
+        hidden: !mine && !g.canResearch(PLAYER, t),
+        disabled: !!r && !mine,
         progress: mine ? r!.progress : null,
         badge: '',
-        status: done ? 'DONE' : '',
-        extra: done ? 'done' : '',
-        cost: done ? 0 : UPGRADES[t].cost,
+        status: '',
+        extra: '',
+        cost: UPGRADES[t].cost,
       });
     }
 
