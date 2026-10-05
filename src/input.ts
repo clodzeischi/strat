@@ -222,8 +222,8 @@ export class Input {
 
     if (units.length === 0) {
       const b = this.selection[0];
-      if (b instanceof Building && b.team === PLAYER && b.type === 'factory') {
-        g.teams[PLAYER].rally = { x: point.x, z: point.z };
+      if (b instanceof Building && b.team === PLAYER && (b.type === 'factory' || b.type === 'barracks')) {
+        g.teams[PLAYER].rally[b.type] = { x: point.x, z: point.z };
         g.effects.marker(point, 0x7cff7c);
         g.onMessage('Rally point set.');
       }
@@ -389,7 +389,7 @@ export class Input {
       const e = sel[0];
       text = `${e.name}  ${Math.ceil(e.hp)} / ${e.maxHp}`;
       if (e instanceof Unit && e.type === 'harvester') text += `   Spice: ${Math.floor(e.cargo)}`;
-      if (e instanceof Building && e.type === 'factory' && e.team === PLAYER) text += '   Right-click to set a rally point';
+      if (e instanceof Building && (e.type === 'factory' || e.type === 'barracks') && e.team === PLAYER) text += '   Right-click to set a rally point';
     } else if (sel.length > 1) {
       const counts = new Map<string, number>();
       for (const e of sel) counts.set(e.name, (counts.get(e.name) ?? 0) + 1);

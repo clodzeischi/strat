@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import {
-  BUILDINGS, DAMAGE_MOD, PLAYER, START_CREDITS, TILE, UNITS, UPGRADES,
-  type BuildingType, type ProjectileKind, type Team, type UnitType, type UpgradeType,
+  ARMOR_BONUS, BUILDINGS, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
+  type Producer,
+  type BuildingType, type ProjectileKind, type Team,
+  type WeaponDef, type UnitType, type UpgradeType,
 } from './config';
 import { Effects } from './effects';
 import { Building, distTo, Unit, type Entity } from './entities';
@@ -16,9 +18,12 @@ export interface TeamState {
   upgrades: Set<UpgradeType>;
   /** The one structure being built at the Construction Yard. */
   building: { type: BuildingType; progress: number; ready: boolean } | null;
-  unitQueue: { type: UnitType; progress: number }[];
+  /** One queue per producer type. The first N items build in parallel, N = buildings of that type. */
+  queues: Record<Producer, { type: UnitType; progress: number }[]>;
   research: { type: UpgradeType; progress: number } | null;
-  rally: Point | null;
+  rally: Record<Producer, Point | null>;
+  /** Round-robin counter so units leave from each building of a type in turn. */
+  spawnTurn: Record<Producer, number>;
 }
 
 interface Projectile {
@@ -30,8 +35,9 @@ interface Projectile {
   owner: Unit;
   t: number;
   duration: number;
-  damage: number;
-  splash: number;
+  weapon: WeaponDef;
+  /** Attacker's damage multiplier at the moment of firing (Weapons upgrade). */
+  mult: number;
   trailTimer: number;
 }
 
@@ -61,7 +67,8 @@ export class Game {
     this.effects = new Effects(scene);
     this.teams = ([0, 1] as Team[]).map((team) => ({
       team, credits: START_CREDITS, upgrades: new Set<UpgradeType>(),
-      building: null, unitQueue: [], research: null, rally: null,
+      building: null, queues: { barracks: [], factory: [] }, research: null,
+      rally: { barracks: null, factory: null }, spawnTurn: { barracks: 0, factory: 0 },
     }));
     this.setupStart();
   }
@@ -103,21 +110,44 @@ export class Game {
   }
 
   canTrain(team: Team, type: UnitType): boolean {
-    return this.has(team, 'factory') && this.requirementsMet(team, UNITS[type].requires);
+    return this.has(team, UNITS[type].producer) && this.requirementsMet(team, UNITS[type].requires);
   }
 
   canResearch(team: Team, type: UpgradeType): boolean {
-    return !this.teams[team].upgrades.has(type) && this.requirementsMet(team, UPGRADES[type].requires);
+    const d = UPGRADES[type];
+    const ups = this.teams[team].upgrades;
+    return !ups.has(type) && (!d.after || ups.has(d.after)) && this.requirementsMet(team, d.requires);
   }
 
-  nearestEnemy(team: Team, x: number, z: number, range: number): Entity | null {
+  /** Researched tier (0-2) of a two-tier upgrade line. */
+  tier(team: Team, line: 'weapons' | 'armor'): number {
+    const ups = this.teams[team].upgrades;
+    return ups.has(`${line}2`) ? 2 : ups.has(`${line}1`) ? 1 : 0;
+  }
+
+  /** Seconds between shots for this unit's weapon, after upgrades. */
+  cooldownFor(u: Unit, w: WeaponDef): number {
+    return w.cooldown * (u.type === 'trike' && this.teams[u.team].upgrades.has('nitro') ? NITRO.cooldown : 1);
+  }
+
+  /**
+   * Best enemy within range of a point. When `seeker` is given, targets it counters are preferred
+   * and ones inside its minimum range are avoided.
+   */
+  nearestEnemy(team: Team, x: number, z: number, range: number, seeker?: Unit): Entity | null {
     let best: Entity | null = null;
     let bestScore = Infinity;
     const consider = (e: Entity, penalty: number) => {
       if (e.team === team || e.dead) return;
       const d = distTo(e, x, z);
       if (d > range) return;
-      const score = d + penalty;
+      let score = d + penalty;
+      const w = seeker && this.weaponFor(seeker, e);
+      if (w) {
+        const ratio = THREE.MathUtils.clamp(weaponDamage(w, e) / w.damage - 1, -1, 2);
+        score -= ratio * 4;
+        if (d < w.minRange) score += 30;
+      }
       if (score < bestScore) {
         bestScore = score;
         best = e;
@@ -212,17 +242,20 @@ export class Game {
     return b;
   }
 
-  private spawnFromFactory(team: Team, type: UnitType): void {
-    const factory = this.buildings.find((b) => b.team === team && b.type === 'factory' && !b.dead);
-    if (!factory) return;
-    const front = factory.frontCell();
+  private spawnFromProducer(team: Team, type: UnitType): void {
+    const producer = UNITS[type].producer;
+    const sites = this.buildings.filter((b) => b.team === team && b.type === producer && !b.dead);
+    if (sites.length === 0) return;
+    const ts = this.teams[team];
+    const site = sites[ts.spawnTurn[producer]++ % sites.length];
+    const front = site.frontCell();
     const cell = this.map.nearestPassable(front.cx, front.cz) ?? front;
     const u = this.spawnUnit(type, team, this.map.center(cell.cx), this.map.center(cell.cz), Math.PI / 2);
     if (type === 'harvester') {
       u.commandHarvest(this, null);
       return;
     }
-    const rally = this.teams[team].rally;
+    const rally = ts.rally[producer];
     if (rally) {
       u.command(this, { kind: 'move', x: rally.x, z: rally.z });
     } else {
@@ -233,6 +266,11 @@ export class Game {
   }
 
   // ---- Production -----------------------------------------------------------
+
+  /** Number of queue items that build at once for a producer type. */
+  activeLines(team: Team, p: Producer): number {
+    return this.count(team, p);
+  }
 
   private notify(team: Team, text: string): void {
     if (team === PLAYER) this.onMessage(text);
@@ -269,19 +307,24 @@ export class Game {
 
   queueUnit(team: Team, type: UnitType): boolean {
     const ts = this.teams[team];
-    if (!this.canTrain(team, type) || ts.unitQueue.length >= 10) return false;
+    const queue = ts.queues[UNITS[type].producer];
+    if (!this.canTrain(team, type)) return false;
+    if (queue.length >= QUEUE_MAX) {
+      this.notify(team, 'Production queue full.');
+      return false;
+    }
     const cost = UNITS[type].cost;
     if (ts.credits < cost) {
       this.notify(team, 'Insufficient funds.');
       return false;
     }
     ts.credits -= cost;
-    ts.unitQueue.push({ type, progress: 0 });
+    queue.push({ type, progress: 0 });
     return true;
   }
 
   dequeueUnit(team: Team, type: UnitType): void {
-    const q = this.teams[team].unitQueue;
+    const q = this.teams[team].queues[UNITS[type].producer];
     for (let i = q.length - 1; i >= 0; i--) {
       if (q[i].type === type) {
         q.splice(i, 1);
@@ -321,13 +364,18 @@ export class Game {
         this.notify(ts.team, 'Construction complete. Click the card to place it.');
       }
     }
-    const q = ts.unitQueue[0];
-    if (q && this.canTrain(ts.team, q.type)) {
-      q.progress += dt / UNITS[q.type].buildTime;
-      if (q.progress >= 1) {
-        ts.unitQueue.shift();
-        this.spawnFromFactory(ts.team, q.type);
-        this.notify(ts.team, `${UNITS[q.type].name} ready.`);
+    for (const p of PRODUCERS) {
+      const queue = ts.queues[p];
+      const lines = this.activeLines(ts.team, p);
+      for (let i = 0; i < queue.length && i < lines; i++) {
+        const q = queue[i];
+        if (!this.canTrain(ts.team, q.type)) continue;
+        q.progress += dt / UNITS[q.type].buildTime;
+        if (q.progress >= 1) {
+          queue.splice(i--, 1);
+          this.spawnFromProducer(ts.team, q.type);
+          this.notify(ts.team, `${UNITS[q.type].name} ready.`);
+        }
       }
     }
     const r = ts.research;
@@ -343,9 +391,15 @@ export class Game {
 
   // ---- Combat ---------------------------------------------------------------
 
-  fire(u: Unit, target: Entity): void {
-    const w = u.def.weapon!;
-    const damage = w.damage * (this.teams[u.team].upgrades.has('weapons') ? 1.3 : 1);
+  /** The weapon a unit uses against this target: Infantry Rockets swap in against Armored. */
+  weaponFor(u: Unit, target: Entity): WeaponDef | null {
+    const anti = u.def.antiArmor;
+    if (anti && target.tags.includes('armored') && this.teams[u.team].upgrades.has('rockets')) return anti;
+    return u.def.weapon;
+  }
+
+  fire(u: Unit, target: Entity, w: WeaponDef): void {
+    const mult = 1 + WEAPONS_BONUS * this.tier(u.team, 'weapons');
     const from = u.muzzleWorld();
     const to = target.aimPoint();
     this.effects.flash(from, w.projectile === 'bullet' ? 0.15 : 0.35);
@@ -353,7 +407,7 @@ export class Game {
       to.x += (Math.random() - 0.5) * 0.5;
       to.z += (Math.random() - 0.5) * 0.5;
       this.effects.tracer(from, to);
-      this.damage(target, damage, u, 'bullet');
+      this.damage(target, w, mult, u);
       return;
     }
     const mesh = new THREE.Mesh(w.projectile === 'shell' ? shellGeo : rocketGeo, mat(w.projectile === 'shell' ? 0x403020 : 0xeeeeee));
@@ -361,7 +415,7 @@ export class Game {
     this.scene.add(mesh);
     this.projectiles.push({
       kind: w.projectile, mesh, start: from, end: to, target, owner: u, t: 0,
-      duration: Math.max(0.1, from.distanceTo(to) / w.speed), damage, splash: w.splash, trailTimer: 0,
+      duration: Math.max(0.1, from.distanceTo(to) / w.speed), weapon: w, mult, trailTimer: 0,
     });
   }
 
@@ -384,14 +438,15 @@ export class Game {
         }
       }
       if (p.t >= 1) {
-        this.effects.explosion(p.end, p.kind === 'rocket' ? 1.3 : 0.6);
-        if (p.splash > 0) {
+        const splash = p.weapon.splash;
+        this.effects.explosion(p.end, splash > 0 ? 1.3 : p.kind === 'rocket' ? 0.8 : 0.6);
+        if (splash > 0) {
           const victims = [...this.units, ...this.buildings].filter(
-            (e) => e.team !== p.owner.team && !e.dead && distTo(e, p.end.x, p.end.z) <= p.splash,
+            (e) => e.team !== p.owner.team && !e.dead && distTo(e, p.end.x, p.end.z) <= splash,
           );
-          for (const v of victims) this.damage(v, p.damage, p.owner, p.kind);
+          for (const v of victims) this.damage(v, p.weapon, p.mult, p.owner);
         } else if (!p.target.dead) {
-          this.damage(p.target, p.damage, p.owner, p.kind);
+          this.damage(p.target, p.weapon, p.mult, p.owner);
         }
         this.scene.remove(p.mesh);
         this.projectiles.splice(i, 1);
@@ -399,11 +454,10 @@ export class Game {
     }
   }
 
-  damage(target: Entity, amount: number, attacker: Unit | null, kind: ProjectileKind): void {
+  damage(target: Entity, w: WeaponDef, mult: number, attacker: Unit | null): void {
     if (target.dead) return;
-    const cls = target instanceof Building ? 'building' : (target as Unit).def.infantry ? 'infantry' : 'vehicle';
-    let dmg = amount * DAMAGE_MOD[kind][cls];
-    if (this.teams[target.team].upgrades.has('armor')) dmg *= 0.75;
+    let dmg = weaponDamage(w, target) * mult;
+    dmg *= 1 - ARMOR_BONUS * this.tier(target.team, 'armor');
     target.hp -= dmg;
     if (target instanceof Unit) target.onDamaged(attacker);
     const important = target instanceof Building || (target as Unit).type === 'harvester';
@@ -494,4 +548,11 @@ export class Game {
     if (inBlocked || m.passable(m.cellOf(u.x + dx), m.cellOf(u.z))) u.x += dx;
     if (inBlocked || m.passable(m.cellOf(u.x), m.cellOf(u.z + dz))) u.z += dz;
   }
+}
+
+/** Base damage plus the weapon's bonus for each of the target's tags, before upgrades. */
+export function weaponDamage(w: WeaponDef, target: Entity): number {
+  let dmg = w.damage;
+  for (const t of target.tags) dmg += w.bonus[t] ?? 0;
+  return Math.max(1, dmg);
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
-  BUILDINGS, HARVESTER, TEAM_COLORS, TILE, UNITS,
-  type BuildingDef, type BuildingType, type Team, type UnitDef, type UnitType,
+  BUILDING_TAGS, BUILDINGS, HARVEST_UPGRADE, HARVESTER, NITRO, TEAM_COLORS, TILE, UNITS,
+  type BuildingDef, type BuildingType, type Tag, type Team, type UnitDef, type UnitType,
 } from './config';
 import type { Game } from './game';
 import { SPICE, type Cell } from './map';
@@ -31,6 +31,7 @@ export abstract class Entity {
   abstract readonly kind: 'unit' | 'building';
   abstract readonly radius: number;
   abstract readonly name: string;
+  abstract readonly tags: readonly Tag[];
   hp: number;
   dead = false;
   selected = false;
@@ -90,6 +91,7 @@ export abstract class Entity {
 
 export class Building extends Entity {
   readonly kind = 'building';
+  readonly tags = BUILDING_TAGS;
   readonly def: BuildingDef;
   readonly radius: number;
   readonly size: number;
@@ -179,9 +181,15 @@ export class Unit extends Entity {
     return this.def.name;
   }
 
+  get tags(): readonly Tag[] {
+    return this.def.tags;
+  }
+
   speed(game: Game): number {
-    const bonus = this.type === 'harvester' && game.teams[this.team].upgrades.has('harvest') ? 1.25 : 1;
-    return this.def.speed * bonus;
+    const ups = game.teams[this.team].upgrades;
+    if (this.type === 'harvester' && ups.has('harvest')) return this.def.speed * HARVEST_UPGRADE.speed;
+    if (this.type === 'trike' && ups.has('nitro')) return this.def.speed * NITRO.speed;
+    return this.def.speed;
   }
 
   muzzleWorld(): THREE.Vector3 {
@@ -253,7 +261,7 @@ export class Unit extends Entity {
       }
       if (!this.target && this.scanTimer <= 0) {
         this.scanTimer = 0.4 + Math.random() * 0.2;
-        this.target = game.nearestEnemy(this.team, this.x, this.z, this.def.sight);
+        this.target = game.nearestEnemy(this.team, this.x, this.z, this.def.sight, this);
       }
     } else {
       this.target = null;
@@ -287,9 +295,21 @@ export class Unit extends Entity {
 
   /** Moves into range of the target and fires. Returns true while the turret is aiming at it. */
   private engage(game: Game, target: Entity, dt: number): boolean {
-    const w = this.def.weapon!;
+    const w = game.weaponFor(this, target)!;
     const d = distTo(target, this.x, this.z);
     const angle = Math.atan2(target.z - this.z, target.x - this.x);
+    if (d < w.minRange) {
+      // Too close to fire: back away from the target to open the distance.
+      this.chasing = true;
+      this.repathTimer -= dt;
+      if (this.repathTimer <= 0 || this.path.length === 0) {
+        this.repathTimer = 0.6;
+        const away = w.minRange + TILE * 1.5;
+        this.setPath(game, target.x - Math.cos(angle) * (d + away), target.z - Math.sin(angle) * (d + away));
+      }
+      this.followPath(game, dt);
+      return false;
+    }
     if (d <= w.range) {
       this.path = [];
       let aligned: boolean;
@@ -301,8 +321,8 @@ export class Unit extends Entity {
         aligned = Math.abs(wrapAngle(angle - this.heading)) < 0.2;
       }
       if (aligned && this.cooldown <= 0) {
-        game.fire(this, target);
-        this.cooldown = w.cooldown * (0.9 + Math.random() * 0.2);
+        game.fire(this, target, w);
+        this.cooldown = game.cooldownFor(this, w) * (0.9 + Math.random() * 0.2);
       }
       return true;
     }
@@ -376,8 +396,7 @@ export class Unit extends Entity {
   private updateHarvester(game: Game, dt: number): void {
     const map = game.map;
     const team = game.teams[this.team];
-    const boost = team.upgrades.has('harvest') ? 1.5 : 1;
-    const capacity = HARVESTER.capacity * boost;
+    const capacity = HARVESTER.capacity * (team.upgrades.has('harvest') ? HARVEST_UPGRADE.capacity : 1);
 
     switch (this.hstate) {
       case 'seek': {
@@ -424,7 +443,7 @@ export class Unit extends Entity {
           break;
         }
         this.lastSpice = c;
-        this.cargo += map.takeSpice(c.cx, c.cz, HARVESTER.rate * boost * dt);
+        this.cargo += map.takeSpice(c.cx, c.cz, HARVESTER.rate * dt);
         game.terrain.refreshTile(c.cx, c.cz);
         this.heading += Math.sin(game.time * 1.5) * dt * 0.5;
         this.puffTimer -= dt;
