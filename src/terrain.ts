@@ -42,7 +42,7 @@ interface Chunk {
   n: number;
   /** Blended color at each grid vertex; each triangle is drawn in the average of its three corners. */
   grid: Float32Array;
-  /** Per grid vertex: share of spice tiles around it, and how rich that spice is (0..1). */
+  /** Per grid vertex: share of spice tiles around it, how rich that spice is (0..1), and share of sand (incl. spice). */
   spice: Float32Array;
   geo: THREE.BufferGeometry;
 }
@@ -65,6 +65,7 @@ function addSpiceShader(material: THREE.MeshLambertMaterial, time: { value: numb
     Object.assign(shader.uniforms, {
       uTime: time,
       uSand: { value: COLORS[SAND] },
+      uRock: { value: COLORS[ROCK] },
       uSpiceLight: { value: SPICE_LOOK.light },
       uSpiceDeep: { value: SPICE_LOOK.deep },
       uSpiceRim: { value: SPICE_LOOK.rim },
@@ -72,8 +73,8 @@ function addSpiceShader(material: THREE.MeshLambertMaterial, time: { value: numb
     });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
-attribute vec2 spice;
-varying vec2 vSpice;
+attribute vec3 spice;
+varying vec3 vSpice;
 varying vec3 vGround;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vSpice = spice;
@@ -81,8 +82,8 @@ vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uTime;
-uniform vec3 uSand, uSpiceLight, uSpiceDeep, uSpiceRim, uGlint;
-varying vec2 vSpice;
+uniform vec3 uSand, uRock, uSpiceLight, uSpiceDeep, uSpiceRim, uGlint;
+varying vec3 vSpice;
 varying vec3 vGround;
 float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float gNoise(vec2 p) {
@@ -93,6 +94,24 @@ float gNoise(vec2 p) {
       .replace('#include <color_fragment>', `#include <color_fragment>
 vec2 gp = vGround.xz;
 float amount = vSpice.y;
+// Rock/sand boundary: like the spice edge, a crisp noisy contour instead of the vertex colors' tile-wide fade.
+// The vertex color is (roughly) rock and sand blended by the sand share; rescaling it to pure rock or pure sand
+// on either side of the contour keeps the shading baked into it.
+float sandEdge = vSpice.z - 0.5 + (gNoise(gp * 1.1 + 90.0) * 0.6 + gNoise(gp * 3.0) * 0.4 - 0.5) * 0.45;
+float sandAa = fwidth(sandEdge) + 1e-4;
+float sandShare = smoothstep(-sandAa, sandAa, sandEdge);
+vec3 blended = mix(uRock, uSand, vSpice.z);
+diffuseColor.rgb *= mix(uRock, uSand, sandShare) / blended;
+// Sand: fine grain and wind ripples. Ripples run across the wind and wander a little; they fade out when
+// they'd be thinner than a few pixels, so they never flicker.
+float ripple = dot(gp, vec2(0.8, 0.6)) * 2.6 + gNoise(gp * 0.45) * 2.5;
+float rippleFade = 1.0 - smoothstep(0.25, 0.6, fwidth(ripple));
+float wave = fract(ripple);
+float rippleShade = (smoothstep(0.0, 0.75, wave) - smoothstep(0.75, 1.0, wave) - 0.5) * 0.07 * rippleFade;
+float sandGrain = (gNoise(gp * 14.0) - 0.5) * 0.06;
+// Rock: blotchy color, and faint layers that follow height so outcrop faces read as stratified stone.
+float mottle = (gNoise(gp * 1.3 + 70.0) * 0.6 + gNoise(gp * 4.1) * 0.4 - 0.5) * 0.16;
+float strata = (sin(vGround.y * 7.0 + gNoise(gp * 0.7) * 3.0) * 0.5) * 0.06;
 // Field edge: where the spice share crosses one half, pushed in and out by noise.
 float edge = vSpice.x - 0.5 + (gNoise(gp * 0.9) * 0.6 + gNoise(gp * 2.6) * 0.4 - 0.5) * 0.5;
 // Thinning: as a field is harvested, bare sand opens up in patches.
@@ -105,7 +124,9 @@ vec3 spiceCol = mix(uSpiceLight, uSpiceDeep, clamp(amount * 0.85 + (grain - 0.5)
 spiceCol *= 0.84 + 0.3 * gNoise(gp * 5.0 + 19.0);
 spiceCol = mix(spiceCol, uSpiceRim, (1.0 - smoothstep(0.0, 0.06, shape)) * 0.7);
 // The vertex color is sand with dune shading baked in; scaling it keeps that shading on the spice.
-diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * spiceCol / uSand, inside);`)
+diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * spiceCol / uSand, inside);
+// Sand and rock detail last, kept off the spice (it has its own grain).
+diffuseColor.rgb *= 1.0 + mix(mottle + strata, rippleShade + sandGrain, sandShare) * (1.0 - inside);`)
       .replace('#include <opaque_fragment>', `{
   // Shimmer: one possible glint per small cell, each twinkling on its own clock, denser on rich spice.
   vec2 cp = gp * 2.2;
@@ -278,9 +299,9 @@ export class Terrain {
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.length), 3));
-    geo.setAttribute('spice', new THREE.BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
+    geo.setAttribute('spice', new THREE.BufferAttribute(new Float32Array(pos.length), 3));
     geo.computeBoundingSphere();
-    const chunk: Chunk = { cx0, cz0, n, grid: new Float32Array(n * n * 3), spice: new Float32Array(n * n * 2), geo };
+    const chunk: Chunk = { cx0, cz0, n, grid: new Float32Array(n * n * 3), spice: new Float32Array(n * n * 3), geo };
     this.chunks.push(chunk);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) this.paintVertex(chunk, i, j);
     for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) this.paintSquare(chunk, i, j);
@@ -307,8 +328,8 @@ export class Terrain {
   }
 
   /**
-   * Colors the two triangles of one grid square. Smooth triangles blend their corner colors; faceted ones are
-   * one color (the average of their corners plus a little jitter), shaded toward rock-face brown with steepness.
+   * Colors the two triangles of one grid square from their corner colors. Smooth triangles add baked sun relief;
+   * faceted ones get a per-face brightness jitter and shade toward rock-face brown with steepness.
    */
   private paintSquare(chunk: Chunk, i: number, j: number): void {
     const { n, grid } = chunk;
@@ -318,7 +339,7 @@ export class Terrain {
     const tris = [all.slice(0, 3), all.slice(3, 6)];
     tris.forEach((corners, t) => {
       const face = (j * (n - 1) + i) * 2 + t;
-      corners.forEach((c, k) => spice.setXY(face * 3 + k, chunk.spice[(c / 3) * 2], chunk.spice[(c / 3) * 2 + 1]));
+      corners.forEach((c, k) => spice.setXYZ(face * 3 + k, chunk.spice[c], chunk.spice[c + 1], chunk.spice[c + 2]));
       const f = this.faceIndex(chunk.cx0, chunk.cz0, i, j, t);
       if (this.smooth[f]) {
         const flat = TO_SUN.y;
@@ -335,15 +356,14 @@ export class Terrain {
       const gi = chunk.cx0 * SURFACE_RES + i;
       const gj = chunk.cz0 * SURFACE_RES + j;
       const jitter = ((((gi * 73856093) ^ (gj * 19349663) ^ (t * 83492791)) & 0xff) / 255) * 0.07 + 0.965;
-      this.acc.setRGB(
-        (grid[corners[0]] + grid[corners[1]] + grid[corners[2]]) / 3,
-        (grid[corners[0] + 1] + grid[corners[1] + 1] + grid[corners[2] + 1]) / 3,
-        (grid[corners[0] + 2] + grid[corners[1] + 2] + grid[corners[2] + 2]) / 3,
-      );
       const ny = this.faceNy[f];
       const slope = Math.sqrt(1 - ny * ny) / ny;
-      this.acc.lerp(SLOPE, Math.min(0.85, Math.max(0, (slope - 0.12) * 2))).multiplyScalar(jitter);
-      for (let k = 0; k < 3; k++) col.setXYZ(face * 3 + k, this.acc.r, this.acc.g, this.acc.b);
+      const toSlope = Math.min(0.85, Math.max(0, (slope - 0.12) * 2));
+      // Corner colors still blend (the shader's crisp rock edge relies on it); the face gets one jitter and tint.
+      corners.forEach((c, k) => {
+        this.acc.setRGB(grid[c], grid[c + 1], grid[c + 2]).lerp(SLOPE, toSlope).multiplyScalar(jitter);
+        col.setXYZ(face * 3 + k, this.acc.r, this.acc.g, this.acc.b);
+      });
     });
   }
 
@@ -373,6 +393,7 @@ export class Terrain {
     let w = 0;
     let share = 0;
     let rich = 0;
+    let sand = 0;
     for (const [dx, dz] of [[-o, -o], [o, -o], [-o, o], [o, o]]) {
       const cx = map.cellOf(x + dx);
       const cz = map.cellOf(z + dz);
@@ -380,6 +401,7 @@ export class Terrain {
       this.acc.add(tileColor(map, cx, cz, this.tmp, true));
       w++;
       const k = map.idx(cx, cz);
+      if (map.tiles[k] === SAND || map.tiles[k] === SPICE || map.ramp[k]) sand++;
       if (map.tiles[k] === SPICE) {
         share++;
         rich += Math.min(1, map.spice[k] / SPICE_MAX);
@@ -389,7 +411,8 @@ export class Terrain {
     const v = j * chunk.n + i;
     chunk.grid.set([this.acc.r, this.acc.g, this.acc.b], v * 3);
     // Richness is averaged over the spice tiles only, so a field's edge is as rich as the tiles it bounds.
-    chunk.spice[v * 2] = w ? share / w : 0;
-    chunk.spice[v * 2 + 1] = share ? rich / share : 0;
+    chunk.spice[v * 3] = w ? share / w : 0;
+    chunk.spice[v * 3 + 1] = share ? rich / share : 0;
+    chunk.spice[v * 3 + 2] = w ? sand / w : 0;
   }
 }
