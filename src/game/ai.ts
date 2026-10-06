@@ -38,7 +38,10 @@ export interface AIProfile {
   initiative: number;
   /** A wave falls back once it's down to this share of its starting strength. */
   waveRetreat: number;
-  /** A wave only sets out when it's at least this share of the enemy's whole army; otherwise it keeps gathering. */
+  /**
+   * A wave only sets out when it's at least this share of the enemy's whole army; otherwise it keeps gathering.
+   * The share it waits for shrinks the longer a wave has been due.
+   */
   waveGate: number;
   /** How closely unit picks follow the best counter to the enemy army (see `counterWeights`; higher: more strictly). */
   counterFocus: number;
@@ -677,7 +680,10 @@ export class AI {
     const enemy = this.enemyDefense();
     const seize = this.profile.initiative > 0 && ready.length >= 4 && strength >= enemy * this.profile.initiative;
     if (!seize) {
-      if (g.time < this.nextWaveTime || strength < enemy * this.profile.waveGate) return;
+      // The longer it's been since a wave was due, the less of an edge it waits for (down to half after five
+      // minutes), so two evenly matched armies don't just stare at each other all game.
+      const patience = Math.max(0.5, 1 - (g.time - this.nextWaveTime) / 600);
+      if (g.time < this.nextWaveTime || strength < enemy * this.profile.waveGate * patience) return;
       // A full-size wave, or a smaller one if it's been a long while, so the pressure keeps up after heavy losses.
       const overdue = g.time >= this.nextWaveTime + 90;
       if (ready.length < this.waveSize && !(overdue && ready.length >= Math.max(4, this.waveSize / 2))) return;

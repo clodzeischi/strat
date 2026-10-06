@@ -64,6 +64,9 @@ const shellGeo = new THREE.IcosahedronGeometry(0.12, 0);
 const rocketGeo = new THREE.ConeGeometry(0.12, 0.6, 5);
 rocketGeo.rotateX(Math.PI / 2); // point along +Z so lookAt aims it
 
+/** Splash damage to units other than the one aimed at, at the center of the blast (half that at its edge). */
+export const SPLASH_SHARE = 0.5;
+
 export class Game {
   readonly map: GameMap;
   readonly terrain: Terrain;
@@ -644,10 +647,15 @@ export class Game {
         const splash = p.weapon.splash;
         this.effects.explosion(p.end, splash > 0 ? 1.3 : p.kind === 'rocket' ? 0.8 : 0.6);
         if (splash > 0) {
+          // The target takes the full hit; anything else in the blast takes half, fading toward the edge, so one
+          // rocket into a tight group doesn't do full damage to every unit in it.
           const victims = [...this.units, ...this.buildings].filter(
             (e) => e.team !== p.owner.team && !e.dead && distTo(e, p.end.x, p.end.z) <= splash,
           );
-          for (const v of victims) this.damage(v, p.weapon, p.mult, p.owner);
+          for (const v of victims) {
+            const share = v === p.target ? 1 : SPLASH_SHARE * (1 - distTo(v, p.end.x, p.end.z) / splash / 2);
+            this.damage(v, p.weapon, p.mult * share, p.owner);
+          }
         } else if (!p.target.dead) {
           this.damage(p.target, p.weapon, p.mult, p.owner);
         }
