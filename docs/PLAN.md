@@ -100,7 +100,7 @@ Follow-ups: the AI doesn't build Repair Vehicles, the Hi-Tech Factory or Carryal
 - **Income first.** Below 2 harvesters, or with no refinery, getting income back comes before army and tech. Without a factory, it builds a refinery (which comes with a harvester) instead of a factory plus a harvester. Lost opening buildings are rebuilt before more units. Once the base is up, it keeps one harvester's price (800) in reserve so it can always replace one.
 - **Waves.** Unchanged in size and timing, plus: a wave that loses 70% of its strength falls back instead of trickling in, survivors push on to the next target, and if a full wave hasn't formed 90 s after one was due, a half-size wave goes so the pressure keeps up.
 - **Surrender.** When it has no income and no way to buy it back (or nothing left to build units with), and its army is under half the enemy's, for 15 seconds, it offers to surrender, once. The game pauses for the answer. Declining plays on to the end.
-- Against the old Normal it won 23 of 32 games, and all 9 losses ended in a surrender rather than being wiped out. It's a little stronger because it no longer collapses; wave size and timing, the knobs that set its pressure, are the same.
+- Against the old Normal it won 17 of 32 games (random maps), so it's about as strong; wave size and timing, the knobs that set its pressure, are unchanged. 14 of its 15 losses ended in a surrender rather than being wiped out. In 16 games against itself every game was decided (no stalemates), 15 by surrender.
 
 **Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
 
