@@ -705,6 +705,7 @@ export class Game {
       for (let z = e.cz; z < e.cz + e.size; z++) {
         for (let x = e.cx; x < e.cx + e.size; x++) this.map.occupied[this.map.idx(x, z)] = 0;
       }
+      this.unloadBunker(e); // whoever was inside gets out
       for (let k = 0; k < 5; k++) {
         const p = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, e.y + 1 + Math.random(), e.z + (Math.random() - 0.5) * 4);
         this.effects.explosion(p, 1.5 + Math.random() * 1.5);
@@ -724,6 +725,75 @@ export class Game {
         }
       }
       this.effects.explosion(new THREE.Vector3(e.x, this.map.surfaceAt(e.x, e.z) + 0.5, e.z), 1.8);
+    }
+  }
+
+  // ---- Bunkers --------------------------------------------------------------
+
+  /** Puts an infantry unit into its own team's bunker, if there's room. */
+  enterBunker(u: Unit, b: Building): boolean {
+    if (!u.def.infantry || u.team !== b.team || b.dead || b.room <= 0 || u.carrier) return false;
+    u.carrier = b;
+    u.path = [];
+    u.target = null;
+    u.order = { kind: 'idle' };
+    u.setSelected(false);
+    u.root.visible = false;
+    // Shots come from the roof.
+    u.x = b.x;
+    u.z = b.z;
+    u.root.position.set(b.x, b.y + 1.4, b.z);
+    b.occupants.push(u);
+    this.effects.puff(new THREE.Vector3(b.x, b.y + 0.5, b.z), 0xd8c49a);
+    return true;
+  }
+
+  /** Everyone out, onto the cells in front of the door. */
+  unloadBunker(b: Building): Unit[] {
+    const out = b.occupants;
+    b.occupants = [];
+    if (!out.length) return out;
+    const front = b.frontCell();
+    const spots = cellsAround(this.map, front.cx, front.cz, out.length, 'foot');
+    out.forEach((u, k) => {
+      const c = spots[k] ?? front;
+      u.carrier = null;
+      u.x = this.map.center(c.cx);
+      u.z = this.map.center(c.cz);
+      u.root.visible = true;
+      u.order = { kind: 'idle' };
+    });
+    return out;
+  }
+
+  /**
+   * Infantry in a bunker shoot from it with their own weapons (rifles, or Infantry Rockets against armor), measuring
+   * range from the bunker's walls.
+   */
+  private updateBunkers(dt: number): void {
+    for (const b of this.buildings) {
+      if (!b.occupants.length) continue;
+      b.occupants = b.occupants.filter((u) => !u.dead);
+      // Gap between the bunker's square walls and the target's edge.
+      const gap = (t: Entity) => {
+        if (t instanceof Building) {
+          const reach = ((b.size + t.size) * TILE) / 2;
+          return Math.hypot(Math.max(0, Math.abs(t.x - b.x) - reach), Math.max(0, Math.abs(t.z - b.z) - reach));
+        }
+        return Math.max(0, distTo(b, t.x, t.z) - t.radius);
+      };
+      for (const u of b.occupants) {
+        u.cooldown -= dt;
+        if (u.cooldown > 0) continue;
+        const reach = Math.max(u.def.weapon!.range, u.def.antiArmor?.range ?? 0) * 1.1;
+        const t = u.target && !u.target.dead && gap(u.target) <= reach ? u.target : this.nearestEnemy(b.team, b.x, b.z, reach + b.size * TILE, u);
+        u.target = t;
+        if (!t) continue;
+        const w = this.weaponFor(u, t);
+        if (!w || gap(t) > this.rangeFor(u, w, t)) continue;
+        this.fire(u, t, w);
+        u.cooldown = this.cooldownFor(u, w) * (0.9 + Math.random() * 0.2);
+      }
     }
   }
 
@@ -753,6 +823,7 @@ export class Game {
         u.hp = Math.min(u.maxHp, u.hp + u.maxHp * INFANTRY_REGEN.rate * dt);
       }
     }
+    this.updateBunkers(dt);
     this.separate();
     for (const u of this.units) if (!u.carrier) u.syncVisual(this, dt);
     this.updateProjectiles(dt);

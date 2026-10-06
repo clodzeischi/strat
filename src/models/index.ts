@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { TILE, type BuildingType, type UnitType } from '../config';
 import { CONCRETE } from '../materials/palette';
 import { barracks } from './buildings/barracks';
+import { bunker } from './buildings/bunker';
 import { conyard } from './buildings/conyard';
 import { factory } from './buildings/factory';
 import { hitech } from './buildings/hitech';
@@ -21,7 +22,7 @@ export { makeParachute } from './parachute';
 export { CARRYALL_HOOK_Y, SEATS, SEAT_OFF, SEAT_ON } from './units/carryall';
 
 const UNIT_MODELS: Record<UnitType, UnitBlueprint> = { harvester, infantry, trike, tank, rocket, repair, carryall };
-const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = { conyard, refinery, barracks, factory, hitech };
+const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = { conyard, refinery, barracks, bunker, factory, hitech };
 
 /** Unit models face +X. */
 export function makeUnitModel(type: UnitType, color: number): UnitModel {

@@ -3,7 +3,7 @@
 export type Team = 0 | 1;
 
 export type UnitType = 'harvester' | 'infantry' | 'trike' | 'tank' | 'rocket' | 'repair' | 'carryall';
-export type BuildingType = 'conyard' | 'refinery' | 'barracks' | 'factory' | 'hitech';
+export type BuildingType = 'conyard' | 'refinery' | 'barracks' | 'bunker' | 'factory' | 'hitech';
 /** Buildings that train units. Each one of a type adds a parallel production line for that type. */
 export type Producer = 'barracks' | 'factory' | 'hitech';
 /** Buildings that can be upgraded to level 2 to unlock more tech. */
@@ -64,6 +64,8 @@ export interface BuildingDef {
   requires: Req[];
   desc: string;
   levelUp?: { name: string; short: string; cost: number; time: number; desc: string };
+  /** Infantry it can hold (a bunker); they shoot from it and can't be hit while inside. */
+  garrison?: number;
 }
 
 export interface UpgradeDef {

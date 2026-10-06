@@ -29,7 +29,8 @@ export type Order =
   | { kind: 'amove'; x: number; z: number }
   | { kind: 'attack'; target: Entity }
   | { kind: 'harvest' }
-  | { kind: 'repair'; target: Entity };
+  | { kind: 'repair'; target: Entity }
+  | { kind: 'enter'; target: Building };
 
 /** Paratroopers come down at this speed; vehicles on their bigger canopies a little slower. */
 const FALL_SPEED = { foot: 2.2, vehicle: 1.7 };
@@ -54,7 +55,8 @@ export class Unit extends Entity {
   target: Entity | null = null;
   path: Point[] = [];
   /** The Carryall this unit is riding in, if any: it's off the map until dropped. */
-  carrier: Unit | null = null;
+  /** The Carryall carrying this unit, or the bunker it's in. */
+  carrier: Unit | Building | null = null;
   /** Paratrooper on the way down: drifts toward the landing cell under its parachute. */
   falling: { x: number; z: number; chute: THREE.Object3D } | null = null;
   protected body: THREE.Group;
@@ -62,7 +64,8 @@ export class Unit extends Entity {
   /** Parts showing researched upgrades, rebuilt when the team's upgrades change. */
   private kit: { key: string; body: THREE.Group; turret: THREE.Group } | null = null;
   private muzzle: THREE.Object3D;
-  private cooldown = 0;
+  /** Seconds until the weapon can fire again (also counted down by a bunker the unit is in). */
+  cooldown = 0;
   private scanTimer = Math.random() * 0.5;
   /** Turreted units: what the turret shoots at while the hull does something else (driving, chasing). */
   private sideTarget: Entity | null = null;
@@ -131,6 +134,7 @@ export class Unit extends Entity {
     this.chasing = false;
     this.path = [];
     if (order.kind === 'move' || order.kind === 'amove') this.setPath(game, order.x, order.z);
+    if (order.kind === 'enter') this.setPath(game, order.target.x, order.target.z);
   }
 
   commandHarvest(game: Game, cell: Cell | null): void {
@@ -301,6 +305,16 @@ export class Unit extends Entity {
         case 'repair':
           this.updateRepair(game, this.order.target, dt);
           break;
+        case 'enter': {
+          // Walk to the bunker and get in, if there's still room when we arrive.
+          const b = this.order.target;
+          if (b.dead || b.room <= 0 || b.team !== this.team) {
+            this.order = { kind: 'idle' };
+            this.path = [];
+          } else if (distTo(b, this.x, this.z) < TILE * 0.75) game.enterBunker(this, b);
+          else if (this.followPath(game, dt)) this.setPath(game, b.x, b.z);
+          break;
+        }
         case 'idle':
           if (this.def.repair && this.scanTimer <= 0) {
             this.scanTimer = 0.8 + Math.random() * 0.4;

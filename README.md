@@ -9,6 +9,7 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 - **Classic Dune economy.** Harvesters collect spice and bring it to Refineries for credits. Spice fields shimmer and run out as they're harvested.
 - **Procedural maps.** Every game gets a new, point-symmetric map in one of three sizes. The desert has dunes, scattered mesas and rock shelves with cliffs on one edge. Spawns are random, and the end screen shows the seed so you can replay a map with `?seed=N`.
 - **Elevation that matters.** Units only climb to high ground by ramps, and they shoot further downhill than up. A base on a rock shelf has a cliff flank that only rocket launchers can hit from below.
+- **Bunkers.** Fill one with three infantry: they shoot out from cover, Infantry Rockets included, and can't be hit inside. Tanks and rocket launchers outrange them.
 - **Counter-based combat.** Units have StarCraft-style tags (light, armored, biological, mechanical) with bonus damage against them. Tanks and rocket launchers can fire on the move, and vehicles tilt with the ground.
 - **Tech and upgrades.** Level-2 Construction Yard and Factory, two tiers each of Weapons and Armor, Infantry Rockets, Trike Nitro and Harvesting. Each upgrade shows on the unit models.
 - **Carryalls and airborne drops.** The Hi-Tech Factory builds Carryalls. Each can lift a heavy vehicle, two trikes or six infantry and drop them anywhere:
@@ -49,6 +50,7 @@ Then open the address Vite prints (usually http://localhost:5173). `npm run buil
 | **F**, then click | Attack-move |
 | **E**, then click | Carryall drop |
 | **X** | Stop |
+| **U** | Unload a selected bunker |
 | **Ctrl+1-9** / **1-9** | Set / select a control group (double-tap to jump to it) |
 | **H** | Jump to your base |
 | **WASD**, arrow keys, screen edges, middle-drag | Pan the camera |
@@ -64,6 +66,7 @@ Production is in the sidebar on the right. Click a card to build or train, and r
 | Construction Yard | Builds structures. Upgrades to HQ Level 2. |
 | Refinery | Turns spice into credits. Comes with a free Harvester. |
 | Barracks | Trains infantry. |
+| Bunker | Holds three infantry, who shoot from it and can't be hurt while inside. Right-click it with infantry to fill it. |
 | Factory | Builds vehicles. Upgrades to Level 2 for Rocket Launchers and tier-2 upgrades. |
 | Hi-Tech Factory | Builds Carryalls. |
 

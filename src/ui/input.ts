@@ -306,6 +306,17 @@ export class Input {
         if (units.length === 0) return;
       }
     }
+    if (target instanceof Building && target.team === PLAYER && target.def.garrison) {
+      // Infantry right-clicking their own bunker: the nearest ones go in, as many as there's room for.
+      const inf = units.filter((u) => u.def.infantry).sort((a, b) => Math.hypot(a.x - target.x, a.z - target.z) - Math.hypot(b.x - target.x, b.z - target.z));
+      const going = inf.slice(0, Math.max(0, target.room));
+      for (const u of going) u.command(g, { kind: 'enter', target });
+      if (going.length) {
+        g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0x7cff7c);
+        units = units.filter((u) => !going.includes(u));
+        if (units.length === 0) return;
+      }
+    }
     if (target && target.team === PLAYER && target.hp < target.maxHp && repairable(target)) {
       const mechs = units.filter((u) => u.def.repair && u !== target);
       for (const u of mechs) u.command(g, { kind: 'repair', target });
@@ -455,6 +466,9 @@ export class Input {
       case 'x':
         for (const u of this.ownUnits()) u.command(g, { kind: 'idle' });
         break;
+      case 'u':
+        for (const b of this.selection) if (b instanceof Building && b.team === PLAYER) g.unloadBunker(b);
+        break;
       case 'f':
         if (this.ownUnits().some((u) => u.def.weapon)) {
           this.attackMode = true;
@@ -545,6 +559,7 @@ export class Input {
       if (e instanceof Building && PRODUCERS.includes(e.type as Producer) && e.team === PLAYER) text += '   Right-click to set a rally point';
       if (e instanceof Carryall && e.team === PLAYER) text += this.carryallInfo(e);
       if (e instanceof Unit && e.def.repair && e.team === PLAYER) text += '   Right-click a damaged vehicle or building to repair it';
+      if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === PLAYER && e.occupants.length ? '   U to unload' : ''}`;
     } else if (sel.length > 1) {
       const counts = new Map<string, number>();
       for (const e of sel) counts.set(e.name, (counts.get(e.name) ?? 0) + 1);

@@ -50,6 +50,8 @@ export interface AIProfile {
    * up (cheap infantry from idle barracks would otherwise make up most of the army whatever it's up against).
    */
   goodLinesOnly: boolean;
+  /** Bunkers it keeps at the front of its base, filled with infantry. */
+  bunkers: number;
   /**
    * Keeping the army alive (all off at 0): one Repair Vehicle per `repairPer` combat vehicles, up to `maxRepair`.
    * They stay home: damaged vehicles come to them after a fight, nobody leaves one. A wave pulls back when the
@@ -61,7 +63,7 @@ export interface AIProfile {
 export const NORMAL_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
-  raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3, waveGate: 0.6, counterFocus: 3, goodLinesOnly: false,
+  raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3, waveGate: 0.6, counterFocus: 3, goodLinesOnly: false, bunkers: 1,
   sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 },
 };
 
@@ -72,7 +74,7 @@ export const NORMAL_PROFILE: AIProfile = {
  */
 export const HARD_PROFILE: AIProfile = {
   ...NORMAL_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
-  initiative: 1.2, waveRetreat: 0.5, waveGate: 0.9, counterFocus: 8, goodLinesOnly: true, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
+  initiative: 1.2, waveRetreat: 0.5, waveGate: 0.9, counterFocus: 8, goodLinesOnly: true, bunkers: 2, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
   sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 },
 };
 
@@ -100,7 +102,8 @@ const LEASH = 22 * TILE;
 /** An attack that hasn't been seen for this long is over, and its defenders go home. */
 const DEFENSE_TIMEOUT = 4;
 
-export type Role = 'home' | 'defend' | 'wave' | 'raid';
+/** 'garrison': on its way into one of our bunkers, or in it. */
+export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -282,6 +285,11 @@ export class AI {
     if (ts.building || !g.has(this.team, 'conyard')) return;
 
     if (this.rushed() && !goal && g.has(this.team, 'refinery')) {
+      // A bunker first (the infantry we're making anyway hold out far better in it), then more barracks.
+      if (g.has(this.team, 'barracks') && g.count(this.team, 'bunker') < 1 && ts.credits >= BUILDINGS.bunker.cost && this.findSpot('bunker')) {
+        g.startBuilding(this.team, 'bunker');
+        return;
+      }
       if (g.count(this.team, 'barracks') < 3 && ts.credits >= BUILDINGS.barracks.cost && this.findSpot('barracks')) g.startBuilding(this.team, 'barracks');
       return;
     }
@@ -292,6 +300,7 @@ export class AI {
     if (want) {
       // getting income back, still in the opening, or rebuilding what the opening had
     } else if (refineries < this.wantRefineries()) want = 'refinery';
+    else if (g.count(this.team, 'bunker') < this.profile.bunkers && barracks > 0 && (ts.credits > 900 || this.behindFor > 0)) want = 'bunker';
     else if (barracks < 2 && ts.credits > 1500) want = 'barracks';
     else if (factories < 2 && ts.credits > 2500) want = 'factory';
     else if (g.count(this.team, 'conyard') < 2 && ts.credits > 4000) want = 'conyard';
@@ -308,7 +317,11 @@ export class AI {
     const full = (p: Producer) => ts.queues[p].length >= g.activeLines(this.team, p) + 1;
     const refineries = g.count(this.team, 'refinery');
     const rushed = this.rushed();
-    if (this.harvesterCount() < (rushed ? 1 : this.wantHarvesters()) && g.canTrain(this.team, 'harvester')) {
+    // More harvesters only while our army is holding its own; with a stronger enemy army about, units come first
+    // (just the minimum, so income doesn't collapse).
+    const holding = this.armyPower(this.team, true) >= this.armyPower(this.team, false) * 0.8;
+    const harvesterGoal = rushed ? 1 : holding ? this.wantHarvesters() : Math.min(this.wantHarvesters(), this.profile.minHarvesters);
+    if (this.harvesterCount() < harvesterGoal && g.canTrain(this.team, 'harvester')) {
       if (!full('factory') && ts.credits >= UNITS.harvester.cost) g.queueUnit(this.team, 'harvester');
       return;
     }
@@ -326,7 +339,18 @@ export class AI {
 
     // Savings don't stack (the fund covers a harvester, the reserve the next big purchase), and none of it matters
     // while the base is being overrun: then every credit goes into units.
-    const keep = this.outgunned || rushed ? 0 : behind ? (goal?.cost ?? 0) : Math.max(reserve, this.fund());
+    // Under pressure, spend now: the best counter that a free line can start and we can afford, down the list, so
+    // idle barracks don't wait on a factory unit we can't pay for yet. The first bunker's price is kept aside.
+    if (this.outgunned || rushed || behind) {
+      const bunker = !g.has(this.team, 'bunker') && g.canBuild(this.team, 'bunker') ? BUILDINGS.bunker.cost : 0;
+      const keepNow = this.outgunned ? 0 : bunker;
+      const options = this.counterWeights().filter(([t]) => g.canTrain(this.team, t) && !full(UNITS[t].producer) && ts.credits - UNITS[t].cost >= keepNow);
+      options.sort((a, b) => b[1] - a[1]);
+      if (options.length) g.queueUnit(this.team, options[0][0]);
+      this.nextUnit = null;
+      return;
+    }
+    const keep = Math.max(reserve, this.fund());
     if (!this.nextUnit) this.nextUnit = this.chooseUnit();
     let next = this.nextUnit;
     if (!g.canTrain(this.team, next)) {
@@ -478,6 +502,7 @@ export class AI {
     this.updateRally();
 
     this.manageRepairs(army);
+    this.manageGarrisons(army);
     this.manageDefense(army);
     const baseAttacked = this.defenses.some((d) => d.base);
     this.manageWaves(baseAttacked);
@@ -610,6 +635,25 @@ export class AI {
       // Defenders that got where they were sent and found nothing follow the attackers as they move.
       for (const u of d.units) {
         if (u.order.kind === 'idle' && !u.target && Math.hypot(u.x - d.x, u.z - d.z) > 4 * TILE) u.command(g, { kind: 'amove', x: d.x, z: d.z });
+      }
+    }
+  }
+
+  /** Idle infantry at home fill our bunkers; ones that came out (bunker lost, or unloaded) rejoin the units at home. */
+  private manageGarrisons(army: Unit[]): void {
+    const g = this.game;
+    for (const u of army) if (this.roles.get(u) === 'garrison' && u.order.kind !== 'enter') this.roles.set(u, 'home');
+    for (const b of g.buildings) {
+      if (b.team !== this.team || !b.def.garrison) continue;
+      let room = b.room - army.filter((u) => u.order.kind === 'enter' && u.order.target === b).length;
+      if (room <= 0) continue;
+      const idle = army
+        .filter((u) => u.def.infantry && this.roles.get(u) === 'home' && !u.target)
+        .sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z));
+      for (const u of idle) {
+        if (room-- <= 0) break;
+        this.roles.set(u, 'garrison');
+        u.command(g, { kind: 'enter', target: b });
       }
     }
   }
@@ -838,6 +882,8 @@ export class AI {
       const spice = g.map.nearestCell(anchor.cx + 1, anchor.cz + 1, (x, z) => g.map.tile(x, z) === SPICE, 20);
       if (spice) goal = { x: spice.cx + 0.5, z: spice.cz + 0.5 };
     }
+    // Bunkers go at the front of the base, where the rally point is and attacks come from.
+    if (type === 'bunker' && this.rally) goal = { x: this.rally.x / TILE, z: this.rally.z / TILE };
     const ok = (cx: number, cz: number) => {
       if (!g.canPlace(type, this.team, cx, cz)) return false;
       for (let z = cz - 1; z <= cz + size; z++) {

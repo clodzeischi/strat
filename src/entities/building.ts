@@ -3,6 +3,7 @@ import { BUILDING_TAGS, BUILDINGS, TEAM_COLORS, TILE, type BuildingDef, type Bui
 import type { Cell } from '../map';
 import { makeBuildingModel, makeLevelKit } from '../models';
 import { Entity } from './entity';
+import type { Unit } from './unit';
 
 /** Which side a building's door (unit exit, harvester dock) is on. Models are built facing south (+z). */
 export type Facing = 'south' | 'east' | 'north' | 'west';
@@ -27,6 +28,8 @@ export class Building extends Entity {
   readonly size: number;
   readonly spinner: THREE.Object3D | null;
   level = 1;
+  /** Infantry inside (bunkers). */
+  occupants: Unit[] = [];
 
   constructor(id: number, team: Team, readonly type: BuildingType, readonly cx: number, readonly cz: number, groundY: number, readonly facing: Facing = 'south') {
     const def = BUILDINGS[type];
@@ -42,6 +45,11 @@ export class Building extends Entity {
     model.group.rotation.y = FACING_ANGLE[facing];
     this.root.add(model.group);
     this.root.position.set(this.x, this.y, this.z);
+  }
+
+  /** Free places for infantry, 0 for buildings that don't hold any. */
+  get room(): number {
+    return (this.def.garrison ?? 0) - this.occupants.length;
   }
 
   get name(): string {

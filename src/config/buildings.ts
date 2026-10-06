@@ -1,6 +1,6 @@
 import type { BuildingDef, BuildingType, Req, Tag } from './types';
 
-export const BUILDING_ORDER: BuildingType[] = ['conyard', 'refinery', 'barracks', 'factory', 'hitech'];
+export const BUILDING_ORDER: BuildingType[] = ['conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech'];
 
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   conyard: {
@@ -15,6 +15,10 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   barracks: {
     name: 'Barracks', short: 'Barracks', cost: 500, buildTime: 10, hp: 800, size: 2, requires: [],
     desc: 'Trains infantry. Each Barracks adds a production line.',
+  },
+  bunker: {
+    name: 'Bunker', short: 'Bunker', cost: 400, buildTime: 10, hp: 1400, size: 2, requires: ['barracks'], garrison: 3,
+    desc: 'Holds three infantry, who shoot from it and can\'t be hurt while inside. Right-click it with infantry selected; U unloads.',
   },
   factory: {
     name: 'Factory', short: 'Factory', cost: 1000, buildTime: 14, hp: 1100, size: 3, requires: ['refinery', 'barracks'],
