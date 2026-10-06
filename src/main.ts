@@ -33,24 +33,33 @@ scene.add(sun, sun.target);
 
 // Restart and changing map size reload the page; the next game's settings ride along in session storage.
 const AUTOSTART_KEY = 'strat.autostart';
-interface Autostart { difficulty: Difficulty; size: MapSize }
+interface Autostart { difficulty: Difficulty; size: MapSize; seed: number }
 function readAutostart(): Autostart | null {
   try {
     const raw = sessionStorage.getItem(AUTOSTART_KEY);
     sessionStorage.removeItem(AUTOSTART_KEY);
-    const [difficulty, size] = (raw ?? '').split(':');
+    const [difficulty, size, seed] = (raw ?? '').split(':');
     const okDifficulty = difficulty === 'normal' || difficulty === 'hard' || difficulty === 'brutal';
     const okSize = (MAP_SIZES as readonly number[]).includes(Number(size));
-    return okDifficulty && okSize ? { difficulty, size: Number(size) as MapSize } : null;
+    const okSeed = seed !== '' && Number.isInteger(Number(seed));
+    return okDifficulty && okSize && okSeed ? { difficulty, size: Number(size) as MapSize, seed: Number(seed) } : null;
   } catch {
     return null;
   }
 }
+const randomSeed = () => Math.floor(Math.random() * 1_000_000);
+/** `?seed=123` in the address replays a map. */
+function urlSeed(): number | null {
+  const v = new URLSearchParams(location.search).get('seed');
+  return v !== null && /^\d+$/.test(v) ? Number(v) : null;
+}
 const autostart = readAutostart();
 const mapSize = autostart?.size ?? loadMapSize();
+// Every visit gets a new map; Restart keeps the seed so the same map comes back.
+const mapSeed = autostart?.seed ?? urlSeed() ?? randomSeed();
 
 const rts = new RTSCamera(mapSize * TILE);
-const game = new Game(scene, rts.camera, mapSize);
+const game = new Game(scene, rts.camera, mapSize, mapSeed);
 
 // The sun's shadow map follows whatever the active camera is looking at.
 const shadows = new ViewShadows(sun);
@@ -61,8 +70,10 @@ game.onMessage = (t) => sidebar.showMessage(t);
 const ai = new AI(game, ENEMY);
 if (import.meta.env.DEV) Object.assign(window, { game, ai, input, rts, renderer });
 
+// Start looking at the home base, nudged toward the middle of the map where the action will come from.
 const home = game.buildings.find((b) => b.team === PLAYER)!;
-rts.lookAt(home.x + 6, home.z - 6);
+const toMid = new THREE.Vector2(game.map.worldSize() / 2 - home.x, game.map.worldSize() / 2 - home.z).normalize().multiplyScalar(8);
+rts.lookAt(home.x + toMid.x, home.z + toMid.y);
 
 // Cinematic camera for the title screen: drifts low over sand, rock and spice.
 const titleCam = new THREE.PerspectiveCamera(55, 1, 0.5, 400);
@@ -116,7 +127,7 @@ function startGame(difficulty: Difficulty): void {
 /** Restart, Quit and a new map size reload the page for a clean match; with `next` set, the title is skipped. */
 function reload(next: Autostart | null): void {
   try {
-    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}`);
+    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}:${next.seed}`);
   } catch {
     // Without session storage, Restart falls back to the title screen.
   }
@@ -130,9 +141,9 @@ function setPaused(paused: boolean): void {
 }
 
 const menus = new Menus({
-  onPlay: (difficulty, size) => (size === game.map.size ? startGame(difficulty) : reload({ difficulty, size })),
+  onPlay: (difficulty, size) => (size === game.map.size ? startGame(difficulty) : reload({ difficulty, size, seed: urlSeed() ?? randomSeed() })),
   onResume: () => setPaused(false),
-  onRestart: () => reload({ difficulty: game.difficulty, size: mapSize }),
+  onRestart: () => reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed }),
   onQuit: () => reload(null),
   onFps: (show) => (fpsEl.hidden = !show),
 });

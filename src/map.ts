@@ -15,6 +15,8 @@ export const RAMP_WIDTH: Record<number, number> = { [NARROW]: 1, [NORMAL]: 2, [L
 const RAMP_EVERY = 6;
 /** Minimum gap in tiles between two ramps' carved strips. */
 const RAMP_GAP = 1;
+/** Tiles kept between a base center and the map edge. */
+const BASE_MARGIN = 10;
 
 /** How high the high ground sits above the low ground: a low rise, not a wall, so units below can still shoot up. */
 export const HIGH_Y = 1.1;
@@ -90,7 +92,7 @@ export class GameMap {
   version = 0;
 
   /** `size` is tiles per side. */
-  constructor(readonly size = 64, seed = 7) {
+  constructor(readonly size = 64, readonly seed = 7) {
     const N = size;
     this.tiles = new Uint8Array(N * N);
     this.spice = new Float32Array(N * N);
@@ -100,11 +102,32 @@ export class GameMap {
     this.rampDir = new Uint8Array(N * N);
     this.occupied = new Int32Array(N * N);
     this.surface = new Float32Array((N * SURFACE_RES + 1) ** 2);
-    this.bases = [{ cx: 10, cz: N - 11 }, { cx: N - 11, cz: 10 }];
+    this.bases = [];
     for (let attempt = 0; attempt < 20; attempt++) {
+      this.bases = this.pickBases(seed + attempt * 101);
       if (this.generate(seed + attempt * 101)) break;
     }
     this.buildSurface(seed);
+  }
+
+  /**
+   * Spawn spots from the seed: base 0 at a random angle and distance from the middle, base 1 mirrored through
+   * it, so the map stays point-symmetric. Kept far enough from the edges for the base plateau and spice field,
+   * and from about two thirds of the map width apart up to nearly corner to corner.
+   */
+  private pickBases(seed: number): Cell[] {
+    const N = this.size;
+    const mid = (N - 1) / 2;
+    const room = mid - BASE_MARGIN; // farthest a base may sit from the middle along either axis
+    const angle = hash(1, 2, seed) * Math.PI * 2;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const rMax = room / Math.max(Math.abs(cos), Math.abs(sin));
+    const rMin = Math.min(0.32 * N, rMax);
+    const r = rMin + (rMax - rMin) * Math.sqrt(hash(3, 4, seed)); // leans toward far apart
+    const cx = Math.round(mid + cos * r);
+    const cz = Math.round(mid + sin * r);
+    return [{ cx, cz }, { cx: N - 1 - cx, cz: N - 1 - cz }];
   }
 
   /** Vertices per side of the surface grid. */
@@ -465,10 +488,15 @@ export class GameMap {
 
     // A guaranteed spice field near each base, toward the map center.
     for (const b of this.bases) {
-      const dirX = Math.sign(N / 2 - b.cx);
-      const dirZ = Math.sign(N / 2 - b.cz);
-      const fx = b.cx + dirX * 12;
-      const fz = b.cz + dirZ * 3;
+      // Off to one side of the line toward the middle (as the original corner bases had it).
+      // Offsets round the same way on both sides, so the two fields stay exact mirrors.
+      const mid = (N - 1) / 2;
+      const len = Math.hypot(mid - b.cx, mid - b.cz) || 1;
+      const ux = (mid - b.cx) / len;
+      const uz = (mid - b.cz) / len;
+      const round = (v: number) => Math.sign(v) * Math.round(Math.abs(v));
+      const fx = b.cx + round(ux * 10 - uz * 6);
+      const fz = b.cz + round(uz * 10 + ux * 6);
       for (let dz = -4; dz <= 4; dz++) {
         for (let dx = -4; dx <= 4; dx++) {
           const x = fx + dx;

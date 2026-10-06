@@ -81,8 +81,8 @@ export class Game {
   private lastAlert = -100;
   private victoryTimer = 0;
 
-  constructor(readonly scene: THREE.Scene, private camera: THREE.Camera, size: MapSize = 64) {
-    this.map = new GameMap(size);
+  constructor(readonly scene: THREE.Scene, private camera: THREE.Camera, size: MapSize = 64, seed = 7) {
+    this.map = new GameMap(size, seed);
     this.terrain = new Terrain(this.map);
     scene.add(this.terrain.mesh);
     this.effects = new Effects(scene);
@@ -103,12 +103,17 @@ export class Game {
       const team = i as Team;
       const yard = this.placeBuilding('conyard', team, b.cx - 1, b.cz - 1);
       const front = yard.frontCell();
-      const towardCenter = { cx: front.cx + (team === 0 ? 3 : -3), cz: front.cz + (team === 0 ? -1 : 1) };
+      // Starting units gather a few tiles from the yard, toward the middle of the map, facing it.
+      const mid = (this.map.size - 1) / 2;
+      const len = Math.hypot(mid - b.cx, mid - b.cz) || 1;
+      const ux = (mid - b.cx) / len;
+      const uz = (mid - b.cz) / len;
+      const towardCenter = { cx: front.cx + Math.round(ux * 3), cz: front.cz + Math.round(uz * 3) };
       const cells = cellsAround(this.map, towardCenter.cx, towardCenter.cz, 12);
       const start: UnitType[] = ['trike', 'infantry', 'infantry', 'infantry'];
       start.forEach((type, k) => {
         const c = cells[k * 2] ?? cells[0];
-        this.spawnUnit(type, team, this.map.center(c.cx), this.map.center(c.cz), team === 0 ? -Math.PI / 4 : (Math.PI * 3) / 4);
+        this.spawnUnit(type, team, this.map.center(c.cx), this.map.center(c.cz), Math.atan2(uz, ux));
       });
     });
   }

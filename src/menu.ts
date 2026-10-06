@@ -127,7 +127,7 @@ export class Menus {
     const result = this.end.querySelector('.result')!;
     result.textContent = won ? 'Victory' : 'Defeat';
     result.className = `result ${won ? 'victory' : 'defeat'}`;
-    this.end.querySelector('.sub')!.textContent = `${formatTime(game.time)}  ·  ${DIFFICULTY_NAMES[game.difficulty]}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map`;
+    this.end.querySelector('.sub')!.textContent = `${formatTime(game.time)}  ·  ${DIFFICULTY_NAMES[game.difficulty]}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map  ·  seed ${game.map.seed}`;
 
     const you = game.teams[PLAYER];
     const foe = game.teams[ENEMY];

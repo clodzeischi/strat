@@ -44,7 +44,7 @@ Follow-ups: the AI still uses straight-line distance (`pickTarget`) and knows no
 
 **Decided:** sizes 64, 96 and 128. Plan for up to 4 players.
 
-**Status: sizes done.** Picked on the difficulty page (Small 64 / Medium 96 / Large 128), remembered between visits and kept on Restart. A different size from the one on screen reloads the page into the new map. Check with `SIZE=128 QUIET=1 CHECK=40 npx tsx sim/maps.ts` and `SIZE=128 npx tsx sim/terrain-check.ts 2`. Still to do: random seeds, the validation checks below, 4 players.
+**Status: sizes done.** Picked on the difficulty page (Small 64 / Medium 96 / Large 128), remembered between visits and kept on Restart. A different size from the one on screen reloads the page into the new map. Check with `SIZE=128 QUIET=1 CHECK=40 npx tsx sim/maps.ts` and `SIZE=128 npx tsx sim/terrain-check.ts 2`. **Random maps done:** every visit gets a random seed (Restart keeps it, `?seed=N` replays one, the end screen shows it). Spawns come from the seed: base 0 at a random angle and distance from the middle, base 1 mirrored through it, from about two thirds of the map width apart up to nearly corner to corner. Sims keep seed 7 unless run with `MAPS=random` (`sim/match.ts`). Check with `npx tsx sim/spawn-check.ts`. Still to do: the validation checks below, 4 players.
 
 To check in the fairness work: side 1 won 25 of 40 Normal-vs-Normal games on the 64 map, and all 4 audited games on 96 and 128. The terrain is symmetric, but other things aren't: every building's exit faces south, so team 0's units come out facing the map edge while team 1's face the center, and building placement scans in a fixed order.
 

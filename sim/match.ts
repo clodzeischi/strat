@@ -12,13 +12,15 @@ const opponent: AIProfile = { ...NORMAL_PROFILE, ...VARIANTS[oppName] };
 const games = Number(gamesArg ?? 20);
 const offset = Number(offsetArg ?? 0);
 const MAX_TIME = 30 * 60;
-// Balance experiments: HARV_COST=600 npx tsx sim/match.ts ...; SIZE=96 for a bigger map
+// Balance experiments: HARV_COST=600 npx tsx sim/match.ts ...; SIZE=96 for a bigger map;
+// MAPS=random plays each game on its own map (seed 1000 + game number) instead of seed 7
 if (process.env.HARV_COST) UNITS.harvester.cost = Number(process.env.HARV_COST);
 const AT = 300; // economy snapshot time
 
 for (let k = 0; k < games; k++) {
   const side = ((k + offset) % 2) as Team;
-  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize);
+  const seed = process.env.MAPS === 'random' ? 1000 + k + offset : 7;
+  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed);
   const ais = [0, 1].map((t) => new AI(g, t as Team, t === side ? profile : opponent));
   let spiceAt5 = 0;
   let armyAt5 = 0;
