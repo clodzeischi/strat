@@ -15,6 +15,13 @@ export const RAMP_WIDTH: Record<number, number> = { [NARROW]: 1, [NORMAL]: 2, [L
 const RAMP_EVERY = 6;
 /** Minimum gap in tiles between two ramps' carved strips. */
 const RAMP_GAP = 1;
+/** Rock areas with at least this many rock tiles stand as raised shelves. */
+const SHELF_MIN = 50;
+/** One mirrored pair of desert mesas per this many map tiles (2 pairs on the 64 map, 8 on the 128). */
+const MESA_AREA = 2000;
+/** Share of a rock shelf's edge left as cliff, as a range: one unbroken stretch, the rest opened up by ramps. */
+const SHELF_CLIFF = [0.3, 0.45];
+
 /** Tiles kept between a base center and the map edge. */
 const BASE_MARGIN = 10;
 
@@ -434,7 +441,6 @@ export class GameMap {
     const total = N * N;
     const h = new Array<number>(total);
     const s = new Array<number>(total);
-    const e = new Array<number>(total);
     const baseDist = new Array<number>(total);
     this.level.fill(0);
     this.ramp.fill(0);
@@ -448,21 +454,9 @@ export class GameMap {
         const i = this.idx(cx, cz);
         h[i] = (fbm(cx / 7, cz / 7, seed) + fbm(mx / 7, mz / 7, seed)) / 2;
         s[i] = (fbm(cx / 5 + 50, cz / 5 + 50, seed + 9) + fbm(mx / 5 + 50, mz / 5 + 50, seed + 9)) / 2;
-        e[i] = (fbm(cx / 11 + 100, cz / 11 + 100, seed + 21) + fbm(mx / 11 + 100, mz / 11 + 100, seed + 21)) / 2;
         baseDist[i] = Math.min(...this.bases.map((b) => Math.hypot(cx - b.cx, cz - b.cz)));
       }
     }
-
-    // High ground: the top third of the elevation noise. Each base sits on one flat level.
-    const highT = percentile(e, 0.33);
-    for (let i = 0; i < total; i++) this.level[i] = e[i] > highT ? 1 : 0;
-    for (const b of this.bases) {
-      const lvl = this.level[this.idx(b.cx, b.cz)];
-      for (let i = 0; i < total; i++) {
-        if (Math.hypot((i % N) - b.cx, ((i / N) | 0) - b.cz) < 10) this.level[i] = lvl;
-      }
-    }
-    this.removeSmallRegions(24);
 
     const cliffT = percentile(h, 0.08);
     const rockT = percentile(h, 0.2);
@@ -474,6 +468,16 @@ export class GameMap {
       else if (h[i] > rockT) t = ROCK;
       this.tiles[i] = t;
     }
+
+    // High ground. Every sizeable rock area (with the outcrops in it) is a raised shelf, the bases' included;
+    // placeRamps leaves a cliff along one stretch of each shelf's edge and opens the rest. The open desert only
+    // gets a few small mesas: obstacles to move around, with a ramp for whoever wants the height.
+    const { cells: rockAreas } = this.regions((i) => this.tiles[i] === ROCK || this.tiles[i] === CLIFF);
+    for (const list of rockAreas) {
+      if (list.filter((i) => this.tiles[i] === ROCK).length >= SHELF_MIN) for (const i of list) this.level[i] = 1;
+    }
+    this.placeMesas(seed, baseDist);
+    this.removeSmallRegions(24);
 
     // Spice in sandy areas away from bases.
     const sandSpice: number[] = [];
@@ -527,14 +531,21 @@ export class GameMap {
       if (this.tiles[i] !== SPICE) this.spice[i] = 0;
     }
 
-    // Keep at least a tile of sand between spice and rock or outcrops, diagonals included: where they touch,
-    // the ground shader's two crisp edges run into each other and look wrong.
-    const rocky = (x: number, z: number) => this.inBounds(x, z) && (this.tiles[this.idx(x, z)] === ROCK || this.tiles[this.idx(x, z)] === CLIFF);
+    // Keep at least a tile of sand between spice and rock, outcrops or a cliff edge, diagonals included: where
+    // they touch, the ground's crisp edges run into each other and look wrong.
+    const clash = (i: number, x: number, z: number) => {
+      if (!this.inBounds(x, z)) return false;
+      const j = this.idx(x, z);
+      if (this.tiles[j] === ROCK || this.tiles[j] === CLIFF) return true;
+      return this.level[j] !== this.level[i] && !this.ramp[i] && !this.ramp[j];
+    };
     for (let i = 0; i < total; i++) {
       if (this.tiles[i] !== SPICE) continue;
       const x = i % N;
       const z = (i / N) | 0;
-      if (rocky(x - 1, z - 1) || rocky(x, z - 1) || rocky(x + 1, z - 1) || rocky(x - 1, z) || rocky(x + 1, z) || rocky(x - 1, z + 1) || rocky(x, z + 1) || rocky(x + 1, z + 1)) {
+      let bad = false;
+      for (let dz = -1; dz <= 1 && !bad; dz++) for (let dx = -1; dx <= 1 && !bad; dx++) if (dx || dz) bad = clash(i, x + dx, z + dz);
+      if (bad) {
         this.tiles[i] = SAND;
         this.spice[i] = 0;
       }
@@ -546,6 +557,41 @@ export class GameMap {
       this.heights[i] = this.ramp[i] ? HIGH_Y / 2 : this.level[i] * HIGH_Y + detail;
     }
     return true;
+  }
+
+  /** A few small desert mesas in mirrored pairs, on open low sand away from bases. */
+  private placeMesas(seed: number, baseDist: number[]): void {
+    const N = this.size;
+    const pairs = Math.round((N * N) / MESA_AREA);
+    let made = 0;
+    for (let k = 0; k < pairs * 40 && made < pairs; k++) {
+      const cx = Math.floor(hash(k, 11, seed) * N);
+      const cz = Math.floor(hash(k, 12, seed) * N);
+      const r = 2.8 + hash(k, 13, seed) * 1.8;
+      // Far enough from its own mirror image that the pair stays two mesas.
+      if (Math.hypot(cx - (N - 1 - cx), cz - (N - 1 - cz)) < 2 * (r + 4)) continue;
+      const cells: number[] = [];
+      let ok = true;
+      for (let dz = -8; dz <= 8 && ok; dz++) {
+        for (let dx = -8; dx <= 8 && ok; dx++) {
+          const x = cx + dx;
+          const z = cz + dz;
+          const edge = r + (fbm(x / 2.5 + 200, z / 2.5 + 200, seed + 61) - 0.5) * 3; // lumpy outline
+          const d = Math.hypot(dx, dz);
+          if (d > edge + 2) continue;
+          // The mesa and a 2-tile margin around it: open low sand, inside the map, away from the bases.
+          if (x < 3 || z < 3 || x >= N - 3 || z >= N - 3) ok = false;
+          else {
+            const i = this.idx(x, z);
+            if (this.tiles[i] !== SAND || this.level[i] || baseDist[i] < 14) ok = false;
+            else if (d <= edge) cells.push(i);
+          }
+        }
+      }
+      if (!ok || cells.length < 24) continue;
+      for (const i of cells) this.level[i] = this.level[this.idx(N - 1 - (i % N), N - 1 - ((i / N) | 0))] = 1;
+      made++;
+    }
   }
 
   /** Cells reachable from a start cell for a movement class. */
@@ -610,8 +656,9 @@ export class GameMap {
 
   /**
    * Carves ramps into the edges of every plateau, in mirrored pairs so both sides get the same ones.
-   * Ramps are frequent and mostly wide, so high ground is a position to take, not a maze of chokepoints;
-   * single-file and infantry-only ramps are the occasional exception. The first two always take vehicles.
+   * Rock shelves keep a cliff along one stretch of their edge (a flank only artillery can hit from below) and
+   * the rest is opened with frequent, mostly wide ramps; single-file and infantry-only ones are the occasional
+   * exception, and a shelf's first two always take vehicles. Desert mesas get one ramp.
    */
   private placeRamps(seed: number): void {
     const N = this.size;
@@ -680,16 +727,26 @@ export class GameMap {
       const mx = plateau.reduce((s, i) => s + (i % N), 0) / plateau.length;
       const mz = plateau.reduce((s, i) => s + ((i / N) | 0), 0) / plateau.length;
       edge.sort((a, b) => Math.atan2(((a.i / N) | 0) - mz, (a.i % N) - mx) - Math.atan2(((b.i / N) | 0) - mz, (b.i % N) - mx));
-      const want = Math.max(1, Math.min(40, Math.round(edge.length / (self ? 2 * RAMP_EVERY : RAMP_EVERY))));
+      // Rock shelves keep one unbroken stretch of cliff and open the rest of their edge with ramps.
+      // Desert mesas get a single ramp: they're mainly obstacles.
+      const shelf = plateau.filter((i) => this.tiles[i] === ROCK).length > plateau.length / 2;
+      let spots = edge;
+      if (shelf) {
+        const share = SHELF_CLIFF[0] + (SHELF_CLIFF[1] - SHELF_CLIFF[0]) * hash(plateau[0], 51, seed);
+        const from = Math.floor(hash(plateau[0], 52, seed) * edge.length);
+        const len = Math.floor(edge.length * share);
+        spots = edge.filter((_, k) => (k - from + edge.length) % edge.length >= len);
+      }
+      const want = shelf ? Math.max(1, Math.min(40, Math.round(spots.length / (self ? 2 * RAMP_EVERY : RAMP_EVERY)))) : 1;
       let made = 0;
       for (let k = 0; k < want; k++) {
         const first = made === 0;
         const roll = hash(plateau[0], 7 + k, seed);
-        const kind = made < 2 || roll < 0.8 ? LARGE : roll < 0.93 ? NORMAL : NARROW;
+        const kind = !shelf ? (roll < 0.7 ? LARGE : NORMAL) : made < 2 || roll < 0.8 ? LARGE : roll < 0.93 ? NORMAL : NARROW;
         // Try spots around this ramp's share of the edge until one carves cleanly.
-        const startAt = Math.floor(((k + hash(plateau[0], 31 + k, seed)) / want) * edge.length);
-        for (let t = 0; t < edge.length; t += 3) {
-          const e = edge[(startAt + t) % edge.length];
+        const startAt = Math.floor(((k + hash(plateau[0], 31 + k, seed)) / want) * spots.length);
+        for (let t = 0; t < spots.length; t += 3) {
+          const e = spots[(startAt + t) % spots.length];
           if (carve(e.i, e.down, kind) || (first && carve(e.i, e.down, NORMAL))) {
             made++;
             break;
