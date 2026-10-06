@@ -37,22 +37,30 @@ export interface AIProfile {
   initiative: number;
   /** A wave falls back once it's down to this share of its starting strength. */
   waveRetreat: number;
+  /**
+   * Keeping the army alive (all off at 0): one Repair Vehicle per `repairPer` combat vehicles, up to `maxRepair`,
+   * waiting at the rally point; units below `mendBelow` of their health leave the fight to be repaired (infantry heal
+   * on their own); a wave pulls back when the enemies around it are `outmatched` times its strength.
+   */
+  sustain: { repairPer: number; maxRepair: number; mendBelow: number; outmatched: number };
 }
 
 export const NORMAL_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
   raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3,
+  sustain: { repairPer: 0, maxRepair: 0, mendBelow: 0, outmatched: 0 },
 };
 
 /**
  * Hard: twice Normal's harvesters with both refineries early, attacks whenever its army at home is clearly stronger
- * than the enemy's (going for the economy), falls back from a losing fight sooner, and harasses harvesters with
- * hit-and-run trike raids. Tuned with `MAPS=random sim/run.sh`; see docs/PLAN.md.
+ * than the enemy's (going for the economy), harasses harvesters with hit-and-run trike raids, and keeps its army
+ * alive: Repair Vehicles at home, badly hurt units pulled out to be mended, and waves that pull back when outmatched. Tuned with `MAPS=random sim/run.sh`; see docs/PLAN.md.
  */
 export const HARD_PROFILE: AIProfile = {
   ...NORMAL_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
   initiative: 1.2, waveRetreat: 0.5, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
+  sustain: { repairPer: 6, maxRepair: 3, mendBelow: 0.35, outmatched: 1.3 },
 };
 
 /** The AI profile for a difficulty. Brutal isn't built yet and plays as Hard. */
@@ -74,7 +82,8 @@ const CLUSTER_RADIUS = 10 * TILE;
 /** An attack that hasn't been seen for this long is over, and its defenders go home. */
 const DEFENSE_TIMEOUT = 4;
 
-type Role = 'home' | 'defend' | 'wave' | 'raid';
+/** 'mend': pulled out of a fight to be repaired or to heal. */
+type Role = 'home' | 'defend' | 'wave' | 'raid' | 'mend';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -276,7 +285,7 @@ export class AI {
       : step ? BUILDINGS[step].cost
       : refineries < this.wantRefineries() ? 800 : army >= this.profile.techArmy ? (this.techGoal()?.cost ?? 0) : 0;
 
-    if (!this.nextUnit) this.nextUnit = this.raidTrikeWanted() ? 'trike' : this.pickCounter();
+    if (!this.nextUnit) this.nextUnit = this.raidTrikeWanted() ? 'trike' : this.repairWanted() ? 'repair' : this.pickCounter();
     const next = this.nextUnit;
     if (!g.canTrain(this.team, next) || full(UNITS[next].producer)) {
       this.nextUnit = null; // that line is busy or missing; pick again next think
@@ -321,6 +330,16 @@ export class AI {
     return trikes + queued < r.trikes && !!this.rally && !!this.pickHarvester(this.rally, r.trikes * UNITS.trike.cost);
   }
 
+  /** Short of Repair Vehicles for the size of the vehicle army. */
+  private repairWanted(): boolean {
+    const s = this.profile.sustain;
+    if (!s.repairPer || !this.game.canTrain(this.team, 'repair')) return false;
+    const vehicles = this.game.units.filter((u) => u.team === this.team && u.def.weapon && !u.def.infantry && !u.def.air).length;
+    const want = Math.min(s.maxRepair, Math.round(vehicles / s.repairPer));
+    const have = this.game.count(this.team, 'repair') + this.ts.queues.factory.filter((q) => q.type === 'repair').length;
+    return have < want;
+  }
+
   // ---- Army -----------------------------------------------------------------
 
   private manageArmy(): void {
@@ -330,6 +349,7 @@ export class AI {
     for (const u of army) if (!this.roles.has(u)) this.roles.set(u, 'home');
     this.updateRally();
 
+    this.manageMending(army);
     this.manageDefense(army);
     const baseAttacked = this.defenses.some((d) => d.base);
     this.manageWaves(baseAttacked);
@@ -453,7 +473,47 @@ export class AI {
 
   private leaveGroups(u: Unit): void {
     for (const w of this.waves) w.units.delete(u);
+    for (const d of this.defenses) d.units.delete(u);
     this.raiders.delete(u);
+  }
+
+  /**
+   * Badly hurt units leave the fight: vehicles drive to the nearest Repair Vehicle, infantry fall back to the rally
+   * point to heal. Once mended they rejoin the units at home. Repair Vehicles wait at the rally point between jobs.
+   */
+  private manageMending(army: Unit[]): void {
+    const s = this.profile.sustain;
+    if (!s.mendBelow) return;
+    const g = this.game;
+    const repairers = g.units.filter((u) => u.team === this.team && u.def.repair && !u.carrier);
+    const rally = this.rally;
+    if (rally) {
+      for (const r of repairers) {
+        if (r.order.kind === 'idle' && Math.hypot(r.x - rally.x, r.z - rally.z) > 5 * TILE) {
+          r.command(g, { kind: 'move', x: rally.x + (Math.random() - 0.5) * 2 * TILE, z: rally.z + (Math.random() - 0.5) * 2 * TILE });
+        }
+      }
+    }
+    const nearestRepairer = (u: Unit) => {
+      let best: Unit | null = null;
+      for (const r of repairers) if (!best || Math.hypot(r.x - u.x, r.z - u.z) < Math.hypot(best.x - u.x, best.z - u.z)) best = r;
+      return best;
+    };
+    for (const u of army) {
+      const role = this.roles.get(u);
+      const health = u.hp / u.maxHp;
+      const mender = u.def.infantry ? rally : nearestRepairer(u);
+      if (role === 'mend') {
+        // Mended, or nobody left to mend it: back to the units at home.
+        if (health >= 0.9 || !mender) this.sendHome(u);
+        else if (u.order.kind === 'idle' && Math.hypot(u.x - mender.x, u.z - mender.z) > 3 * TILE) u.command(g, { kind: 'move', x: mender.x, z: mender.z });
+        continue;
+      }
+      if (health >= s.mendBelow || !mender || Math.hypot(u.x - mender.x, u.z - mender.z) < 6 * TILE) continue;
+      this.leaveGroups(u);
+      this.roles.set(u, 'mend');
+      u.command(g, { kind: 'move', x: mender.x, z: mender.z });
+    }
   }
 
   private manageWaves(baseAttacked: boolean): void {
@@ -465,6 +525,14 @@ export class AI {
         // Beaten: fall back and join the next wave instead of trickling in one by one.
         for (const u of w.units) this.sendHome(u);
         this.waves.splice(this.waves.indexOf(w), 1);
+        continue;
+      }
+      // Outmatched where it stands (enemy strength around it well above its own): pull back to fight another day.
+      const s = this.profile.sustain;
+      if (s.outmatched && this.guardAround(this.centroid(w.units), 14) > left * s.outmatched) {
+        for (const u of w.units) this.sendHome(u);
+        this.waves.splice(this.waves.indexOf(w), 1);
+        this.nextWaveTime = Math.max(this.nextWaveTime, g.time + 30); // regroup before going again
         continue;
       }
       // Reached its target and nothing left to shoot there: push on to the next one.

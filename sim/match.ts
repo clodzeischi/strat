@@ -13,13 +13,14 @@ const games = Number(gamesArg ?? 20);
 const offset = Number(offsetArg ?? 0);
 const MAX_TIME = 30 * 60;
 // Balance experiments: HARV_COST=600 npx tsx sim/match.ts ...; SIZE=96 for a bigger map;
-// MAPS=random plays each game on its own map (seed 1000 + game number) instead of seed 7
+// MAPS=random plays each map twice, once from each side (seeds from 1000), instead of seed 7
 if (process.env.HARV_COST) UNITS.harvester.cost = Number(process.env.HARV_COST);
 const AT = 300; // economy snapshot time
 
 for (let k = 0; k < games; k++) {
   const side = ((k + offset) % 2) as Team;
-  const seed = process.env.MAPS === 'random' ? 1000 + k + offset : 7;
+  // Random maps come in pairs, one per side, so a map that favors one spawn can't favor a variant.
+  const seed = process.env.MAPS === 'random' ? 1000 + Math.floor((k + offset) / 2) : 7;
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed);
   g.onSurrenderOffer = (t) => g.acceptSurrender(t); // an offer ends the game, as if the other side accepted
   const ais = [0, 1].map((t) => new AI(g, t as Team, t === side ? profile : opponent));

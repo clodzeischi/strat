@@ -117,9 +117,12 @@ What Hard does on top of Normal:
 - **Economy:** 6 harvesters and both refineries early (Normal: one harvester per refinery).
 - **Initiative:** besides Normal's wave timer, it attacks as soon as its army at home is 1.2x the enemy's whole army, and those waves go for refineries and harvesters first. Waves fall back at half strength (Normal: 30%).
 - **Harassment:** 3-trike raids from 2:30, every minute, on the least protected harvester; on to the next one after a kill; home as soon as defenders close in or half the group is lost. It keeps 3 trikes for raids while there's a harvester worth hitting, and they stay out of waves.
-- Defense, income recovery and surrender as on Normal (`DIFFICULTY=hard npx tsx sim/ai-check.ts`).
+- **Keeping its army alive:** one Repair Vehicle per 6 combat vehicles (up to 3), waiting at the rally point. Units below 35% health leave the fight: vehicles drive to the nearest Repair Vehicle, infantry fall back to heal, and both rejoin at 90%. A wave pulls back (and waits 30 s to regroup) when the enemy strength around it is 1.3x its own, re-checked every second.
+- Defense, income recovery and surrender as on Normal (`DIFFICULTY=hard npx tsx sim/ai-check.ts`, which also checks repairs and pulling back).
 
-Raids barely matter against Normal, whose defense now answers them in seconds; they are aimed at a human, who reacts slower. Next for Hard: chokepoint and high-ground awareness, using Carryalls and Repair Vehicles, and a reaction delay per difficulty.
+Raids barely matter against Normal, whose defense now answers them in seconds; they are aimed at a human, who reacts slower. Repairs and pulling back were neutral in win rate too (Hard with them vs without: 49-51% over 80 games; K/D 1.00 vs 0.95 against Normal), for the reason below. Next for Hard: chokepoint and high-ground awareness, Carryalls, and a reaction delay per difficulty.
+
+**Spawn side decides mirror matches.** Hard against a slightly different Hard, each map played from both sides: on 18 of 20 maps the same *spawn* won both games, whichever AI had it (Hard vs Normal: 13 of 20 maps won by the same AI from both sides). The winning spawn varies by map (10 and 10), and the terrain is point-symmetric, so the asymmetry is in the mechanics: building exits all face south, the AI's building placement scans in a fixed order, units update in a fixed order. Until that's fixed, small AI changes can't be measured in mirror matches, and on some maps the player's spawn may be the weaker one. This is the next thing to investigate. `MAPS=random` sims now play every map once from each side.
 
 **Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
 

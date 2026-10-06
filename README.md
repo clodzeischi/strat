@@ -17,7 +17,7 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
   - A Carryall assigned to a harvester ferries it between field and refinery, and flies it home if it comes under attack.
 - **Anti-air.** Infantry and rocket launchers can shoot Carryalls down. Troopers aboard a downed Carryall bail out by parachute.
 - **Repair.** Repair Vehicles fix vehicles, aircraft and buildings for credits. Infantry heal on their own once out of combat.
-- **A computer opponent** that defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Hard it runs a bigger economy, attacks when it's stronger and raids your harvesters. Brutal is coming. End-of-game stats screen.
+- **A computer opponent** that defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Hard it runs a bigger economy, attacks when it's stronger, raids your harvesters, repairs its damaged units and pulls back from fights it's losing. Brutal is coming. End-of-game stats screen.
 
 ## Screenshots
 

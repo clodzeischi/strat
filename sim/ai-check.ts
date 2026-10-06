@@ -191,5 +191,40 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
   check(s.g.winner === PLAYER_TEAM && s.g.surrendered === AI_TEAM, 'accepting ends the game as a win');
 }
 
+// 7-8. Hard keeps its army alive: badly hurt vehicles go to a Repair Vehicle, and an outmatched wave pulls back.
+if (profileFor(DIFFICULTY).sustain.mendBelow) {
+  {
+    const s = setup();
+    const a = s.ai as unknown as { roles: Map<Unit, string>; rally: { x: number; z: number } };
+    if (!s.g.count(AI_TEAM, 'repair')) s.g.spawnUnit('repair', AI_TEAM, a.rally.x, a.rally.z);
+    const home = conyard(s.g);
+    const far = s.g.map.nearestCell(s.g.map.cellOf(s.g.map.worldSize() / 2), s.g.map.cellOf(s.g.map.worldSize() / 2), (cx, cz) => s.g.map.canEnter(cx, cz, 'vehicle'), 20)!;
+    const tank = s.g.spawnUnit('tank', AI_TEAM, s.g.map.center(far.cx), s.g.map.center(far.cz));
+    tank.hp = tank.maxHp * 0.2;
+    s.ai.update(1.01); // takes it on as a unit at home
+    a.roles.set(tank, 'wave');
+    const start = dist(tank, home);
+    run(s, 90, () => tank.hp >= tank.maxHp * 0.9);
+    check(tank.hp >= tank.maxHp * 0.9, 'a badly hurt tank drives back and gets repaired', `${Math.round(start / TILE)} tiles out, ${Math.round((100 * tank.hp) / tank.maxHp)}% health after ${Math.round(s.g.time - 420)}s`);
+  }
+  {
+    const s = setup();
+    const a = s.ai as unknown as { roles: Map<Unit, string>; waves: { units: Set<Unit>; start: number; economy: boolean }[] };
+    const player = s.g.buildings.find((b) => b.team === PLAYER_TEAM)!;
+    for (let k = 0; k < 8; k++) s.g.spawnUnit('tank', PLAYER_TEAM, player.x + 6 + (k % 4) * 2, player.z + 6 + Math.floor(k / 4) * 2);
+    const wave = new Set<Unit>();
+    for (let k = 0; k < 3; k++) {
+      const u = s.g.spawnUnit('tank', AI_TEAM, player.x + 30, player.z + 30 + k * 2);
+      a.roles.set(u, 'wave');
+      wave.add(u);
+      u.command(s.g, { kind: 'amove', x: player.x, z: player.z });
+    }
+    a.waves.push({ units: wave, start: 3 * 400, economy: false });
+    run(s, 15);
+    const back = [...wave].filter((u) => !u.dead && a.roles.get(u) === 'home').length;
+    check(back === [...wave].filter((u) => !u.dead).length && back > 0, 'a three-tank wave facing eight tanks pulls back', `${back} of 3 heading home`);
+  }
+}
+
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
 process.exitCode = failures ? 1 : 0;
