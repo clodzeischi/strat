@@ -21,6 +21,13 @@ const ringMats = [
   new THREE.MeshBasicMaterial({ color: 0xff6a5a, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false }),
 ];
 
+/** Steepest a vehicle leans to follow the ground, so cliff-foot slopes don't stand it on end. */
+const MAX_TILT = THREE.MathUtils.degToRad(25);
+const UP = new THREE.Vector3(0, 1, 0);
+const tmpNormal = new THREE.Vector3();
+const tilt = new THREE.Quaternion();
+const yaw = new THREE.Quaternion();
+
 function wrapAngle(a: number): number {
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
@@ -157,6 +164,11 @@ export class Unit extends Entity {
   private muzzle: THREE.Object3D;
   private cooldown = 0;
   private scanTimer = Math.random() * 0.5;
+  /** Turreted units: what the turret shoots at while the hull does something else (driving, chasing). */
+  private sideTarget: Entity | null = null;
+  private sideScanTimer = Math.random() * 0.3;
+  /** Vehicles: smoothed ground normal the hull leans to. */
+  private groundUp = new THREE.Vector3(0, 1, 0);
   private repathTimer = 0;
   private chasing = false;
   private progressTimer = 0;
@@ -256,6 +268,7 @@ export class Unit extends Entity {
   update(game: Game, dt: number): void {
     this.cooldown -= dt;
     this.scanTimer -= dt;
+    this.sideScanTimer -= dt;
     const weapon = this.def.weapon;
 
     // Pick or drop the current target.
@@ -302,8 +315,44 @@ export class Unit extends Entity {
       }
     }
 
+    if (this.turret && weapon && !aiming) aiming = this.fireOnTheMove(game, dt);
     if (this.turret && !aiming) this.turretHeading = this.rotateToward(this.turretHeading, this.heading, 3 * dt);
     this.checkStuck(game, dt);
+  }
+
+  /**
+   * Turreted units fire while the hull is busy: driving on a move order, chasing a target that's out of range,
+   * or backing away from one inside minimum range. The turret takes the current target when it's in range,
+   * otherwise the best enemy within reach. Returns true while the turret is aiming.
+   */
+  private fireOnTheMove(game: Game, dt: number): boolean {
+    const inReach = (e: Entity | null): e is Entity => {
+      if (!e || e.dead) return false;
+      const w = game.weaponFor(this, e);
+      if (!w) return false;
+      const d = distTo(e, this.x, this.z);
+      return d >= w.minRange && d <= game.rangeFor(this, w, e);
+    };
+    if (inReach(this.target)) this.sideTarget = this.target;
+    else if (!inReach(this.sideTarget)) {
+      this.sideTarget = null;
+      if (this.sideScanTimer <= 0) {
+        this.sideScanTimer = 0.3 + Math.random() * 0.1;
+        // A little past nominal range, since shooting down from high ground reaches further.
+        const found = game.nearestEnemy(this.team, this.x, this.z, this.def.weapon!.range * 1.1, this);
+        if (inReach(found)) this.sideTarget = found;
+      }
+    }
+    const target = this.sideTarget;
+    if (!target) return false;
+    const angle = Math.atan2(target.z - this.z, target.x - this.x);
+    this.turretHeading = this.rotateToward(this.turretHeading, angle, 4 * dt);
+    if (Math.abs(wrapAngle(angle - this.turretHeading)) < 0.12 && this.cooldown <= 0) {
+      const w = game.weaponFor(this, target)!;
+      game.fire(this, target, w);
+      this.cooldown = game.cooldownFor(this, w) * (0.9 + Math.random() * 0.2);
+    }
+    return true;
   }
 
   /** Moves into range of the target and fires. Returns true while the turret is aiming at it. */
@@ -541,7 +590,27 @@ export class Unit extends Entity {
     const groundY = game.map.surfaceAt(this.x, this.z);
     this.y += (groundY - this.y) * Math.min(1, dt * 10);
     this.root.position.set(this.x, this.y, this.z);
-    this.body.rotation.y = -this.heading;
+    if (this.def.infantry) {
+      this.body.rotation.y = -this.heading;
+    } else {
+      // Vehicles lean with the ground under their hull (sampled across it, so single facets don't jolt them).
+      const m = game.map;
+      const r = Math.max(0.6, this.radius);
+      const n = tmpNormal.set(
+        m.surfaceAt(this.x - r, this.z) - m.surfaceAt(this.x + r, this.z),
+        2 * r,
+        m.surfaceAt(this.x, this.z - r) - m.surfaceAt(this.x, this.z + r),
+      ).normalize();
+      if (n.y < Math.cos(MAX_TILT)) {
+        const flat = Math.hypot(n.x, n.z);
+        const s = Math.sin(MAX_TILT) / flat;
+        n.set(n.x * s, Math.cos(MAX_TILT), n.z * s);
+      }
+      this.groundUp.lerp(n, Math.min(1, dt * 8)).normalize();
+      tilt.setFromUnitVectors(UP, this.groundUp);
+      yaw.setFromAxisAngle(UP, -this.heading);
+      this.body.quaternion.multiplyQuaternions(tilt, yaw);
+    }
     if (this.turret) this.turret.rotation.y = -(this.turretHeading - this.heading);
   }
 }
