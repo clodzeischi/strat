@@ -223,6 +223,7 @@ export class GameMap {
         const z = j * step;
         let h = 0;
         let top = -Infinity;
+        let bottom = Infinity;
         let dune = 0;
         let cliff = 0;
         let soft = 0; // share of sand, spice and ramp around: smooth-shaded ground, no jitter
@@ -233,6 +234,7 @@ export class GameMap {
           const s = this.heightAt(x + dx, z + dz);
           h += s / 4;
           top = Math.max(top, s);
+          bottom = Math.min(bottom, s);
           const cx = this.cellOf(x + dx);
           const cz = this.cellOf(z + dz);
           if (!this.inBounds(cx, cz)) continue;
@@ -245,10 +247,15 @@ export class GameMap {
           else levels |= this.level[k] ? 2 : 1;
           highs += this.level[k];
         }
-        // On a plateau corner that sticks out (one high tile of four) the vertex stays low, cutting the corner
-        // diagonally so plateau outlines don't follow the tile grid's staircase.
-        const edge = levels === 3 && !ramp && cliff === 0 && highs > 1;
-        if (edge) h = top + (hash(i, j, seed + 45) - 0.5) * 0.25; // a slightly ragged lip
+        // A cliff edge vertex sits at the top or the foot of the wall, never halfway, so the wall stays steep.
+        // A plateau corner that sticks out (one high tile of four) takes the foot, cutting the corner diagonally;
+        // an inner corner (three of four) takes the top. Along straight runs (two of four) slow noise picks, so
+        // the wall wanders in and out by half a tile instead of tracing the tile grid's staircase.
+        if (levels === 3 && !ramp && cliff === 0) {
+          const wander = fbm(x / 5 + 700, z / 5 + 700, seed + 47) > 0.5;
+          const atTop = highs > 2 || (highs === 2 && wander);
+          h = (atTop ? top : bottom) + (hash(i, j, seed + 45) - 0.5) * 0.25; // a slightly ragged lip
+        }
         if (dune > 0) {
           // Broad swells plus crested ridges running roughly east-west, like wind-built dunes.
           const swell = fbm(x / 40 + 300, z / 40 + 300, seed + 41) - 0.45;

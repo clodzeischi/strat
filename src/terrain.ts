@@ -75,9 +75,11 @@ function addSpiceShader(material: THREE.MeshLambertMaterial, time: { value: numb
       .replace('#include <common>', `#include <common>
 attribute vec3 spice;
 varying vec3 vSpice;
-varying vec3 vGround;`)
+varying vec3 vGround;
+varying vec3 vGroundN;`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 vSpice = spice;
+vGroundN = mat3(modelMatrix) * objectNormal;
 vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
@@ -85,6 +87,7 @@ uniform float uTime;
 uniform vec3 uSand, uRock, uSpiceLight, uSpiceDeep, uSpiceRim, uGlint;
 varying vec3 vSpice;
 varying vec3 vGround;
+varying vec3 vGroundN;
 float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float gNoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -126,7 +129,21 @@ spiceCol = mix(spiceCol, uSpiceRim, (1.0 - smoothstep(0.0, 0.06, shape)) * 0.7);
 // The vertex color is sand with dune shading baked in; scaling it keeps that shading on the spice.
 diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * spiceCol / uSand, inside);
 // Sand and rock detail last, kept off the spice (it has its own grain).
-diffuseColor.rgb *= 1.0 + mix(mottle + strata, rippleShade + sandGrain, sandShare) * (1.0 - inside);`)
+diffuseColor.rgb *= 1.0 + mix(mottle + strata, rippleShade + sandGrain, sandShare) * (1.0 - inside);
+// Steep faces: layered rock with vertical weathering streaks and thin dark cracks. Streaks run along the wall,
+// so they use whichever horizontal axis the wall faces across.
+vec3 wn = normalize(vGroundN);
+float steep = 1.0 - smoothstep(0.55, 0.85, wn.y);
+if (steep > 0.0) {
+  float along = abs(wn.x) > abs(wn.z) ? vGround.z : vGround.x;
+  float layers = sin(vGround.y * 10.0 + gNoise(vec2(along * 0.5, vGround.y * 2.0)) * 4.0) * 0.5 + 0.5;
+  float streaks = gNoise(vec2(along * 3.5, vGround.y * 0.6)) * 0.65 + gNoise(vec2(along * 9.0, vGround.y * 1.5)) * 0.35;
+  // Cracks: thin lines where a noise stretched tall crosses one half, so they run mostly up and down.
+  float crackN = gNoise(vec2(along * 2.2, vGround.y * 0.35) + 30.0);
+  float crack = (1.0 - smoothstep(0.0, 0.03 + fwidth(crackN), abs(crackN - 0.5))) * step(0.55, gNoise(vec2(along * 0.7, 3.0)));
+  float wall = 1.0 + (layers - 0.5) * 0.14 + (streaks - 0.5) * 0.3;
+  diffuseColor.rgb *= mix(1.0, wall * (1.0 - crack * 0.4), steep);
+}`)
       .replace('#include <opaque_fragment>', `{
   // Shimmer: one possible glint per small cell, each twinkling on its own clock, denser on rich spice.
   vec2 cp = gp * 2.2;
@@ -144,8 +161,12 @@ diffuseColor.rgb *= 1.0 + mix(mottle + strata, rippleShade + sandGrain, sandShar
   };
 }
 
-/** Faces steeper than this (normal's y below it) are cliff faces and drawn faceted. */
+/** Faces steeper than this (normal's y below it) are cliff walls, not ground. */
 const SHARP_NY = 0.8;
+/** Smoothing groups. Normals only average within a group, so where two groups meet the edge stays sharp. */
+const FACETED = 0; // rock, outcrops: flat faces
+const GROUND = 1; // sand, spice, ramps
+const WALL = 2; // shelf and mesa cliff walls: smooth along the wall, creased at its lip and foot
 /**
  * Extra light baked into smooth ground per unit of sun-facing tilt. Under the high sun and strong sky light,
  * gentle dunes would otherwise barely shade at all.
@@ -165,18 +186,21 @@ export class Terrain {
   private dirty = new Set<number>();
   private tmp = new THREE.Color();
   private acc = new THREE.Color();
-  /** Per surface triangle (two per grid square, square-major): 1 if smooth-shaded. */
+  /** Per surface triangle (two per grid square, square-major): smoothing group, one of FACETED / GROUND / WALL. */
   private smooth: Uint8Array;
   /** Per surface triangle: y of its face normal (1 = flat). */
   private faceNy: Float32Array;
-  /** Per surface vertex: normal averaged over the smooth faces around it. */
+  /** Per surface vertex: normal averaged over the smooth ground faces around it. */
   private normals: Float32Array;
+  /** Per surface vertex: normal averaged over the cliff-wall faces around it. */
+  private wallNormals: Float32Array;
 
   constructor(private map: GameMap) {
     const V = map.surfaceSize;
     this.smooth = new Uint8Array((V - 1) * (V - 1) * 2);
     this.faceNy = new Float32Array((V - 1) * (V - 1) * 2);
     this.normals = new Float32Array(V * V * 3);
+    this.wallNormals = new Float32Array(V * V * 3);
     this.classifyFaces();
     addSpiceShader(this.material, this.time);
     for (let cz0 = 0; cz0 < map.size; cz0 += CHUNK) {
@@ -215,7 +239,7 @@ export class Terrain {
     this.dirty.clear();
   }
 
-  /** Decides which triangles are smooth and builds the smooth vertex normals from them. */
+  /** Puts each triangle in a smoothing group and builds the smooth vertex normals for each group. */
   private classifyFaces(): void {
     const map = this.map;
     const V = map.surfaceSize;
@@ -241,20 +265,25 @@ export class Terrain {
           const cz = Math.floor((tri[0][1] + tri[1][1] + tri[2][1]) / 3 / SURFACE_RES);
           const k = map.idx(Math.min(cx, map.size - 1), Math.min(cz, map.size - 1));
           const soft = map.ramp[k] !== 0 || (map.tiles[k] !== ROCK && map.tiles[k] !== CLIFF);
-          if (!soft || this.faceNy[f] < SHARP_NY) continue;
-          this.smooth[f] = 1;
+          const steep = this.faceNy[f] < SHARP_NY;
+          const group = steep ? (map.tiles[k] === CLIFF ? FACETED : WALL) : soft ? GROUND : FACETED;
+          this.smooth[f] = group;
+          if (group === FACETED) continue;
+          const acc = group === WALL ? this.wallNormals : this.normals;
           for (const [i, j] of tri) {
             const o = (j * V + i) * 3;
-            this.normals[o] += n.x;
-            this.normals[o + 1] += n.y;
-            this.normals[o + 2] += n.z;
+            acc[o] += n.x;
+            acc[o + 1] += n.y;
+            acc[o + 2] += n.z;
           }
         }
       }
     }
-    for (let o = 0; o < this.normals.length; o += 3) {
-      n.fromArray(this.normals, o);
-      (n.lengthSq() ? n.normalize() : n.set(0, 1, 0)).toArray(this.normals, o);
+    for (const acc of [this.normals, this.wallNormals]) {
+      for (let o = 0; o < acc.length; o += 3) {
+        n.fromArray(acc, o);
+        (n.lengthSq() ? n.normalize() : n.set(0, 1, 0)).toArray(acc, o);
+      }
     }
   }
 
@@ -283,10 +312,12 @@ export class Terrain {
             pos[p] = gi * step;
             pos[p + 1] = map.surface[gj * V + gi];
             pos[p + 2] = gj * step;
-            nor.set(this.normals.subarray((gj * V + gi) * 3, (gj * V + gi) * 3 + 3), p);
+            const group = this.smooth[this.faceIndex(cx0, cz0, i, j, t)];
+            const src = group === WALL ? this.wallNormals : this.normals;
+            nor.set(src.subarray((gj * V + gi) * 3, (gj * V + gi) * 3 + 3), p);
             p += 3;
           }
-          if (this.smooth[this.faceIndex(cx0, cz0, i, j, t)]) continue;
+          if (this.smooth[this.faceIndex(cx0, cz0, i, j, t)] !== FACETED) continue;
           // Faceted: all three corners take the face normal.
           origin.fromArray(pos, p0);
           face.fromArray(pos, p0 + 3).sub(origin);
@@ -341,7 +372,7 @@ export class Terrain {
       const face = (j * (n - 1) + i) * 2 + t;
       corners.forEach((c, k) => spice.setXYZ(face * 3 + k, chunk.spice[c], chunk.spice[c + 1], chunk.spice[c + 2]));
       const f = this.faceIndex(chunk.cx0, chunk.cz0, i, j, t);
-      if (this.smooth[f]) {
+      if (this.smooth[f] === GROUND) {
         const flat = TO_SUN.y;
         const all = this.corners(chunk.cx0, chunk.cz0, i, j).slice(t * 3, t * 3 + 3);
         corners.forEach((c, k) => {
@@ -355,10 +386,12 @@ export class Terrain {
       }
       const gi = chunk.cx0 * SURFACE_RES + i;
       const gj = chunk.cz0 * SURFACE_RES + j;
-      const jitter = ((((gi * 73856093) ^ (gj * 19349663) ^ (t * 83492791)) & 0xff) / 255) * 0.07 + 0.965;
+      // Walls skip the per-face jitter: it would show their triangles; the shader gives them texture instead.
+      const jitter = this.smooth[f] === WALL ? 1 : ((((gi * 73856093) ^ (gj * 19349663) ^ (t * 83492791)) & 0xff) / 255) * 0.07 + 0.965;
       const ny = this.faceNy[f];
       const slope = Math.sqrt(1 - ny * ny) / ny;
-      const toSlope = Math.min(0.85, Math.max(0, (slope - 0.12) * 2));
+      // Walls take one tint throughout; tinting each face by its own steepness would show the triangles.
+      const toSlope = this.smooth[f] === WALL ? 0.7 : Math.min(0.85, Math.max(0, (slope - 0.12) * 2));
       // Corner colors still blend (the shader's crisp rock edge relies on it); the face gets one jitter and tint.
       corners.forEach((c, k) => {
         this.acc.setRGB(grid[c], grid[c + 1], grid[c + 2]).lerp(SLOPE, toSlope).multiplyScalar(jitter);
