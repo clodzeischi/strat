@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AI } from './game/ai';
+import { AI, profileFor } from './game/ai';
 import { RTSCamera } from './render/camera';
 import { ENEMY, MAP_SIZES, PLAYER, TILE, type MapSize } from './config';
 import { Game, type Difficulty } from './game/game';
@@ -39,7 +39,7 @@ function readAutostart(): Autostart | null {
     const raw = sessionStorage.getItem(AUTOSTART_KEY);
     sessionStorage.removeItem(AUTOSTART_KEY);
     const [difficulty, size, seed] = (raw ?? '').split(':');
-    const okDifficulty = difficulty === 'normal' || difficulty === 'hard' || difficulty === 'brutal';
+    const okDifficulty = difficulty === 'normal' || difficulty === 'hard';
     const okSize = (MAP_SIZES as readonly number[]).includes(Number(size));
     const okSeed = seed !== '' && Number.isInteger(Number(seed));
     return okDifficulty && okSize && okSeed ? { difficulty, size: Number(size) as MapSize, seed: Number(seed) } : null;
@@ -67,8 +67,9 @@ const shadows = new ViewShadows(sun);
 const input = new Input(game, rts, canvas, document.getElementById('selbox')!, document.getElementById('info')!);
 const sidebar = new Sidebar(game, input, rts);
 game.onMessage = (t) => sidebar.showMessage(t);
-const ai = new AI(game, ENEMY);
-if (import.meta.env.DEV) Object.assign(window, { game, ai, input, rts, renderer });
+// Created when the game starts, with the profile for the chosen difficulty.
+let ai: AI | null = null;
+if (import.meta.env.DEV) Object.assign(window, { game, input, rts, renderer });
 
 // Start looking at the home base, nudged toward the middle of the map where the action will come from.
 const home = game.buildings.find((b) => b.team === PLAYER)!;
@@ -117,6 +118,8 @@ const fpsEl = document.getElementById('fps')!;
 
 function startGame(difficulty: Difficulty): void {
   game.difficulty = difficulty;
+  ai = new AI(game, ENEMY, profileFor(difficulty));
+  if (import.meta.env.DEV) Object.assign(window, { ai });
   mode = 'playing';
   menus.hideTitle();
   document.body.classList.remove('in-menu');
@@ -202,7 +205,7 @@ function frame(now: number): void {
       input.update(dt);
       if (!input.paused) {
         game.update(dt);
-        ai.update(dt);
+        ai?.update(dt);
       }
       if (game.winner !== null) {
         mode = 'ended';

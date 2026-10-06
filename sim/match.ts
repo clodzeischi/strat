@@ -21,6 +21,7 @@ for (let k = 0; k < games; k++) {
   const side = ((k + offset) % 2) as Team;
   const seed = process.env.MAPS === 'random' ? 1000 + k + offset : 7;
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed);
+  g.onSurrenderOffer = (t) => g.acceptSurrender(t); // an offer ends the game, as if the other side accepted
   const ais = [0, 1].map((t) => new AI(g, t as Team, t === side ? profile : opponent));
   let spiceAt5 = 0;
   let armyAt5 = 0;

@@ -1,6 +1,6 @@
 import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType } from '../config';
 import { Building, type Entity, type Unit } from '../entities';
-import type { Game } from './game';
+import type { Difficulty, Game } from './game';
 import type { Cell } from '../map';
 
 const RESEARCH_ORDER: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
@@ -25,12 +25,40 @@ export interface AIProfile {
   defenseMargin: number;
   /** Offers to surrender when it has lost its production and its income for good. */
   surrender: boolean;
+  /**
+   * Trike raids on enemy harvesters: group size, first raid and time between raids (seconds). With `hunt`, raids pick
+   * the least protected harvester, keep trikes in production for them, and pull back once half the group is lost.
+   */
+  raids: { trikes: number; start: number; interval: number; hunt: boolean };
+  /**
+   * Besides the wave timer, attack as soon as the army at home is this many times stronger than the enemy's whole
+   * army (0: timer only). Such waves go for the enemy economy first.
+   */
+  initiative: number;
+  /** A wave falls back once it's down to this share of its starting strength. */
+  waveRetreat: number;
 }
 
 export const NORMAL_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
+  raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3,
 };
+
+/**
+ * Hard: twice Normal's harvesters with both refineries early, attacks whenever its army at home is clearly stronger
+ * than the enemy's (going for the economy), falls back from a losing fight sooner, and harasses harvesters with
+ * hit-and-run trike raids. Tuned with `MAPS=random sim/run.sh`; see docs/PLAN.md.
+ */
+export const HARD_PROFILE: AIProfile = {
+  ...NORMAL_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
+  initiative: 1.2, waveRetreat: 0.5, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
+};
+
+/** The AI profile for a difficulty. Brutal isn't built yet and plays as Hard. */
+export function profileFor(difficulty: Difficulty): AIProfile {
+  return difficulty === 'normal' ? NORMAL_PROFILE : HARD_PROFILE;
+}
 
 /** Rough fighting strength: what the unit cost, scaled by the health it has left. Unarmed units count for nothing. */
 export function power(u: Unit): number {
@@ -45,8 +73,6 @@ const HARVESTER_RADIUS = 10 * TILE;
 const CLUSTER_RADIUS = 10 * TILE;
 /** An attack that hasn't been seen for this long is over, and its defenders go home. */
 const DEFENSE_TIMEOUT = 4;
-/** A wave that has lost this share of its strength falls back instead of feeding units in one by one. */
-const WAVE_RETREAT = 0.3;
 
 type Role = 'home' | 'defend' | 'wave' | 'raid';
 
@@ -66,6 +92,8 @@ interface Wave {
   units: Set<Unit>;
   /** Strength when it set out. */
   start: number;
+  /** Goes for refineries and harvesters before anything else. */
+  economy: boolean;
 }
 
 /**
@@ -79,7 +107,7 @@ export class AI {
   private nextWaveTime = 150;
   /** Unit we're saving up for, so expensive units still get built. */
   private nextUnit: UnitType | null = null;
-  private nextRaidTime = 200;
+  private nextRaidTime: number;
   /** Tech path for this game: economy and anti-armor first, or heavy army first. */
   private readonly techOrder: LevelUpType[] = Math.random() < 0.5 ? ['conyard', 'factory'] : ['factory', 'conyard'];
 
@@ -91,6 +119,8 @@ export class AI {
   private defenses: Defense[] = [];
   private waves: Wave[] = [];
   private raiders = new Set<Unit>();
+  /** Strength of the current raid when it set out. */
+  private raidStart = 0;
   /** Where idle units gather: just in front of the base, toward the middle of the map. */
   private rally: { x: number; z: number } | null = null;
   private rallyAnchor: Building | null = null;
@@ -101,7 +131,9 @@ export class AI {
   private hopelessFor = 0;
   surrenderOffered = false;
 
-  constructor(private game: Game, private team: Team, private profile: AIProfile = NORMAL_PROFILE) {}
+  constructor(private game: Game, private team: Team, private profile: AIProfile = NORMAL_PROFILE) {
+    this.nextRaidTime = profile.raids.start;
+  }
 
   /** The first opening structure we don't have yet (a type listed twice needs two of it). */
   private openingStep(): BuildingType | null {
@@ -144,7 +176,8 @@ export class AI {
     if (!g.has(this.team, 'refinery')) return g.has(this.team, 'conyard') ? refinery : null;
     if (this.harvesterCount() >= Math.min(this.profile.minHarvesters, this.wantHarvesters())) return null;
     if (g.has(this.team, 'factory')) return { type: 'harvester', cost: UNITS.harvester.cost };
-    return g.has(this.team, 'conyard') ? refinery : null;
+    // Only once the opening is done: before that, the factory is on its way anyway.
+    return this.openingDone && g.has(this.team, 'conyard') ? refinery : null;
   }
 
   /** A structure lost since the opening was finished: rebuilt before units, so production comes back. */
@@ -243,7 +276,7 @@ export class AI {
       : step ? BUILDINGS[step].cost
       : refineries < this.wantRefineries() ? 800 : army >= this.profile.techArmy ? (this.techGoal()?.cost ?? 0) : 0;
 
-    if (!this.nextUnit) this.nextUnit = this.pickCounter();
+    if (!this.nextUnit) this.nextUnit = this.raidTrikeWanted() ? 'trike' : this.pickCounter();
     const next = this.nextUnit;
     if (!g.canTrain(this.team, next) || full(UNITS[next].producer)) {
       this.nextUnit = null; // that line is busy or missing; pick again next think
@@ -252,8 +285,8 @@ export class AI {
     if (ts.credits - UNITS[next].cost >= reserve + this.fund() && g.queueUnit(this.team, next)) this.nextUnit = null;
   }
 
-  /** Weighted pick that leans toward whatever counters the enemy's current army. */
-  private pickCounter(): UnitType {
+  /** How much we want of each unit type, from what counters the enemy's current army. */
+  private counterWeights(): [UnitType, number][] {
     const g = this.game;
     const value: Record<UnitType, number> = { harvester: 0, infantry: 0, trike: 0, tank: 0, rocket: 0, repair: 0, carryall: 0 };
     for (const u of g.units) if (u.team !== this.team) value[u.type] += UNITS[u.type].cost / 500;
@@ -264,7 +297,12 @@ export class AI {
       ['tank', 1 + value.trike + value.rocket],
       ['rocket', 0.6 + value.infantry],
     ];
-    const options = weights.filter(([t]) => g.requirementsMet(this.team, UNITS[t].requires));
+    return weights.filter(([t]) => g.requirementsMet(this.team, UNITS[t].requires));
+  }
+
+  /** Weighted pick that leans toward whatever counters the enemy's current army. */
+  private pickCounter(): UnitType {
+    const options = this.counterWeights();
     if (options.length === 0) return 'infantry';
     let r = Math.random() * options.reduce((sum, [, w]) => sum + w, 0);
     for (const [type, w] of options) {
@@ -272,6 +310,15 @@ export class AI {
       if (r <= 0) return type;
     }
     return options[0][0];
+  }
+
+  /** Hunting raiders keep enough trikes for the next raid, while there's a harvester worth raiding. */
+  private raidTrikeWanted(): boolean {
+    const r = this.profile.raids;
+    if (!r.hunt || this.game.time < this.nextRaidTime - 20 || !this.game.canTrain(this.team, 'trike')) return false;
+    const trikes = this.game.count(this.team, 'trike');
+    const queued = this.ts.queues.factory.filter((q) => q.type === 'trike').length;
+    return trikes + queued < r.trikes && !!this.rally && !!this.pickHarvester(this.rally, r.trikes * UNITS.trike.cost);
   }
 
   // ---- Army -----------------------------------------------------------------
@@ -414,7 +461,7 @@ export class AI {
     for (const w of [...this.waves]) {
       for (const u of w.units) if (u.dead) w.units.delete(u);
       const left = [...w.units].reduce((s, u) => s + power(u), 0);
-      if (w.units.size === 0 || left < w.start * WAVE_RETREAT) {
+      if (w.units.size === 0 || left < w.start * this.profile.waveRetreat) {
         // Beaten: fall back and join the next wave instead of trickling in one by one.
         for (const u of w.units) this.sendHome(u);
         this.waves.splice(this.waves.indexOf(w), 1);
@@ -423,19 +470,28 @@ export class AI {
       // Reached its target and nothing left to shoot there: push on to the next one.
       const idle = [...w.units].filter((u) => u.order.kind === 'idle' && !u.target);
       if (idle.length) {
-        const target = this.pickTarget(idle[0]);
+        const target = this.pickTarget(idle[0], w.economy);
         if (target) for (const u of idle) u.command(g, { kind: 'amove', x: target.x, z: target.z });
       }
     }
 
-    if (baseAttacked || g.time < this.nextWaveTime) return;
-    const ready = [...this.roles].filter(([u, r]) => r === 'home' && !u.dead && !u.carrier).map(([u]) => u);
-    // A full-size wave, or a smaller one if it's been a long while, so the pressure keeps up after heavy losses.
-    const overdue = g.time >= this.nextWaveTime + 90;
-    if (ready.length < this.waveSize && !(overdue && ready.length >= Math.max(4, this.waveSize / 2))) return;
-    const target = this.pickTarget(ready[0]);
+    if (baseAttacked) return;
+    // Hunting raiders keep their trikes out of the waves.
+    const hunt = this.profile.raids.hunt;
+    const ready = [...this.roles].filter(([u, r]) => r === 'home' && !u.dead && !u.carrier && !(hunt && u.type === 'trike')).map(([u]) => u);
+    const strength = ready.reduce((s, u) => s + power(u), 0);
+    // Initiative: strong enough to win outright, so go now, whatever the timer says.
+    const enemy = g.units.filter((u) => u.team !== this.team && !u.carrier).reduce((s, u) => s + power(u), 0);
+    const seize = this.profile.initiative > 0 && ready.length >= 4 && strength >= enemy * this.profile.initiative;
+    if (!seize) {
+      if (g.time < this.nextWaveTime) return;
+      // A full-size wave, or a smaller one if it's been a long while, so the pressure keeps up after heavy losses.
+      const overdue = g.time >= this.nextWaveTime + 90;
+      if (ready.length < this.waveSize && !(overdue && ready.length >= Math.max(4, this.waveSize / 2))) return;
+    }
+    const target = this.pickTarget(ready[0], seize);
     if (!target) return;
-    const wave: Wave = { units: new Set(ready), start: ready.reduce((s, u) => s + power(u), 0) };
+    const wave: Wave = { units: new Set(ready), start: strength, economy: seize };
     for (const u of ready) {
       this.roles.set(u, 'wave');
       u.command(g, { kind: 'amove', x: target.x, z: target.z });
@@ -445,36 +501,94 @@ export class AI {
     this.nextWaveTime = g.time + 60;
   }
 
-  /** A few idle trikes go after an enemy harvester, and come home once it's dead or out of reach. */
+  /**
+   * A few idle trikes go after an enemy harvester and come home once it's dead or out of reach. Hunting raiders hit
+   * and run: they only pick a harvester with little protection, move on to the next one after a kill, and run
+   * home as soon as defenders close in or they've lost half their strength.
+   */
   private manageRaids(army: Unit[], baseAttacked: boolean): void {
     const g = this.game;
-    for (const u of [...this.raiders]) {
-      if (u.dead) this.raiders.delete(u);
-      else if (u.order.kind !== 'attack') {
-        this.raiders.delete(u);
-        this.sendHome(u);
+    const r = this.profile.raids;
+    for (const u of [...this.raiders]) if (u.dead) this.raiders.delete(u);
+    const left = [...this.raiders].reduce((s, u) => s + power(u), 0);
+    const beaten = r.hunt && this.raiders.size > 0 && (left < this.raidStart * 0.5 || this.guardAround(this.centroid(this.raiders), 9) > left * 0.6);
+    const done = [...this.raiders].filter((u) => beaten || u.order.kind !== 'attack');
+    if (r.hunt && !beaten && done.length && done.length === this.raiders.size) {
+      // Kill made and the group is still healthy: on to the next harvester.
+      const next = this.pickHarvester(done[0], left);
+      if (next) {
+        for (const u of done) u.command(g, { kind: 'attack', target: next });
+        done.length = 0;
       }
     }
-    if (baseAttacked || g.time < this.nextRaidTime) return;
+    for (const u of done) {
+      this.raiders.delete(u);
+      this.sendHome(u);
+    }
+
+    if (baseAttacked || g.time < this.nextRaidTime || this.raiders.size) return;
     const trikes = army.filter((u) => u.type === 'trike' && this.roles.get(u) === 'home');
-    if (trikes.length < 3) return;
-    const victim = g.units.find((u) => u.team !== this.team && u.type === 'harvester' && !u.dead && !u.carrier);
+    if (trikes.length < r.trikes) return;
+    const victim = r.hunt ? this.pickHarvester(trikes[0], trikes.reduce((s, u) => s + power(u), 0)) : g.units.find((u) => u.team !== this.team && u.type === 'harvester' && !u.dead && !u.carrier);
     if (!victim) return;
     for (const u of trikes) {
       this.roles.set(u, 'raid');
       this.raiders.add(u);
       u.command(g, { kind: 'attack', target: victim });
     }
-    this.nextRaidTime = g.time + 90;
+    this.raidStart = trikes.reduce((s, u) => s + power(u), 0);
+    this.nextRaidTime = g.time + r.interval;
   }
 
-  private pickTarget(from: Unit): { x: number; z: number } | null {
+  private centroid(units: Set<Unit>): { x: number; z: number } {
+    let x = 0;
+    let z = 0;
+    for (const u of units) {
+      x += u.x;
+      z += u.z;
+    }
+    return { x: x / Math.max(1, units.size), z: z / Math.max(1, units.size) };
+  }
+
+  /** Enemy fighting strength within `tiles` of a point. */
+  private guardAround(p: { x: number; z: number }, tiles: number): number {
+    let guard = 0;
+    for (const e of this.game.units) {
+      if (e.team !== this.team && e.def.weapon && !e.carrier && Math.hypot(e.x - p.x, e.z - p.z) < tiles * TILE) guard += power(e);
+    }
+    return guard;
+  }
+
+  /**
+   * The enemy harvester with the least protection around it, nearer ones preferred; none if every one is guarded by
+   * more than half of `strength`.
+   */
+  private pickHarvester(from: { x: number; z: number }, strength: number): Unit | null {
+    const g = this.game;
+    let best: Unit | null = null;
+    let bestScore = Infinity;
+    for (const h of g.units) {
+      if (h.team === this.team || h.type !== 'harvester' || h.dead || h.carrier) continue;
+      const guard = this.guardAround(h, 12);
+      if (guard > strength * 0.5) continue;
+      const score = guard + Math.hypot(h.x - from.x, h.z - from.z) * 5;
+      if (score < bestScore) {
+        bestScore = score;
+        best = h;
+      }
+    }
+    return best;
+  }
+
+  /** The nearest enemy building (or, a little less eagerly, unit); with `economy`, refineries and harvesters come first. */
+  private pickTarget(from: Unit, economy = false): { x: number; z: number } | null {
     const g = this.game;
     let best: { x: number; z: number } | null = null;
     let bestD = Infinity;
     for (const e of [...g.buildings, ...g.units]) {
       if (e.team === this.team || (!(e instanceof Building) && (e as Unit).carrier)) continue;
-      const d = Math.hypot(e.x - from.x, e.z - from.z) + (e instanceof Building ? 0 : 20);
+      const econ = economy && ((e as Building | Unit).type === 'refinery' || (e as Building | Unit).type === 'harvester');
+      const d = Math.hypot(e.x - from.x, e.z - from.z) + (e instanceof Building ? 0 : 20) - (econ ? 40 : 0);
       if (d < bestD) {
         bestD = d;
         best = { x: e.x, z: e.z };

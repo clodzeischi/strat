@@ -1,16 +1,16 @@
 // AI behavior checks: defense sized to the attack, defenders returning home, economy recovery and surrender.
 // The AI plays team 1 alone for a few minutes; the scenario then spawns attackers or destroys its buildings.
-// Usage: npx tsx sim/ai-check.ts [seed]      LEGACY=1 runs the same scenarios against sim/_legacy-ai.ts, if present.
+// Usage: npx tsx sim/ai-check.ts [seed]      DIFFICULTY=hard checks the Hard profile.
 import * as THREE from 'three';
-import { AI } from '../src/game/ai';
+import { AI, profileFor } from '../src/game/ai';
 import { TILE, type Team } from '../src/config';
-import { Game } from '../src/game/game';
+import { Game, type Difficulty } from '../src/game/game';
 import { Building, type Entity, type Unit } from '../src/entities';
 
 const SEED = Number(process.argv[2] ?? 7);
 const AI_TEAM: Team = 1;
 const PLAYER_TEAM: Team = 0;
-const legacy = process.env.LEGACY ? (await import('./_legacy-ai')).AI : null;
+const DIFFICULTY = (process.env.DIFFICULTY ?? 'normal') as Difficulty;
 type Brain = { update(dt: number): void };
 
 let failures = 0;
@@ -24,12 +24,13 @@ interface Setup { g: Game; ai: Brain; offers: number }
 /** A game where only the AI plays, for `warmup` seconds. The player's base can't be destroyed and has no units. */
 function setup(warmup = 420, waves = false): Setup {
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, SEED);
-  const ai: Brain = legacy ? new legacy(g, AI_TEAM) : new AI(g, AI_TEAM);
+  const ai: Brain = new AI(g, AI_TEAM, profileFor(DIFFICULTY));
   const s: Setup = { g, ai, offers: 0 };
   g.onSurrenderOffer = () => s.offers++;
   for (const b of g.buildings) if (b.team === PLAYER_TEAM) b.hp = b.maxHp = 1e9;
   for (const u of g.units) if (u.team === PLAYER_TEAM) kill(g, u);
-  if (!waves) Object.assign(ai, { nextWaveTime: Infinity, nextRaidTime: Infinity });
+  // No attacks of its own (Hard attacks whenever it's stronger, and the player here has no army), so the army stays home.
+  if (!waves) Object.assign(ai, { nextWaveTime: Infinity, nextRaidTime: Infinity, profile: { ...profileFor(DIFFICULTY), initiative: 0 } });
   run(s, warmup);
   return s;
 }
@@ -103,7 +104,7 @@ function farHarvester(s: Setup, tiles = 15): Unit | null {
   return found;
 }
 
-console.log(`seed ${SEED}${legacy ? '  (legacy AI)' : ''}\n`);
+console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
 
 // 1. A lone trike hunting a harvester draws a few defenders, not the whole army, and they go home afterwards.
 {

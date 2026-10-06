@@ -102,6 +102,25 @@ Follow-ups: the AI doesn't build Repair Vehicles, the Hi-Tech Factory or Carryal
 - **Surrender.** When it has no income and no way to buy it back (or nothing left to build units with), and its army is under half the enemy's, for 15 seconds, it offers to surrender, once. The game pauses for the answer. Declining plays on to the end.
 - Against the old Normal it won 17 of 32 games (random maps), so it's about as strong; wave size and timing, the knobs that set its pressure, are unchanged. 14 of its 15 losses ended in a surrender rather than being wiped out. In 16 games against itself every game was decided (no stalemates), 15 by surrender.
 
+**Hard, first version (done).** `HARD_PROFILE` in `src/game/ai.ts`, picked from the menu. Brutal is on the menu as "coming soon". Tuned on random maps (`MAPS=random sim/run.sh`, 40-80 games per row, against Normal):
+
+| Variant | Win % vs Normal | What it adds |
+|---|---|---|
+| 6 harvesters, second refinery right away | 83 | economy |
+| + attack when 1.2x stronger, fall back at half strength | 88 | initiative |
+| + hit-and-run trike raids | 76-87 | harassment (neutral against Normal, kept for feel) |
+| + build toward a target mix of counters | lost 30-40% head to head | dropped |
+
+The final profile wins 73-76% against Normal (60-80 games); Normal against itself, 47%.
+
+What Hard does on top of Normal:
+- **Economy:** 6 harvesters and both refineries early (Normal: one harvester per refinery).
+- **Initiative:** besides Normal's wave timer, it attacks as soon as its army at home is 1.2x the enemy's whole army, and those waves go for refineries and harvesters first. Waves fall back at half strength (Normal: 30%).
+- **Harassment:** 3-trike raids from 2:30, every minute, on the least protected harvester; on to the next one after a kill; home as soon as defenders close in or half the group is lost. It keeps 3 trikes for raids while there's a harvester worth hitting, and they stay out of waves.
+- Defense, income recovery and surrender as on Normal (`DIFFICULTY=hard npx tsx sim/ai-check.ts`).
+
+Raids barely matter against Normal, whose defense now answers them in seconds; they are aimed at a human, who reacts slower. Next for Hard: chokepoint and high-ground awareness, using Carryalls and Repair Vehicles, and a reaction delay per difficulty.
+
 **Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
 
 **Spending decisions use value estimation (utility AI)**, scored in credits rather than vague weights. Example: a harvester is worth income per minute × expected lifetime × survival odds, minus its cost. This covers a small set of choices: harvester, army unit, tech, refinery, backup Construction Yard. Movement and combat stay scripted.
@@ -117,6 +136,7 @@ Harness in `sim/`: the game runs headless in Node at about 600× real time.
 - At the old price of 300, harvesters paid for themselves in under a minute, so more was always better (12+). **Harvester price raised to 800** (decided). Tests at 900 showed counts from 4 to 10 all viable, which gives a real trade-off.
 - A refinery adds no income: several harvesters unload at one refinery at the same time. One vs two refineries at equal harvester counts gave the same income.
 - Builds with a second refinery still won matches. Not yet explained: the likely cause is that the experiment also changed when tech spending starts. This needs re-testing.
+- **Re-tested on random maps (with the revised Normal):** building the second refinery right away beats building it only under threat or never, at every harvester count: 4 harvesters 85% vs 73%, 6 harvesters 83% vs 73% (threat) and 58% (never). Spice at 5 minutes jumps from about 8k to 11k. The free harvester that comes with it is the likely reason. Two factories instead lost badly (28%).
 - **Open:** a refinery still includes a free harvester. At 800 that makes a refinery a 400-credit building plus a harvester. Options: raise the refinery to about 1,800-1,900, or drop the free harvester.
 - Normal loses to an early mass-infantry rush. Worth fixing in Normal, or worth using as an early aggression option for Hard.
 - All of this was measured on one map. Re-run after procedural maps and the expansion changes.
