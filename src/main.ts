@@ -170,6 +170,7 @@ function frame(now: number): void {
   const rawDt = (now - last) / 1000;
   const dt = Math.min(0.05, rawDt);
   last = now;
+  game.terrain.animate(now / 1000);
 
   fpsFrames++;
   fpsTime += rawDt;

@@ -12,11 +12,16 @@ const COLORS = {
 /** Steep ground (plateau edges, outcrop faces) shades toward this. */
 const SLOPE = new THREE.Color(0x7a5238);
 
-/** Flat color of one tile, used for the minimap and as the base the ground mesh blends between. */
-export function tileColor(map: GameMap, cx: number, cz: number, out = new THREE.Color()): THREE.Color {
+/**
+ * Flat color of one tile, used for the minimap and as the base the ground mesh blends between.
+ * With `ground`, spice tiles give plain sand: the ground shader paints the spice on top.
+ */
+export function tileColor(map: GameMap, cx: number, cz: number, out = new THREE.Color(), ground = false): THREE.Color {
   const i = map.idx(cx, cz);
   const t = map.tiles[i];
-  if (t === SPICE) {
+  if (t === SPICE && ground) {
+    out.copy(COLORS[SAND]);
+  } else if (t === SPICE) {
     const f = Math.min(1, map.spice[i] / SPICE_MAX);
     out.copy(COLORS[SAND]).lerp(COLORS[SPICE], 0.35 + f * 0.65);
   } else {
@@ -37,7 +42,85 @@ interface Chunk {
   n: number;
   /** Blended color at each grid vertex; each triangle is drawn in the average of its three corners. */
   grid: Float32Array;
+  /** Per grid vertex: share of spice tiles around it, and how rich that spice is (0..1). */
+  spice: Float32Array;
   geo: THREE.BufferGeometry;
+}
+
+/** Spice look: light thin spice, deep rich spice, the darker rim along field edges, and the glint color. */
+const SPICE_LOOK = {
+  light: new THREE.Color(0xd8803c),
+  deep: new THREE.Color(0xb4441c),
+  rim: new THREE.Color(0x7a2a12),
+  glint: new THREE.Color(0xfff2c8),
+};
+
+/**
+ * Patches the ground's Lambert shader to paint spice per pixel: a crisp field edge (the 0.5 contour of the
+ * spice share, wobbled by noise so it doesn't follow the tile grid), a dark rim inside it, grain, bare patches
+ * that open up as a field is harvested, and the shimmer: tiny twinkling glints plus a slow drifting sheen.
+ */
+function addSpiceShader(material: THREE.MeshLambertMaterial, time: { value: number }): void {
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, {
+      uTime: time,
+      uSand: { value: COLORS[SAND] },
+      uSpiceLight: { value: SPICE_LOOK.light },
+      uSpiceDeep: { value: SPICE_LOOK.deep },
+      uSpiceRim: { value: SPICE_LOOK.rim },
+      uGlint: { value: SPICE_LOOK.glint },
+    });
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+attribute vec2 spice;
+varying vec2 vSpice;
+varying vec3 vGround;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vSpice = spice;
+vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+uniform float uTime;
+uniform vec3 uSand, uSpiceLight, uSpiceDeep, uSpiceRim, uGlint;
+varying vec2 vSpice;
+varying vec3 vGround;
+float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float gNoise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(gHash(i), gHash(i + vec2(1, 0)), u.x), mix(gHash(i + vec2(0, 1)), gHash(i + vec2(1, 1)), u.x), u.y);
+}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+vec2 gp = vGround.xz;
+float amount = vSpice.y;
+// Field edge: where the spice share crosses one half, pushed in and out by noise.
+float edge = vSpice.x - 0.5 + (gNoise(gp * 0.9) * 0.6 + gNoise(gp * 2.6) * 0.4 - 0.5) * 0.5;
+// Thinning: as a field is harvested, bare sand opens up in patches.
+float cover = amount * 2.2 + 0.1 - gNoise(gp * 0.8 + 40.0);
+float shape = min(edge, cover * 0.6);
+float aa = fwidth(shape) + 1e-4;
+float inside = smoothstep(-aa, aa, shape);
+float grain = gNoise(gp * 7.0) * 0.6 + gNoise(gp * 13.0 + 7.0) * 0.4;
+vec3 spiceCol = mix(uSpiceLight, uSpiceDeep, clamp(amount * 0.85 + (grain - 0.5) * 0.5, 0.0, 1.0));
+spiceCol *= 0.84 + 0.3 * gNoise(gp * 5.0 + 19.0);
+spiceCol = mix(spiceCol, uSpiceRim, (1.0 - smoothstep(0.0, 0.06, shape)) * 0.7);
+// The vertex color is sand with dune shading baked in; scaling it keeps that shading on the spice.
+diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * spiceCol / uSand, inside);`)
+      .replace('#include <opaque_fragment>', `{
+  // Shimmer: one possible glint per small cell, each twinkling on its own clock, denser on rich spice.
+  vec2 cp = gp * 2.2;
+  vec2 cell = floor(cp);
+  float h = gHash(cell);
+  vec2 at = vec2(gHash(cell + 17.1), gHash(cell + 31.7)) * 0.7 + 0.15;
+  float d = length(fract(cp) - at);
+  float twinkle = pow(max(0.0, sin(uTime * (1.2 + h * 2.4) + h * 60.0)), 20.0);
+  float size = max(0.07, fwidth(cp.x) * 1.2);
+  float spark = (1.0 - smoothstep(size * 0.3, size, d)) * twinkle * step(h, 0.2 + 0.4 * amount);
+  float sheen = smoothstep(0.62, 0.9, gNoise(gp * 0.3 + vec2(uTime * 0.22, uTime * 0.09))) * 0.1;
+  outgoingLight += uGlint * (spark * 1.5 + sheen) * inside;
+}
+#include <opaque_fragment>`);
+  };
 }
 
 /** Faces steeper than this (normal's y below it) are cliff faces and drawn faceted. */
@@ -56,6 +139,7 @@ const RELIEF = 1.6;
 export class Terrain {
   readonly mesh = new THREE.Group();
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  private readonly time = { value: 0 };
   private chunks: Chunk[] = [];
   private dirty = new Set<number>();
   private tmp = new THREE.Color();
@@ -73,9 +157,15 @@ export class Terrain {
     this.faceNy = new Float32Array((V - 1) * (V - 1) * 2);
     this.normals = new Float32Array(V * V * 3);
     this.classifyFaces();
+    addSpiceShader(this.material, this.time);
     for (let cz0 = 0; cz0 < map.size; cz0 += CHUNK) {
       for (let cx0 = 0; cx0 < map.size; cx0 += CHUNK) this.buildChunk(cx0, cz0);
     }
+  }
+
+  /** Advances the spice shimmer (seconds). */
+  animate(t: number): void {
+    this.time.value = t;
   }
 
   /** Marks a tile for repainting (its spice changed). Applied by `flush`, at most once per frame. */
@@ -97,7 +187,10 @@ export class Terrain {
         touched.add(k);
       }
     }
-    for (const k of touched) (this.chunks[k].geo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+    for (const k of touched) {
+      (this.chunks[k].geo.getAttribute('color') as THREE.BufferAttribute).needsUpdate = true;
+      (this.chunks[k].geo.getAttribute('spice') as THREE.BufferAttribute).needsUpdate = true;
+    }
     this.dirty.clear();
   }
 
@@ -185,8 +278,9 @@ export class Terrain {
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.length), 3));
+    geo.setAttribute('spice', new THREE.BufferAttribute(new Float32Array((pos.length / 3) * 2), 2));
     geo.computeBoundingSphere();
-    const chunk: Chunk = { cx0, cz0, n, grid: new Float32Array(n * n * 3), geo };
+    const chunk: Chunk = { cx0, cz0, n, grid: new Float32Array(n * n * 3), spice: new Float32Array(n * n * 2), geo };
     this.chunks.push(chunk);
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) this.paintVertex(chunk, i, j);
     for (let j = 0; j < n - 1; j++) for (let i = 0; i < n - 1; i++) this.paintSquare(chunk, i, j);
@@ -219,10 +313,12 @@ export class Terrain {
   private paintSquare(chunk: Chunk, i: number, j: number): void {
     const { n, grid } = chunk;
     const col = chunk.geo.getAttribute('color') as THREE.BufferAttribute;
+    const spice = chunk.geo.getAttribute('spice') as THREE.BufferAttribute;
     const all = this.corners(chunk.cx0, chunk.cz0, i, j).map(([a, b]) => (b * n + a) * 3);
     const tris = [all.slice(0, 3), all.slice(3, 6)];
     tris.forEach((corners, t) => {
       const face = (j * (n - 1) + i) * 2 + t;
+      corners.forEach((c, k) => spice.setXY(face * 3 + k, chunk.spice[(c / 3) * 2], chunk.spice[(c / 3) * 2 + 1]));
       const f = this.faceIndex(chunk.cx0, chunk.cz0, i, j, t);
       if (this.smooth[f]) {
         const flat = TO_SUN.y;
@@ -264,7 +360,7 @@ export class Terrain {
     }
   }
 
-  /** A grid vertex blends the colors of the tiles around it. */
+  /** A grid vertex blends the colors of the tiles around it, and records the spice around it for the shader. */
   private paintVertex(chunk: Chunk, i: number, j: number): void {
     const map = this.map;
     const step = TILE / SURFACE_RES;
@@ -275,14 +371,25 @@ export class Terrain {
     const o = TILE * 0.25;
     this.acc.setRGB(0, 0, 0);
     let w = 0;
+    let share = 0;
+    let rich = 0;
     for (const [dx, dz] of [[-o, -o], [o, -o], [-o, o], [o, o]]) {
       const cx = map.cellOf(x + dx);
       const cz = map.cellOf(z + dz);
       if (!map.inBounds(cx, cz)) continue;
-      this.acc.add(tileColor(map, cx, cz, this.tmp));
+      this.acc.add(tileColor(map, cx, cz, this.tmp, true));
       w++;
+      const k = map.idx(cx, cz);
+      if (map.tiles[k] === SPICE) {
+        share++;
+        rich += Math.min(1, map.spice[k] / SPICE_MAX);
+      }
     }
     if (w) this.acc.multiplyScalar(1 / w);
-    chunk.grid.set([this.acc.r, this.acc.g, this.acc.b], (j * chunk.n + i) * 3);
+    const v = j * chunk.n + i;
+    chunk.grid.set([this.acc.r, this.acc.g, this.acc.b], v * 3);
+    // Richness is averaged over the spice tiles only, so a field's edge is as rich as the tiles it bounds.
+    chunk.spice[v * 2] = w ? share / w : 0;
+    chunk.spice[v * 2 + 1] = share ? rich / share : 0;
   }
 }
