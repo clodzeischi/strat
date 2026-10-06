@@ -1,7 +1,7 @@
 // Checks that GameMap.surfaceAt matches the rendered terrain mesh, by raycasting down onto it at random points.
 import * as THREE from 'three';
 import { GameMap } from '../src/map';
-import { Terrain } from '../src/terrain';
+import { Terrain } from '../src/render/terrain';
 
 const map = new GameMap(Number(process.env.SIZE ?? 64), 7);
 const terrain = new Terrain(map);

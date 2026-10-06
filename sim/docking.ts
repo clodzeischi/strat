@@ -1,6 +1,6 @@
 // Same harvester count, one vs two refineries, no enemy: does a second dock raise income?
 import * as THREE from 'three';
-import { Game } from '../src/game';
+import { Game } from '../src/game/game';
 import type { Team } from '../src/config';
 
 const team: Team = 0;

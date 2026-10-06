@@ -1,6 +1,6 @@
 // How many harvesters can one refinery feed before income stops scaling, and how long the spice lasts.
 import * as THREE from 'three';
-import { Game } from '../src/game';
+import { Game } from '../src/game/game';
 import { SPICE } from '../src/map';
 import { BUILDINGS, type Team } from '../src/config';
 

@@ -1,6 +1,6 @@
 // Stress-tests the effect pools: fill them past capacity, then check they drain back to empty.
 import * as THREE from 'three';
-import { Effects } from '../src/effects';
+import { Effects } from '../src/render/effects/effects';
 
 const scene = new THREE.Scene();
 const fx = new Effects(scene);

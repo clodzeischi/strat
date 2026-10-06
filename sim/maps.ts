@@ -35,7 +35,7 @@ for (const seed of seeds.length ? seeds : [7]) {
 
 // Quick validity check over many seeds: vehicles can drive base to base.
 if (process.env.CHECK) {
-  const { findPath } = await import('../src/pathfinding');
+  const { findPath } = await import('../src/game/pathfinding');
   let bad = 0;
   for (let seed = 1; seed <= Number(process.env.CHECK); seed++) {
     const m = new GameMap(SIZE, seed);

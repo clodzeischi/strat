@@ -1,7 +1,7 @@
-import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType } from './config';
-import { Building, type Unit } from './entities';
+import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType } from '../config';
+import { Building, type Unit } from '../entities';
 import type { Game } from './game';
-import type { Cell } from './map';
+import type { Cell } from '../map';
 
 const RESEARCH_ORDER: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
 

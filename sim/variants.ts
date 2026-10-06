@@ -1,4 +1,4 @@
-import type { AIProfile } from '../src/ai';
+import type { AIProfile } from '../src/game/ai';
 
 /** Candidate Hard economy profiles. Anything not set falls back to Normal. */
 export const VARIANTS: Record<string, Partial<AIProfile>> = {

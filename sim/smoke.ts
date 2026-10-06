@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { Game } from '../src/game';
-import { AI } from '../src/ai';
+import { Game } from '../src/game/game';
+import { AI } from '../src/game/ai';
 const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera());
 const a = new AI(g, 0), b = new AI(g, 1);
 const t0 = performance.now();

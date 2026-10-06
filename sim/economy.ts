@@ -2,7 +2,7 @@
 // Compares adding harvesters to one refinery against building more refineries.
 import * as THREE from 'three';
 import { BUILDINGS, UNITS, type BuildingType, type Team } from '../src/config';
-import { Game } from '../src/game';
+import { Game } from '../src/game/game';
 
 type Step = BuildingType | 'harvester';
 

@@ -1,8 +1,8 @@
 // Checks random spawns over many seeds: symmetric maps, both bases on rock with a vehicle route between them,
 // starting yards and units placed. Usage: npx tsx sim/spawn-check.ts [seeds per size]
 import * as THREE from 'three';
-import { Game } from '../src/game';
-import { findPath } from '../src/pathfinding';
+import { Game } from '../src/game/game';
+import { findPath } from '../src/game/pathfinding';
 import { GameMap, ROCK } from '../src/map';
 for (const size of [64, 96, 128] as const) {
   let bad = 0, asym = 0, dmin = 1e9, dmax = 0, fails = 0;

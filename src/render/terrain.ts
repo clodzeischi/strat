@@ -1,38 +1,9 @@
 import * as THREE from 'three';
-import { SPICE_MAX, TILE } from './config';
-import { CLIFF, ROCK, SAND, SPICE, SURFACE_RES, type GameMap } from './map';
+import { SPICE_MAX, TILE } from '../config';
+import { SAND, SPICE, SURFACE_RES, type GameMap } from '../map';
+import { tileColor } from '../materials/ground';
+import { groundShader } from '../shaders/ground';
 import { TO_SUN } from './shadows';
-
-const COLORS = {
-  [SAND]: new THREE.Color(0xd9b77a),
-  [ROCK]: new THREE.Color(0x8f7d66),
-  [CLIFF]: new THREE.Color(0x6b5646),
-  [SPICE]: new THREE.Color(0xc8642a),
-};
-/** Cliff walls (painted by the shader). */
-const WALL_COLOR = new THREE.Color(0x76533b);
-
-/**
- * Flat color of one tile, used for the minimap and as the base the ground mesh blends between.
- * With `ground`, spice tiles give plain sand and outcrops plain rock: the ground shader paints those on top.
- */
-export function tileColor(map: GameMap, cx: number, cz: number, out = new THREE.Color(), ground = false): THREE.Color {
-  const i = map.idx(cx, cz);
-  const t = map.tiles[i];
-  if (t === SPICE && ground) {
-    out.copy(COLORS[SAND]);
-  } else if (t === CLIFF && ground) {
-    out.copy(COLORS[ROCK]); // the shader paints outcrops brown over a sprawl
-  } else if (t === SPICE) {
-    const f = Math.min(1, map.spice[i] / SPICE_MAX);
-    out.copy(COLORS[SAND]).lerp(COLORS[SPICE], 0.35 + f * 0.65);
-  } else {
-    out.copy(COLORS[t as keyof typeof COLORS]);
-  }
-  // High ground is a touch lighter so plateaus read at a glance (on the minimap too).
-  if (map.level[i] === 1 && !map.ramp[i]) out.multiplyScalar(1.08);
-  return out;
-}
 
 /** Tiles per side of one mesh chunk; chunks off screen are skipped when drawing. */
 const CHUNK = 16;
@@ -47,132 +18,6 @@ interface Chunk {
   /** Per grid vertex: spice share, spice richness (0..1), sand share (incl. spice), outcrop share. */
   spice: Float32Array;
   geo: THREE.BufferGeometry;
-}
-
-/** Spice look: light thin spice, deep rich spice, the darker rim along field edges, and the glint color. */
-const SPICE_LOOK = {
-  light: new THREE.Color(0xd8803c),
-  deep: new THREE.Color(0xb4441c),
-  rim: new THREE.Color(0x7a2a12),
-  glint: new THREE.Color(0xfff2c8),
-};
-
-/**
- * Patches the ground's Lambert shader to paint spice per pixel: a crisp field edge (the 0.5 contour of the
- * spice share, wobbled by noise so it doesn't follow the tile grid), a dark rim inside it, grain, bare patches
- * that open up as a field is harvested, and the shimmer: tiny twinkling glints plus a slow drifting sheen.
- */
-function addSpiceShader(material: THREE.MeshLambertMaterial, time: { value: number }): void {
-  material.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, {
-      uTime: time,
-      uSand: { value: COLORS[SAND] },
-      uRock: { value: COLORS[ROCK] },
-      uOutcrop: { value: COLORS[CLIFF] },
-      uWall: { value: WALL_COLOR },
-      uSpiceLight: { value: SPICE_LOOK.light },
-      uSpiceDeep: { value: SPICE_LOOK.deep },
-      uSpiceRim: { value: SPICE_LOOK.rim },
-      uGlint: { value: SPICE_LOOK.glint },
-    });
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>
-attribute vec4 spice;
-attribute float wall;
-varying vec4 vSpice;
-varying float vWall;
-varying vec3 vGround;
-varying vec3 vGroundN;`)
-      .replace('#include <begin_vertex>', `#include <begin_vertex>
-vSpice = spice;
-vWall = wall;
-vGroundN = mat3(modelMatrix) * objectNormal;
-vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>
-uniform float uTime;
-uniform vec3 uSand, uRock, uOutcrop, uWall, uSpiceLight, uSpiceDeep, uSpiceRim, uGlint;
-varying vec4 vSpice;
-varying float vWall;
-varying vec3 vGround;
-varying vec3 vGroundN;
-float gHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float gNoise(vec2 p) {
-  vec2 i = floor(p), f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(gHash(i), gHash(i + vec2(1, 0)), u.x), mix(gHash(i + vec2(0, 1)), gHash(i + vec2(1, 1)), u.x), u.y);
-}`)
-      .replace('#include <color_fragment>', `#include <color_fragment>
-vec2 gp = vGround.xz;
-float amount = vSpice.y;
-// Rock/sand boundary: like the spice edge, a crisp noisy contour instead of the vertex colors' tile-wide fade.
-// The vertex color is (roughly) rock and sand blended by the sand share; rescaling it to pure rock or pure sand
-// on either side of the contour keeps the shading baked into it.
-float sandEdge = vSpice.z - 0.5 + (gNoise(gp * 1.1 + 90.0) * 0.6 + gNoise(gp * 3.0) * 0.4 - 0.5) * 0.45;
-float sandAa = fwidth(sandEdge) + 1e-4;
-float sandShare = smoothstep(-sandAa, sandAa, sandEdge);
-vec3 blended = mix(uRock, uSand, vSpice.z);
-diffuseColor.rgb *= mix(uRock, uSand, sandShare) / blended;
-// Outcrops: brown, fading out gradually over their sprawling base into whatever surrounds them, sand or rock.
-float oc = smoothstep(0.12, 0.7, vSpice.w + (gNoise(gp * 1.4 + 5.0) - 0.5) * 0.3);
-diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * uOutcrop / mix(uRock, uSand, sandShare), oc);
-// Sand: fine grain and wind ripples. Ripples run across the wind and wander a little; they fade out when
-// they'd be thinner than a few pixels, so they never flicker.
-float ripple = dot(gp, vec2(0.8, 0.6)) * 2.6 + gNoise(gp * 0.45) * 2.5;
-float rippleFade = 1.0 - smoothstep(0.25, 0.6, fwidth(ripple));
-float wave = fract(ripple);
-float rippleShade = (smoothstep(0.0, 0.75, wave) - smoothstep(0.75, 1.0, wave) - 0.5) * 0.07 * rippleFade;
-float sandGrain = (gNoise(gp * 14.0) - 0.5) * 0.06;
-// Rock: blotchy color, and faint layers that follow height so outcrop faces read as stratified stone.
-float mottle = (gNoise(gp * 1.3 + 70.0) * 0.6 + gNoise(gp * 4.1) * 0.4 - 0.5) * 0.16;
-float strata = (sin(vGround.y * 7.0 + gNoise(gp * 0.7) * 3.0) * 0.5) * 0.06;
-// Field edge: where the spice share crosses one half, pushed in and out by noise.
-float edge = vSpice.x - 0.5 + (gNoise(gp * 0.9) * 0.6 + gNoise(gp * 2.6) * 0.4 - 0.5) * 0.5;
-// Thinning: as a field is harvested, bare sand opens up in patches.
-float cover = amount * 2.2 + 0.1 - gNoise(gp * 0.8 + 40.0);
-float shape = min(edge, cover * 0.6);
-float aa = fwidth(shape) + 1e-4;
-float inside = smoothstep(-aa, aa, shape);
-float grain = gNoise(gp * 7.0) * 0.6 + gNoise(gp * 13.0 + 7.0) * 0.4;
-vec3 spiceCol = mix(uSpiceLight, uSpiceDeep, clamp(amount * 0.85 + (grain - 0.5) * 0.5, 0.0, 1.0));
-spiceCol *= 0.84 + 0.3 * gNoise(gp * 5.0 + 19.0);
-spiceCol = mix(spiceCol, uSpiceRim, (1.0 - smoothstep(0.0, 0.06, shape)) * 0.7);
-// The vertex color is sand with dune shading baked in; scaling it keeps that shading on the spice.
-diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * spiceCol / uSand, inside);
-// Sand and rock detail last, kept off the spice (it has its own grain).
-diffuseColor.rgb *= 1.0 + mix((mottle + strata) * (1.0 + oc), rippleShade + sandGrain, sandShare * (1.0 - oc)) * (1.0 - inside);
-// Cliff walls: their own brown with a crisp, slightly noisy edge onto the ground above and below (never a blend
-// with it), layered, streaked and cracked. Streaks run along the wall, so they use whichever horizontal axis the
-// wall faces across. Outcrops keep their own soft look.
-vec3 wn = normalize(vGroundN);
-float wallEdge = vWall - 0.45 + (gNoise(gp * 2.2 + 11.0) * 0.6 + gNoise(gp * 6.0) * 0.4 - 0.5) * 0.3;
-float wallAa = fwidth(wallEdge) + 1e-4;
-float wallMask = smoothstep(-wallAa, wallAa, wallEdge) * (1.0 - smoothstep(0.2, 0.45, vSpice.w));
-if (wallMask > 0.0) {
-  float along = abs(wn.x) > abs(wn.z) ? vGround.z : vGround.x;
-  float layers = sin(vGround.y * 10.0 + gNoise(vec2(along * 0.5, vGround.y * 2.0)) * 4.0) * 0.5 + 0.5;
-  float streaks = gNoise(vec2(along * 3.5, vGround.y * 0.6)) * 0.65 + gNoise(vec2(along * 9.0, vGround.y * 1.5)) * 0.35;
-  // Cracks: thin lines where a noise stretched tall crosses one half, so they run mostly up and down.
-  float crackN = gNoise(vec2(along * 2.2, vGround.y * 0.35) + 30.0);
-  float crack = (1.0 - smoothstep(0.0, 0.03 + fwidth(crackN), abs(crackN - 0.5))) * step(0.55, gNoise(vec2(along * 0.7, 3.0)));
-  float wall = 1.0 + (layers - 0.5) * 0.14 + (streaks - 0.5) * 0.3;
-  diffuseColor.rgb = mix(diffuseColor.rgb, uWall * wall * (1.0 - crack * 0.4), wallMask);
-}`)
-      .replace('#include <opaque_fragment>', `{
-  // Shimmer: one possible glint per small cell, each twinkling on its own clock, denser on rich spice.
-  vec2 cp = gp * 2.2;
-  vec2 cell = floor(cp);
-  float h = gHash(cell);
-  vec2 at = vec2(gHash(cell + 17.1), gHash(cell + 31.7)) * 0.7 + 0.15;
-  float d = length(fract(cp) - at);
-  float twinkle = pow(max(0.0, sin(uTime * (1.2 + h * 2.4) + h * 60.0)), 20.0);
-  float size = max(0.07, fwidth(cp.x) * 1.2);
-  float spark = (1.0 - smoothstep(size * 0.3, size, d)) * twinkle * step(h, 0.2 + 0.4 * amount);
-  float sheen = smoothstep(0.62, 0.9, gNoise(gp * 0.3 + vec2(uTime * 0.22, uTime * 0.09))) * 0.1;
-  outgoingLight += uGlint * (spark * 1.5 + sheen) * inside;
-}
-#include <opaque_fragment>`);
-  };
 }
 
 /**
@@ -201,7 +46,7 @@ export class Terrain {
   constructor(private map: GameMap) {
     this.normals = new Float32Array(map.surfaceSize * map.surfaceSize * 3);
     this.computeNormals();
-    addSpiceShader(this.material, this.time);
+    groundShader(this.material, this.time);
     for (let cz0 = 0; cz0 < map.size; cz0 += CHUNK) {
       for (let cx0 = 0; cx0 < map.size; cx0 += CHUNK) this.buildChunk(cx0, cz0);
     }

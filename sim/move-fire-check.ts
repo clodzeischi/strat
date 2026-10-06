@@ -2,7 +2,7 @@
 // without stopping; units without a turret don't. Usage: npx tsx sim/move-fire-check.ts
 import * as THREE from 'three';
 import type { UnitType } from '../src/config';
-import { Game } from '../src/game';
+import { Game } from '../src/game/game';
 import { SAND } from '../src/map';
 
 for (const type of ['tank', 'rocket', 'trike'] as UnitType[]) {

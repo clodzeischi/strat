@@ -1,8 +1,8 @@
 // Runs AI-vs-AI matches and audits movement: units stuck with a path, units spawned where they can't stand,
 // and every individual movement step (path following and separation pushes) against the map's step rules.
 import * as THREE from 'three';
-import { AI } from '../src/ai';
-import { Game } from '../src/game';
+import { AI } from '../src/game/ai';
+import { Game } from '../src/game/game';
 import { Unit } from '../src/entities';
 import type { MapSize } from '../src/config';
 

@@ -1,5 +1,5 @@
-import { TILE } from './config';
-import type { Cell, GameMap, MoveClass } from './map';
+import { TILE } from '../config';
+import type { Cell, GameMap, MoveClass } from '../map';
 
 export interface Point {
   x: number;

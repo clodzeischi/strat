@@ -4,13 +4,13 @@ import {
   type LevelUpType, type MapSize, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
   type WeaponDef, type UnitType, type UpgradeType,
-} from './config';
-import { Effects } from './effects';
-import { Building, distTo, Unit, type Entity } from './entities';
-import { GameMap, ROCK, SPICE, type Cell } from './map';
-import { mat } from './models';
+} from '../config';
+import { Effects } from '../render/effects/effects';
+import { Building, distTo, Unit, type Entity } from '../entities';
+import { GameMap, ROCK, SPICE, type Cell } from '../map';
+import { mat } from '../materials/lambert';
 import { cellsAround, type Point } from './pathfinding';
-import { Terrain } from './terrain';
+import { Terrain } from '../render/terrain';
 
 /** Running totals for the end-of-game screen. */
 export interface TeamStats {

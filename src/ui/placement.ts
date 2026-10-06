@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { BUILDINGS, TILE, type BuildingType, type Team } from './config';
-import type { Game } from './game';
+import { BUILDINGS, TILE, type BuildingType, type Team } from '../config';
+import type { Game } from '../game/game';
 
 /** Tiles of context shown around the footprint. */
 const RING = 1;

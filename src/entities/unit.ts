@@ -1,25 +1,14 @@
 import * as THREE from 'three';
 import {
-  BUILDING_TAGS, BUILDINGS, HARVEST_UPGRADE, HARVESTER, NITRO, TEAM_COLORS, TILE, UNITS,
-  type BuildingDef, type BuildingType, type Tag, type Team, type UnitDef, type UnitType,
-} from './config';
-import type { Game } from './game';
-import { SPICE, type Cell, type MoveClass } from './map';
-import { disposeParts, makeBuildingModel, makeLevelKit, makeUnitModel, makeUpgradeKit } from './models';
-import { findPath, type Point } from './pathfinding';
-
-const barGeo = new THREE.PlaneGeometry(1, 1);
-barGeo.translate(0.5, 0, 0); // anchor on the left edge so scale.x shrinks toward the left
-const barBgMat = new THREE.MeshBasicMaterial({ color: 0x111111, depthTest: false, transparent: true, opacity: 0.8 });
-const barMats = {
-  good: new THREE.MeshBasicMaterial({ color: 0x4cd04c, depthTest: false, transparent: true }),
-  mid: new THREE.MeshBasicMaterial({ color: 0xe0c030, depthTest: false, transparent: true }),
-  bad: new THREE.MeshBasicMaterial({ color: 0xe03a2a, depthTest: false, transparent: true }),
-};
-const ringMats = [
-  new THREE.MeshBasicMaterial({ color: 0x7cff7c, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false }),
-  new THREE.MeshBasicMaterial({ color: 0xff6a5a, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false }),
-];
+  HARVEST_UPGRADE, HARVESTER, NITRO, TEAM_COLORS, TILE, UNITS, type Tag, type Team, type UnitDef, type UnitType,
+} from '../config';
+import type { Game } from '../game/game';
+import { findPath, type Point } from '../game/pathfinding';
+import { SPICE, type Cell, type MoveClass } from '../map';
+import { disposeParts, makeUnitModel, makeUpgradeKit } from '../models';
+import { Building } from './building';
+import { distTo } from './distance';
+import { Entity } from './entity';
 
 /** Steepest a vehicle leans to follow the ground, so cliff-foot slopes don't stand it on end. */
 const MAX_TILT = THREE.MathUtils.degToRad(25);
@@ -32,108 +21,6 @@ function wrapAngle(a: number): number {
   while (a > Math.PI) a -= Math.PI * 2;
   while (a < -Math.PI) a += Math.PI * 2;
   return a;
-}
-
-export abstract class Entity {
-  abstract readonly kind: 'unit' | 'building';
-  abstract readonly radius: number;
-  abstract readonly name: string;
-  abstract readonly tags: readonly Tag[];
-  hp: number;
-  dead = false;
-  selected = false;
-  x = 0;
-  z = 0;
-  y = 0;
-  readonly root = new THREE.Group();
-  private bar = new THREE.Group();
-  private barFg: THREE.Mesh;
-  private ring: THREE.Mesh;
-
-  constructor(readonly id: number, readonly team: Team, readonly maxHp: number, barWidth: number, barHeight: number, ringRadius: number, square: boolean) {
-    this.hp = maxHp;
-    const bg = new THREE.Mesh(barGeo, barBgMat);
-    bg.scale.set(barWidth + 0.12, 0.3, 1);
-    bg.position.set(-barWidth / 2 - 0.06, 0, 0);
-    bg.renderOrder = 998;
-    this.barFg = new THREE.Mesh(barGeo, barMats.good);
-    this.barFg.scale.set(barWidth, 0.18, 1);
-    this.barFg.position.set(-barWidth / 2, 0, 0.001);
-    this.barFg.renderOrder = 999;
-    this.bar.add(bg, this.barFg);
-    this.bar.position.y = barHeight;
-    this.bar.visible = false; // shown by updateBar once the game runs
-    this.bar.userData.width = barWidth;
-    this.root.add(this.bar);
-
-    const seg = square ? 4 : 24;
-    const outer = square ? ringRadius * Math.SQRT2 : ringRadius;
-    const ringGeo = new THREE.RingGeometry(outer - 0.15, outer, seg);
-    ringGeo.rotateZ(square ? Math.PI / 4 : 0);
-    ringGeo.rotateX(-Math.PI / 2);
-    this.ring = new THREE.Mesh(ringGeo, ringMats[team === 0 ? 0 : 1]);
-    this.ring.position.y = 0.08;
-    this.ring.visible = false;
-    this.root.add(this.ring);
-  }
-
-  setSelected(v: boolean): void {
-    this.selected = v;
-    this.ring.visible = v;
-  }
-
-  updateBar(camera: THREE.Camera): void {
-    const frac = Math.max(0, this.hp / this.maxHp);
-    this.bar.visible = this.selected || frac < 0.999;
-    if (!this.bar.visible) return;
-    this.bar.quaternion.copy(camera.quaternion);
-    this.barFg.scale.x = this.bar.userData.width * frac;
-    this.barFg.material = frac > 0.6 ? barMats.good : frac > 0.3 ? barMats.mid : barMats.bad;
-  }
-
-  /** World position at roughly the entity's middle height, for aiming. */
-  aimPoint(): THREE.Vector3 {
-    return new THREE.Vector3(this.x, this.y + (this.kind === 'building' ? 1.2 : 0.6), this.z);
-  }
-}
-
-export class Building extends Entity {
-  readonly kind = 'building';
-  readonly tags = BUILDING_TAGS;
-  readonly def: BuildingDef;
-  readonly radius: number;
-  readonly size: number;
-  readonly spinner: THREE.Object3D | null;
-  level = 1;
-
-  constructor(id: number, team: Team, readonly type: BuildingType, readonly cx: number, readonly cz: number, groundY: number) {
-    const def = BUILDINGS[type];
-    super(id, team, def.hp, def.size * TILE * 0.8, 4.8, (def.size * TILE) / 2 + 0.1, true);
-    this.def = def;
-    this.size = def.size;
-    this.radius = (def.size * TILE) / 2;
-    this.x = (cx + def.size / 2) * TILE;
-    this.z = (cz + def.size / 2) * TILE;
-    this.y = groundY;
-    const model = makeBuildingModel(type, TEAM_COLORS[team], def.size);
-    this.spinner = model.spinner;
-    this.root.add(model.group);
-    this.root.position.set(this.x, this.y, this.z);
-  }
-
-  get name(): string {
-    return this.level >= 2 && this.def.levelUp ? this.def.levelUp.name : this.def.name;
-  }
-
-  setLevel(level: number): void {
-    this.level = level;
-    if (level >= 2) this.root.add(makeLevelKit(this.type, TEAM_COLORS[this.team]));
-  }
-
-  /** Cell in front of the building where units exit / harvesters dock. */
-  frontCell(): Cell {
-    return { cx: this.cx + Math.floor(this.size / 2), cz: this.cz + this.size };
-  }
 }
 
 export type Order =
@@ -613,15 +500,4 @@ export class Unit extends Entity {
     }
     if (this.turret) this.turret.rotation.y = -(this.turretHeading - this.heading);
   }
-}
-
-/** Edge-to-point distance: footprint edge for buildings, hull edge for units. */
-export function distTo(e: Entity, x: number, z: number): number {
-  if (e instanceof Building) {
-    const half = (e.size * TILE) / 2;
-    const dx = Math.max(Math.abs(x - e.x) - half, 0);
-    const dz = Math.max(Math.abs(z - e.z) - half, 0);
-    return Math.hypot(dx, dz);
-  }
-  return Math.max(0, Math.hypot(e.x - x, e.z - z) - e.radius);
 }

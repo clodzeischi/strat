@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import type { RTSCamera } from './camera';
-import { BUILDINGS, PLAYER, TILE, type BuildingType } from './config';
-import { Building, Unit, type Entity } from './entities';
-import type { Game } from './game';
-import { SPICE } from './map';
-import { cellsAround } from './pathfinding';
+import type { RTSCamera } from '../render/camera';
+import { BUILDINGS, PLAYER, TILE, type BuildingType } from '../config';
+import { Building, Unit, type Entity } from '../entities';
+import type { Game } from '../game/game';
+import { SPICE } from '../map';
+import { cellsAround } from '../game/pathfinding';
 import { PlacementGrid } from './placement';
 
 const EDGE = 12; // px from the screen edge that triggers scrolling

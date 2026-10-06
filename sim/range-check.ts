@@ -1,6 +1,6 @@
 // Checks the high-ground range modifier: a tank on high ground vs one below, at distances around 10 range.
 import * as THREE from 'three';
-import { Game } from '../src/game';
+import { Game } from '../src/game/game';
 import { UNITS } from '../src/config';
 
 const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera());

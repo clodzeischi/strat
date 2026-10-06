@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { AI } from './ai';
-import { RTSCamera } from './camera';
+import { AI } from './game/ai';
+import { RTSCamera } from './render/camera';
 import { ENEMY, MAP_SIZES, PLAYER, TILE, type MapSize } from './config';
-import { Game, type Difficulty } from './game';
-import { Input } from './input';
-import { loadMapSize, Menus } from './menu';
-import { ViewShadows } from './shadows';
-import { Sidebar } from './ui';
+import { Game, type Difficulty } from './game/game';
+import { Input } from './ui/input';
+import { loadMapSize, Menus } from './ui/menu';
+import { ViewShadows } from './render/shadows';
+import { Sidebar } from './ui/sidebar';
 import './style.css';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;

@@ -1,6 +1,6 @@
-import { MAP_SIZE_NAMES, MAP_SIZES, PLAYER, ENEMY, UNITS, type MapSize, type Team } from './config';
-import type { Difficulty, Game, TeamStats } from './game';
-import { heroTitle } from './heroes';
+import { MAP_SIZE_NAMES, MAP_SIZES, PLAYER, ENEMY, UNITS, type MapSize, type Team } from '../config';
+import type { Difficulty, Game, TeamStats } from '../game/game';
+import { heroTitle } from '../game/heroes';
 
 export interface MenuHandlers {
   onPlay: (difficulty: Difficulty, size: MapSize) => void;

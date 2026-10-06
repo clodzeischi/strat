@@ -11,7 +11,7 @@ Living plan for upcoming features and the AI difficulty work. Decisions are mark
 5. Hard AI (economy, recovery, harassment, chokepoint awareness), tuned across many generated maps
 6. Brutal AI, once units and numbers have settled
 
-Brutal waits because timing builds and micro depend on exact numbers (speeds, ranges, build times), so every balance change would break them. Hard's general systems (rebuilding, value-based spending) read costs and stats from `config.ts`, so they survive changes.
+Brutal waits because timing builds and micro depend on exact numbers (speeds, ranges, build times), so every balance change would break them. Hard's general systems (rebuilding, value-based spending) read costs and stats from `src/config/`, so they survive changes.
 
 ## 1. Elevation and ramps
 
@@ -80,7 +80,7 @@ Suggestion: rather than making harvesters slower overall, make home fields run o
 | Hard | Strong economy, recovers from setbacks, small harassment, practices army compositions, starts taking the initiative. |
 | Brutal | Optimized timing builds, constant harassment, fast reactions, micro (rotating damaged units, picking squads to counter the player's formations), forcing the player to split attention. |
 
-**Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
+**Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
 
 **Spending decisions use value estimation (utility AI)**, scored in credits rather than vague weights. Example: a harvester is worth income per minute × expected lifetime × survival odds, minus its cost. This covers a small set of choices: harvester, army unit, tech, refinery, backup Construction Yard. Movement and combat stay scripted.
 

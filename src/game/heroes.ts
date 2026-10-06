@@ -1,4 +1,4 @@
-import type { Unit } from './entities';
+import type { Unit } from '../entities';
 
 // Desert-warrior flavored names and ranks for the end-of-game "hero of the battle".
 
