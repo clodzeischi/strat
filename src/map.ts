@@ -29,7 +29,7 @@ const BASE_MARGIN = 10;
 export const HIGH_Y = 1.1;
 
 /** Vertices per tile edge in the smooth ground surface (the visual mesh, and what units ride on). */
-export const SURFACE_RES = 2;
+export const SURFACE_RES = 4;
 
 /** Infantry can use narrow ramps; vehicles can't. */
 export type MoveClass = 'foot' | 'vehicle';
@@ -88,6 +88,8 @@ export class GameMap {
    * Purely visual: gameplay still uses the per-tile levels. Built from the tile heights plus dune and rock noise.
    */
   surface: Float32Array;
+  /** Per surface grid square: 1 if split along (1,0)-(0,1), see `flipped`. */
+  private flips: Uint8Array = new Uint8Array(0);
   /** Highest and lowest point of `surface`. */
   surfaceTop = 0;
   surfaceBottom = 0;
@@ -142,9 +144,12 @@ export class GameMap {
     return this.size * SURFACE_RES + 1;
   }
 
-  /** Which diagonal splits surface grid square (i, j): mixed per square so the mesh doesn't look striped. */
+  /**
+   * Which diagonal splits surface grid square (i, j). On slopes, the one joining the two closest heights, so walls
+   * follow their contour instead of zigzagging; on flat ground, mixed per square so the mesh doesn't look striped.
+   */
   flipped(i: number, j: number): boolean {
-    return hash(i, j, 97) < 0.5;
+    return this.flips[j * (this.surfaceSize - 1) + i] === 1;
   }
 
   /**
@@ -206,55 +211,77 @@ export class GameMap {
     return -1;
   }
 
+  /** The four tile centers around a world point, as cell indices in `k` with bilinear weights in `w`. */
+  centerWeights(x: number, z: number, k: number[], w: number[]): void {
+    const N = this.size;
+    const gx = Math.min(Math.max(x / TILE - 0.5, 0), N - 1);
+    const gz = Math.min(Math.max(z / TILE - 0.5, 0), N - 1);
+    const x0 = Math.min(Math.floor(gx), N - 2);
+    const z0 = Math.min(Math.floor(gz), N - 2);
+    const fx = gx - x0;
+    const fz = gz - z0;
+    k[0] = this.idx(x0, z0);
+    w[0] = (1 - fx) * (1 - fz);
+    k[1] = this.idx(x0 + 1, z0);
+    w[1] = fx * (1 - fz);
+    k[2] = this.idx(x0, z0 + 1);
+    w[2] = (1 - fx) * fz;
+    k[3] = this.idx(x0 + 1, z0 + 1);
+    w[3] = fx * fz;
+  }
+
   /**
-   * Turns the stepped tile heights into ground: each vertex averages the tile heights just around it, except
-   * on a plateau edge without a ramp, where the vertex stays at the top so the edge drops as a steep cliff
-   * inside the low tile. Ramps stay gentle slopes, so they read as the way up. Open sand gets broad dunes
-   * that fade out near cliffs, ramps and rock, and rocky outcrops get jagged.
+   * Turns the stepped tile heights into ground. Heights blend smoothly between tile centers, so ramps become
+   * gentle slopes and outcrops rounded peaks. Where high and low ground meet without a ramp, the wall instead
+   * follows a smooth, noise-wobbled contour as a steep step about a unit wide: cliff lines curve instead of
+   * tracing the tile grid. Open sand gets broad dunes that fade out near cliffs,
+   * ramps and rock, and rocky outcrops get jagged.
    */
   private buildSurface(seed: number): void {
     const V = this.surfaceSize;
     const step = TILE / SURFACE_RES;
-    const o = TILE * 0.25; // sample offset: a vertex on a tile corner averages the four tiles that meet there
     const dunes = this.duneWeights();
+    const k4 = [0, 0, 0, 0];
+    const w4 = [0, 0, 0, 0];
     for (let j = 0; j < V; j++) {
       for (let i = 0; i < V; i++) {
         const x = i * step;
         const z = j * step;
+        this.centerWeights(x, z, k4, w4);
         let h = 0;
+        let high = 0; // blended level
         let top = -Infinity;
         let bottom = Infinity;
         let dune = 0;
         let cliff = 0;
         let soft = 0; // share of sand, spice and ramp around: smooth-shaded ground, no jitter
         let levels = 0; // bit 1: low ground nearby, bit 2: high ground nearby
-        let highs = 0; // high-ground samples around
         let ramp = false;
-        for (const [dx, dz] of [[-o, -o], [o, -o], [-o, o], [o, o]]) {
-          const s = this.heightAt(x + dx, z + dz);
-          h += s / 4;
-          top = Math.max(top, s);
-          bottom = Math.min(bottom, s);
-          const cx = this.cellOf(x + dx);
-          const cz = this.cellOf(z + dz);
-          if (!this.inBounds(cx, cz)) continue;
-          const k = this.idx(cx, cz);
-          dune += dunes[k] / 4;
+        let outcrop = false;
+        for (let q = 0; q < 4; q++) {
+          const k = k4[q];
+          const w = w4[q];
+          h += this.heights[k] * w;
+          dune += dunes[k] * w;
           const t = this.tiles[k];
-          if (t === CLIFF) cliff += 0.25;
-          if (t === SAND || t === SPICE || this.ramp[k]) soft += 0.25;
+          if (t === CLIFF) {
+            cliff += w;
+            outcrop = true;
+          }
+          if (t === SAND || t === SPICE || this.ramp[k]) soft += w;
+          high += this.level[k] * w;
+          // All four tiles count here, even at zero weight, so neighbouring vertices agree on the rule.
           if (this.ramp[k]) ramp = true;
           else levels |= this.level[k] ? 2 : 1;
-          highs += this.level[k];
+          if (this.level[k]) top = Math.max(top, this.heights[k]);
+          else bottom = Math.min(bottom, this.heights[k]);
         }
-        // A cliff edge vertex sits at the top or the foot of the wall, never halfway, so the wall stays steep.
-        // A plateau corner that sticks out (one high tile of four) takes the foot, cutting the corner diagonally;
-        // an inner corner (three of four) takes the top. Along straight runs (two of four) slow noise picks, so
-        // the wall wanders in and out by half a tile instead of tracing the tile grid's staircase.
-        if (levels === 3 && !ramp && cliff === 0) {
-          const wander = fbm(x / 5 + 700, z / 5 + 700, seed + 47) > 0.5;
-          const atTop = highs > 2 || (highs === 2 && wander);
-          h = (atTop ? top : bottom) + (hash(i, j, seed + 45) - 0.5) * 0.25; // a slightly ragged lip
+        if (levels === 3 && !ramp && !outcrop) {
+          const wobble = (fbm(x / 3 + 700, z / 3 + 700, seed + 47) - 0.5) * 0.6;
+          // A steep smooth step across the contour (about a unit wide) rather than a hard top/foot choice, so the
+          // wall has a face and follows the curve without stair steps.
+          const t = Math.min(1, Math.max(0, (high + wobble - 0.5) / 0.24 + 0.5));
+          h = bottom + (top - bottom) * t * t * (3 - 2 * t) + (valueNoise(x, z, seed + 45) - 0.5) * 0.25 * t; // ragged lip
         }
         if (dune > 0) {
           // Broad swells plus crested ridges running roughly east-west, like wind-built dunes.
@@ -262,9 +289,20 @@ export class GameMap {
           const ridge = 1 - Math.abs(2 * fbm(x / 30 + 500, z / 11 + 500, seed + 42) - 1);
           h += (swell * 1.6 + (ridge * ridge - 0.45) * 1.6) * dune;
         }
-        if (cliff > 0) h += hash(i, j, seed + 43) * 0.9 * cliff;
-        else h += (hash(i, j, seed + 44) - 0.5) * 0.22 * (1 - soft); // rock stays uneven so its facets catch the light
+        // Rock jitter on a one-unit lattice whatever the mesh resolution, so facets keep their size.
+        if (cliff > 0) h += valueNoise(x, z, seed + 43) * 0.9 * cliff;
+        else h += (valueNoise(x, z, seed + 44) - 0.5) * 0.22 * (1 - soft); // rock stays uneven so its facets catch the light
         this.surface[j * V + i] = h;
+      }
+    }
+    // Split each square along the diagonal that joins its two closest heights where it slopes; at random on flat ground.
+    this.flips = new Uint8Array((V - 1) * (V - 1));
+    const sf = this.surface;
+    for (let j = 0; j < V - 1; j++) {
+      for (let i = 0; i < V - 1; i++) {
+        const d00 = Math.abs(sf[j * V + i] - sf[(j + 1) * V + i + 1]);
+        const d10 = Math.abs(sf[j * V + i + 1] - sf[(j + 1) * V + i]);
+        this.flips[j * (V - 1) + i] = Math.max(d00, d10) > 0.15 ? (d10 < d00 ? 1 : 0) : hash(i, j, 97) < 0.5 ? 1 : 0;
       }
     }
     this.surfaceTop = this.surface.reduce((a, b) => Math.max(a, b), -Infinity);

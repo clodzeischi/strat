@@ -186,6 +186,8 @@ export class Terrain {
   private dirty = new Set<number>();
   private tmp = new THREE.Color();
   private acc = new THREE.Color();
+  private k4 = [0, 0, 0, 0];
+  private w4 = [0, 0, 0, 0];
   /** Per surface triangle (two per grid square, square-major): smoothing group, one of FACETED / GROUND / WALL. */
   private smooth: Uint8Array;
   /** Per surface triangle: y of its face normal (1 = flat). */
@@ -403,49 +405,49 @@ export class Terrain {
   /** Repaints one tile inside a chunk: its grid vertices, then every square touching them. */
   private paintTile(chunk: Chunk, cx: number, cz: number): void {
     const { n } = chunk;
-    const i0 = (cx - chunk.cx0) * SURFACE_RES;
-    const j0 = (cz - chunk.cz0) * SURFACE_RES;
-    for (let j = j0; j <= j0 + SURFACE_RES; j++) {
-      for (let i = i0; i <= i0 + SURFACE_RES; i++) if (i >= 0 && j >= 0 && i < n && j < n) this.paintVertex(chunk, i, j);
+    // A tile's color blends out to the neighbouring tile centers: half a tile past each of its edges.
+    const half = SURFACE_RES / 2;
+    const i0 = (cx - chunk.cx0) * SURFACE_RES - half;
+    const j0 = (cz - chunk.cz0) * SURFACE_RES - half;
+    const i1 = i0 + 2 * SURFACE_RES;
+    const j1 = j0 + 2 * SURFACE_RES;
+    for (let j = j0; j <= j1; j++) {
+      for (let i = i0; i <= i1; i++) if (i >= 0 && j >= 0 && i < n && j < n) this.paintVertex(chunk, i, j);
     }
-    for (let j = j0 - 1; j <= j0 + SURFACE_RES; j++) {
-      for (let i = i0 - 1; i <= i0 + SURFACE_RES; i++) if (i >= 0 && j >= 0 && i < n - 1 && j < n - 1) this.paintSquare(chunk, i, j);
+    for (let j = j0 - 1; j <= j1; j++) {
+      for (let i = i0 - 1; i <= i1; i++) if (i >= 0 && j >= 0 && i < n - 1 && j < n - 1) this.paintSquare(chunk, i, j);
     }
   }
 
-  /** A grid vertex blends the colors of the tiles around it, and records the spice around it for the shader. */
+  /**
+   * A grid vertex blends the colors of the tiles around it (bilinear between tile centers, so blends span a tile
+   * whatever the mesh resolution), and records the spice and sand around it for the shader.
+   */
   private paintVertex(chunk: Chunk, i: number, j: number): void {
     const map = this.map;
     const step = TILE / SURFACE_RES;
-    const gi = chunk.cx0 * SURFACE_RES + i;
-    const gj = chunk.cz0 * SURFACE_RES + j;
-    const x = gi * step;
-    const z = gj * step;
-    const o = TILE * 0.25;
+    const x = (chunk.cx0 * SURFACE_RES + i) * step;
+    const z = (chunk.cz0 * SURFACE_RES + j) * step;
+    map.centerWeights(x, z, this.k4, this.w4);
     this.acc.setRGB(0, 0, 0);
-    let w = 0;
     let share = 0;
     let rich = 0;
     let sand = 0;
-    for (const [dx, dz] of [[-o, -o], [o, -o], [-o, o], [o, o]]) {
-      const cx = map.cellOf(x + dx);
-      const cz = map.cellOf(z + dz);
-      if (!map.inBounds(cx, cz)) continue;
-      this.acc.add(tileColor(map, cx, cz, this.tmp, true));
-      w++;
-      const k = map.idx(cx, cz);
-      if (map.tiles[k] === SAND || map.tiles[k] === SPICE || map.ramp[k]) sand++;
+    for (let q = 0; q < 4; q++) {
+      const k = this.k4[q];
+      const w = this.w4[q];
+      this.acc.add(tileColor(map, k % map.size, (k / map.size) | 0, this.tmp, true).multiplyScalar(w));
+      if (map.tiles[k] === SAND || map.tiles[k] === SPICE || map.ramp[k]) sand += w;
       if (map.tiles[k] === SPICE) {
-        share++;
-        rich += Math.min(1, map.spice[k] / SPICE_MAX);
+        share += w;
+        rich += Math.min(1, map.spice[k] / SPICE_MAX) * w;
       }
     }
-    if (w) this.acc.multiplyScalar(1 / w);
     const v = j * chunk.n + i;
     chunk.grid.set([this.acc.r, this.acc.g, this.acc.b], v * 3);
-    // Richness is averaged over the spice tiles only, so a field's edge is as rich as the tiles it bounds.
-    chunk.spice[v * 3] = w ? share / w : 0;
-    chunk.spice[v * 3 + 1] = share ? rich / share : 0;
-    chunk.spice[v * 3 + 2] = w ? sand / w : 0;
+    // Richness is averaged over the spice only, so a field's edge is as rich as the tiles it bounds.
+    chunk.spice[v * 3] = share;
+    chunk.spice[v * 3 + 1] = share > 0 ? rich / share : 0;
+    chunk.spice[v * 3 + 2] = sand;
   }
 }
