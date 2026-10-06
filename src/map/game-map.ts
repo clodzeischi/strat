@@ -430,6 +430,10 @@ export class GameMap {
   /** Nearest cell that passes `ok`, searching rings outwards; ties broken by distance to (fx, fz). */
   nearestCell(cx: number, cz: number, ok: (cx: number, cz: number) => boolean, maxR = 12, fx = cx, fz = cz): Cell | null {
     if (ok(cx, cz)) return { cx, cz };
+    const mid = (this.size - 1) / 2;
+    const len = Math.hypot(mid - fx, mid - fz) || 1;
+    const tx = (mid - fx) / len;
+    const tz = (mid - fz) / len;
     for (let r = 1; r <= maxR; r++) {
       let best: Cell | null = null;
       let bestD = Infinity;
@@ -439,7 +443,11 @@ export class GameMap {
           const x = cx + dx;
           const z = cz + dz;
           if (!ok(x, z)) continue;
-          const d = (x - fx) ** 2 + (z - fz) ** 2;
+          // Ties go to the cell nearer the map's middle, then to one side of the line from the search point to the
+          // middle, so mirrored searches on a point-symmetric map pick mirrored cells instead of whichever the scan
+          // order meets first.
+          const across = (x - fx) * -tz + (z - fz) * tx;
+          const d = (x - fx) ** 2 + (z - fz) ** 2 + ((x - mid) ** 2 + (z - mid) ** 2) * 1e-6 + across * 1e-9;
           if (d < bestD) {
             bestD = d;
             best = { cx: x, cz: z };

@@ -6,7 +6,7 @@ import {
   type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
 import { Effects } from '../render/effects/effects';
-import { Building, Carryall, distTo, repairable, Unit, type Entity } from '../entities';
+import { Building, Carryall, distTo, facingToward, repairable, Unit, type Entity } from '../entities';
 import { GameMap, ROCK, SPICE, type Cell } from '../map';
 import { mat } from '../materials/lambert';
 import { cellsAround, type Point } from './pathfinding';
@@ -73,6 +73,7 @@ export class Game {
   teams: TeamState[];
   time = 0;
   winner: Team | null = null;
+  private tick = 0;
   /** The team that surrendered, when the game ended that way. */
   surrendered: Team | null = null;
   /** Called when a computer opponent offers to surrender; answer with `acceptSurrender` or ignore it to play on. */
@@ -320,7 +321,12 @@ export class Game {
   }
 
   placeBuilding(type: BuildingType, team: Team, cx: number, cz: number): Building {
-    const b = new Building(this.nextId++, team, type, cx, cz, this.map.surfaceAt((cx + BUILDINGS[type].size / 2) * TILE, (cz + BUILDINGS[type].size / 2) * TILE));
+    const size = BUILDINGS[type].size;
+    const bx = (cx + size / 2) * TILE;
+    const bz = (cz + size / 2) * TILE;
+    // Doors face the middle of the map, so mirrored bases get mirrored exits and docks.
+    const mid = this.map.worldSize() / 2;
+    const b = new Building(this.nextId++, team, type, cx, cz, this.map.surfaceAt(bx, bz), facingToward(bx, bz, mid, mid));
     for (let z = cz; z < cz + b.size; z++) {
       for (let x = cx; x < cx + b.size; x++) this.map.occupied[this.map.idx(x, z)] = b.id;
     }
@@ -328,7 +334,7 @@ export class Game {
     this.buildings.push(b);
     if (type === 'refinery') {
       const dock = this.dockCell(b);
-      const h = this.spawnUnit('harvester', team, this.map.center(dock.cx), this.map.center(dock.cz), Math.PI / 2);
+      const h = this.spawnUnit('harvester', team, this.map.center(dock.cx), this.map.center(dock.cz), b.doorHeading());
       h.commandHarvest(this, null);
     }
     return b;
@@ -351,7 +357,7 @@ export class Game {
     }
     const front = site.frontCell();
     const cell = this.dockCell(site);
-    const u = this.spawnUnit(type, team, this.map.center(cell.cx), this.map.center(cell.cz), Math.PI / 2);
+    const u = this.spawnUnit(type, team, this.map.center(cell.cx), this.map.center(cell.cz), site.doorHeading());
     if (type === 'harvester') {
       u.commandHarvest(this, null);
       return;
@@ -360,7 +366,8 @@ export class Game {
     if (rally) {
       u.command(this, { kind: 'move', x: rally.x, z: rally.z });
     } else {
-      const spots = cellsAround(this.map, front.cx, front.cz + 2, 10);
+      const out = site.doorStep();
+      const spots = cellsAround(this.map, front.cx + out.dx * 2, front.cz + out.dz * 2, 10);
       const s = spots[Math.floor(Math.random() * spots.length)];
       if (s) u.command(this, { kind: 'move', x: this.map.center(s.cx), z: this.map.center(s.cz) });
     }
@@ -727,7 +734,10 @@ export class Game {
   update(dt: number): void {
     this.time += dt;
     for (const ts of this.teams) this.updateProduction(ts, dt);
-    for (const u of this.units) {
+    // Alternate the order units act in, so neither side always gets the first shot in a tick.
+    this.tick++;
+    const order = this.tick % 2 ? this.units : [...this.units].reverse();
+    for (const u of order) {
       if (u.dead || u.carrier) continue;
       if (u.falling) u.updateFall(this, dt);
       else u.update(this, dt);

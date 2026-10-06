@@ -179,21 +179,36 @@ function smooth(map: GameMap, start: Point, cells: Point[], cls: MoveClass): Poi
 export function cellsAround(map: GameMap, cx: number, cz: number, count: number, cls: MoveClass = 'vehicle'): Cell[] {
   const startCell = map.nearestPassable(cx, cz);
   if (!startCell) return [];
-  const out: Cell[] = [];
-  const seen = new Set<number>([map.idx(startCell.cx, startCell.cz)]);
-  const queue: Cell[] = [startCell];
-  while (queue.length && out.length < count) {
-    const c = queue.shift()!;
-    out.push(c);
-    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
-      const x = c.cx + dx;
-      const z = c.cz + dz;
-      if (!map.inBounds(x, z) || !map.canStep(c.cx, c.cz, x, z, cls)) continue;
-      const k = map.idx(x, z);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      queue.push({ cx: x, cz: z });
+  // Every cell reachable within a square around the start, grown until there are enough, nearest first. Ties are
+  // broken by distance to the map's middle, then by side, so mirrored calls on a point-symmetric map give mirrored
+  // cells (a plain breadth-first order would depend on which neighbor is tried first).
+  const mid = (map.size - 1) / 2;
+  const len = Math.hypot(mid - startCell.cx, mid - startCell.cz) || 1;
+  const tx = (mid - startCell.cx) / len;
+  const tz = (mid - startCell.cz) / len;
+  const key = (c: Cell) => {
+    const dx = c.cx - startCell.cx;
+    const dz = c.cz - startCell.cz;
+    return dx * dx + dz * dz + ((c.cx - mid) ** 2 + (c.cz - mid) ** 2) * 1e-6 + (dx * -tz + dz * tx) * 1e-9;
+  };
+  for (let r = Math.ceil(Math.sqrt(count)); ; r++) {
+    const out: Cell[] = [];
+    const seen = new Set<number>([map.idx(startCell.cx, startCell.cz)]);
+    const queue: Cell[] = [startCell];
+    while (queue.length) {
+      const c = queue.shift()!;
+      out.push(c);
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [-1, -1], [1, -1], [-1, 1]]) {
+        const x = c.cx + dx;
+        const z = c.cz + dz;
+        if (Math.max(Math.abs(x - startCell.cx), Math.abs(z - startCell.cz)) > r) continue;
+        if (!map.inBounds(x, z) || !map.canStep(c.cx, c.cz, x, z, cls)) continue;
+        const k = map.idx(x, z);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        queue.push({ cx: x, cz: z });
+      }
     }
+    if (out.length >= count || r >= 24) return out.sort((a, b) => key(a) - key(b)).slice(0, count);
   }
-  return out;
 }

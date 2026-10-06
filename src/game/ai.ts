@@ -1,7 +1,7 @@
 import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType } from '../config';
 import { Building, type Entity, type Unit } from '../entities';
 import type { Difficulty, Game } from './game';
-import type { Cell } from '../map';
+import { SPICE, type Cell } from '../map';
 
 const RESEARCH_ORDER: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
 
@@ -676,12 +676,27 @@ export class AI {
     this.game.offerSurrender(this.team);
   }
 
-  /** Spiral out from our buildings for a valid spot, leaving a one-tile gap so paths stay open. */
+  /**
+   * A valid spot near the base, leaving a one-tile gap so paths stay open: the closest to the construction yard (a
+   * refinery: to the nearest spice), ties going toward the middle of the map. Positions are compared in the base's
+   * own frame (toward the middle, and across), so two mirrored bases pick mirrored spots.
+   */
   private findSpot(type: BuildingType): Cell | null {
     const g = this.game;
     const size = BUILDINGS[type].size;
     const anchor = this.home();
     if (!anchor) return null;
+    const ax = anchor.cx + anchor.size / 2;
+    const az = anchor.cz + anchor.size / 2;
+    const mid = g.map.size / 2;
+    const len = Math.hypot(mid - ax, mid - az) || 1;
+    const tx = (mid - ax) / len;
+    const tz = (mid - az) / len;
+    let goal = { x: ax, z: az };
+    if (type === 'refinery') {
+      const spice = g.map.nearestCell(anchor.cx + 1, anchor.cz + 1, (x, z) => g.map.tile(x, z) === SPICE, 20);
+      if (spice) goal = { x: spice.cx + 0.5, z: spice.cz + 0.5 };
+    }
     const ok = (cx: number, cz: number) => {
       if (!g.canPlace(type, this.team, cx, cz)) return false;
       for (let z = cz - 1; z <= cz + size; z++) {
@@ -691,6 +706,24 @@ export class AI {
       }
       return true;
     };
-    return g.map.nearestCell(anchor.cx, anchor.cz, ok, 10);
+    let best: Cell | null = null;
+    let bestKey: number[] = [];
+    const R = 12;
+    for (let cz = anchor.cz - R; cz <= anchor.cz + R; cz++) {
+      for (let cx = anchor.cx - R; cx <= anchor.cx + R; cx++) {
+        const x = cx + size / 2;
+        const z = cz + size / 2;
+        // Rounded so mirrored spots tie exactly despite floating point, then broken in the base's frame.
+        const d = Math.round(Math.hypot(x - goal.x, z - goal.z) * 1000);
+        const along = Math.round(((x - ax) * tx + (z - az) * tz) * 1000);
+        const across = Math.round(((x - ax) * -tz + (z - az) * tx) * 1000);
+        const key = [d, -along, across];
+        if (best && !(key[0] < bestKey[0] || (key[0] === bestKey[0] && (key[1] < bestKey[1] || (key[1] === bestKey[1] && key[2] < bestKey[2]))))) continue;
+        if (!g.map.inBounds(cx, cz) || !ok(cx, cz)) continue;
+        best = { cx, cz };
+        bestKey = key;
+      }
+    }
+    return best;
   }
 }
