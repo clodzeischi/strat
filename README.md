@@ -84,6 +84,9 @@ Production is in the sidebar on the right. Click a card to build or train, and r
   - `npx tsx sim/air-repair-check.ts`: Carryall, paradrop and repair behavior.
   - `npx tsx sim/ai-check.ts`: AI defense, economy recovery and surrender (`DIFFICULTY=hard` for Hard).
   - `MAPS=random sim/run.sh 10 4 hard`: a profile from `sim/variants.ts` against Normal, 40 games on random maps.
+  - `sim/gauntlet.sh 20`: Normal and Hard against scripted player strategies (rush, turtle, harass, rockets, drop).
+  - `npx tsx sim/side-bias.ts`: spawn fairness, the same AI on both sides of each map.
+  - `npx tsx sim/matchups.ts`: re-measure unit matchups for the AI after changing unit stats; `npx tsx sim/duel.ts` for quick duels.
   - `npx tsx sim/terrain-check.ts 3`: AI matches, checked for illegal moves and stuck units.
   - `CHECK=60 QUIET=1 npx tsx sim/maps.ts`: generate 60 maps and validate them.
 - [docs/CODE_LAYOUT.md](docs/CODE_LAYOUT.md): where everything lives in `src/`.

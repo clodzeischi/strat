@@ -1,6 +1,7 @@
 import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType } from '../config';
 import { Building, type Entity, type Unit } from '../entities';
 import type { Difficulty, Game } from './game';
+import { MATCHUP_TYPES, MATCHUPS, type Matchup } from './matchups';
 import { SPICE, type Cell } from '../map';
 
 const RESEARCH_ORDER: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
@@ -37,6 +38,15 @@ export interface AIProfile {
   initiative: number;
   /** A wave falls back once it's down to this share of its starting strength. */
   waveRetreat: number;
+  /** A wave only sets out when it's at least this share of the enemy's whole army; otherwise it keeps gathering. */
+  waveGate: number;
+  /** How closely unit picks follow the best counter to the enemy army (see `counterWeights`; higher: more strictly). */
+  counterFocus: number;
+  /**
+   * When the chosen unit's production line is busy, wait for it instead of filling free lines with whatever comes
+   * up (cheap infantry from idle barracks would otherwise make up most of the army whatever it's up against).
+   */
+  goodLinesOnly: boolean;
   /**
    * Keeping the army alive (all off at 0): one Repair Vehicle per `repairPer` combat vehicles, up to `maxRepair`.
    * They stay home: damaged vehicles come to them after a fight, nobody leaves one. A wave pulls back when the
@@ -48,7 +58,7 @@ export interface AIProfile {
 export const NORMAL_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
-  raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3,
+  raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3, waveGate: 0.6, counterFocus: 3, goodLinesOnly: false,
   sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 },
 };
 
@@ -59,7 +69,7 @@ export const NORMAL_PROFILE: AIProfile = {
  */
 export const HARD_PROFILE: AIProfile = {
   ...NORMAL_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
-  initiative: 1.2, waveRetreat: 0.5, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
+  initiative: 1.2, waveRetreat: 0.5, waveGate: 0.9, counterFocus: 8, goodLinesOnly: true, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
   sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 },
 };
 
@@ -73,16 +83,21 @@ export function power(u: Unit): number {
   return u.def.weapon ? u.def.cost * (u.hp / u.maxHp) : 0;
 }
 
+/** Combined-arms base preference for unit picks, before counters (see `counterWeights`). */
+const BASE_MIX: Record<Matchup, number> = { infantry: 0.7, trike: 0.4, tank: 1, rocket: 1 };
+
 /** Enemies this close to one of our buildings are attacking the base. */
 const BASE_RADIUS = 14 * TILE;
 /** Enemies this close to one of our harvesters are hunting it. */
 const HARVESTER_RADIUS = 10 * TILE;
 /** Intruders this close together count as one attack. */
 const CLUSTER_RADIUS = 10 * TILE;
+/** Units at home or defending never chase further than this from the rally point. */
+const LEASH = 22 * TILE;
 /** An attack that hasn't been seen for this long is over, and its defenders go home. */
 const DEFENSE_TIMEOUT = 4;
 
-type Role = 'home' | 'defend' | 'wave' | 'raid';
+export type Role = 'home' | 'defend' | 'wave' | 'raid';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -112,10 +127,10 @@ interface Wave {
 export class AI {
   private thinkTimer = 2;
   private waveSize = 5;
-  private nextWaveTime = 150;
+  protected nextWaveTime = 150;
   /** Unit we're saving up for, so expensive units still get built. */
   private nextUnit: UnitType | null = null;
-  private nextRaidTime: number;
+  protected nextRaidTime: number;
   /** Tech path for this game: economy and anti-armor first, or heavy army first. */
   private readonly techOrder: LevelUpType[] = Math.random() < 0.5 ? ['conyard', 'factory'] : ['factory', 'conyard'];
 
@@ -123,15 +138,19 @@ export class AI {
   private lastEconHit = -Infinity;
   private harvesterIds = new Set<number>();
 
-  private roles = new Map<Unit, Role>();
+  protected roles = new Map<Unit, Role>();
   private defenses: Defense[] = [];
+  /** An attack on the base is stronger than everything we could send against it (as of the last think). */
+  private outgunned = false;
   private waves: Wave[] = [];
   private raiders = new Set<Unit>();
   /** Strength of the current raid when it set out. */
   private raidStart = 0;
   /** Where idle units gather: just in front of the base, toward the middle of the map. */
-  private rally: { x: number; z: number } | null = null;
+  protected rally: { x: number; z: number } | null = null;
   private rallyAnchor: Building | null = null;
+  /** Building types there was no room for, and until when not to try them again. */
+  private noRoom = new Map<BuildingType, number>();
   /** Once the opening is done, buildings missing from it are rebuilt before anything else is bought. */
   private openingDone = false;
 
@@ -139,7 +158,7 @@ export class AI {
   private hopelessFor = 0;
   surrenderOffered = false;
 
-  constructor(private game: Game, private team: Team, private profile: AIProfile = NORMAL_PROFILE) {
+  constructor(protected game: Game, protected team: Team, protected profile: AIProfile = NORMAL_PROFILE) {
     this.nextRaidTime = profile.raids.start;
   }
 
@@ -209,7 +228,7 @@ export class AI {
   /** Buys the next tech step once we can afford it. */
   private manageTech(): void {
     const goal = this.techGoal();
-    if (!goal || this.ts.credits - goal.cost < this.fund()) return;
+    if (!goal || this.rushed() || this.ts.credits - goal.cost < this.fund()) return;
     if (goal.kind === 'level') this.game.startLevelUp(this.team, goal.type);
     else this.game.startResearch(this.team, goal.type);
   }
@@ -235,7 +254,7 @@ export class AI {
     return this.openingDone && !this.econGoal() ? this.profile.fund : 0;
   }
 
-  private get ts() {
+  protected get ts() {
     return this.game.teams[this.team];
   }
 
@@ -248,9 +267,18 @@ export class AI {
       else g.cancelBuilding(this.team);
       return;
     }
+    const goal = this.econGoal();
+    // Rushed: anything but a refinery or barracks under construction is called off (full refund) for units.
+    if (ts.building && this.rushed() && g.has(this.team, 'refinery') && ts.building.type !== 'barracks' && ts.building.type !== 'refinery') {
+      g.cancelBuilding(this.team);
+      return;
+    }
     if (ts.building || !g.has(this.team, 'conyard')) return;
 
-    const goal = this.econGoal();
+    if (this.rushed() && !goal && g.has(this.team, 'refinery')) {
+      if (g.count(this.team, 'barracks') < 3 && ts.credits >= BUILDINGS.barracks.cost && this.findSpot('barracks')) g.startBuilding(this.team, 'barracks');
+      return;
+    }
     const refineries = g.count(this.team, 'refinery');
     const barracks = g.count(this.team, 'barracks');
     const factories = g.count(this.team, 'factory');
@@ -261,7 +289,10 @@ export class AI {
     else if (barracks < 2 && ts.credits > 1500) want = 'barracks';
     else if (factories < 2 && ts.credits > 2500) want = 'factory';
     else if (g.count(this.team, 'conyard') < 2 && ts.credits > 4000) want = 'conyard';
-    if (want && ts.credits >= BUILDINGS[want].cost) g.startBuilding(this.team, want);
+    if (!want || ts.credits < BUILDINGS[want].cost || (this.noRoom.get(want) ?? -Infinity) > g.time) return;
+    // Only start what there's room for: a cramped base would otherwise build, fail to place, refund and retry forever.
+    if (this.findSpot(want)) g.startBuilding(this.team, want);
+    else this.noRoom.set(want, g.time + 90);
   }
 
   private manageProduction(): void {
@@ -270,7 +301,8 @@ export class AI {
     // Keep every production line busy plus one queued item, no more, so money isn't locked up.
     const full = (p: Producer) => ts.queues[p].length >= g.activeLines(this.team, p) + 1;
     const refineries = g.count(this.team, 'refinery');
-    if (this.harvesterCount() < this.wantHarvesters() && g.canTrain(this.team, 'harvester')) {
+    const rushed = this.rushed();
+    if (this.harvesterCount() < (rushed ? 1 : this.wantHarvesters()) && g.canTrain(this.team, 'harvester')) {
       if (!full('factory') && ts.credits >= UNITS.harvester.cost) g.queueUnit(this.team, 'harvester');
       return;
     }
@@ -283,29 +315,108 @@ export class AI {
     const reserve = goal ? goal.cost
       : step ? BUILDINGS[step].cost
       : refineries < this.wantRefineries() ? 800 : army >= this.profile.techArmy ? (this.techGoal()?.cost ?? 0) : 0;
+    // Falling well behind the enemy's army (an early rush, say): only getting income back still comes first.
+    const behind = this.armyPower(this.team, true) * 1.5 < this.armyPower(this.team, false);
 
-    if (!this.nextUnit) this.nextUnit = this.raidTrikeWanted() ? 'trike' : this.repairWanted() ? 'repair' : this.pickCounter();
-    const next = this.nextUnit;
-    if (!g.canTrain(this.team, next) || full(UNITS[next].producer)) {
-      this.nextUnit = null; // that line is busy or missing; pick again next think
+    // Savings don't stack (the fund covers a harvester, the reserve the next big purchase), and none of it matters
+    // while the base is being overrun: then every credit goes into units.
+    const keep = this.outgunned || rushed ? 0 : behind ? (goal?.cost ?? 0) : Math.max(reserve, this.fund());
+    if (!this.nextUnit) this.nextUnit = this.chooseUnit();
+    let next = this.nextUnit;
+    if (!g.canTrain(this.team, next)) {
+      this.nextUnit = null;
       return;
     }
-    if (ts.credits - UNITS[next].cost >= reserve + this.fund() && g.queueUnit(this.team, next)) this.nextUnit = null;
+    if (full(UNITS[next].producer)) {
+      if (!this.profile.goodLinesOnly) {
+        this.nextUnit = null; // that line is busy; pick again next think
+        return;
+      }
+      // Wait for the line the best unit comes from, rather than filling a free line with a poor counter. With money
+      // to spare, a free line may build something nearly as good.
+      if (ts.credits - keep < 1500) return;
+      const weights = this.counterWeights();
+      const top = Math.max(...weights.map(([, w]) => w));
+      const alt = weights.filter(([t, w]) => w >= top * 0.4 && g.canTrain(this.team, t) && !full(UNITS[t].producer)).sort((a, b) => b[1] - a[1])[0];
+      if (!alt) return;
+      next = alt[0];
+    }
+    if (ts.credits - UNITS[next].cost >= keep && g.queueUnit(this.team, next) && next === this.nextUnit) this.nextUnit = null;
   }
 
-  /** How much we want of each unit type, from what counters the enemy's current army. */
+  /**
+   * An early rush: in the first five minutes, the enemy's army is more than 1.5x ours. Until we catch up, only a
+   * refinery (if we have none), up to three barracks and units get bought.
+   */
+  private rushed(): boolean {
+    return this.game.time < 300 && this.armyPower(this.team, true) * 1.5 < this.armyPower(this.team, false);
+  }
+
+  /**
+   * The enemy army's strength as an attacker would face it: units within 20 tiles of their own buildings count 1.5x,
+   * since they fight where they're set up, with their base around them and reinforcements arriving.
+   */
+  private enemyDefense(): number {
+    const g = this.game;
+    let p = 0;
+    for (const u of g.units) {
+      if (u.team === this.team || u.carrier) continue;
+      const home = g.buildings.some((b) => b.team === u.team && Math.hypot(b.x - u.x, b.z - u.z) < 20 * TILE);
+      p += power(u) * (home ? 1.5 : 1);
+    }
+    return p;
+  }
+
+  /** Combined strength of our army (`mine`), or of everyone else's. */
+  private armyPower(team: Team, mine: boolean): number {
+    let p = 0;
+    for (const u of this.game.units) if ((u.team === team) === mine && !u.carrier) p += power(u);
+    return p;
+  }
+
+  /** The next unit to save up for and build. */
+  protected chooseUnit(): UnitType {
+    return this.raidTrikeWanted() ? 'trike' : this.repairWanted() ? 'repair' : this.pickCounter();
+  }
+
+  /**
+   * Unit types worth building against the enemy's current army, with how much. Each type is scored by how it fares
+   * against the enemy's unit types in measured equal-cost duels (matchups.ts, from sim/matchups.ts), weighted by
+   * their share of the enemy army's value. Bad matchups count double: a unit the enemy has a hard counter for dies
+   * before it does its job, whatever else it would beat. Weights are exp(counterFocus x score), so Hard sticks
+   * closer to the best counter than Normal, on top of a combined-arms base mix (tanks and rocket launchers at the
+   * core), and a type that's already much of our army gets picked less. With no enemy army yet, the base mix.
+   */
   private counterWeights(): [UnitType, number][] {
     const g = this.game;
-    const value: Record<UnitType, number> = { harvester: 0, infantry: 0, trike: 0, tank: 0, rocket: 0, repair: 0, carryall: 0 };
-    for (const u of g.units) if (u.team !== this.team) value[u.type] += UNITS[u.type].cost / 500;
-    const rockets = this.ts.upgrades.has('rockets') || this.ts.research?.type === 'rockets';
-    const weights: [UnitType, number][] = [
-      ['infantry', 1 + value.tank * (rockets ? 1.5 : 0.3) + value.rocket * (rockets ? 0.8 : 0)],
-      ['trike', 0.5 + value.infantry * 0.5],
-      ['tank', 1 + value.trike + value.rocket],
-      ['rocket', 0.6 + value.infantry],
-    ];
-    return weights.filter(([t]) => g.requirementsMet(this.team, UNITS[t].requires));
+    const options = (MATCHUP_TYPES as Matchup[]).filter((t) => g.requirementsMet(this.team, UNITS[t].requires));
+    const enemy = new Map<Matchup, number>();
+    let total = 0;
+    let foe: Team | null = null;
+    for (const u of g.units) {
+      if (u.team === this.team || u.carrier || !(MATCHUP_TYPES as UnitType[]).includes(u.type)) continue;
+      enemy.set(u.type as Matchup, (enemy.get(u.type as Matchup) ?? 0) + u.def.cost);
+      total += u.def.cost;
+      foe = u.team;
+    }
+    const own = new Map<Matchup, number>();
+    let ownTotal = 0;
+    for (const u of g.units) {
+      if (u.team !== this.team || !(MATCHUP_TYPES as UnitType[]).includes(u.type)) continue;
+      own.set(u.type as Matchup, (own.get(u.type as Matchup) ?? 0) + u.def.cost);
+      ownTotal += u.def.cost;
+    }
+    const base = (t: Matchup) => BASE_MIX[t] * (1 - (own.get(t) ?? 0) / Math.max(1, ownTotal)) ** 2;
+    if (foe === null) return options.map((t) => [t, base(t)]);
+    const key = `${g.teams[this.team].upgrades.has('rockets') ? 'R' : '-'}${g.teams[foe].upgrades.has('rockets') ? 'R' : '-'}`;
+    return options.map((t) => {
+      let score = 0;
+      for (const [e, value] of enemy) {
+        const r = MATCHUPS[key][t][e];
+        score += (value / total) * (r < 0 ? 2 * r : r);
+      }
+      return [t, base(t) * Math.exp(this.profile.counterFocus * score)];
+    });
   }
 
   /** Weighted pick that leans toward whatever counters the enemy's current army. */
@@ -341,7 +452,7 @@ export class AI {
 
   // ---- Army -----------------------------------------------------------------
 
-  private manageArmy(): void {
+  protected manageArmy(): void {
     const g = this.game;
     const army = g.units.filter((u) => u.team === this.team && u.def.weapon && !u.carrier);
     for (const u of [...this.roles.keys()]) if (u.dead) this.roles.delete(u);
@@ -354,6 +465,19 @@ export class AI {
     this.manageWaves(baseAttacked);
     this.manageRaids(army, baseAttacked);
 
+    // Leash: a unit at home or defending that has been drawn far out (chasing a kiting raider, say) comes straight
+    // back with a plain move, which doesn't stop to fight, instead of an attack-move it would break off again.
+    if (this.rally) {
+      for (const u of army) {
+        const role = this.roles.get(u);
+        if ((role !== 'home' && role !== 'defend') || u.order.kind === 'move') continue;
+        if (Math.hypot(u.x - this.rally.x, u.z - this.rally.z) <= LEASH) continue;
+        this.leaveGroups(u);
+        this.roles.set(u, 'home');
+        u.command(g, { kind: 'move', x: this.rally.x, z: this.rally.z });
+      }
+    }
+
     // Idle units at home gather at the rally point (new units, and anyone who wandered off chasing something).
     if (this.rally) {
       for (const u of army) {
@@ -363,7 +487,7 @@ export class AI {
     }
   }
 
-  private home(): Building | null {
+  protected home(): Building | null {
     const g = this.game;
     return g.buildings.find((b) => b.team === this.team && b.type === 'conyard') ?? g.buildings.find((b) => b.team === this.team) ?? null;
   }
@@ -387,7 +511,7 @@ export class AI {
     this.rally = cell ? { x: map.center(cell.cx), z: map.center(cell.cz) } : { x: anchor.x, z: anchor.z };
   }
 
-  private sendHome(u: Unit): void {
+  protected sendHome(u: Unit): void {
     this.roles.set(u, 'home');
     if (!this.rally) {
       u.command(this.game, { kind: 'idle' });
@@ -436,6 +560,7 @@ export class AI {
       seen.add(d);
     }
 
+    this.outgunned = false;
     for (const d of [...this.defenses]) {
       for (const u of d.units) if (u.dead) d.units.delete(u);
       if (g.time - d.lastSeen > DEFENSE_TIMEOUT) {
@@ -463,6 +588,7 @@ export class AI {
           u.command(g, { kind: 'amove', x: d.x, z: d.z });
         }
       }
+      if (d.base && have < d.power) this.outgunned = true;
       // Defenders that got where they were sent and found nothing follow the attackers as they move.
       for (const u of d.units) {
         if (u.order.kind === 'idle' && !u.target && Math.hypot(u.x - d.x, u.z - d.z) > 4 * TILE) u.command(g, { kind: 'amove', x: d.x, z: d.z });
@@ -533,10 +659,10 @@ export class AI {
     const ready = [...this.roles].filter(([u, r]) => r === 'home' && !u.dead && !u.carrier && !(hunt && u.type === 'trike')).map(([u]) => u);
     const strength = ready.reduce((s, u) => s + power(u), 0);
     // Initiative: strong enough to win outright, so go now, whatever the timer says.
-    const enemy = g.units.filter((u) => u.team !== this.team && !u.carrier).reduce((s, u) => s + power(u), 0);
+    const enemy = this.enemyDefense();
     const seize = this.profile.initiative > 0 && ready.length >= 4 && strength >= enemy * this.profile.initiative;
     if (!seize) {
-      if (g.time < this.nextWaveTime) return;
+      if (g.time < this.nextWaveTime || strength < enemy * this.profile.waveGate) return;
       // A full-size wave, or a smaller one if it's been a long while, so the pressure keeps up after heavy losses.
       const overdue = g.time >= this.nextWaveTime + 90;
       if (ready.length < this.waveSize && !(overdue && ready.length >= Math.max(4, this.waveSize / 2))) return;
@@ -633,7 +759,7 @@ export class AI {
   }
 
   /** The nearest enemy building (or, a little less eagerly, unit); with `economy`, refineries and harvesters come first. */
-  private pickTarget(from: Unit, economy = false): { x: number; z: number } | null {
+  protected pickTarget(from: Unit, economy = false): { x: number; z: number } | null {
     const g = this.game;
     let best: { x: number; z: number } | null = null;
     let bestD = Infinity;
@@ -686,13 +812,7 @@ export class AI {
     const size = BUILDINGS[type].size;
     const anchor = this.home();
     if (!anchor) return null;
-    const ax = anchor.cx + anchor.size / 2;
-    const az = anchor.cz + anchor.size / 2;
-    const mid = g.map.size / 2;
-    const len = Math.hypot(mid - ax, mid - az) || 1;
-    const tx = (mid - ax) / len;
-    const tz = (mid - az) / len;
-    let goal = { x: ax, z: az };
+    let goal = { x: anchor.cx + anchor.size / 2, z: anchor.cz + anchor.size / 2 };
     if (type === 'refinery') {
       const spice = g.map.nearestCell(anchor.cx + 1, anchor.cz + 1, (x, z) => g.map.tile(x, z) === SPICE, 20);
       if (spice) goal = { x: spice.cx + 0.5, z: spice.cz + 0.5 };
@@ -706,6 +826,19 @@ export class AI {
       }
       return true;
     };
+    return this.bestSpot(type, anchor, goal, ok) ?? this.bestSpot(type, anchor, goal, (cx, cz) => g.canPlace(type, this.team, cx, cz));
+  }
+
+  /** The valid spot (by `ok`) nearest `goal`; see `findSpot`. */
+  private bestSpot(type: BuildingType, anchor: Building, goal: { x: number; z: number }, ok: (cx: number, cz: number) => boolean): Cell | null {
+    const g = this.game;
+    const size = BUILDINGS[type].size;
+    const ax = anchor.cx + anchor.size / 2;
+    const az = anchor.cz + anchor.size / 2;
+    const mid = g.map.size / 2;
+    const len = Math.hypot(mid - ax, mid - az) || 1;
+    const tx = (mid - ax) / len;
+    const tz = (mid - az) / len;
     let best: Cell | null = null;
     let bestKey: number[] = [];
     const R = 12;

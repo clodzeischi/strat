@@ -132,6 +132,32 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
   }
 }
 
+// 2b. Kiting: a trike pokes the units at home, then backs off just out of reach, again and again. The defenders
+// shouldn't follow it far from the base (they're leashed to the rally point).
+{
+  const s = setup();
+  const rally = (s.ai as unknown as { rally: { x: number; z: number } }).rally;
+  const home = conyard(s.g);
+  const player = s.g.buildings.find((b) => b.team === PLAYER_TEAM)!;
+  const kiter = spawnAttackers(s.g, 'trike', 1, home, 16)[0];
+  kiter.hp = kiter.maxHp = 1e6; // it only needs to keep the bait going
+  let farthest = 0;
+  let next = 0;
+  run(s, 120, () => {
+    if (s.g.time >= next) {
+      next = s.g.time + 0.5;
+      const near = Math.min(...army(s.g, AI_TEAM).map((u) => dist(u, kiter)));
+      // Within their reach: run toward our own base; well clear: come back for another poke.
+      if (near < 10 * TILE) kiter.command(s.g, { kind: 'move', x: player.x, z: player.z });
+      else if (near > 14 * TILE) kiter.command(s.g, { kind: 'amove', x: rally.x, z: rally.z });
+      for (const u of army(s.g, AI_TEAM)) farthest = Math.max(farthest, dist(u, rally));
+    }
+    return false;
+  });
+  // The leash is 22 tiles from the rally point, plus however far a unit gets before the next think calls it back.
+  check(farthest < 28 * TILE, 'a kiting trike can\'t drag the defenders far from the base', `farthest ${Math.round(farthest / TILE)} tiles from the rally point`);
+}
+
 // 3. Losing every harvester: income comes back before the army grows.
 {
   const s = setup();
@@ -201,8 +227,10 @@ if (profileFor(DIFFICULTY).sustain.repairPer) {
     const out = s.g.spawnUnit('tank', AI_TEAM, s.g.map.center(mid.cx), s.g.map.center(mid.cz));
     back.hp = back.maxHp * 0.2;
     out.hp = out.maxHp * 0.2;
-    s.ai.update(1.01); // takes both on as units at home
+    // The one out on the field is part of a wave, attack-moving on the enemy base.
     a.roles.set(out, 'wave');
+    const enemy = s.g.buildings.find((b) => b.team === PLAYER_TEAM)!;
+    out.command(s.g, { kind: 'amove', x: enemy.x, z: enemy.z });
     const t0 = s.g.time;
     let left = false;
     run(s, 60, () => {
