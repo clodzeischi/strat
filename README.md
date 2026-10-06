@@ -2,7 +2,7 @@
 
 A Dune-style real-time strategy game in the browser, built with Three.js and TypeScript. Harvest spice, build a base, and fight a computer opponent across a randomly generated desert. You can also drop paratroopers on top of its base.
 
-![Carryalls parachuting infantry onto an enemy base](docs/screenshots/airdrop2.jpg)
+![Carryalls parachuting infantry and trikes onto an enemy base](docs/screenshots/airdrop.jpg)
 
 ## Features
 
@@ -23,10 +23,10 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 
 | | |
 |---|---|
-| ![Three Carryalls dropping paratroopers and trikes on a red base](docs/screenshots/airdrop.jpg) | ![A Carryall setting a tank down on a spice field, kicking up red dust](docs/screenshots/landing.jpg) |
-| A paradrop on the enemy base: trikes and infantry come down under canopies while the defenders shoot back. | A touch-and-go drop: the Carryall comes in low, sets the tank down and climbs away. Its downwash raises red dust over spice. |
-| ![Blue and red tank columns clashing on a spice field](docs/screenshots/battle.jpg) | ![A built-up blue base with the sidebar](docs/screenshots/gameplay.jpg) |
-| Armies clash in the open desert. | A built-up base, with a Carryall ferrying the harvester. |
+| ![The main menu over a fly-over of the desert](docs/screenshots/menu.jpg) | ![A built-up blue base with the sidebar](docs/screenshots/gameplay.jpg) |
+| The main menu, over a fly-over of the generated map. | A built-up base. A Carryall ferries the harvester. |
+| ![Blue and red armies clashing on a spice field](docs/screenshots/battle.jpg) | ![A Carryall setting a tank down on a spice field, kicking up red dust](docs/screenshots/landing.jpg) |
+| Armies clash over a spice field. | A touch-and-go drop: the Carryall's downwash raises red dust over spice. |
 
 ## Getting started
 
@@ -86,3 +86,7 @@ Production is in the sidebar on the right. Click a card to build or train, and r
   - `CHECK=60 QUIET=1 npx tsx sim/maps.ts`: generate 60 maps and validate them.
 - [docs/CODE_LAYOUT.md](docs/CODE_LAYOUT.md): where everything lives in `src/`.
 - [docs/PLAN.md](docs/PLAN.md): the roadmap and design decisions.
+
+## License
+
+[MIT](LICENSE)
