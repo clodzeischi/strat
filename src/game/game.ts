@@ -73,6 +73,10 @@ export class Game {
   teams: TeamState[];
   time = 0;
   winner: Team | null = null;
+  /** The team that surrendered, when the game ended that way. */
+  surrendered: Team | null = null;
+  /** Called when a computer opponent offers to surrender; answer with `acceptSurrender` or ignore it to play on. */
+  onSurrenderOffer: (team: Team) => void = () => {};
   difficulty: Difficulty = 'normal';
   /** Called with player-facing notifications. */
   onMessage: (text: string) => void = () => {};
@@ -706,6 +710,16 @@ export class Game {
       }
       this.effects.explosion(new THREE.Vector3(e.x, this.map.surfaceAt(e.x, e.z) + 0.5, e.z), 1.8);
     }
+  }
+
+  offerSurrender(team: Team): void {
+    if (this.winner === null) this.onSurrenderOffer(team);
+  }
+
+  acceptSurrender(team: Team): void {
+    if (this.winner !== null) return;
+    this.surrendered = team;
+    this.winner = (1 - team) as Team;
   }
 
   // ---- Simulation -----------------------------------------------------------

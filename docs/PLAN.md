@@ -95,6 +95,13 @@ Follow-ups: the AI doesn't build Repair Vehicles, the Hi-Tech Factory or Carryal
 | Hard | Strong economy, recovers from setbacks, small harassment, practices army compositions, starts taking the initiative. |
 | Brutal | Optimized timing builds, constant harassment, fast reactions, micro (rotating damaged units, picking squads to counter the player's formations), forcing the player to split attention. |
 
+**Normal, revised after playtesting** (it used to fizzle out after the first serious attack). Check with `npx tsx sim/ai-check.ts`.
+- **Defense sized to the attack.** Enemy combat units near our buildings (14 tiles) or harvesters (10 tiles) are grouped into attacks, each scored by strength (cost × health left). Each attack gets about 1.5× its strength in defenders, nearest first: a lone trike draws a few units, a real attack draws everyone at home. Waves out in the field are only called back when the base itself is hit. When an attack has been gone for 4 seconds, its defenders return to a rally point in front of the base.
+- **Income first.** Below 2 harvesters, or with no refinery, getting income back comes before army and tech. Without a factory, it builds a refinery (which comes with a harvester) instead of a factory plus a harvester. Lost opening buildings are rebuilt before more units. Once the base is up, it keeps one harvester's price (800) in reserve so it can always replace one.
+- **Waves.** Unchanged in size and timing, plus: a wave that loses 70% of its strength falls back instead of trickling in, survivors push on to the next target, and if a full wave hasn't formed 90 s after one was due, a half-size wave goes so the pressure keeps up.
+- **Surrender.** When it has no income and no way to buy it back (or nothing left to build units with), and its army is under half the enemy's, for 15 seconds, it offers to surrender, once. The game pauses for the answer. Declining plays on to the end.
+- Against the old Normal it won 23 of 32 games, and all 9 losses ended in a surrender rather than being wiped out. It's a little stronger because it no longer collapses; wave size and timing, the knobs that set its pressure, are the same.
+
 **Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
 
 **Spending decisions use value estimation (utility AI)**, scored in credits rather than vague weights. Example: a harvester is worth income per minute × expected lifetime × survival odds, minus its cost. This covers a small set of choices: harvester, army unit, tech, refinery, backup Construction Yard. Movement and combat stay scripted.

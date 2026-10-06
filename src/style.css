@@ -552,6 +552,14 @@ body.in-menu #info {
   color: var(--muted);
 }
 
+.panel .note {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+  color: var(--muted);
+}
+
 .panel .row {
   display: flex;
   gap: 8px;

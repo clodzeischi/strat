@@ -17,7 +17,7 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
   - A Carryall assigned to a harvester ferries it between field and refinery, and flies it home if it comes under attack.
 - **Anti-air.** Infantry and rocket launchers can shoot Carryalls down. Troopers aboard a downed Carryall bail out by parachute.
 - **Repair.** Repair Vehicles fix vehicles, aircraft and buildings for credits. Infantry heal on their own once out of combat.
-- **A computer opponent** on Normal, Hard or Brutal, with an end-of-game stats screen.
+- **A computer opponent** that defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). Normal, Hard and Brutal are on the menu, though Hard and Brutal play like Normal for now. End-of-game stats screen.
 
 ## Screenshots
 
@@ -82,6 +82,7 @@ Production is in the sidebar on the right. Click a card to build or train, and r
 - `npm run typecheck`: type-check the project.
 - `sim/`: headless simulations and checks that run the real game code without a browser. For example:
   - `npx tsx sim/air-repair-check.ts`: Carryall, paradrop and repair behavior.
+  - `npx tsx sim/ai-check.ts`: AI defense, economy recovery and surrender.
   - `npx tsx sim/terrain-check.ts 3`: AI matches, checked for illegal moves and stuck units.
   - `CHECK=60 QUIET=1 npx tsx sim/maps.ts`: generate 60 maps and validate them.
 - [docs/CODE_LAYOUT.md](docs/CODE_LAYOUT.md): where everything lives in `src/`.

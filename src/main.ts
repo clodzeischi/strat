@@ -111,7 +111,7 @@ resize();
 
 // ---- Screens and game flow -------------------------------------------------------
 
-type Mode = 'title' | 'playing' | 'paused' | 'ended';
+type Mode = 'title' | 'playing' | 'paused' | 'offer' | 'ended';
 let mode: Mode = 'title';
 const fpsEl = document.getElementById('fps')!;
 
@@ -146,7 +146,20 @@ const menus = new Menus({
   onRestart: () => reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed }),
   onQuit: () => reload(null),
   onFps: (show) => (fpsEl.hidden = !show),
+  onSurrenderAnswer: (accept) => {
+    if (mode !== 'offer') return;
+    menus.setSurrenderOffer(false);
+    mode = 'playing';
+    if (accept) game.acceptSurrender(ENEMY);
+    else sidebar.showMessage('Surrender refused. The enemy fights on.');
+  },
 });
+// The game waits for the player's answer, like the pause menu.
+game.onSurrenderOffer = (team) => {
+  if (team !== ENEMY || mode !== 'playing') return;
+  mode = 'offer';
+  menus.setSurrenderOffer(true);
+};
 fpsEl.hidden = !menus.showFps;
 input.onMenu = () => setPaused(mode === 'playing');
 document.getElementById('menu-btn')!.addEventListener('click', () => setPaused(true));

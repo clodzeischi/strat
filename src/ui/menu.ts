@@ -8,6 +8,8 @@ export interface MenuHandlers {
   onRestart: () => void;
   onQuit: () => void;
   onFps: (show: boolean) => void;
+  /** The player's answer to the enemy's surrender offer. */
+  onSurrenderAnswer: (accept: boolean) => void;
 }
 
 const FPS_KEY = 'strat.showFps';
@@ -60,6 +62,7 @@ export class Menus {
   readonly title = document.getElementById('title')!;
   readonly pause = document.getElementById('pause')!;
   readonly end = document.getElementById('end')!;
+  readonly surrender = document.getElementById('surrender')!;
   showFps = loadFps();
   mapSize = loadMapSize();
 
@@ -81,6 +84,10 @@ export class Menus {
       else if (btn.dataset.action === 'play') this.page('difficulty');
       else if (btn.dataset.action === 'controls') this.page('controls');
       else if (btn.dataset.action === 'back') this.page('main');
+    });
+    this.surrender.addEventListener('click', (e) => {
+      const action = (e.target as HTMLElement).closest('button')?.dataset.action;
+      if (action === 'accept' || action === 'decline') this.h.onSurrenderAnswer(action === 'accept');
     });
     for (const screen of [this.pause, this.end]) {
       screen.addEventListener('click', (e) => {
@@ -122,12 +129,17 @@ export class Menus {
     this.pause.hidden = !open;
   }
 
+  setSurrenderOffer(open: boolean): void {
+    this.surrender.hidden = !open;
+  }
+
   showEnd(game: Game, apm: number): void {
     const won = game.winner === PLAYER;
     const result = this.end.querySelector('.result')!;
     result.textContent = won ? 'Victory' : 'Defeat';
     result.className = `result ${won ? 'victory' : 'defeat'}`;
-    this.end.querySelector('.sub')!.textContent = `${formatTime(game.time)}  ·  ${DIFFICULTY_NAMES[game.difficulty]}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map  ·  seed ${game.map.seed}`;
+    const how = game.surrendered === ENEMY ? 'Enemy surrendered  ·  ' : '';
+    this.end.querySelector('.sub')!.textContent = `${how}${formatTime(game.time)}  ·  ${DIFFICULTY_NAMES[game.difficulty]}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map  ·  seed ${game.map.seed}`;
 
     const you = game.teams[PLAYER];
     const foe = game.teams[ENEMY];
