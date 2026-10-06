@@ -5,6 +5,7 @@ import { Building, Unit, type Entity } from './entities';
 import type { Game } from './game';
 import { SPICE } from './map';
 import { cellsAround } from './pathfinding';
+import { PlacementGrid } from './placement';
 
 const EDGE = 12; // px from the screen edge that triggers scrolling
 const PAN_SPEED = 45;
@@ -35,7 +36,9 @@ export class Input {
   private grab: THREE.Vector3 | null = null;
   private grabPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private ghost: THREE.Mesh;
-  private ghostMat = new THREE.MeshBasicMaterial({ color: 0x40ff60, transparent: true, opacity: 0.45, depthWrite: false });
+  private ghostMat = new THREE.MeshBasicMaterial({ color: 0x40ff60, transparent: true, opacity: 0.3, depthWrite: false });
+  /** Per-tile placement grid under the ghost. */
+  private grid: PlacementGrid;
 
   constructor(
     private game: Game,
@@ -47,6 +50,8 @@ export class Input {
     this.ghost = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), this.ghostMat);
     this.ghost.visible = false;
     game.scene.add(this.ghost);
+    this.grid = new PlacementGrid(game);
+    game.scene.add(this.grid.mesh);
 
     canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
     window.addEventListener('mousemove', (e) => this.onMouseMove(e));
@@ -400,10 +405,12 @@ export class Input {
     const p = type && this.mouse.inside ? this.groundPoint(this.mouse.x, this.mouse.y) : null;
     if (!type || !p) {
       this.ghost.visible = false;
+      this.grid.update(null, PLAYER, 0, 0);
       return;
     }
     const size = BUILDINGS[type].size;
     const c = this.placementCell(p, type);
+    this.grid.update(type, PLAYER, c.cx, c.cz);
     this.ghost.visible = true;
     this.ghost.scale.set(size * TILE, 1.2, size * TILE);
     const x = (c.cx + size / 2) * TILE;

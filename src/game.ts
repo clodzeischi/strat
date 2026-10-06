@@ -267,24 +267,33 @@ export class Game {
     if (!m.inBounds(cx, cz)) return false;
     const level = m.level[m.idx(cx, cz)];
     for (let z = cz; z < cz + size; z++) {
-      for (let x = cx; x < cx + size; x++) {
-        if (!m.inBounds(x, z)) return false;
-        const i = m.idx(x, z);
-        if (m.tiles[i] !== ROCK || m.occupied[i] !== 0 || m.level[i] !== level || m.ramp[i]) return false;
-      }
+      for (let x = cx; x < cx + size; x++) if (!this.tileBuildable(x, z, level)) return false;
     }
-    // Flat footprint only, and ramps (plus the cell around them) stay clear.
-    for (let z = cz - 1; z <= cz + size; z++) {
-      for (let x = cx - 1; x <= cx + size; x++) if (m.inBounds(x, z) && m.ramp[m.idx(x, z)]) return false;
+    return this.inBuildRange(type, team, cx, cz);
+  }
+
+  /**
+   * Whether one tile could hold part of a building standing on `level`: rock, free, on that level (footprints are
+   * flat), not a ramp or next to one (ramps stay clear), and no unit on it.
+   */
+  tileBuildable(cx: number, cz: number, level: number): boolean {
+    const m = this.map;
+    if (!m.inBounds(cx, cz)) return false;
+    const i = m.idx(cx, cz);
+    if (m.tiles[i] !== ROCK || m.occupied[i] !== 0 || m.level[i] !== level || m.ramp[i]) return false;
+    for (let z = cz - 1; z <= cz + 1; z++) {
+      for (let x = cx - 1; x <= cx + 1; x++) if (m.inBounds(x, z) && m.ramp[m.idx(x, z)]) return false;
     }
     const x0 = cx * TILE;
     const z0 = cz * TILE;
-    const x1 = (cx + size) * TILE;
-    const z1 = (cz + size) * TILE;
-    for (const u of this.units) {
-      if (u.x + u.radius > x0 && u.x - u.radius < x1 && u.z + u.radius > z0 && u.z - u.radius < z1) return false;
-    }
-    // Must be close to one of our own buildings.
+    const x1 = x0 + TILE;
+    const z1 = z0 + TILE;
+    return !this.units.some((u) => u.x + u.radius > x0 && u.x - u.radius < x1 && u.z + u.radius > z0 && u.z - u.radius < z1);
+  }
+
+  /** Whether a footprint at (cx, cz) is close enough to one of the team's own buildings. */
+  inBuildRange(type: BuildingType, team: Team, cx: number, cz: number): boolean {
+    const size = BUILDINGS[type].size;
     return this.buildings.some((b) => {
       if (b.team !== team || b.dead) return false;
       const gapX = Math.max(b.cx - (cx + size), cx - (b.cx + b.size), 0);
