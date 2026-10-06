@@ -478,7 +478,7 @@ export class GameMap {
     // Spice in sandy areas away from bases.
     const sandSpice: number[] = [];
     for (let i = 0; i < total; i++) if (this.tiles[i] === SAND && baseDist[i] > 12) sandSpice.push(s[i]);
-    const spiceT = percentile(sandSpice, 0.22);
+    const spiceT = percentile(sandSpice, 0.28);
     for (let i = 0; i < total; i++) {
       if (this.tiles[i] === SAND && baseDist[i] > 12 && s[i] > spiceT) {
         this.tiles[i] = SPICE;
@@ -495,8 +495,8 @@ export class GameMap {
       const ux = (mid - b.cx) / len;
       const uz = (mid - b.cz) / len;
       const round = (v: number) => Math.sign(v) * Math.round(Math.abs(v));
-      const fx = b.cx + round(ux * 10 - uz * 6);
-      const fz = b.cz + round(uz * 10 + ux * 6);
+      const fx = b.cx + round(ux * 11 - uz * 6);
+      const fz = b.cz + round(uz * 11 + ux * 6);
       for (let dz = -4; dz <= 4; dz++) {
         for (let dx = -4; dx <= 4; dx++) {
           const x = fx + dx;
@@ -525,6 +525,19 @@ export class GameMap {
       }
       if (!byVehicle[i] && this.tiles[i] === SPICE) this.tiles[i] = SAND;
       if (this.tiles[i] !== SPICE) this.spice[i] = 0;
+    }
+
+    // Keep at least a tile of sand between spice and rock or outcrops, diagonals included: where they touch,
+    // the ground shader's two crisp edges run into each other and look wrong.
+    const rocky = (x: number, z: number) => this.inBounds(x, z) && (this.tiles[this.idx(x, z)] === ROCK || this.tiles[this.idx(x, z)] === CLIFF);
+    for (let i = 0; i < total; i++) {
+      if (this.tiles[i] !== SPICE) continue;
+      const x = i % N;
+      const z = (i / N) | 0;
+      if (rocky(x - 1, z - 1) || rocky(x, z - 1) || rocky(x + 1, z - 1) || rocky(x - 1, z) || rocky(x + 1, z) || rocky(x - 1, z + 1) || rocky(x, z + 1) || rocky(x + 1, z + 1)) {
+        this.tiles[i] = SAND;
+        this.spice[i] = 0;
+      }
     }
 
     for (let i = 0; i < total; i++) {
