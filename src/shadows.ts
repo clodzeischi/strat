@@ -6,6 +6,8 @@ const CORNERS: [number, number][] = [[-1, 1], [1, 1], [1, -1], [-1, -1]];
 const MARGIN = 6;
 /** The shadow square grows and shrinks in steps of this many world units, so its texel size rarely changes. */
 const SIZE_STEP = 8;
+/** Direction from the ground toward the sun. */
+export const TO_SUN = new THREE.Vector3(-50, 90, 30).normalize();
 
 /**
  * Keeps the sun's shadow map on the patch of ground the camera can see, instead of the whole map,
@@ -13,8 +15,6 @@ const SIZE_STEP = 8;
  * stops shadow edges shimmering while the camera pans.
  */
 export class ViewShadows {
-  /** Direction from the ground toward the sun. */
-  private readonly toSun = new THREE.Vector3(-50, 90, 30).normalize();
   /** The shadow camera's screen axes in world space (fixed, since the sun doesn't move). */
   private readonly right = new THREE.Vector3();
   private readonly up = new THREE.Vector3();
@@ -25,7 +25,7 @@ export class ViewShadows {
 
   constructor(private sun: THREE.DirectionalLight) {
     // Same orientation the shadow camera gets when it looks from the sun at its target.
-    new THREE.Matrix4().lookAt(this.toSun, new THREE.Vector3(), new THREE.Vector3(0, 1, 0)).extractBasis(this.right, this.up, new THREE.Vector3());
+    new THREE.Matrix4().lookAt(TO_SUN, new THREE.Vector3(), new THREE.Vector3(0, 1, 0)).extractBasis(this.right, this.up, new THREE.Vector3());
     sun.shadow.camera.near = 1;
     sun.shadow.camera.far = 300;
   }
@@ -64,6 +64,6 @@ export class ViewShadows {
     this.center.addScaledVector(this.up, Math.round(ly / texel) * texel - ly);
 
     this.sun.target.position.copy(this.center);
-    this.sun.position.copy(this.center).addScaledVector(this.toSun, 150);
+    this.sun.position.copy(this.center).addScaledVector(TO_SUN, 150);
   }
 }

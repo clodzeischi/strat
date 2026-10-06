@@ -141,38 +141,105 @@ export class GameMap {
   }
 
   /**
-   * Smooths the stepped tile heights into rolling ground: each vertex averages the tile heights just around
-   * it, so plateau edges become short slopes about a tile wide. Then sand gets low dunes and rocky outcrops
-   * get jagged.
+   * Turns the stepped tile heights into ground: each vertex averages the tile heights just around it, except
+   * on a plateau edge without a ramp, where the vertex stays at the top so the edge drops as a steep cliff
+   * inside the low tile. Ramps stay gentle slopes, so they read as the way up. Open sand gets broad dunes
+   * that fade out near cliffs, ramps and rock, and rocky outcrops get jagged.
    */
   private buildSurface(seed: number): void {
     const V = this.surfaceSize;
     const step = TILE / SURFACE_RES;
     const o = TILE * 0.25; // sample offset: a vertex on a tile corner averages the four tiles that meet there
+    const dunes = this.duneWeights();
     for (let j = 0; j < V; j++) {
       for (let i = 0; i < V; i++) {
         const x = i * step;
         const z = j * step;
         let h = 0;
-        let sand = 0;
+        let top = -Infinity;
+        let dune = 0;
         let cliff = 0;
+        let soft = 0; // share of sand, spice and ramp around: smooth-shaded ground, no jitter
+        let levels = 0; // bit 1: low ground nearby, bit 2: high ground nearby
+        let highs = 0; // high-ground samples around
+        let ramp = false;
         for (const [dx, dz] of [[-o, -o], [o, -o], [-o, o], [o, o]]) {
-          h += this.heightAt(x + dx, z + dz) / 4;
+          const s = this.heightAt(x + dx, z + dz);
+          h += s / 4;
+          top = Math.max(top, s);
           const cx = this.cellOf(x + dx);
           const cz = this.cellOf(z + dz);
           if (!this.inBounds(cx, cz)) continue;
           const k = this.idx(cx, cz);
+          dune += dunes[k] / 4;
           const t = this.tiles[k];
-          if ((t === SAND || t === SPICE) && !this.ramp[k]) sand += 0.25;
           if (t === CLIFF) cliff += 0.25;
+          if (t === SAND || t === SPICE || this.ramp[k]) soft += 0.25;
+          if (this.ramp[k]) ramp = true;
+          else levels |= this.level[k] ? 2 : 1;
+          highs += this.level[k];
         }
-        // Dunes only where the ground around is all sand, so slopes and ramps keep their shape.
-        if (sand === 1) h += (fbm(x / 14 + 300, z / 9 + 300, seed + 41) - 0.45) * 0.7;
+        // On a plateau corner that sticks out (one high tile of four) the vertex stays low, cutting the corner
+        // diagonally so plateau outlines don't follow the tile grid's staircase.
+        const edge = levels === 3 && !ramp && cliff === 0 && highs > 1;
+        if (edge) h = top + (hash(i, j, seed + 45) - 0.5) * 0.25; // a slightly ragged lip
+        if (dune > 0) {
+          // Broad swells plus crested ridges running roughly east-west, like wind-built dunes.
+          const swell = fbm(x / 40 + 300, z / 40 + 300, seed + 41) - 0.45;
+          const ridge = 1 - Math.abs(2 * fbm(x / 30 + 500, z / 11 + 500, seed + 42) - 1);
+          h += (swell * 1.6 + (ridge * ridge - 0.45) * 1.6) * dune;
+        }
         if (cliff > 0) h += hash(i, j, seed + 43) * 0.9 * cliff;
-        else h += (hash(i, j, seed + 44) - 0.5) * 0.22; // unevenness everywhere, so the facets catch the light
+        else h += (hash(i, j, seed + 44) - 0.5) * 0.22 * (1 - soft); // rock stays uneven so its facets catch the light
         this.surface[j * V + i] = h;
       }
     }
+  }
+
+  /**
+   * Per tile, how much dune height it takes (0..1): full on open sand, fading to nothing within about three tiles
+   * of anything that isn't plain sand or spice (rock, outcrops, ramps, plateau edges).
+   */
+  private duneWeights(): Float32Array {
+    const N = this.size;
+    const dist = new Float32Array(N * N).fill(1e9);
+    for (let cz = 0; cz < N; cz++) {
+      for (let cx = 0; cx < N; cx++) {
+        const i = this.idx(cx, cz);
+        const t = this.tiles[i];
+        let open = (t === SAND || t === SPICE) && !this.ramp[i];
+        for (const [dx, dz] of DIR4) {
+          const x = cx + dx;
+          const z = cz + dz;
+          if (open && this.inBounds(x, z) && this.level[this.idx(x, z)] !== this.level[i]) open = false;
+        }
+        if (!open) dist[i] = 0;
+      }
+    }
+    // Two-pass chamfer distance (1 straight, 1.4 diagonal).
+    const relax = (cx: number, cz: number, dx: number, dz: number, cost: number) => {
+      const x = cx + dx;
+      const z = cz + dz;
+      if (!this.inBounds(x, z)) return;
+      const i = this.idx(cx, cz);
+      dist[i] = Math.min(dist[i], dist[this.idx(x, z)] + cost);
+    };
+    for (let cz = 0; cz < N; cz++) {
+      for (let cx = 0; cx < N; cx++) {
+        relax(cx, cz, -1, 0, 1); relax(cx, cz, 0, -1, 1); relax(cx, cz, -1, -1, 1.4); relax(cx, cz, 1, -1, 1.4);
+      }
+    }
+    for (let cz = N - 1; cz >= 0; cz--) {
+      for (let cx = N - 1; cx >= 0; cx--) {
+        relax(cx, cz, 1, 0, 1); relax(cx, cz, 0, 1, 1); relax(cx, cz, 1, 1, 1.4); relax(cx, cz, -1, 1, 1.4);
+      }
+    }
+    const w = new Float32Array(N * N);
+    for (let i = 0; i < N * N; i++) {
+      const t = Math.min(1, Math.max(0, (dist[i] - 0.5) / 2.5));
+      w[i] = t * t * (3 - 2 * t);
+    }
+    return w;
   }
 
   idx(cx: number, cz: number): number {
