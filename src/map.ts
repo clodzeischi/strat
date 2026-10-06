@@ -79,6 +79,9 @@ export class GameMap {
    * Purely visual: gameplay still uses the per-tile levels. Built from the tile heights plus dune and rock noise.
    */
   surface: Float32Array;
+  /** Highest and lowest point of `surface`. */
+  surfaceTop = 0;
+  surfaceBottom = 0;
   /** Building id occupying each cell, 0 if free. */
   occupied: Int32Array;
   /** Base centers for team 0 and team 1. */
@@ -146,6 +149,34 @@ export class GameMap {
   }
 
   /**
+   * Where a ray (origin o, direction d) first meets the ground surface, as a distance along the ray, or -1
+   * if it misses the map. Marches in small steps from where the ray drops below the highest ground, then
+   * refines the crossing by bisection.
+   */
+  raySurface(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number): number {
+    if (dy >= 0) return -1;
+    const W = this.worldSize();
+    let t = Math.max(0, (this.surfaceTop - oy) / dy);
+    const end = (this.surfaceBottom - oy) / dy;
+    const step = (TILE / SURFACE_RES) * 0.5;
+    const above = (u: number) => oy + dy * u > this.surfaceAt(ox + dx * u, oz + dz * u);
+    for (let prev = t; t <= end + step; prev = t, t += step) {
+      const x = ox + dx * t;
+      const z = oz + dz * t;
+      if (x < 0 || z < 0 || x > W || z > W || above(t)) continue;
+      let lo = prev;
+      let hi = t;
+      for (let k = 0; k < 12; k++) {
+        const mid = (lo + hi) / 2;
+        if (above(mid)) lo = mid;
+        else hi = mid;
+      }
+      return hi;
+    }
+    return -1;
+  }
+
+  /**
    * Turns the stepped tile heights into ground: each vertex averages the tile heights just around it, except
    * on a plateau edge without a ramp, where the vertex stays at the top so the edge drops as a steep cliff
    * inside the low tile. Ramps stay gentle slopes, so they read as the way up. Open sand gets broad dunes
@@ -199,6 +230,8 @@ export class GameMap {
         this.surface[j * V + i] = h;
       }
     }
+    this.surfaceTop = this.surface.reduce((a, b) => Math.max(a, b), -Infinity);
+    this.surfaceBottom = this.surface.reduce((a, b) => Math.min(a, b), Infinity);
   }
 
   /**

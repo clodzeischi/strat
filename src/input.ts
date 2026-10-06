@@ -75,6 +75,10 @@ export class Input {
   private groundPoint(x: number, y: number): THREE.Vector3 | null {
     const ndc = new THREE.Vector2((x / this.canvas.clientWidth) * 2 - 1, -(y / this.canvas.clientHeight) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.cam.camera);
+    const { origin: o, direction: d } = this.raycaster.ray;
+    // The ground isn't flat (dunes, plateaus), so find where the ray actually meets it; off the map, fall back to y = 0.
+    const t = this.game.map.raySurface(o.x, o.y, o.z, d.x, d.y, d.z);
+    if (t >= 0) return this.raycaster.ray.at(t, new THREE.Vector3());
     return this.raycaster.ray.intersectPlane(this.ground, new THREE.Vector3());
   }
 
@@ -377,7 +381,9 @@ export class Input {
     const c = this.placementCell(p, type);
     this.ghost.visible = true;
     this.ghost.scale.set(size * TILE, 1.2, size * TILE);
-    this.ghost.position.set((c.cx + size / 2) * TILE, 0.6, (c.cz + size / 2) * TILE);
+    const x = (c.cx + size / 2) * TILE;
+    const z = (c.cz + size / 2) * TILE;
+    this.ghost.position.set(x, this.game.map.surfaceAt(x, z) + 0.6, z);
     this.ghostMat.color.setHex(this.game.canPlace(type, PLAYER, c.cx, c.cz) ? 0x40ff60 : 0xff4030);
   }
 

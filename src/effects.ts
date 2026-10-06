@@ -332,14 +332,16 @@ export class Effects {
     if (!ring) {
       const geo = new THREE.RingGeometry(0.7, 0.95, 20);
       geo.rotateX(-Math.PI / 2);
-      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }));
+      // Drawn over the ground, so a ring on a slope isn't half buried in it.
+      const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, depthTest: false }));
+      mesh.renderOrder = 10;
       this.scene.add(mesh);
       ring = { mesh, life: 0 };
       this.rings.push(ring);
     }
     ring.life = 0.5;
     ring.mesh.visible = true;
-    ring.mesh.position.set(p.x, p.y + 0.1, p.z);
+    ring.mesh.position.set(p.x, p.y + 0.15, p.z);
     (ring.mesh.material as THREE.MeshBasicMaterial).color.setHex(color);
   }
 
