@@ -149,6 +149,8 @@ export class AI {
   /** Where idle units gather: just in front of the base, toward the middle of the map. */
   protected rally: { x: number; z: number } | null = null;
   private rallyAnchor: Building | null = null;
+  /** Consecutive thinks the enemy army has been well ahead of ours (see `trackStrength`). */
+  private behindFor = 0;
   /** Building types there was no room for, and until when not to try them again. */
   private noRoom = new Map<BuildingType, number>();
   /** Once the opening is done, buildings missing from it are rebuilt before anything else is bought. */
@@ -218,6 +220,7 @@ export class AI {
     this.thinkTimer = 1;
     if (!this.openingStep()) this.openingDone = true;
     this.trackHarvesterLosses();
+    this.trackStrength();
     this.manageConstruction();
     this.manageProduction();
     this.manageTech();
@@ -316,7 +319,7 @@ export class AI {
       : step ? BUILDINGS[step].cost
       : refineries < this.wantRefineries() ? 800 : army >= this.profile.techArmy ? (this.techGoal()?.cost ?? 0) : 0;
     // Falling well behind the enemy's army (an early rush, say): only getting income back still comes first.
-    const behind = this.armyPower(this.team, true) * 1.5 < this.armyPower(this.team, false);
+    const behind = this.behindFor >= 5;
 
     // Savings don't stack (the fund covers a harvester, the reserve the next big purchase), and none of it matters
     // while the base is being overrun: then every credit goes into units.
@@ -345,11 +348,23 @@ export class AI {
   }
 
   /**
-   * An early rush: in the first five minutes, the enemy's army is more than 1.5x ours. Until we catch up, only a
+   * An early rush: in the first five minutes, the enemy's army is well ahead of ours (`trackStrength`). Until we
+   * catch up, only a
    * refinery (if we have none), up to three barracks and units get bought.
    */
   private rushed(): boolean {
-    return this.game.time < 300 && this.armyPower(this.team, true) * 1.5 < this.armyPower(this.team, false);
+    return this.game.time < 300 && this.behindFor >= 5;
+  }
+
+  /**
+   * Counts consecutive thinks with the enemy's army well ahead of ours: over 1.5x, and by at least 600 credits'
+   * worth. Requiring a margin and a few seconds of it keeps one unit's difference early on (or a moment of trading
+   * in a fight) from flipping the economy into emergency mode, which in an even game snowballs into a lead.
+   */
+  private trackStrength(): void {
+    const mine = this.armyPower(this.team, true);
+    const theirs = this.armyPower(this.team, false);
+    this.behindFor = mine * 1.5 < theirs && theirs - mine > 600 ? this.behindFor + 1 : 0;
   }
 
   /**
