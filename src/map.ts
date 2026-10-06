@@ -67,6 +67,27 @@ function fbm(x: number, y: number, seed: number): number {
   return (valueNoise(x, y, seed) * 0.6 + valueNoise(x * 2, y * 2, seed + 1) * 0.3 + valueNoise(x * 4, y * 4, seed + 2) * 0.1);
 }
 
+/** One pass of a 3x3 [1 2 1] blur over a square grid (edges clamped). */
+function blur(src: Float32Array, n: number): Float32Array {
+  const tmp = new Float32Array(n * n);
+  const out = new Float32Array(n * n);
+  for (let z = 0; z < n; z++) {
+    for (let x = 0; x < n; x++) {
+      const l = src[z * n + Math.max(0, x - 1)];
+      const r = src[z * n + Math.min(n - 1, x + 1)];
+      tmp[z * n + x] = (l + 2 * src[z * n + x] + r) / 4;
+    }
+  }
+  for (let z = 0; z < n; z++) {
+    for (let x = 0; x < n; x++) {
+      const u = tmp[Math.max(0, z - 1) * n + x];
+      const d = tmp[Math.min(n - 1, z + 1) * n + x];
+      out[z * n + x] = (u + 2 * tmp[z * n + x] + d) / 4;
+    }
+  }
+  return out;
+}
+
 /** Value at which `fraction` of the values are above it. */
 function percentile(values: number[], fraction: number): number {
   const sorted = [...values].sort((a, b) => b - a);
@@ -88,6 +109,13 @@ export class GameMap {
    * Purely visual: gameplay still uses the per-tile levels. Built from the tile heights plus dune and rock noise.
    */
   surface: Float32Array;
+  /**
+   * Per surface vertex near a cliff wall: 1 if it belongs to the top of the wall, 0 to the foot, -1 elsewhere.
+   * Ground colors on each side come only from that side's tiles, so a plateau's material runs right up to the lip.
+   */
+  surfaceSide: Int8Array = new Int8Array(0);
+  /** Per tile, 0..1: how much outcrop is around (CLIFF tiles blurred over about two tiles). Outcrops sprawl by it. */
+  outcropField: Float32Array = new Float32Array(0);
   /** Per surface grid square: 1 if split along (1,0)-(0,1), see `flipped`. */
   private flips: Uint8Array = new Uint8Array(0);
   /** Highest and lowest point of `surface`. */
@@ -241,6 +269,19 @@ export class GameMap {
     const V = this.surfaceSize;
     const step = TILE / SURFACE_RES;
     const dunes = this.duneWeights();
+    // Outcrops: their extra height (over the level they stand on), and a blurred copy that gives them a sprawling
+    // skirt; the surface takes whichever is higher, so peaks keep their height and the base spreads out.
+    const N = this.size;
+    const excess = new Float32Array(N * N);
+    const cliffs = new Float32Array(N * N);
+    for (let k = 0; k < N * N; k++) {
+      if (this.tiles[k] !== CLIFF) continue;
+      excess[k] = this.heights[k] - this.level[k] * HIGH_Y;
+      cliffs[k] = 1;
+    }
+    const sprawl = blur(blur(excess, N), N);
+    this.outcropField = blur(blur(cliffs, N), N);
+    this.surfaceSide = new Int8Array(V * V).fill(-1);
     const k4 = [0, 0, 0, 0];
     const w4 = [0, 0, 0, 0];
     for (let j = 0; j < V; j++) {
@@ -258,10 +299,14 @@ export class GameMap {
         let levels = 0; // bit 1: low ground nearby, bit 2: high ground nearby
         let ramp = false;
         let outcrop = false;
+        let peak = 0;
+        let skirt = 0;
         for (let q = 0; q < 4; q++) {
           const k = k4[q];
           const w = w4[q];
-          h += this.heights[k] * w;
+          h += (this.heights[k] - excess[k]) * w;
+          peak += excess[k] * w;
+          skirt += sprawl[k] * w;
           dune += dunes[k] * w;
           const t = this.tiles[k];
           if (t === CLIFF) {
@@ -276,12 +321,14 @@ export class GameMap {
           if (this.level[k]) top = Math.max(top, this.heights[k]);
           else bottom = Math.min(bottom, this.heights[k]);
         }
+        h += Math.max(peak, skirt * 1.6);
         if (levels === 3 && !ramp && !outcrop) {
           const wobble = (fbm(x / 3 + 700, z / 3 + 700, seed + 47) - 0.5) * 0.6;
           // A steep smooth step across the contour (about a unit wide) rather than a hard top/foot choice, so the
           // wall has a face and follows the curve without stair steps.
           const t = Math.min(1, Math.max(0, (high + wobble - 0.5) / 0.24 + 0.5));
-          h = bottom + (top - bottom) * t * t * (3 - 2 * t) + (valueNoise(x, z, seed + 45) - 0.5) * 0.25 * t; // ragged lip
+          h = bottom + (top - bottom) * t * t * (3 - 2 * t);
+          this.surfaceSide[j * V + i] = t > 0.5 ? 1 : 0;
         }
         if (dune > 0) {
           // Broad swells plus crested ridges running roughly east-west, like wind-built dunes.
@@ -291,7 +338,7 @@ export class GameMap {
         }
         // Rock jitter on a one-unit lattice whatever the mesh resolution, so facets keep their size.
         if (cliff > 0) h += valueNoise(x, z, seed + 43) * 0.9 * cliff;
-        else h += (valueNoise(x, z, seed + 44) - 0.5) * 0.22 * (1 - soft); // rock stays uneven so its facets catch the light
+        else h += (valueNoise(x, z, seed + 44) - 0.5) * 0.1 * (1 - soft); // rock stays a little uneven
         this.surface[j * V + i] = h;
       }
     }
