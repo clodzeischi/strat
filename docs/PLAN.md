@@ -20,7 +20,7 @@ Brutal waits because timing builds and micro depend on exact numbers (speeds, ra
 - Buildings can be built on high ground.
 - Three ramp types: narrow (infantry only), normal (vehicles in single file) and large (several vehicles side by side). Ramps are generous: Dune-style games have no drops and little need to expand, so a plateau must not be a fortress you can hold forever.
 
-**Status: done.** Ramp widths are narrow 1, normal 2, large 5 tiles; high ground is 1.1 units up. Ramps are carved into plateau edges in mirrored pairs; every plateau gets at least one vehicle ramp. Checks: `npx tsx sim/maps.ts <seed>` (ASCII map), `CHECK=60 QUIET=1 npx tsx sim/maps.ts` (vehicle route on 60 seeds), `npx tsx sim/terrain-check.ts 3` (illegal steps, stuck units).
+**Status: done.** Ramp widths are narrow 1, normal 2, large 8 tiles; high ground is 1.1 units up. Ramps are carved into plateau edges in mirrored pairs, about one per 6 edge cells with a 1-tile gap, so plateaus are reachable from many sides. Wide ramps are the norm (about 80%), with occasional single-file (13%) and infantry-only (7%) ones; a plateau's first two ramps are always wide. Revised after playtesting: with sparse ramps the map had too many chokepoints. About 59% of plateau edge length is now ramp, up from 30%. Checks: `npx tsx sim/maps.ts <seed>` (ASCII map), `CHECK=60 QUIET=1 npx tsx sim/maps.ts` (vehicle route on 60 seeds), `npx tsx sim/terrain-check.ts 3` (illegal steps, stuck units).
 
 Follow-ups: the AI still uses straight-line distance (`pickTarget`) and knows nothing about chokepoints; jams on normal ramps haven't shown up in sims, but sims don't stress them.
 

@@ -9,7 +9,12 @@ export const SPICE = 3;
 export const NARROW = 1; // infantry only
 export const NORMAL = 2; // vehicles in single file
 export const LARGE = 3; // several vehicles side by side
-export const RAMP_WIDTH: Record<number, number> = { [NARROW]: 1, [NORMAL]: 2, [LARGE]: 5 };
+export const RAMP_WIDTH: Record<number, number> = { [NARROW]: 1, [NORMAL]: 2, [LARGE]: 8 };
+
+/** Plateaus get one ramp per this many edge cells (edge cells count once per open side). */
+const RAMP_EVERY = 6;
+/** Minimum gap in tiles between two ramps' carved strips. */
+const RAMP_GAP = 1;
 
 /** How high the high ground sits above the low ground: a low rise, not a wall, so units below can still shoot up. */
 export const HIGH_Y = 1.1;
@@ -531,7 +536,8 @@ export class GameMap {
 
   /**
    * Carves ramps into the edges of every plateau, in mirrored pairs so both sides get the same ones.
-   * Ramps are spread around each plateau's edge; the first one always takes vehicles.
+   * Ramps are frequent and mostly wide, so high ground is a position to take, not a maze of chokepoints;
+   * single-file and infantry-only ramps are the occasional exception. The first two always take vehicles.
    */
   private placeRamps(seed: number): void {
     const N = this.size;
@@ -574,7 +580,7 @@ export class GameMap {
         }
       }
       const cells = strip.map((s) => s.c);
-      if (cells.some((c) => placed.some((p) => near(c, p, 5)) || cells.some((m) => near(c, mirror(m), 5)))) return false;
+      if (cells.some((c) => placed.some((p) => near(c, p, RAMP_GAP)) || cells.some((m) => near(c, mirror(m), RAMP_GAP)))) return false;
       for (const [copy, dir] of [[strip, down], [strip.map((s) => ({ c: mirror(s.c), row: s.row })), opposite[down]]] as const) {
         for (const { c, row } of copy) {
           if (this.tiles[c] === CLIFF) this.tiles[c] = row < 0 ? ROCK : SAND;
@@ -600,12 +606,12 @@ export class GameMap {
       const mx = plateau.reduce((s, i) => s + (i % N), 0) / plateau.length;
       const mz = plateau.reduce((s, i) => s + ((i / N) | 0), 0) / plateau.length;
       edge.sort((a, b) => Math.atan2(((a.i / N) | 0) - mz, (a.i % N) - mx) - Math.atan2(((b.i / N) | 0) - mz, (b.i % N) - mx));
-      const want = Math.max(1, Math.min(6, Math.round(edge.length / (self ? 40 : 20))));
+      const want = Math.max(1, Math.min(40, Math.round(edge.length / (self ? 2 * RAMP_EVERY : RAMP_EVERY))));
       let made = 0;
       for (let k = 0; k < want; k++) {
         const first = made === 0;
         const roll = hash(plateau[0], 7 + k, seed);
-        const kind = first || roll < 0.5 ? LARGE : roll < 0.8 ? NORMAL : NARROW;
+        const kind = made < 2 || roll < 0.8 ? LARGE : roll < 0.93 ? NORMAL : NARROW;
         // Try spots around this ramp's share of the edge until one carves cleanly.
         const startAt = Math.floor(((k + hash(plateau[0], 31 + k, seed)) / want) * edge.length);
         for (let t = 0; t < edge.length; t += 3) {
