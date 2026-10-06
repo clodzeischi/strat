@@ -9,28 +9,28 @@ export type Matchup = 'infantry' | 'trike' | 'tank' | 'rocket';
  */
 export const MATCHUPS: Record<string, Record<Matchup, Record<Matchup, number>>> = {
   '--': {
-    infantry: { infantry: 0, trike: 0.03, tank: 0.18, rocket: -0.83 },
-    trike: { infantry: -0.03, trike: 0, tank: -0.59, rocket: -0.86 },
-    tank: { infantry: -0.18, trike: 0.59, tank: 0, rocket: 0.17 },
-    rocket: { infantry: 0.83, trike: 0.86, tank: -0.16, rocket: 0 },
+    infantry: { infantry: 0, trike: -0.56, tank: -0.51, rocket: -0.83 },
+    trike: { infantry: 0.56, trike: 0, tank: -0.59, rocket: -0.67 },
+    tank: { infantry: 0.51, trike: 0.59, tank: 0, rocket: 0.39 },
+    rocket: { infantry: 0.84, trike: 0.68, tank: -0.38, rocket: 0 },
   },
   '-R': {
-    infantry: { infantry: 0.04, trike: 0.01, tank: 0.17, rocket: -0.83 },
-    trike: { infantry: -0.01, trike: 0, tank: -0.59, rocket: -0.86 },
-    tank: { infantry: -0.7, trike: 0.6, tank: 0.01, rocket: 0.14 },
-    rocket: { infantry: 0.74, trike: 0.87, tank: -0.14, rocket: 0.02 },
+    infantry: { infantry: 0.02, trike: -0.55, tank: -0.51, rocket: -0.83 },
+    trike: { infantry: 0.55, trike: -0.01, tank: -0.58, rocket: -0.68 },
+    tank: { infantry: -0.64, trike: 0.6, tank: 0, rocket: 0.38 },
+    rocket: { infantry: 0.66, trike: 0.7, tank: -0.36, rocket: 0 },
   },
   'R-': {
-    infantry: { infantry: -0.04, trike: 0.01, tank: 0.71, rocket: -0.74 },
-    trike: { infantry: 0, trike: 0, tank: -0.6, rocket: -0.87 },
-    tank: { infantry: -0.16, trike: 0.6, tank: -0.01, rocket: 0.14 },
-    rocket: { infantry: 0.83, trike: 0.86, tank: -0.14, rocket: -0.02 },
+    infantry: { infantry: -0.02, trike: -0.55, tank: 0.65, rocket: -0.66 },
+    trike: { infantry: 0.55, trike: 0.01, tank: -0.59, rocket: -0.7 },
+    tank: { infantry: 0.52, trike: 0.59, tank: 0, rocket: 0.37 },
+    rocket: { infantry: 0.84, trike: 0.69, tank: -0.37, rocket: 0.01 },
   },
   'RR': {
-    infantry: { infantry: 0, trike: -0.01, tank: 0.71, rocket: -0.76 },
-    trike: { infantry: 0.01, trike: 0, tank: -0.6, rocket: -0.87 },
-    tank: { infantry: -0.7, trike: 0.6, tank: 0, rocket: 0.15 },
-    rocket: { infantry: 0.76, trike: 0.87, tank: -0.15, rocket: 0 },
+    infantry: { infantry: 0, trike: -0.55, tank: 0.65, rocket: -0.63 },
+    trike: { infantry: 0.55, trike: 0, tank: -0.6, rocket: -0.69 },
+    tank: { infantry: -0.65, trike: 0.61, tank: 0, rocket: 0.35 },
+    rocket: { infantry: 0.64, trike: 0.69, tank: -0.34, rocket: 0 },
   },
 };
 

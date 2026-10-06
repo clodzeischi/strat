@@ -134,11 +134,13 @@ Raids barely matter against Normal, whose defense now answers them in seconds; t
 - **Waves:** a wave sets out only when it's at least 0.6x (Normal) / 0.9x (Hard) the enemy army, counting enemy units within 20 tiles of their own buildings 1.5x.
 - **Leash:** units at home or defending that get more than 22 tiles from the rally point come straight back with a plain move. A kiting trike used to drag a defender 40 tiles out (`sim/ai-check.ts` checks it).
 
-Gauntlet results are in the summary below. Hard handles drops and harassment; it still loses to the rocket tech rush and the turtle more often than not, and to the infantry rush nearly always.
 
-**Balance questions the gauntlet raised (for a decision, not AI work):**
-- Nothing early beats massed infantry. In equal-cost duels infantry trade evenly with trikes and beat tanks, rocket launchers need Factory Level 2, and there are no defensive structures; a Barracks-first rush at about 1:40 beats any economic opening, AI or not.
-- Rocket launchers beat infantry (+0.83) and trikes (+0.86) outright and only break even with tanks. The unit text says trikes harass and rockets are fragile up close, but trikes can't get in: 26 trikes lose to 8 launchers while killing a sixth of their value.
+**Balance pass (after the gauntlet).** Equal-cost duels (`sim/matchups.ts` prints them; -1 to +1) and the gauntlet, 20 games per row:
+- **Infantry 60 -> 90 credits, build time 3 -> 4.5 s** (decided). At 60 nothing early beat massed infantry (even with trikes, +0.18 against tanks), so a Barracks-first rush beat any economic opening. At 90 infantry lose to trikes (-0.52) and tanks (-0.48) without Infantry Rockets, and still beat tanks with them (+0.65). 75 credits plays the same in the gauntlet and keeps infantry closer to even with trikes (-0.28), if that's preferred.
+- **Splash falls off** (`SPLASH_SHARE` in `game.ts`): the unit aimed at takes the full hit, others in the blast half, less toward the edge. Before, every unit within reach took full damage: one rocket volley into a column of tanks did 4-5x its damage, and tanks, the counter to rocket launchers, only broke even (+0.13; now +0.31).
+- Looked at and left alone: Infantry Rockets' anti-armor bonus (cutting it from 22 to 10 barely moves infantry vs tanks; tanks lack splash and are weak against infantry by design), rocket launcher range (14-15 instead of 17: +0.03), tagging rocket launchers light (lets trikes kill them, beyond the trike's raider role), refinery price (a second refinery earns about what one extra harvester does and costs 400 more: fair).
+- Hard vs bots after the pass: drop 100%, harass 70%, rockets 70% (was 10-15%), turtle 70% (was 15%), rush 25% (was 0%, and it now kills 3.8 units per unit lost). Hard vs Normal 88%.
+- Still open: the infantry rush beats Hard 3 games in 4 even though it trades badly; it wins by reaching the base before Hard's army does. There are no defensive structures, which is what usually stops this in RTS games.
 
 **Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
 

@@ -9,7 +9,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Collects spice and brings it to a Refinery.',
   },
   infantry: {
-    name: 'Infantry', producer: 'barracks', cost: 60, buildTime: 3, hp: 70, speed: 2.4, turnRate: 12, radius: 0.45, sight: 10,
+    name: 'Infantry', producer: 'barracks', cost: 90, buildTime: 4.5, hp: 70, speed: 2.4, turnRate: 12, radius: 0.45, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'],
     weapon: { range: 6, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -3 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, air: true },
     antiArmor: { range: 8, minRange: 0, damage: 6, bonus: { armored: 22, structure: -2 }, cooldown: 1.5, projectile: 'rocket', speed: 18, splash: 0, air: true },
