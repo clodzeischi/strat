@@ -31,6 +31,9 @@ export class Input {
   private lastGroupKey = { key: '', time: 0 };
   private raycaster = new THREE.Raycaster();
   private ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.2);
+  /** Middle-drag panning: the ground point grabbed, kept under the cursor on a plane at its height. */
+  private grab: THREE.Vector3 | null = null;
+  private grabPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private ghost: THREE.Mesh;
   private ghostMat = new THREE.MeshBasicMaterial({ color: 0x40ff60, transparent: true, opacity: 0.45, depthWrite: false });
 
@@ -57,7 +60,10 @@ export class Input {
     });
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
     window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => this.keys.clear());
+    window.addEventListener('blur', () => {
+      this.keys.clear();
+      this.grab = null;
+    });
   }
 
   beginPlacement(type: BuildingType): void {
@@ -138,6 +144,11 @@ export class Input {
       this.dragStart = p;
       this.dragging = false;
     }
+    if (e.button === 1) {
+      e.preventDefault(); // no browser autoscroll
+      this.grab = this.groundPoint(p.x, p.y);
+      if (this.grab) this.grabPlane.constant = -this.grab.y;
+    }
   }
 
   private onMouseMove(e: MouseEvent): void {
@@ -145,6 +156,16 @@ export class Input {
     const p = this.local(e);
     this.mouse.x = p.x;
     this.mouse.y = p.y;
+    if (this.grab) {
+      // Move the camera so the grabbed point is back under the cursor.
+      const ndc = new THREE.Vector2((p.x / this.canvas.clientWidth) * 2 - 1, -(p.y / this.canvas.clientHeight) * 2 + 1);
+      this.raycaster.setFromCamera(ndc, this.cam.camera);
+      const hit = this.raycaster.ray.intersectPlane(this.grabPlane, new THREE.Vector3());
+      if (hit) {
+        this.cam.move(this.grab.x - hit.x, this.grab.z - hit.z);
+        this.cam.apply();
+      }
+    }
     if (this.dragStart && !this.placing && !this.attackMode) {
       if (!this.dragging && Math.hypot(p.x - this.dragStart.x, p.y - this.dragStart.y) > 6) this.dragging = true;
       if (this.dragging) {
@@ -160,6 +181,10 @@ export class Input {
 
   private onMouseUp(e: MouseEvent): void {
     const p = this.local(e);
+    if (e.button === 1) {
+      this.grab = null;
+      return;
+    }
     if (e.button === 2) {
       if (e.target !== this.canvas) return;
       if (this.placing) this.placing = null;
@@ -353,7 +378,7 @@ export class Input {
     if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
     if (this.keys.has('w') || this.keys.has('arrowup')) dy += 1;
     if (this.keys.has('s') || this.keys.has('arrowdown')) dy -= 1;
-    if (this.screen.inside && !this.dragStart) {
+    if (this.screen.inside && !this.dragStart && !this.grab) {
       if (this.screen.x < EDGE) dx -= 1;
       if (this.screen.x > window.innerWidth - EDGE) dx += 1;
       if (this.screen.y < EDGE) dy += 1;
@@ -389,7 +414,8 @@ export class Input {
 
   private updateCursor(): void {
     let cursor = 'default';
-    if (this.placing) cursor = 'cell';
+    if (this.grab) cursor = 'grabbing';
+    else if (this.placing) cursor = 'cell';
     else if (this.attackMode) cursor = 'crosshair';
     else if (this.mouse.inside && this.ownUnits().length) {
       const t = this.pick(this.mouse.x, this.mouse.y);

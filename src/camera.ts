@@ -1,14 +1,17 @@
 import * as THREE from 'three';
 
-/** Classic Dune-style camera: fixed angle and height looking north, pans only. */
+/**
+ * Classic Dune-style camera: fixed angle and height looking north, pans only. Steep and far back with a
+ * narrow lens, so the view leans toward Dune II's near-overhead look while keeping some perspective.
+ */
 export class RTSCamera {
   readonly camera: THREE.PerspectiveCamera;
   readonly target = new THREE.Vector3();
-  private readonly pitch = 0.95;
-  private readonly dist = 42;
+  private readonly pitch = 1.12;
+  private readonly dist = 66;
 
   constructor(private worldSize: number) {
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.5, 600);
+    this.camera = new THREE.PerspectiveCamera(30, 1, 1, 600);
     this.apply();
   }
 
@@ -27,6 +30,13 @@ export class RTSCamera {
   pan(dx: number, dy: number): void {
     this.target.x += dx;
     this.target.z -= dy;
+    this.clamp();
+  }
+
+  /** Pan by a world-space offset on the ground. */
+  move(dx: number, dz: number): void {
+    this.target.x += dx;
+    this.target.z += dz;
     this.clamp();
   }
 
