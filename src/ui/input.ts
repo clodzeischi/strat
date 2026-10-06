@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { RTSCamera } from '../render/camera';
-import { BUILDINGS, PLAYER, TILE, type BuildingType } from '../config';
-import { Building, Unit, type Entity } from '../entities';
+import { BUILDINGS, PLAYER, PRODUCERS, TILE, type BuildingType, type Producer } from '../config';
+import { Building, Carryall, repairable, Unit, type Entity } from '../entities';
 import type { Game } from '../game/game';
 import { SPICE } from '../map';
 import { cellsAround } from '../game/pathfinding';
@@ -15,6 +15,8 @@ export class Input {
   selection: Entity[] = [];
   placing: BuildingType | null = null;
   attackMode = false;
+  /** Waiting for a click on where the selected Carryalls should drop their load. */
+  dropMode = false;
   paused = false;
   /** Clicks and hotkeys issued, for APM on the end screen. */
   actions = 0;
@@ -74,6 +76,7 @@ export class Input {
   beginPlacement(type: BuildingType): void {
     this.placing = type;
     this.attackMode = false;
+    this.dropMode = false;
   }
 
   // ---- Helpers ----------------------------------------------------------------
@@ -107,6 +110,7 @@ export class Input {
     let best: Entity | null = null;
     let bestD = Infinity;
     for (const u of this.game.units) {
+      if (u.carrier) continue;
       const s = this.toScreen(u.x, u.y + 0.5, u.z);
       const d = Math.hypot(s.x - x, s.y - y);
       if (d < u.radius * 18 + 8 && d < bestD) {
@@ -133,6 +137,10 @@ export class Input {
 
   private ownUnits(): Unit[] {
     return this.selection.filter((e): e is Unit => e instanceof Unit && e.team === PLAYER && !e.dead);
+  }
+
+  private ownCarryalls(): Carryall[] {
+    return this.ownUnits().filter((u): u is Carryall => u instanceof Carryall);
   }
 
   private placementCell(p: THREE.Vector3, type: BuildingType): { cx: number; cz: number } {
@@ -171,7 +179,7 @@ export class Input {
         this.cam.apply();
       }
     }
-    if (this.dragStart && !this.placing && !this.attackMode) {
+    if (this.dragStart && !this.placing && !this.attackMode && !this.dropMode) {
       if (!this.dragging && Math.hypot(p.x - this.dragStart.x, p.y - this.dragStart.y) > 6) this.dragging = true;
       if (this.dragging) {
         const x = Math.min(p.x, this.dragStart.x);
@@ -194,6 +202,7 @@ export class Input {
       if (e.target !== this.canvas) return;
       if (this.placing) this.placing = null;
       else if (this.attackMode) this.attackMode = false;
+      else if (this.dropMode) this.dropMode = false;
       else this.commandAt(p.x, p.y);
       return;
     }
@@ -217,6 +226,11 @@ export class Input {
       this.commandAt(p.x, p.y, true);
       return;
     }
+    if (this.dropMode) {
+      this.dropMode = false;
+      this.dropAt(p.x, p.y);
+      return;
+    }
     if (wasDragging) this.boxSelect(start, p, e.shiftKey);
     else this.clickSelect(p.x, p.y, e.shiftKey);
   }
@@ -227,7 +241,7 @@ export class Input {
     const y0 = Math.min(a.y, b.y);
     const y1 = Math.max(a.y, b.y);
     const hits = this.game.units.filter((u) => {
-      if (u.team !== PLAYER) return false;
+      if (u.team !== PLAYER || u.carrier) return false;
       const s = this.toScreen(u.x, u.y + 0.5, u.z);
       return s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1;
     });
@@ -262,14 +276,14 @@ export class Input {
   /** Right click (or A + left click when `attackMove`). */
   private commandAt(x: number, y: number, attackMove = false): void {
     const g = this.game;
-    const units = this.ownUnits();
+    let units = this.ownUnits();
     const point = this.groundPoint(x, y);
     if (!point) return;
 
     if (units.length === 0) {
       const b = this.selection[0];
-      if (b instanceof Building && b.team === PLAYER && (b.type === 'factory' || b.type === 'barracks')) {
-        g.teams[PLAYER].rally[b.type] = { x: point.x, z: point.z };
+      if (b instanceof Building && b.team === PLAYER && PRODUCERS.includes(b.type as Producer)) {
+        g.teams[PLAYER].rally[b.type as Producer] = { x: point.x, z: point.z };
         g.effects.marker(point, 0x7cff7c);
         g.onMessage('Rally point set.');
       }
@@ -277,11 +291,35 @@ export class Input {
     }
 
     const target = this.pick(x, y);
+    const carryalls = units.filter((u): u is Carryall => u instanceof Carryall);
+    if (carryalls.length) {
+      this.commandCarryalls(carryalls, target, point);
+      units = units.filter((u) => !(u instanceof Carryall));
+      if (units.length === 0) return;
+    }
+    if (target instanceof Carryall && target.team === PLAYER) {
+      // Ground units right-clicking their own Carryall: it comes to pick them up.
+      const taken = target.orderPickup(g, units);
+      if (taken.length) {
+        g.effects.marker(new THREE.Vector3(target.x, g.map.surfaceAt(target.x, target.z), target.z), 0x7cff7c);
+        units = units.filter((u) => !taken.includes(u));
+        if (units.length === 0) return;
+      }
+    }
+    if (target && target.team === PLAYER && target.hp < target.maxHp && repairable(target)) {
+      const mechs = units.filter((u) => u.def.repair && u !== target);
+      for (const u of mechs) u.command(g, { kind: 'repair', target });
+      if (mechs.length) {
+        g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xffd27a);
+        units = units.filter((u) => !mechs.includes(u));
+        if (units.length === 0) return;
+      }
+    }
     if (target && target.team !== PLAYER) {
       g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xff5040);
       const rest: Unit[] = [];
       for (const u of units) {
-        if (u.def.weapon) u.command(g, { kind: 'attack', target });
+        if (g.weaponFor(u, target)) u.command(g, { kind: 'attack', target });
         else rest.push(u);
       }
       this.formationMove(rest, target.x, target.z, false);
@@ -310,6 +348,56 @@ export class Input {
     g.effects.marker(point, attackMove ? 0xff9040 : 0x7cff7c);
   }
 
+  /**
+   * Right-click with Carryalls selected: on one of our liftable units, pick it up along with nearby units of the
+   * same kind (a harvester becomes the Carryall's ferry assignment); anywhere else, fly there and circle.
+   */
+  private commandCarryalls(carryalls: Carryall[], target: Entity | null, point: THREE.Vector3): void {
+    const g = this.game;
+    if (target instanceof Unit && target.team === PLAYER && target.def.lift !== undefined && !target.carrier) {
+      const near = g.units
+        .filter((u) => u.team === PLAYER && u.type === target.type && u !== target && !u.carrier && !u.falling && Math.hypot(u.x - target.x, u.z - target.z) < 4 * TILE)
+        .sort((a, b) => Math.hypot(a.x - target.x, a.z - target.z) - Math.hypot(b.x - target.x, b.z - target.z));
+      let pool = target.type === 'harvester' ? [target] : [target, ...near];
+      for (const c of carryalls) {
+        if (pool.length === 0) break;
+        const taken = c.orderPickup(g, pool);
+        pool = pool.filter((u) => !taken.includes(u));
+      }
+      g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0x7cff7c);
+      return;
+    }
+    // Spread several Carryalls around the point so they don't stack.
+    carryalls.forEach((c, i) => {
+      const a = (i / carryalls.length) * Math.PI * 2;
+      const r = carryalls.length > 1 ? 3 : 0;
+      c.command(g, { kind: 'move', x: point.x + Math.cos(a) * r, z: point.z + Math.sin(a) * r });
+    });
+    g.effects.marker(point, 0x7cff7c);
+  }
+
+  /** Left click in drop mode: every selected loaded Carryall drops at the spot. */
+  private dropAt(x: number, y: number): void {
+    const g = this.game;
+    const point = this.groundPoint(x, y);
+    if (!point) return;
+    const loaded = this.ownCarryalls().filter((c) => c.load.length);
+    loaded.forEach((c, i) => {
+      const a = (i / loaded.length) * Math.PI * 2;
+      const r = loaded.length > 1 ? 2.5 : 0;
+      c.orderDrop(g, point.x + Math.cos(a) * r, point.z + Math.sin(a) * r);
+    });
+    if (loaded.length) g.effects.marker(point, 0xffb040);
+  }
+
+  private carryallInfo(c: Carryall): string {
+    if (c.task.kind === 'ferry') return `   Ferrying a Harvester${c.load.length ? ' (lifting)' : ''}`;
+    if (c.load.length === 0) return '   Empty. Right-click a unit to pick it up';
+    const counts = new Map<string, number>();
+    for (const u of c.load) counts.set(u.name, (counts.get(u.name) ?? 0) + 1);
+    return `   Cargo: ${[...counts].map(([n, k]) => `${k}× ${n}`).join(', ')}   E: drop`;
+  }
+
   /** Each unit gets its own nearby cell so groups don't pile onto one point. */
   private formationMove(units: Unit[], x: number, z: number, attackMove: boolean): void {
     if (!units.length) return;
@@ -334,7 +422,7 @@ export class Input {
     const k = e.key.toLowerCase();
     this.keys.add(k);
     const g = this.game;
-    if (/^[0-9xfh]$/.test(k)) this.actions++;
+    if (/^[0-9xfhe]$/.test(k)) this.actions++;
     if (/^[0-9]$/.test(k)) {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
@@ -355,13 +443,23 @@ export class Input {
       case 'escape':
         if (this.placing) this.placing = null;
         else if (this.attackMode) this.attackMode = false;
+        else if (this.dropMode) this.dropMode = false;
         else this.onMenu();
+        break;
+      case 'e':
+        if (this.ownCarryalls().some((c) => c.load.length)) {
+          this.dropMode = true;
+          this.attackMode = false;
+        }
         break;
       case 'x':
         for (const u of this.ownUnits()) u.command(g, { kind: 'idle' });
         break;
       case 'f':
-        if (this.ownUnits().some((u) => u.def.weapon)) this.attackMode = true;
+        if (this.ownUnits().some((u) => u.def.weapon)) {
+          this.attackMode = true;
+          this.dropMode = false;
+        }
         break;
       case 'h': {
         const home = g.buildings.find((b) => b.team === PLAYER && b.type === 'conyard') ?? g.buildings.find((b) => b.team === PLAYER);
@@ -392,7 +490,9 @@ export class Input {
     if (dx || dy) this.cam.pan(Math.sign(dx) * PAN_SPEED * dt, Math.sign(dy) * PAN_SPEED * dt);
     this.cam.apply();
 
-    if (this.selection.some((e) => e.dead)) this.setSelection(this.selection.filter((e) => !e.dead));
+    const gone = (e: Entity) => e.dead || (e instanceof Unit && !!e.carrier);
+    if (this.selection.some(gone)) this.setSelection(this.selection.filter((e) => !gone(e)));
+    if (this.dropMode && !this.ownCarryalls().some((c) => c.load.length)) this.dropMode = false;
     if (this.placing && !this.game.teams[PLAYER].building?.ready) this.placing = null;
 
     this.updateGhost();
@@ -423,7 +523,7 @@ export class Input {
     let cursor = 'default';
     if (this.grab) cursor = 'grabbing';
     else if (this.placing) cursor = 'cell';
-    else if (this.attackMode) cursor = 'crosshair';
+    else if (this.attackMode || this.dropMode) cursor = 'crosshair';
     else if (this.mouse.inside && this.ownUnits().length) {
       const t = this.pick(this.mouse.x, this.mouse.y);
       if (t && t.team !== PLAYER) cursor = 'crosshair';
@@ -437,11 +537,14 @@ export class Input {
     let text = '';
     if (this.placing) text = `Placing ${BUILDINGS[this.placing].name}. Left-click to place, right-click to cancel.`;
     else if (this.attackMode) text = 'Attack-move: left-click a target or location.';
+    else if (this.dropMode) text = 'Drop: left-click where to drop. Vehicles are set down; infantry jump on a fly-by.';
     else if (sel.length === 1) {
       const e = sel[0];
       text = `${e.name}  ${Math.ceil(e.hp)} / ${e.maxHp}`;
       if (e instanceof Unit && e.type === 'harvester') text += `   Spice: ${Math.floor(e.cargo)}`;
-      if (e instanceof Building && (e.type === 'factory' || e.type === 'barracks') && e.team === PLAYER) text += '   Right-click to set a rally point';
+      if (e instanceof Building && PRODUCERS.includes(e.type as Producer) && e.team === PLAYER) text += '   Right-click to set a rally point';
+      if (e instanceof Carryall && e.team === PLAYER) text += this.carryallInfo(e);
+      if (e instanceof Unit && e.def.repair && e.team === PLAYER) text += '   Right-click a damaged vehicle or building to repair it';
     } else if (sel.length > 1) {
       const counts = new Map<string, number>();
       for (const e of sel) counts.set(e.name, (counts.get(e.name) ?? 0) + 1);

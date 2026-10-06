@@ -6,9 +6,9 @@
 |---|---|
 | `config/` | Game data. `types.ts` (shared types), `rules.ts` (tile size, teams, upgrade effects, economy), and one table each for `units.ts`, `buildings.ts`, `upgrades.ts`. |
 | `game/` | Game logic: `game.ts` (the match: entities, production, combat, projectiles), `ai.ts`, `pathfinding.ts`, `heroes.ts`. |
-| `entities/` | Things on the map: `entity.ts` (base class, health bar, selection ring), `building.ts`, `unit.ts` (movement, combat, harvesting, vehicle tilt), `distance.ts`. |
+| `entities/` | Things on the map: `entity.ts` (base class, health bar, selection ring), `building.ts`, `unit.ts` (movement, combat, harvesting, repair, parachute falls, vehicle tilt), `carryall.ts` (the aircraft: flight, pickups, drops, harvester ferrying), `distance.ts`. |
 | `map/` | The map and its generator: `game-map.ts` (`GameMap`: tiles, levels, ramps, generation, the smooth ground surface), `tiles.ts` (tile and ramp kinds), `noise.ts`. |
-| `models/` | 3D models, one file per model: `units/` (with each unit's upgrade parts), `buildings/` (with each building's level-2 parts), shared `parts.ts`, and `index.ts`, which the game calls. |
+| `models/` | 3D models, one file per model: `units/` (with each unit's upgrade parts), `buildings/` (with each building's level-2 parts), shared `parts.ts`, `parachute.ts`, and `index.ts`, which the game calls. |
 | `materials/` | Colors and materials: model `palette.ts`, the shared `lambert.ts` cache, `ground.ts` (ground colors), `overlays.ts` (health bars, selection rings), `upgrade-fx.ts` (lasers, nitro flames). |
 | `shaders/` | Shader patches: `ground.ts` (sand, rock, outcrops, cliff walls, spice and its shimmer), `instance-alpha.ts` and `dithered-shadow.ts` (particles). |
 | `render/` | Drawing: `terrain.ts` (ground mesh), `camera.ts`, `shadows.ts`, `effects/` (one file per effect pool, plus `effects.ts`). |

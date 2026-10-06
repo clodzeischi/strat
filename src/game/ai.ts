@@ -153,7 +153,7 @@ export class AI {
   /** Weighted pick that leans toward whatever counters the enemy's current army. */
   private pickCounter(): UnitType {
     const g = this.game;
-    const value: Record<UnitType, number> = { harvester: 0, infantry: 0, trike: 0, tank: 0, rocket: 0 };
+    const value: Record<UnitType, number> = { harvester: 0, infantry: 0, trike: 0, tank: 0, rocket: 0, repair: 0, carryall: 0 };
     for (const u of g.units) if (u.team !== this.team) value[u.type] += UNITS[u.type].cost / 500;
     const rockets = this.ts.upgrades.has('rockets') || this.ts.research?.type === 'rockets';
     const weights: [UnitType, number][] = [

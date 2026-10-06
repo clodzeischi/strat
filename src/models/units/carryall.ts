@@ -1,0 +1,46 @@
+import * as THREE from 'three';
+import { DARK, METAL, PLATE, shade } from '../../materials/palette';
+import { flameMat } from '../../materials/upgrade-fx';
+import { box, cyl } from '../parts';
+import type { UnitBlueprint } from '../types';
+
+/** Where lifted vehicles hang, below the hull (body space). */
+export const CARRYALL_HOOK_Y = -0.95;
+
+/** Heavy-lift aircraft: a long hull on two cross beams with four engine pods and cargo clamps underneath. */
+export const carryall: UnitBlueprint = {
+  build(color) {
+    const body = new THREE.Group();
+    const muzzle = new THREE.Object3D();
+    box(body, 3.2, 0.45, 0.85, METAL, 0, 0, 0);
+    box(body, 2.4, 0.08, 0.32, color, -0.2, 0.26, 0); // team stripe along the spine
+    box(body, 0.7, 0.38, 0.7, shade(METAL, 0.85), 1.75, 0.05, 0);
+    box(body, 0.12, 0.22, 0.6, 0x223344, 2.1, 0.1, 0); // canopy glass
+    box(body, 0.55, 0.55, 0.08, color, -1.5, 0.45, 0); // tail fin
+    for (const x of [0.85, -0.85]) {
+      box(body, 0.3, 0.14, 3.1, PLATE, x, 0.05, 0); // cross beam
+      for (const z of [-1.55, 1.55]) {
+        const pod = cyl(body, 0.27, 0.95, DARK, x, 0.05, z, 8);
+        pod.rotation.z = Math.PI / 2;
+        box(body, 0.5, 0.1, 0.4, color, x + 0.1, 0.33, z);
+        const glow = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.4, 6), flameMat);
+        glow.rotation.z = Math.PI / 2; // tip points backward (-X)
+        glow.position.set(x - 0.68, 0.05, z);
+        body.add(glow);
+      }
+    }
+    // Cargo clamps.
+    for (const x of [0.7, -0.7]) {
+      box(body, 0.12, 0.5, 0.12, DARK, x, -0.45, 0.35);
+      box(body, 0.12, 0.5, 0.12, DARK, x, -0.45, -0.35);
+    }
+    muzzle.position.set(0, CARRYALL_HOOK_Y, 0);
+    body.add(muzzle);
+    return { body, turret: null, muzzle };
+  },
+
+  kit(look, color, { body }) {
+    if (look.armor >= 1) box(body, 1.6, 0.12, 0.95, shade(color, 0.8), 0.2, -0.27, 0); // belly plate
+    if (look.armor >= 2) box(body, 0.12, 0.3, 0.75, PLATE, 2.12, -0.12, 0); // nose guard
+  },
+};

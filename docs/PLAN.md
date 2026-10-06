@@ -72,6 +72,20 @@ Suggestion: rather than making harvesters slower overall, make home fields run o
 - This also settles the second-refinery question: a second refinery pays off when it is *remote*, not next to the first.
 - Harvester speed stays a tuning knob. Slowing all harvesters is a tax on the whole game; running out of spice is what actually pushes players outward.
 
+## 5. Repair and airlift
+
+**Status: done (branch `air-and-repair`).** Check with `npx tsx sim/air-repair-check.ts`.
+
+- **Repair Vehicle** (Factory, $450): mends vehicles, aircraft and buildings at 30 HP/s, paying as it goes (a full repair costs 40% of the target's price, `REPAIR_COST`). Right-click something damaged; when idle it repairs anything damaged within sight. A Carryall that's being repaired parks low over the truck.
+- **Infantry** heal 2% of their health per second after 5 seconds without taking damage (`INFANTRY_REGEN`).
+- **Hi-Tech Factory** ($1200, needs a Factory) builds the **Carryall** ($700). A new Carryall circles over its factory (or the rally point).
+  - Right-click one of your units with Carryalls selected to pick it up, plus nearby units of the same kind until it's full: one heavy vehicle (harvester, tank, rocket launcher, repair vehicle), two trikes or six infantry (lift space 6; infantry 1, trikes 3, the rest 6). Ground units that right-click their own Carryall call it over.
+  - **E**, then left-click: drop. Any vehicle aboard means a touch-and-go: the Carryall comes in low and slow, sets the load down and climbs away. Infantry only: a fly-by at full speed, troopers parachuting out one after another around the point (they can't act until they land). Either way it then flies back to where it was when given the order.
+  - Picking up a harvester assigns the Carryall to it: whenever the harvester sets off on a trip longer than 10 tiles (to spice or back to a refinery), it's lifted and set down at the far end. In the sim this doubles a harvester's income from a field 40 tiles away. Giving the Carryall another order ends the assignment.
+  - **Anti-air:** infantry (rifles and rockets) and rocket launchers can shoot aircraft (rockets get +25 against them); nothing else can. A Carryall that's shot down loses vehicles aboard, while infantry bail out by parachute. Drops landing within 22 tiles of the other side's buildings warn its owner.
+
+Follow-ups: the AI doesn't build Repair Vehicles, the Hi-Tech Factory or Carryalls yet (its units do shoot at enemy aircraft). Carryalls ignore threats when choosing a path.
+
 ## AI difficulty plan
 
 | Level | Intent |

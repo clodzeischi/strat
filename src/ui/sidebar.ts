@@ -309,6 +309,7 @@ export class Sidebar {
       ctx.strokeRect(b.cx * s + 0.5, b.cz * s + 0.5, b.size * s - 1, b.size * s - 1);
     }
     for (const u of g.units) {
+      if (u.carrier) continue;
       ctx.fillStyle = u.selected ? '#ffffff' : TEAM_CSS[u.team];
       const px = (u.x / TILE) * s;
       const pz = (u.z / TILE) * s;

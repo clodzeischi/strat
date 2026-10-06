@@ -4,19 +4,24 @@ import { CONCRETE } from '../materials/palette';
 import { barracks } from './buildings/barracks';
 import { conyard } from './buildings/conyard';
 import { factory } from './buildings/factory';
+import { hitech } from './buildings/hitech';
 import { refinery } from './buildings/refinery';
 import { box } from './parts';
 import type { BuildingBlueprint, BuildingModel, UnitBlueprint, UnitModel, UpgradeKit, UpgradeLook } from './types';
+import { carryall } from './units/carryall';
 import { harvester } from './units/harvester';
 import { infantry } from './units/infantry';
+import { repair } from './units/repair';
 import { rocket } from './units/rocket';
 import { tank } from './units/tank';
 import { trike } from './units/trike';
 
 export type { BuildingModel, UnitModel, UpgradeKit, UpgradeLook } from './types';
+export { makeParachute } from './parachute';
+export { CARRYALL_HOOK_Y } from './units/carryall';
 
-const UNIT_MODELS: Record<UnitType, UnitBlueprint> = { harvester, infantry, trike, tank, rocket };
-const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = { conyard, refinery, barracks, factory };
+const UNIT_MODELS: Record<UnitType, UnitBlueprint> = { harvester, infantry, trike, tank, rocket, repair, carryall };
+const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = { conyard, refinery, barracks, factory, hitech };
 
 /** Unit models face +X. */
 export function makeUnitModel(type: UnitType, color: number): UnitModel {

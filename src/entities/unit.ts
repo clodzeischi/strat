@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import {
-  HARVEST_UPGRADE, HARVESTER, NITRO, TEAM_COLORS, TILE, UNITS, type Tag, type Team, type UnitDef, type UnitType,
+  BUILDINGS, HARVEST_UPGRADE, HARVESTER, NITRO, REPAIR_COST, TEAM_COLORS, TILE, UNITS, type Tag, type Team, type UnitDef, type UnitType,
 } from '../config';
 import type { Game } from '../game/game';
 import { findPath, type Point } from '../game/pathfinding';
 import { SPICE, type Cell, type MoveClass } from '../map';
-import { disposeParts, makeUnitModel, makeUpgradeKit } from '../models';
+import { disposeParts, makeParachute, makeUnitModel, makeUpgradeKit } from '../models';
 import { Building } from './building';
 import { distTo } from './distance';
 import { Entity } from './entity';
@@ -28,7 +28,16 @@ export type Order =
   | { kind: 'move'; x: number; z: number }
   | { kind: 'amove'; x: number; z: number }
   | { kind: 'attack'; target: Entity }
-  | { kind: 'harvest' };
+  | { kind: 'harvest' }
+  | { kind: 'repair'; target: Entity };
+
+/** Paratroopers come down at this speed. */
+const FALL_SPEED = 2.2;
+
+/** Whether a repair vehicle can mend this: structures and anything mechanical, not infantry. */
+export function repairable(e: Entity): boolean {
+  return e instanceof Building || !(e as Unit).def.infantry;
+}
 
 type HarvestState = 'seek' | 'toSpice' | 'harvest' | 'toRefinery' | 'unload';
 
@@ -44,7 +53,11 @@ export class Unit extends Entity {
   kills = 0;
   target: Entity | null = null;
   path: Point[] = [];
-  private body: THREE.Group;
+  /** The Carryall this unit is riding in, if any: it's off the map until dropped. */
+  carrier: Unit | null = null;
+  /** Paratrooper on the way down: drifts toward the landing cell under its parachute. */
+  falling: { x: number; z: number; chute: THREE.Object3D } | null = null;
+  protected body: THREE.Group;
   private turret: THREE.Group | null;
   /** Parts showing researched upgrades, rebuilt when the team's upgrades change. */
   private kit: { key: string; body: THREE.Group; turret: THREE.Group } | null = null;
@@ -57,6 +70,7 @@ export class Unit extends Entity {
   /** Vehicles: smoothed ground normal the hull leans to. */
   private groundUp = new THREE.Vector3(0, 1, 0);
   private repathTimer = 0;
+  private sparkTimer = 0;
   private chasing = false;
   private progressTimer = 0;
   private lastX = 0;
@@ -138,6 +152,82 @@ export class Unit extends Entity {
     this.setDockPath(game);
   }
 
+  /** Called after a Carryall sets this unit down: pick up whatever it was doing from the new spot. */
+  resumeAfterDrop(game: Game): void {
+    this.path = [];
+    this.target = null;
+    this.chasing = false;
+    const o = this.order;
+    if (o.kind === 'move' || o.kind === 'amove') this.setPath(game, o.x, o.z);
+    else if (o.kind === 'harvest') {
+      if (this.hstate === 'toSpice' && this.spiceCell) this.setPath(game, game.map.center(this.spiceCell.cx), game.map.center(this.spiceCell.cz));
+      else if (this.hstate === 'toRefinery') this.setDockPath(game);
+    }
+  }
+
+  /** A harvester's current destination while it's driving to spice or back to a refinery, else null. */
+  travelGoal(game: Game): Point | null {
+    if (this.order.kind !== 'harvest') return null;
+    if (this.hstate === 'toSpice' && this.spiceCell) return { x: game.map.center(this.spiceCell.cx), z: game.map.center(this.spiceCell.cz) };
+    if (this.hstate === 'toRefinery') {
+      if (!this.refinery || this.refinery.dead) this.refinery = game.nearestBuilding(this.team, 'refinery', this.x, this.z);
+      if (!this.refinery) return null;
+      const dock = game.dockCell(this.refinery);
+      return { x: game.map.center(dock.cx), z: game.map.center(dock.cz) };
+    }
+    return null;
+  }
+
+  /** Jumps from an aircraft at (x, y, z) and comes down by parachute on the nearest open cell. */
+  startFall(game: Game, x: number, y: number, z: number): void {
+    const m = game.map;
+    const cell = m.nearestCell(m.cellOf(x), m.cellOf(z), (cx, cz) => m.canEnter(cx, cz, this.moveClass), 16) ?? { cx: m.cellOf(x), cz: m.cellOf(z) };
+    const chute = makeParachute(TEAM_COLORS[this.team]);
+    this.root.add(chute);
+    this.root.visible = true;
+    this.falling = { x: m.center(cell.cx) + (Math.random() - 0.5) * 0.8, z: m.center(cell.cz) + (Math.random() - 0.5) * 0.8, chute };
+    this.x = x;
+    this.z = z;
+    this.y = y;
+    this.order = { kind: 'idle' };
+    this.path = [];
+    this.target = null;
+  }
+
+  updateFall(game: Game, dt: number): void {
+    const f = this.falling!;
+    const dx = f.x - this.x;
+    const dz = f.z - this.z;
+    const d = Math.hypot(dx, dz);
+    const step = Math.min(d, 1.6 * dt);
+    if (d > 1e-3) {
+      this.x += (dx / d) * step;
+      this.z += (dz / d) * step;
+    }
+    this.y -= FALL_SPEED * dt;
+    const ground = game.map.surfaceAt(this.x, this.z);
+    if (this.y <= ground) {
+      this.y = ground;
+      this.x = f.x;
+      this.z = f.z;
+      this.root.remove(f.chute);
+      this.falling = null;
+    }
+  }
+
+  /** Hangs under a Carryall: follows it, level with its heading. */
+  hangAt(x: number, y: number, z: number, heading: number): void {
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.heading = heading;
+    this.turretHeading = heading;
+    this.groundUp.set(0, 1, 0);
+    this.root.position.set(x, y, z);
+    this.body.quaternion.setFromAxisAngle(UP, -heading);
+    if (this.turret) this.turret.rotation.y = 0;
+  }
+
   onDamaged(attacker: Unit | null): void {
     if (!attacker || attacker.dead || !this.def.weapon) return;
     if (this.order.kind === 'idle' && !this.target) this.target = attacker;
@@ -160,7 +250,7 @@ export class Unit extends Entity {
 
     // Pick or drop the current target.
     if (this.order.kind === 'attack') {
-      if (this.order.target.dead) {
+      if (this.order.target.dead || !game.weaponFor(this, this.order.target)) {
         this.order = { kind: 'idle' };
         this.target = null;
         this.path = [];
@@ -196,7 +286,16 @@ export class Unit extends Entity {
         case 'harvest':
           this.updateHarvester(game, dt);
           break;
+        case 'repair':
+          this.updateRepair(game, this.order.target, dt);
+          break;
         case 'idle':
+          if (this.def.repair && this.scanTimer <= 0) {
+            this.scanTimer = 0.8 + Math.random() * 0.4;
+            const job = game.damagedFriend(this, this.def.sight);
+            if (job) this.command(game, { kind: 'repair', target: job });
+          }
+          break;
         case 'attack':
           break;
       }
@@ -285,6 +384,43 @@ export class Unit extends Entity {
     return false;
   }
 
+  /** Drives up to a damaged friendly unit or structure and mends it, paying as it goes. */
+  private updateRepair(game: Game, target: Entity, dt: number): void {
+    const rep = this.def.repair!;
+    if (target.dead || target.hp >= target.maxHp || (target instanceof Unit && (target.carrier || target.falling))) {
+      this.order = { kind: 'idle' };
+      this.path = [];
+      return;
+    }
+    const d = distTo(target, this.x, this.z);
+    if (d > rep.range) {
+      this.repathTimer -= dt;
+      if (this.repathTimer <= 0 || this.path.length === 0) {
+        this.repathTimer = 1;
+        this.setPath(game, target.x, target.z);
+      }
+      this.followPath(game, dt);
+      return;
+    }
+    this.path = [];
+    this.heading = this.rotateToward(this.heading, Math.atan2(target.z - this.z, target.x - this.x), this.def.turnRate * dt);
+    const price = target instanceof Unit ? target.def.cost : BUILDINGS[(target as Building).type].cost;
+    const hp = Math.min(rep.rate * dt, target.maxHp - target.hp);
+    if (!game.pay(this.team, (hp / target.maxHp) * price * REPAIR_COST)) return;
+    target.hp += hp;
+    this.sparkTimer -= dt;
+    if (this.sparkTimer <= 0) {
+      this.sparkTimer = 0.12 + Math.random() * 0.1;
+      const p = target.aimPoint();
+      const spread = target instanceof Building ? target.radius * 0.7 : target.radius * 0.6;
+      p.x += (Math.random() - 0.5) * spread;
+      p.z += (Math.random() - 0.5) * spread;
+      p.y += (Math.random() - 0.3) * 0.5;
+      game.effects.flash(p, 0.12);
+      if (Math.random() < 0.4) game.effects.puff(p, 0xffd27a);
+    }
+  }
+
   /** Steps along the path. Returns true once the path is finished (or empty). */
   private followPath(game: Game, dt: number): boolean {
     if (this.path.length === 0) return true;
@@ -338,7 +474,7 @@ export class Unit extends Entity {
     this.lastZ = this.z;
   }
 
-  private rotateToward(current: number, desired: number, maxStep: number): number {
+  protected rotateToward(current: number, desired: number, maxStep: number): number {
     const diff = wrapAngle(desired - current);
     if (Math.abs(diff) <= maxStep) return desired;
     return wrapAngle(current + Math.sign(diff) * maxStep);
@@ -449,7 +585,7 @@ export class Unit extends Entity {
     }
   }
 
-  private refreshKit(game: Game): void {
+  protected refreshKit(game: Game): void {
     const ts = game.teams[this.team];
     const look = {
       weapons: game.tier(this.team, 'weapons'),
@@ -474,11 +610,15 @@ export class Unit extends Entity {
 
   syncVisual(game: Game, dt: number): void {
     this.refreshKit(game);
-    const groundY = game.map.surfaceAt(this.x, this.z);
-    this.y += (groundY - this.y) * Math.min(1, dt * 10);
+    if (!this.falling) {
+      const groundY = game.map.surfaceAt(this.x, this.z);
+      this.y += (groundY - this.y) * Math.min(1, dt * 10);
+    }
     this.root.position.set(this.x, this.y, this.z);
-    if (this.def.infantry) {
-      this.body.rotation.y = -this.heading;
+    if (this.falling) {
+      this.body.rotation.set(0, -this.heading, Math.sin(game.time * 2.3 + this.id) * 0.08);
+    } else if (this.def.infantry) {
+      this.body.rotation.set(0, -this.heading, 0);
     } else {
       // Vehicles lean with the ground under their hull (sampled across it, so single facets don't jolt them).
       const m = game.map;

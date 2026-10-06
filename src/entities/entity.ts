@@ -10,6 +10,8 @@ export abstract class Entity {
   abstract readonly tags: readonly Tag[];
   hp: number;
   dead = false;
+  /** Game time this last took damage. */
+  lastHurt = -Infinity;
   selected = false;
   x = 0;
   z = 0;

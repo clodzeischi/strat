@@ -1,12 +1,12 @@
 import * as THREE from 'three';
 import {
-  ARMOR_BONUS, BUILDINGS, HIGH_GROUND_RANGE, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
+  ARMOR_BONUS, BUILDINGS, HIGH_GROUND_RANGE, INFANTRY_REGEN, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
   type LevelUpType, type MapSize, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
   type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
 import { Effects } from '../render/effects/effects';
-import { Building, distTo, Unit, type Entity } from '../entities';
+import { Building, Carryall, distTo, repairable, Unit, type Entity } from '../entities';
 import { GameMap, ROCK, SPICE, type Cell } from '../map';
 import { mat } from '../materials/lambert';
 import { cellsAround, type Point } from './pathfinding';
@@ -79,6 +79,7 @@ export class Game {
   private nextId = 1;
   private projectiles: Projectile[] = [];
   private lastAlert = -100;
+  private lastDropAlert = -100;
   private victoryTimer = 0;
 
   constructor(readonly scene: THREE.Scene, private camera: THREE.Camera, size: MapSize = 64, seed = 7) {
@@ -92,8 +93,8 @@ export class Game {
         unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
         spiceHarvested: 0, creditsSpent: 0,
       },
-      building: null, queues: { barracks: [], factory: [] }, research: null,
-      rally: { barracks: null, factory: null }, spawnTurn: { barracks: 0, factory: 0 }, levelUps: {},
+      building: null, queues: { barracks: [], factory: [], hitech: [] }, research: null,
+      rally: { barracks: null, factory: null, hitech: null }, spawnTurn: { barracks: 0, factory: 0, hitech: 0 }, levelUps: {},
     }));
     this.setupStart();
   }
@@ -182,11 +183,12 @@ export class Game {
     let best: Entity | null = null;
     let bestScore = Infinity;
     const consider = (e: Entity, penalty: number) => {
-      if (e.team === team || e.dead) return;
+      if (e.team === team || e.dead || (e instanceof Unit && e.carrier)) return;
       const d = distTo(e, x, z);
       if (d > range) return;
       let score = d + penalty;
       const w = seeker && this.weaponFor(seeker, e);
+      if (seeker && !w) return; // e.g. an aircraft and no anti-air weapon
       if (w) {
         const ratio = THREE.MathUtils.clamp(weaponDamage(w, e) / w.damage - 1, -1, 2);
         score -= ratio * 4;
@@ -288,7 +290,7 @@ export class Game {
     const z0 = cz * TILE;
     const x1 = x0 + TILE;
     const z1 = z0 + TILE;
-    return !this.units.some((u) => u.x + u.radius > x0 && u.x - u.radius < x1 && u.z + u.radius > z0 && u.z - u.radius < z1);
+    return !this.units.some((u) => !u.def.air && !u.carrier && u.x + u.radius > x0 && u.x - u.radius < x1 && u.z + u.radius > z0 && u.z - u.radius < z1);
   }
 
   /** Whether a footprint at (cx, cz) is close enough to one of the team's own buildings. */
@@ -305,7 +307,7 @@ export class Game {
   // ---- Spawning -------------------------------------------------------------
 
   spawnUnit(type: UnitType, team: Team, x: number, z: number, heading = 0): Unit {
-    const u = new Unit(this.nextId++, team, type, x, z, heading);
+    const u = type === 'carryall' ? new Carryall(this.nextId++, team, x, z, heading) : new Unit(this.nextId++, team, type, x, z, heading);
     u.y = this.map.surfaceAt(x, z);
     u.syncVisual(this, 0);
     this.scene.add(u.root);
@@ -334,10 +336,18 @@ export class Game {
     if (sites.length === 0) return;
     const ts = this.teams[team];
     const site = sites[ts.spawnTurn[producer]++ % sites.length];
+    ts.stats.unitsBuilt++;
+    if (type === 'carryall') {
+      // Lifts off the pad and holds over the rally point, or over its factory.
+      const c = this.spawnUnit(type, team, site.x, site.z, -Math.PI / 2) as Carryall;
+      c.y = site.y + 1;
+      const r = ts.rally[producer];
+      c.task = r ? { kind: 'move', x: r.x, z: r.z } : { kind: 'orbit', x: site.x, z: site.z };
+      return;
+    }
     const front = site.frontCell();
     const cell = this.dockCell(site);
     const u = this.spawnUnit(type, team, this.map.center(cell.cx), this.map.center(cell.cz), Math.PI / 2);
-    ts.stats.unitsBuilt++;
     if (type === 'harvester') {
       u.commandHarvest(this, null);
       return;
@@ -367,6 +377,45 @@ export class Game {
   private refund(ts: TeamState, amount: number): void {
     ts.credits += amount;
     ts.stats.creditsSpent -= amount;
+  }
+
+  /** Spends credits if the team has them (repairs pay as they go). */
+  pay(team: Team, amount: number): boolean {
+    const ts = this.teams[team];
+    if (ts.credits < amount) return false;
+    this.spend(ts, amount);
+    return true;
+  }
+
+  /** The most damaged own unit or structure a repair vehicle could fix within `range`, if any. */
+  damagedFriend(mech: Unit, range: number): Entity | null {
+    let best: Entity | null = null;
+    let bestScore = Infinity;
+    const consider = (e: Entity) => {
+      if (e === mech || e.team !== mech.team || e.dead || e.hp >= e.maxHp || !repairable(e)) return;
+      if (e instanceof Unit && (e.carrier || e.falling)) return;
+      const d = distTo(e, mech.x, mech.z);
+      if (d > range) return;
+      const score = d + (e.hp / e.maxHp) * 10;
+      if (score < bestScore) {
+        bestScore = score;
+        best = e;
+      }
+    };
+    for (const u of this.units) consider(u);
+    for (const b of this.buildings) consider(b);
+    return best;
+  }
+
+  /** A Carryall just set down or dropped a unit: warn the other side if it landed near their base. */
+  onDrop(carrier: Unit, u: Unit): void {
+    for (const ts of this.teams) {
+      if (ts.team === carrier.team || this.time - this.lastDropAlert < 12) continue;
+      if (this.buildings.some((b) => b.team === ts.team && !b.dead && Math.hypot(b.x - u.x, b.z - u.z) < 22 * TILE)) {
+        if (ts.team === PLAYER) this.lastDropAlert = this.time;
+        this.notify(ts.team, 'Enemy airdrop detected!');
+      }
+    }
   }
 
   private notify(team: Team, text: string): void {
@@ -528,8 +577,9 @@ export class Game {
   /** The weapon a unit uses against this target: Infantry Rockets swap in against Armored. */
   weaponFor(u: Unit, target: Entity): WeaponDef | null {
     const anti = u.def.antiArmor;
-    if (anti && target.tags.includes('armored') && this.teams[u.team].upgrades.has('rockets')) return anti;
-    return u.def.weapon;
+    const w = anti && target.tags.includes('armored') && this.teams[u.team].upgrades.has('rockets') ? anti : u.def.weapon;
+    if (w && target.tags.includes('air') && !w.air) return null;
+    return w;
   }
 
   fire(u: Unit, target: Entity, w: WeaponDef): void {
@@ -589,7 +639,8 @@ export class Game {
   }
 
   damage(target: Entity, w: WeaponDef, mult: number, attacker: Unit | null): void {
-    if (target.dead) return;
+    if (target.dead || (target instanceof Unit && target.carrier)) return;
+    target.lastHurt = this.time;
     let dmg = weaponDamage(w, target) * mult;
     dmg *= 1 - ARMOR_BONUS * this.tier(target.team, 'armor');
     target.hp -= dmg;
@@ -631,6 +682,18 @@ export class Game {
     } else {
       this.effects.explosion(e.aimPoint(), (e as Unit).def.infantry ? 0.5 : 1.3);
     }
+    if (e instanceof Carryall) {
+      // Shot down: troopers bail out by parachute; vehicles go down with it.
+      for (const p of e.releaseAll()) {
+        if (p.def.infantry) p.startFall(this, e.x + (Math.random() - 0.5) * 2, e.y - 0.5, e.z + (Math.random() - 0.5) * 2);
+        else {
+          p.hp = 0;
+          this.kill(p, attacker);
+          this.effects.explosion(new THREE.Vector3(p.x, this.map.surfaceAt(p.x, p.z) + 0.5, p.z), 1.6);
+        }
+      }
+      this.effects.explosion(new THREE.Vector3(e.x, this.map.surfaceAt(e.x, e.z) + 0.5, e.z), 1.8);
+    }
   }
 
   // ---- Simulation -----------------------------------------------------------
@@ -638,16 +701,23 @@ export class Game {
   update(dt: number): void {
     this.time += dt;
     for (const ts of this.teams) this.updateProduction(ts, dt);
-    for (const u of this.units) if (!u.dead) u.update(this, dt);
+    for (const u of this.units) {
+      if (u.dead || u.carrier) continue;
+      if (u.falling) u.updateFall(this, dt);
+      else u.update(this, dt);
+      if (u.def.infantry && u.hp < u.maxHp && this.time - u.lastHurt > INFANTRY_REGEN.delay) {
+        u.hp = Math.min(u.maxHp, u.hp + u.maxHp * INFANTRY_REGEN.rate * dt);
+      }
+    }
     this.separate();
-    for (const u of this.units) u.syncVisual(this, dt);
+    for (const u of this.units) if (!u.carrier) u.syncVisual(this, dt);
     this.updateProjectiles(dt);
     for (const b of this.buildings) if (b.spinner) b.spinner.rotation.y += dt * (b.type === 'factory' ? 1.5 : 0.25);
     this.effects.update(dt);
     this.terrain.flush();
     this.units = this.units.filter((u) => !u.dead);
     this.buildings = this.buildings.filter((b) => !b.dead);
-    for (const u of this.units) u.updateBar(this.camera);
+    for (const u of this.units) if (!u.carrier || !u.def.infantry) u.updateBar(this.camera);
     for (const b of this.buildings) b.updateBar(this.camera);
 
     this.victoryTimer -= dt;
@@ -661,7 +731,7 @@ export class Game {
 
   /** Pushes overlapping units apart, never into blocked cells. */
   private separate(): void {
-    const us = this.units;
+    const us = this.units.filter((u) => !u.def.air && !u.carrier && !u.falling);
     for (let i = 0; i < us.length; i++) {
       const a = us[i];
       for (let j = i + 1; j < us.length; j++) {

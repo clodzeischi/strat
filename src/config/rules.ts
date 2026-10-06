@@ -14,7 +14,7 @@ export const TEAM_CSS = ['#3d7be0', '#d8402f'];
 
 export const START_CREDITS = 2500;
 
-export const PRODUCERS: Producer[] = ['barracks', 'factory'];
+export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech'];
 export const QUEUE_MAX = 5; // per producer type
 export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory'];
 
@@ -34,3 +34,15 @@ export const HARVESTER = {
 };
 
 export const SPICE_MAX = 500;
+
+/** Repairs cost this share of the unit's or building's price per full health bar. */
+export const REPAIR_COST = 0.4;
+/** Infantry heal this share of their health per second once they haven't been hit for INFANTRY_REGEN.delay seconds. */
+export const INFANTRY_REGEN = { rate: 0.02, delay: 5 };
+
+export const CARRYALL = {
+  capacity: 6, // lift space: infantry take 1, trikes 3, heavy vehicles 6
+  altitude: 7, // cruising height above y = 0
+  orbit: 5, // radius of the holding circle
+  ferryMin: 10, // tiles: harvester trips shorter than this aren't worth a lift
+};
