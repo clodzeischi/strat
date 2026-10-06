@@ -1,5 +1,6 @@
 // Checks repair, infantry regeneration and the Carryall: pickups, heavy touch-and-go drops, infantry fly-by
-// parachute drops, two-trike loads, harvester ferrying and anti-air. Usage: npx tsx sim/air-repair-check.ts
+// parachute drops, two-trike parachute drops, harvester ferrying and rescue, and anti-air.
+// Usage: npx tsx sim/air-repair-check.ts
 import * as THREE from 'three';
 import type { UnitType } from '../src/config';
 import { Carryall, type Unit } from '../src/entities';
@@ -124,8 +125,15 @@ for (const type of ['tank', 'harvester', 'rocket'] as UnitType[]) {
   run(g, 30, () => c.load.length === 2);
   check('carryall lifts two trikes at once (not three)', tt.length === 2 && c.load.length === 2);
   c.orderDrop(g, at(g, 40), at(g, 20));
-  run(g, 30, () => c.load.length === 0);
-  check('  ...and drops both', c.load.length === 0 && tt.every((u) => !u.carrier && Math.hypot(u.x - at(g, 40), u.z - at(g, 20)) < 5));
+  let trikeChutes = false;
+  const tf = run(g, 40, () => {
+    if (tt.some((u) => u.falling)) trikeChutes = true;
+    return c.load.length === 0 && !tt.some((u) => u.falling);
+  });
+  const far = Math.max(...tt.map((u) => Math.hypot(u.x - at(g, 40), u.z - at(g, 20))));
+  check('  ...and parachutes both down on a fly-by', trikeChutes && tt.every((u) => !u.carrier && !u.falling) && far < 8, `${tf.toFixed(1)}s, furthest ${far.toFixed(1)}`);
+  run(g, 1);
+  check('  ...landed trikes are on the ground', tt.every((u) => Math.abs(u.y - g.map.surfaceAt(u.x, u.z)) < 0.2));
 }
 
 // ---- Harvester ferry -----------------------------------------------------------
@@ -144,13 +152,28 @@ for (const type of ['tank', 'harvester', 'rocket'] as UnitType[]) {
   check('picking up a harvester assigns the carryall to it', c.task.kind === 'ferry');
   let lifts = 0;
   let wasCarried = false;
+  let groundDrive = 0;
+  let last = { x: h.x, z: h.z };
   const credits0 = g.teams[0].credits;
   run(g, 120, () => {
     if (h.carrier && !wasCarried) lifts++;
     wasCarried = !!h.carrier;
+    if (!h.carrier) groundDrive += Math.hypot(h.x - last.x, h.z - last.z);
+    last = { x: h.x, z: h.z };
     return false;
   });
   check('  ...it ferries the harvester both ways', lifts >= 3, `${lifts} lifts, +${(g.teams[0].credits - credits0).toFixed(0)} credits in 120s`);
+  check('  ...the harvester waits for its lift instead of driving off', groundDrive < 60, `drove ${groundDrive.toFixed(0)} units on the ground`);
+
+  // Under fire on the field: it calls the Carryall and is flown home.
+  run(g, 60, () => h.order.kind === 'harvest' && h.hstate === 'harvest' && !h.carrier);
+  const raider = g.spawnUnit('trike', 1, h.x + 4, h.z);
+  raider.command(g, { kind: 'attack', target: h });
+  const tr = run(g, 30, () => !!h.carrier);
+  raider.dead = true;
+  check('harvester under attack signals its carryall for pickup', !!h.carrier, `${tr.toFixed(1)}s`);
+  run(g, 30, () => !h.carrier);
+  check('  ...and is set down by the refinery', Math.hypot(h.x - ref.x, h.z - ref.z) < 8 * 2, `${Math.hypot(h.x - ref.x, h.z - ref.z).toFixed(1)} from it`);
 
   // The same trip by road, for comparison.
   const g2 = flatGame();

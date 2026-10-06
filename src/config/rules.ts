@@ -43,6 +43,6 @@ export const INFANTRY_REGEN = { rate: 0.02, delay: 5 };
 export const CARRYALL = {
   capacity: 6, // lift space: infantry take 1, trikes 3, heavy vehicles 6
   altitude: 7, // cruising height above y = 0
-  orbit: 5, // radius of the holding circle
+  orbit: 8, // radius of the holding circle
   ferryMin: 10, // tiles: harvester trips shorter than this aren't worth a lift
 };

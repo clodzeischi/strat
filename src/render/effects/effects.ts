@@ -75,6 +75,18 @@ export class Effects {
     });
   }
 
+  /** Dust blown outward along the ground by an aircraft's downwash; `size` scales the cloud. */
+  dust(p: THREE.Vector3, color: number, size = 1): void {
+    const yaw = rand(0, Math.PI * 2);
+    const r = rand(0.3, 2.2) * size;
+    const speed = rand(2.5, 7);
+    this.smoke.spawn({
+      x: p.x + Math.cos(yaw) * r, y: p.y + 0.15, z: p.z + Math.sin(yaw) * r,
+      vx: Math.cos(yaw) * speed, vy: rand(0.3, 1.2), vz: Math.sin(yaw) * speed, drag: 1.6,
+      life: rand(1, 1.9), size: [0.35 * size, rand(1, 1.7) * size], color: [color, color], alpha: [0.7, 0],
+    });
+  }
+
   /** Command feedback ring on the ground. */
   marker(p: THREE.Vector3, color: number): void {
     let ring = this.rings.find((r) => r.life <= 0);

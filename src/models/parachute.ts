@@ -7,9 +7,13 @@ const apexGeo = new THREE.SphereGeometry(0.86, 10, 2, 0, Math.PI * 2, 0, Math.PI
 const lineGeo = new THREE.CylinderGeometry(0.012, 0.012, 1, 3);
 const apexMats = new Map<number, THREE.MeshLambertMaterial>();
 
-/** Parachute canopy with rigging, hanging over a paratrooper standing at the origin. Shared geometry: don't dispose. */
-export function makeParachute(color: number): THREE.Group {
+/**
+ * Parachute canopy with rigging, hanging over a paratrooper standing at the origin; `scale` 1 suits a trooper,
+ * bigger for vehicles. Shared geometry: don't dispose.
+ */
+export function makeParachute(color: number, scale = 1): THREE.Group {
   const g = new THREE.Group();
+  g.scale.setScalar(scale);
   const top = 1.5; // canopy rim height above the trooper's feet
   const canopy = new THREE.Mesh(canopyGeo, canopyMat);
   canopy.position.y = top - 0.85 * Math.cos(Math.PI * 0.32);

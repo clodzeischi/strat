@@ -407,6 +407,14 @@ export class Game {
     return best;
   }
 
+  /** The Carryall assigned to ferry this harvester, if any. */
+  ferryFor(h: Unit): Carryall | null {
+    for (const u of this.units) {
+      if (u instanceof Carryall && !u.dead && u.task.kind === 'ferry' && u.task.harvester === h) return u;
+    }
+    return null;
+  }
+
   /** A Carryall just set down or dropped a unit: warn the other side if it landed near their base. */
   onDrop(carrier: Unit, u: Unit): void {
     for (const ts of this.teams) {
@@ -644,7 +652,11 @@ export class Game {
     let dmg = weaponDamage(w, target) * mult;
     dmg *= 1 - ARMOR_BONUS * this.tier(target.team, 'armor');
     target.hp -= dmg;
-    if (target instanceof Unit) target.onDamaged(attacker);
+    if (target instanceof Unit) {
+      target.onDamaged(attacker);
+      // A harvester under fire calls its Carryall to fly it home.
+      if (target.type === 'harvester') this.ferryFor(target)?.rescue(this, target);
+    }
     const important = target instanceof Building || (target as Unit).type === 'harvester';
     if (target.team === PLAYER && important && this.time - this.lastAlert > 15) {
       this.lastAlert = this.time;

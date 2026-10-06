@@ -4,6 +4,11 @@ import { flameMat } from '../../materials/upgrade-fx';
 import { box, cyl } from '../parts';
 import type { UnitBlueprint } from '../types';
 
+export const SEAT_OFF = new THREE.MeshBasicMaterial({ color: 0x2a2a2e });
+export const SEAT_ON = new THREE.MeshBasicMaterial({ color: 0xffe9a0 });
+/** Seat lights on the spine, one per infantry space, named `seat0`..`seat5`; the troop pod is named `pod`. */
+export const SEATS = 6;
+
 /** Where lifted vehicles hang, below the hull (body space). */
 export const CARRYALL_HOOK_Y = -0.95;
 
@@ -34,6 +39,21 @@ export const carryall: UnitBlueprint = {
       box(body, 0.12, 0.5, 0.12, DARK, x, -0.45, 0.35);
       box(body, 0.12, 0.5, 0.12, DARK, x, -0.45, -0.35);
     }
+    // Seat lights along the spine, lit one per trooper aboard.
+    for (let k = 0; k < SEATS; k++) {
+      const seat = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.06, 0.18), SEAT_OFF);
+      seat.name = `seat${k}`;
+      seat.position.set(0.85 - k * 0.34, 0.33, 0);
+      body.add(seat);
+    }
+    // Troop pod slung between the clamps, wider than the hull so it shows from above; shown with infantry aboard.
+    const pod = new THREE.Group();
+    pod.name = 'pod';
+    pod.visible = false;
+    box(pod, 1.5, 0.5, 1.2, shade(METAL, 0.8), 0, -0.48, 0);
+    box(pod, 1.55, 0.1, 1.25, color, 0, -0.26, 0);
+    for (const z of [-0.61, 0.61]) for (const x of [-0.45, 0, 0.45]) box(pod, 0.22, 0.14, 0.03, 0x223344, x, -0.45, z);
+    body.add(pod);
     muzzle.position.set(0, CARRYALL_HOOK_Y, 0);
     body.add(muzzle);
     return { body, turret: null, muzzle };

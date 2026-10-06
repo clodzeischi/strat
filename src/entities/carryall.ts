@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { CARRYALL, TILE, type Team } from '../config';
 import type { Game } from '../game/game';
 import type { Point } from '../game/pathfinding';
-import { CARRYALL_HOOK_Y } from '../models';
+import { SAND, SPICE } from '../map';
+import { CARRYALL_HOOK_Y, SEAT_OFF, SEAT_ON, SEATS } from '../models';
 import { Unit, type Order } from './unit';
 
 /** How far below the hook a hanging vehicle's wheels are. */
@@ -14,10 +15,25 @@ type Task =
   | { kind: 'orbit'; x: number; z: number }
   | { kind: 'move'; x: number; z: number }
   | { kind: 'pickup'; units: Unit[] }
-  /** Heavy cargo: a touch-and-go at the drop point. Infantry only: a fly-by parachute drop, then out past the point. */
+  /** Heavy cargo: a touch-and-go at the drop point. Infantry and trikes: a fly-by parachute drop, then out past the point. */
   | { kind: 'drop'; x: number; z: number; back: Point; heavy: boolean; exit: Point | null; phase: 'in' | 'out' }
-  /** Assigned to a harvester: lifts it whenever it starts a long trip and sets it down at the far end. */
-  | { kind: 'ferry'; harvester: Unit; goal: Point | null };
+  /**
+   * Assigned to a harvester: lifts it whenever it starts a long trip and sets it down at the far end. `rescue`:
+   * the harvester came under fire and is waiting to be flown home whatever the distance.
+   */
+  | { kind: 'ferry'; harvester: Unit; goal: Point | null; rescue: boolean };
+
+/** Light enough to parachute: infantry and trikes jump on a fly-by; anything heavier needs a touchdown. */
+const parachutes = (u: Unit) => (u.def.lift ?? CARRYALL.capacity) < CARRYALL.capacity;
+
+/** Downwash dust per ground type: color, puffs per second at the lowest pass, cloud size. */
+const DUST = {
+  sand: { color: 0xe2c896, rate: 110, size: 1.3 },
+  spice: { color: 0xc4532a, rate: 110, size: 1.3 },
+  rock: { color: 0x7a6450, rate: 10, size: 0.7 },
+};
+/** Downwash reaches the ground from this high above it. */
+const DUST_HEIGHT = 5;
 
 const smoothstep = (t: number) => {
   const c = THREE.MathUtils.clamp(t, 0, 1);
@@ -33,6 +49,9 @@ export class Carryall extends Unit {
   private bank = 0;
   private dropTimer = 0;
   private lastDropD = Infinity;
+  private pitch = 0;
+  private shownTroops = 0;
+  private dustDebt = 0;
 
   constructor(id: number, team: Team, x: number, z: number, heading = 0) {
     super(id, team, 'carryall', x, z, heading);
@@ -65,7 +84,7 @@ export class Carryall extends Unit {
   orderPickup(game: Game, units: Unit[]): Unit[] {
     const first = units.find((u) => this.fits(u));
     if (first?.type === 'harvester' && this.load.length === 0) {
-      this.task = { kind: 'ferry', harvester: first, goal: null };
+      this.task = { kind: 'ferry', harvester: first, goal: null, rescue: false };
       return [first];
     }
     const taken: Unit[] = [];
@@ -86,7 +105,7 @@ export class Carryall extends Unit {
   /** Drops the load at a point, then flies back to where it was when ordered. */
   orderDrop(game: Game, x: number, z: number): boolean {
     if (this.load.length === 0) return false;
-    const heavy = this.load.some((u) => !u.def.infantry);
+    const heavy = !this.load.every(parachutes);
     const back = { x: this.x, z: this.z };
     const m = game.map;
     if (heavy) {
@@ -101,6 +120,22 @@ export class Carryall extends Unit {
     }
     this.lastDropD = Infinity;
     return true;
+  }
+
+  /** Whether the harvester it ferries should stop and wait: a lift is coming for its long trip or its rescue. */
+  wantsToLift(game: Game, h: Unit): boolean {
+    const t = this.task;
+    if (t.kind !== 'ferry' || t.harvester !== h || this.load.length) return false;
+    if (t.rescue) return true;
+    const goal = h.travelGoal(game);
+    return !!goal && Math.hypot(goal.x - h.x, goal.z - h.z) > CARRYALL.ferryMin * TILE;
+  }
+
+  /** The ferried harvester is under fire: it heads for home, and waits there for this Carryall to fly it out. */
+  rescue(game: Game, h: Unit): void {
+    const t = this.task;
+    if (t.kind !== 'ferry' || t.harvester !== h || t.rescue || h.carrier || this.load.length) return;
+    if (h.retreat(game)) t.rescue = true;
   }
 
   /** Destroyed in the air: everyone aboard is released (the game decides their fate). */
@@ -132,6 +167,26 @@ export class Carryall extends Unit {
         this.updateFerry(game, t, dt);
         break;
     }
+    this.kickDust(game, dt);
+  }
+
+  /** Low over the ground, the downwash raises dust: thick over sand, red over spice, a little over rock. */
+  private kickDust(game: Game, dt: number): void {
+    const m = game.map;
+    const ground = m.surfaceAt(this.x, this.z);
+    const strength = 1 - (this.y - ground - LOW + 0.5) / DUST_HEIGHT;
+    if (strength <= 0) {
+      this.dustDebt = 0;
+      return;
+    }
+    const cx = m.cellOf(this.x);
+    const cz = m.cellOf(this.z);
+    if (!m.inBounds(cx, cz)) return;
+    const tile = m.tile(cx, cz);
+    const look = tile === SAND ? DUST.sand : tile === SPICE ? DUST.spice : DUST.rock;
+    this.dustDebt += look.rate * Math.min(1, strength) * dt;
+    const p = new THREE.Vector3(this.x, ground, this.z);
+    for (; this.dustDebt >= 1; this.dustDebt--) game.effects.dust(p, look.color, look.size * (0.6 + 0.4 * strength));
   }
 
   /** Circles a point; parks low over a repair vehicle that's working on it. */
@@ -189,12 +244,18 @@ export class Carryall extends Unit {
       return;
     }
     this.dropTimer -= dt;
-    if (this.load.length && this.dropTimer <= 0 && (t.phase === 'out' || toPoint < 4.5)) {
-      this.dropTimer = 0.2;
-      const u = this.load.shift()!;
+    if (this.load.length && this.dropTimer <= 0 && (t.phase === 'out' || toPoint < 5)) {
+      // Vehicles drop off the hook first, then the troopers jump.
+      const i = this.load.findIndex((u) => !u.def.infantry);
+      const u = this.load.splice(i >= 0 ? i : 0, 1)[0];
+      this.dropTimer = u.def.infantry ? 0.2 : 0.45;
       u.carrier = null;
-      const side = (this.load.length % 2 ? 1 : -1) * 0.6;
-      u.startFall(game, this.x - Math.sin(this.heading) * side, this.y - 0.6, this.z + Math.cos(this.heading) * side);
+      if (u.def.infantry) {
+        const side = (this.load.length % 2 ? 1 : -1) * 0.6;
+        u.startFall(game, this.x - Math.sin(this.heading) * side, this.y - 0.6, this.z + Math.cos(this.heading) * side);
+      } else {
+        u.startFall(game, u.x, u.y, u.z); // from where it hangs
+      }
       game.onDrop(this, u);
     }
     if (t.phase === 'out' && this.load.length === 0 && Math.hypot(t.exit!.x - this.x, t.exit!.z - this.z) < 3) {
@@ -219,11 +280,12 @@ export class Carryall extends Unit {
       if (this.touchAndGo(game, goal.x, goal.z, dt)) {
         this.setDown(game);
         t.goal = null;
+        t.rescue = false;
       }
       return;
     }
     const goal = h.travelGoal(game);
-    if (goal && Math.hypot(goal.x - h.x, goal.z - h.z) > CARRYALL.ferryMin * TILE && this.load.length === 0) {
+    if (goal && this.wantsToLift(game, h)) {
       // Swoop down on the harvester as it drives.
       const ground = game.map.surfaceAt(h.x, h.z);
       const near = Math.hypot(h.x - this.x, h.z - this.z) < 2.5;
@@ -241,8 +303,9 @@ export class Carryall extends Unit {
   private touchAndGo(game: Game, x: number, z: number, dt: number): boolean {
     const d = Math.hypot(x - this.x, z - this.z);
     const ground = game.map.surfaceAt(x, z) + LOW;
-    const alt = ground + (CARRYALL.altitude - ground) * smoothstep((d - 2) / 12);
-    const cruise = this.def.speed * THREE.MathUtils.lerp(0.3, 1, smoothstep(d / 16));
+    // A long, shallow approach: start sinking and braking well out, nose up as it sheds speed.
+    const alt = ground + (CARRYALL.altitude - ground) * smoothstep((d - 3) / 26);
+    const cruise = this.def.speed * THREE.MathUtils.lerp(0.3, 1, smoothstep((d - 1) / 30));
     this.fly(game, x, z, dt, { cruise, alt });
     const low = this.y < ground + 0.5;
     const passing = d < 2.5 && d > this.lastDropD;
@@ -303,7 +366,11 @@ export class Carryall extends Unit {
     const d = Math.hypot(dx, dz);
     const cruise = o.cruise ?? this.def.speed;
     const want = o.stop ? Math.min(cruise, Math.max(o.chase ?? 0, d * 1.1)) : cruise;
-    this.speedNow += THREE.MathUtils.clamp(want - this.speedNow, -10 * dt, 6 * dt);
+    const accel = THREE.MathUtils.clamp(want - this.speedNow, -10 * dt, 6 * dt);
+    this.speedNow += accel;
+    // Nose up while braking, slightly down while speeding up.
+    const pitchWant = dt > 0 ? THREE.MathUtils.clamp((-accel / dt) * 0.07, -0.08, 0.3) : 0;
+    this.pitch += (pitchWant - this.pitch) * Math.min(1, dt * 3);
     const desired = Math.atan2(dz, dx);
     const slow = 1 - THREE.MathUtils.clamp(this.speedNow / cruise, 0, 1);
     const before = this.heading;
@@ -328,7 +395,14 @@ export class Carryall extends Unit {
   syncVisual(game: Game, _dt: number): void {
     this.refreshKit(game);
     this.root.position.set(this.x, this.y, this.z);
-    this.body.rotation.set(this.bank, -this.heading, 0, 'YXZ');
+    this.body.rotation.set(this.bank, -this.heading, this.pitch, 'YXZ');
+    // Infantry aboard: the troop pod shows and one seat light per trooper comes on.
+    const troops = this.load.filter((u) => u.def.infantry).length;
+    if (troops !== this.shownTroops) {
+      this.shownTroops = troops;
+      this.body.getObjectByName('pod')!.visible = troops > 0;
+      for (let k = 0; k < SEATS; k++) (this.body.getObjectByName(`seat${k}`) as THREE.Mesh).material = k < troops ? SEAT_ON : SEAT_OFF;
+    }
     // Passengers: vehicles hang under the hook (two trikes side by side); infantry ride inside.
     const vehicles = this.load.filter((u) => !u.def.infantry);
     vehicles.forEach((u, i) => {

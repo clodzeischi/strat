@@ -31,8 +31,8 @@ export type Order =
   | { kind: 'harvest' }
   | { kind: 'repair'; target: Entity };
 
-/** Paratroopers come down at this speed. */
-const FALL_SPEED = 2.2;
+/** Paratroopers come down at this speed; vehicles on their bigger canopies a little slower. */
+const FALL_SPEED = { foot: 2.2, vehicle: 1.7 };
 
 /** Whether a repair vehicle can mend this: structures and anything mechanical, not infantry. */
 export function repairable(e: Entity): boolean {
@@ -178,11 +178,22 @@ export class Unit extends Entity {
     return null;
   }
 
+  /** Harvester under fire: abandon the field and head home to the refinery. Returns false if it's already there. */
+  retreat(game: Game): boolean {
+    if (this.order.kind !== 'harvest' || this.hstate === 'unload') return false;
+    const ref = game.nearestBuilding(this.team, 'refinery', this.x, this.z);
+    if (!ref || Math.hypot(ref.x - this.x, ref.z - this.z) < 8 * TILE) return false;
+    this.hstate = 'toRefinery';
+    this.refinery = ref;
+    this.path = [];
+    return true;
+  }
+
   /** Jumps from an aircraft at (x, y, z) and comes down by parachute on the nearest open cell. */
   startFall(game: Game, x: number, y: number, z: number): void {
     const m = game.map;
     const cell = m.nearestCell(m.cellOf(x), m.cellOf(z), (cx, cz) => m.canEnter(cx, cz, this.moveClass), 16) ?? { cx: m.cellOf(x), cz: m.cellOf(z) };
-    const chute = makeParachute(TEAM_COLORS[this.team]);
+    const chute = makeParachute(TEAM_COLORS[this.team], this.def.infantry ? 1 : 1.9);
     this.root.add(chute);
     this.root.visible = true;
     this.falling = { x: m.center(cell.cx) + (Math.random() - 0.5) * 0.8, z: m.center(cell.cz) + (Math.random() - 0.5) * 0.8, chute };
@@ -204,7 +215,7 @@ export class Unit extends Entity {
       this.x += (dx / d) * step;
       this.z += (dz / d) * step;
     }
-    this.y -= FALL_SPEED * dt;
+    this.y -= FALL_SPEED[this.moveClass] * dt;
     const ground = game.map.surfaceAt(this.x, this.z);
     if (this.y <= ground) {
       this.y = ground;
@@ -284,7 +295,8 @@ export class Unit extends Entity {
           if (this.followPath(game, dt)) this.order = { kind: 'idle' };
           break;
         case 'harvest':
-          this.updateHarvester(game, dt);
+          // With a Carryall assigned, wait for the lift instead of setting off on a long drive.
+          if (!game.ferryFor(this)?.wantsToLift(game, this)) this.updateHarvester(game, dt);
           break;
         case 'repair':
           this.updateRepair(game, this.order.target, dt);

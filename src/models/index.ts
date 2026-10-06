@@ -18,7 +18,7 @@ import { trike } from './units/trike';
 
 export type { BuildingModel, UnitModel, UpgradeKit, UpgradeLook } from './types';
 export { makeParachute } from './parachute';
-export { CARRYALL_HOOK_Y } from './units/carryall';
+export { CARRYALL_HOOK_Y, SEATS, SEAT_OFF, SEAT_ON } from './units/carryall';
 
 const UNIT_MODELS: Record<UnitType, UnitBlueprint> = { harvester, infantry, trike, tank, rocket, repair, carryall };
 const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = { conyard, refinery, barracks, factory, hitech };
