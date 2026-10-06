@@ -35,10 +35,10 @@ export const VARIANTS: Record<string, Partial<AIProfile>> = {
   'hard-init-2': { harvesters: 6, extraRefinery: 'always', saveForOpening: true, initiative: 2, waveRetreat: 0.5 },
   'hard-noraid': { harvesters: 6, extraRefinery: 'always', saveForOpening: true, initiative: 1.2, waveRetreat: 0.5 },
   'hard-raid12': { harvesters: 6, extraRefinery: 'always', saveForOpening: true, raids: { trikes: 3, start: 150, interval: 60, hunt: true }, initiative: 1.2, waveRetreat: 0.5 },
-  // Keeping the army alive, on top of Hard (before sustain was added to it; HARD_PROFILE now matches hard-sustain).
-  'hard-sustain': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, mendBelow: 0.35, outmatched: 1.3 } },
-  'hard-nosustain': { ...HARD_PROFILE, sustain: { repairPer: 0, maxRepair: 0, mendBelow: 0, outmatched: 0 } },
-  'hard-mend': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, mendBelow: 0.35, outmatched: 0 } },
-  'hard-outmatch': { ...HARD_PROFILE, sustain: { repairPer: 0, maxRepair: 0, mendBelow: 0, outmatched: 1.3 } },
-  'hard-sustain-2': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, mendBelow: 0.35, outmatched: 2 } },
+  // Keeping the army alive, on top of Hard (HARD_PROFILE matches hard-sustain).
+  'hard-sustain': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 } },
+  'hard-nosustain': { ...HARD_PROFILE, sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 } },
+  'hard-repair': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 0 } },
+  'hard-outmatch': { ...HARD_PROFILE, sustain: { repairPer: 0, maxRepair: 0, outmatched: 1.3 } },
+  'hard-sustain-2': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 2 } },
 };

@@ -38,18 +38,18 @@ export interface AIProfile {
   /** A wave falls back once it's down to this share of its starting strength. */
   waveRetreat: number;
   /**
-   * Keeping the army alive (all off at 0): one Repair Vehicle per `repairPer` combat vehicles, up to `maxRepair`,
-   * waiting at the rally point; units below `mendBelow` of their health leave the fight to be repaired (infantry heal
-   * on their own); a wave pulls back when the enemies around it are `outmatched` times its strength.
+   * Keeping the army alive (all off at 0): one Repair Vehicle per `repairPer` combat vehicles, up to `maxRepair`.
+   * They stay home: damaged vehicles come to them after a fight, nobody leaves one. A wave pulls back when the
+   * enemies around it are `outmatched` times its strength.
    */
-  sustain: { repairPer: number; maxRepair: number; mendBelow: number; outmatched: number };
+  sustain: { repairPer: number; maxRepair: number; outmatched: number };
 }
 
 export const NORMAL_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
   raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3,
-  sustain: { repairPer: 0, maxRepair: 0, mendBelow: 0, outmatched: 0 },
+  sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 },
 };
 
 /**
@@ -60,7 +60,7 @@ export const NORMAL_PROFILE: AIProfile = {
 export const HARD_PROFILE: AIProfile = {
   ...NORMAL_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
   initiative: 1.2, waveRetreat: 0.5, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
-  sustain: { repairPer: 6, maxRepair: 3, mendBelow: 0.35, outmatched: 1.3 },
+  sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 },
 };
 
 /** The AI profile for a difficulty. Brutal isn't built yet and plays as Hard. */
@@ -82,8 +82,7 @@ const CLUSTER_RADIUS = 10 * TILE;
 /** An attack that hasn't been seen for this long is over, and its defenders go home. */
 const DEFENSE_TIMEOUT = 4;
 
-/** 'mend': pulled out of a fight to be repaired or to heal. */
-type Role = 'home' | 'defend' | 'wave' | 'raid' | 'mend';
+type Role = 'home' | 'defend' | 'wave' | 'raid';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -349,7 +348,7 @@ export class AI {
     for (const u of army) if (!this.roles.has(u)) this.roles.set(u, 'home');
     this.updateRally();
 
-    this.manageMending(army);
+    this.manageRepairs(army);
     this.manageDefense(army);
     const baseAttacked = this.defenses.some((d) => d.base);
     this.manageWaves(baseAttacked);
@@ -478,43 +477,28 @@ export class AI {
   }
 
   /**
-   * Badly hurt units leave the fight: vehicles drive to the nearest Repair Vehicle, infantry fall back to the rally
-   * point to heal. Once mended they rejoin the units at home. Repair Vehicles wait at the rally point between jobs.
+   * Repair Vehicles wait at the rally point between jobs, and damaged vehicles that are home and idle (back from
+   * defending, or from a wave that fell back) drive over to the nearest one. Nobody is pulled out of a fight.
    */
-  private manageMending(army: Unit[]): void {
-    const s = this.profile.sustain;
-    if (!s.mendBelow) return;
+  private manageRepairs(army: Unit[]): void {
+    if (!this.profile.sustain.repairPer) return;
     const g = this.game;
     const repairers = g.units.filter((u) => u.team === this.team && u.def.repair && !u.carrier);
     const rally = this.rally;
-    if (rally) {
-      for (const r of repairers) {
-        if (r.order.kind === 'idle' && Math.hypot(r.x - rally.x, r.z - rally.z) > 5 * TILE) {
-          r.command(g, { kind: 'move', x: rally.x + (Math.random() - 0.5) * 2 * TILE, z: rally.z + (Math.random() - 0.5) * 2 * TILE });
-        }
+    if (!rally || !repairers.length) return;
+    for (const r of repairers) {
+      if (r.order.kind === 'idle' && Math.hypot(r.x - rally.x, r.z - rally.z) > 5 * TILE) {
+        r.command(g, { kind: 'move', x: rally.x + (Math.random() - 0.5) * 2 * TILE, z: rally.z + (Math.random() - 0.5) * 2 * TILE });
       }
     }
-    const nearestRepairer = (u: Unit) => {
-      let best: Unit | null = null;
-      for (const r of repairers) if (!best || Math.hypot(r.x - u.x, r.z - u.z) < Math.hypot(best.x - u.x, best.z - u.z)) best = r;
-      return best;
-    };
     for (const u of army) {
-      const role = this.roles.get(u);
-      const health = u.hp / u.maxHp;
-      const mender = u.def.infantry ? rally : nearestRepairer(u);
-      if (role === 'mend') {
-        // Mended, or nobody left to mend it: back to the units at home.
-        if (health >= 0.9 || !mender) this.sendHome(u);
-        else if (u.order.kind === 'idle' && Math.hypot(u.x - mender.x, u.z - mender.z) > 3 * TILE) u.command(g, { kind: 'move', x: mender.x, z: mender.z });
-        continue;
-      }
-      if (health >= s.mendBelow || !mender || Math.hypot(u.x - mender.x, u.z - mender.z) < 6 * TILE) continue;
-      this.leaveGroups(u);
-      this.roles.set(u, 'mend');
-      u.command(g, { kind: 'move', x: mender.x, z: mender.z });
+      if (u.def.infantry || u.hp >= u.maxHp * 0.95 || this.roles.get(u) !== 'home' || u.order.kind !== 'idle' || u.target) continue;
+      let near = repairers[0];
+      for (const r of repairers) if (Math.hypot(r.x - u.x, r.z - u.z) < Math.hypot(near.x - u.x, near.z - u.z)) near = r;
+      if (Math.hypot(near.x - u.x, near.z - u.z) > 3 * TILE) u.command(g, { kind: 'move', x: near.x, z: near.z });
     }
   }
+
 
   private manageWaves(baseAttacked: boolean): void {
     const g = this.game;

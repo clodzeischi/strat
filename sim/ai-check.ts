@@ -71,22 +71,18 @@ function spawnAttackers(g: Game, type: Unit['type'], n: number, near: Entity, ti
 }
 
 /**
- * Tracks which AI combat units respond while the attack lasts: ordered to move or attack toward an attacker, or
- * shooting at one.
+ * Tracks which AI combat units the AI sends against the attack while it lasts (its defenders). Units that just shoot
+ * at an attacker passing within sight of where they stand don't count.
  */
-function responders(s: Setup, attackers: Unit[], seconds: number, r = 12 * TILE): { units: Set<Unit>; time: number } {
+function responders(s: Setup, attackers: Unit[], seconds: number): { units: Set<Unit>; time: number } {
+  const roles = (s.ai as unknown as { roles: Map<Unit, string> }).roles;
   const units = new Set<Unit>();
   let next = 0;
   const t0 = s.g.time;
   run(s, seconds, () => {
     if (s.g.time >= next) {
       next = s.g.time + 0.25;
-      const live = attackers.filter((a) => !a.dead);
-      for (const u of army(s.g, AI_TEAM)) {
-        const o = u.order;
-        const goal = o.kind === 'amove' || o.kind === 'move' ? o : o.kind === 'attack' ? o.target : null;
-        if ((goal && live.some((a) => dist(a, goal) < r)) || (u.target && live.includes(u.target as Unit))) units.add(u);
-      }
+      for (const u of army(s.g, AI_TEAM)) if (roles.get(u) === 'defend') units.add(u);
     }
     return attackers.every((a) => a.dead);
   });
@@ -191,21 +187,30 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
   check(s.g.winner === PLAYER_TEAM && s.g.surrendered === AI_TEAM, 'accepting ends the game as a win');
 }
 
-// 7-8. Hard keeps its army alive: badly hurt vehicles go to a Repair Vehicle, and an outmatched wave pulls back.
-if (profileFor(DIFFICULTY).sustain.mendBelow) {
+// 7-8. Hard keeps its army alive: vehicles back from a fight get repaired at home (nobody leaves a fight for it),
+// and an outmatched wave pulls back.
+if (profileFor(DIFFICULTY).sustain.repairPer) {
   {
     const s = setup();
     const a = s.ai as unknown as { roles: Map<Unit, string>; rally: { x: number; z: number } };
     if (!s.g.count(AI_TEAM, 'repair')) s.g.spawnUnit('repair', AI_TEAM, a.rally.x, a.rally.z);
-    const home = conyard(s.g);
-    const far = s.g.map.nearestCell(s.g.map.cellOf(s.g.map.worldSize() / 2), s.g.map.cellOf(s.g.map.worldSize() / 2), (cx, cz) => s.g.map.canEnter(cx, cz, 'vehicle'), 20)!;
-    const tank = s.g.spawnUnit('tank', AI_TEAM, s.g.map.center(far.cx), s.g.map.center(far.cz));
-    tank.hp = tank.maxHp * 0.2;
-    s.ai.update(1.01); // takes it on as a unit at home
-    a.roles.set(tank, 'wave');
-    const start = dist(tank, home);
-    run(s, 90, () => tank.hp >= tank.maxHp * 0.9);
-    check(tank.hp >= tank.maxHp * 0.9, 'a badly hurt tank drives back and gets repaired', `${Math.round(start / TILE)} tiles out, ${Math.round((100 * tank.hp) / tank.maxHp)}% health after ${Math.round(s.g.time - 420)}s`);
+    // A tank back from defending, idle a few tiles from the rally point, and one still out on a wave.
+    const near = s.g.map.nearestCell(s.g.map.cellOf(a.rally.x) + 5, s.g.map.cellOf(a.rally.z) + 5, (cx, cz) => s.g.map.canEnter(cx, cz, 'vehicle'), 10)!;
+    const back = s.g.spawnUnit('tank', AI_TEAM, s.g.map.center(near.cx), s.g.map.center(near.cz));
+    const mid = s.g.map.nearestCell(s.g.map.cellOf(s.g.map.worldSize() / 2), s.g.map.cellOf(s.g.map.worldSize() / 2), (cx, cz) => s.g.map.canEnter(cx, cz, 'vehicle'), 20)!;
+    const out = s.g.spawnUnit('tank', AI_TEAM, s.g.map.center(mid.cx), s.g.map.center(mid.cz));
+    back.hp = back.maxHp * 0.2;
+    out.hp = out.maxHp * 0.2;
+    s.ai.update(1.01); // takes both on as units at home
+    a.roles.set(out, 'wave');
+    const t0 = s.g.time;
+    let left = false;
+    run(s, 60, () => {
+      left ||= a.roles.get(out) !== 'wave';
+      return back.hp >= back.maxHp * 0.9;
+    });
+    check(back.hp >= back.maxHp * 0.9, 'a damaged tank back home gets repaired', `${Math.round((100 * back.hp) / back.maxHp)}% health after ${Math.round(s.g.time - t0)}s`);
+    check(!left && out.order.kind !== 'move', 'a damaged tank on a wave stays in the fight');
   }
   {
     const s = setup();
