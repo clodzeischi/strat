@@ -9,6 +9,7 @@ import { disposeParts, makeParachute, makeUnitModel, makeUpgradeKit } from '../m
 import { Building } from './building';
 import { distTo } from './distance';
 import { Entity } from './entity';
+import { hypot } from '../game/hypot';
 
 /** Steepest a vehicle leans to follow the ground, so cliff-foot slopes don't stand it on end. */
 const MAX_TILT = THREE.MathUtils.degToRad(25);
@@ -66,10 +67,10 @@ export class Unit extends Entity {
   private muzzle: THREE.Object3D;
   /** Seconds until the weapon can fire again (also counted down by a bunker the unit is in). */
   cooldown = 0;
-  private scanTimer = Math.random() * 0.5;
+  private scanTimer = 0;
   /** Turreted units: what the turret shoots at while the hull does something else (driving, chasing). */
   private sideTarget: Entity | null = null;
-  private sideScanTimer = Math.random() * 0.3;
+  private sideScanTimer = 0;
   /** Vehicles: smoothed ground normal the hull leans to. */
   private groundUp = new THREE.Vector3(0, 1, 0);
   private repathTimer = 0;
@@ -78,6 +79,8 @@ export class Unit extends Entity {
   private progressTimer = 0;
   private lastX = 0;
   private lastZ = 0;
+  /** Drawn pose at the previous and the latest tick; frames draw the unit in between (see Game.frame). */
+  private pose = { from: new THREE.Vector3(), to: new THREE.Vector3(), qFrom: new THREE.Quaternion(), qTo: new THREE.Quaternion(), fresh: true };
 
   // Harvester state.
   cargo = 0;
@@ -108,6 +111,41 @@ export class Unit extends Entity {
 
   get name(): string {
     return this.def.name;
+  }
+
+  /** Spreads units' target scans over time, so a batch built together doesn't scan on the same tick. */
+  stagger(random: () => number): void {
+    this.scanTimer = random() * 0.5;
+    this.sideScanTimer = random() * 0.3;
+  }
+
+  /** Start of a simulation step: the scene object goes back to where the last step left it. */
+  beginTick(): void {
+    if (this.pose.fresh) return;
+    this.root.position.copy(this.pose.to);
+    this.body.quaternion.copy(this.pose.qTo);
+    this.pose.from.copy(this.pose.to);
+    this.pose.qFrom.copy(this.pose.qTo);
+  }
+
+  /** End of a simulation step: remember the pose it left the scene object in. */
+  endTick(): void {
+    const p = this.pose;
+    p.to.copy(this.root.position);
+    p.qTo.copy(this.body.quaternion);
+    if (p.fresh) {
+      p.from.copy(p.to);
+      p.qFrom.copy(p.qTo);
+      p.fresh = false;
+    }
+  }
+
+  /** Draws the unit `alpha` of the way from the previous tick's pose to the latest one. */
+  interpolate(alpha: number): void {
+    const p = this.pose;
+    if (p.fresh) return;
+    this.root.position.lerpVectors(p.from, p.to, alpha);
+    this.body.quaternion.slerpQuaternions(p.qFrom, p.qTo, alpha);
   }
 
   get tags(): readonly Tag[] {
@@ -186,7 +224,7 @@ export class Unit extends Entity {
   retreat(game: Game): boolean {
     if (this.order.kind !== 'harvest' || this.hstate === 'unload') return false;
     const ref = game.nearestBuilding(this.team, 'refinery', this.x, this.z);
-    if (!ref || Math.hypot(ref.x - this.x, ref.z - this.z) < 8 * TILE) return false;
+    if (!ref || hypot(ref.x - this.x, ref.z - this.z) < 8 * TILE) return false;
     this.hstate = 'toRefinery';
     this.refinery = ref;
     this.path = [];
@@ -200,7 +238,7 @@ export class Unit extends Entity {
     const chute = makeParachute(TEAM_COLORS[this.team], this.def.infantry ? 1 : 1.9);
     this.root.add(chute);
     this.root.visible = true;
-    this.falling = { x: m.center(cell.cx) + (Math.random() - 0.5) * 0.8, z: m.center(cell.cz) + (Math.random() - 0.5) * 0.8, chute };
+    this.falling = { x: m.center(cell.cx) + (game.random() - 0.5) * 0.8, z: m.center(cell.cz) + (game.random() - 0.5) * 0.8, chute };
     this.x = x;
     this.z = z;
     this.y = y;
@@ -213,7 +251,7 @@ export class Unit extends Entity {
     const f = this.falling!;
     const dx = f.x - this.x;
     const dz = f.z - this.z;
-    const d = Math.hypot(dx, dz);
+    const d = hypot(dx, dz);
     const step = Math.min(d, 1.6 * dt);
     if (d > 1e-3) {
       this.x += (dx / d) * step;
@@ -278,7 +316,7 @@ export class Unit extends Entity {
         if (this.order.kind === 'idle') this.path = [];
       }
       if (!this.target && this.scanTimer <= 0) {
-        this.scanTimer = 0.4 + Math.random() * 0.2;
+        this.scanTimer = 0.4 + game.random() * 0.2;
         this.target = game.nearestEnemy(this.team, this.x, this.z, this.def.sight, this);
       }
     } else {
@@ -317,7 +355,7 @@ export class Unit extends Entity {
         }
         case 'idle':
           if (this.def.repair && this.scanTimer <= 0) {
-            this.scanTimer = 0.8 + Math.random() * 0.4;
+            this.scanTimer = 0.8 + game.random() * 0.4;
             const job = game.damagedFriend(this, this.def.sight);
             if (job) this.command(game, { kind: 'repair', target: job });
           }
@@ -349,7 +387,7 @@ export class Unit extends Entity {
     else if (!inReach(this.sideTarget)) {
       this.sideTarget = null;
       if (this.sideScanTimer <= 0) {
-        this.sideScanTimer = 0.3 + Math.random() * 0.1;
+        this.sideScanTimer = 0.3 + game.random() * 0.1;
         // A little past nominal range, since shooting down from high ground reaches further.
         const found = game.nearestEnemy(this.team, this.x, this.z, this.def.weapon!.range * 1.1, this);
         if (inReach(found)) this.sideTarget = found;
@@ -362,7 +400,7 @@ export class Unit extends Entity {
     if (Math.abs(wrapAngle(angle - this.turretHeading)) < 0.12 && this.cooldown <= 0) {
       const w = game.weaponFor(this, target)!;
       game.fire(this, target, w);
-      this.cooldown = game.cooldownFor(this, w) * (0.9 + Math.random() * 0.2);
+      this.cooldown = game.cooldownFor(this, w) * (0.9 + game.random() * 0.2);
     }
     return true;
   }
@@ -396,14 +434,14 @@ export class Unit extends Entity {
       }
       if (aligned && this.cooldown <= 0) {
         game.fire(this, target, w);
-        this.cooldown = game.cooldownFor(this, w) * (0.9 + Math.random() * 0.2);
+        this.cooldown = game.cooldownFor(this, w) * (0.9 + game.random() * 0.2);
       }
       return true;
     }
     this.chasing = true;
     this.repathTimer -= dt;
     if (this.repathTimer <= 0 || this.path.length === 0) {
-      this.repathTimer = 1 + Math.random() * 0.3;
+      this.repathTimer = 1 + game.random() * 0.3;
       this.setPath(game, target.x, target.z);
     }
     this.followPath(game, dt);
@@ -453,7 +491,7 @@ export class Unit extends Entity {
     const wp = this.path[0];
     const dx = wp.x - this.x;
     const dz = wp.z - this.z;
-    const d = Math.hypot(dx, dz);
+    const d = hypot(dx, dz);
     const last = this.path.length === 1;
     if (d < (last ? 0.3 : 0.9)) {
       this.path.shift();
@@ -489,10 +527,10 @@ export class Unit extends Entity {
     }
     this.progressTimer += dt;
     if (this.progressTimer < 1.2) return;
-    const moved = Math.hypot(this.x - this.lastX, this.z - this.lastZ);
+    const moved = hypot(this.x - this.lastX, this.z - this.lastZ);
     if (moved < this.speed(game) * 0.25) {
       const goal = this.path[this.path.length - 1];
-      if (Math.hypot(goal.x - this.x, goal.z - this.z) < TILE * 2.5) this.path = [];
+      if (hypot(goal.x - this.x, goal.z - this.z) < TILE * 2.5) this.path = [];
       else this.setPath(game, goal.x, goal.z);
     }
     this.progressTimer = 0;
@@ -556,7 +594,7 @@ export class Unit extends Entity {
           this.hstate = 'seek';
           break;
         }
-        if (Math.hypot(map.center(c.cx) - this.x, map.center(c.cz) - this.z) > TILE * 1.2) {
+        if (hypot(map.center(c.cx) - this.x, map.center(c.cz) - this.z) > TILE * 1.2) {
           this.hstate = 'toSpice';
           this.setPath(game, map.center(c.cx), map.center(c.cz));
           break;
@@ -585,7 +623,7 @@ export class Unit extends Entity {
         }
         if (this.followPath(game, dt)) {
           const dock = game.dockCell(this.refinery);
-          if (Math.hypot(map.center(dock.cx) - this.x, map.center(dock.cz) - this.z) < TILE * 1.3) this.hstate = 'unload';
+          if (hypot(map.center(dock.cx) - this.x, map.center(dock.cz) - this.z) < TILE * 1.3) this.hstate = 'unload';
           else this.setDockPath(game);
         }
         break;
@@ -655,7 +693,7 @@ export class Unit extends Entity {
         m.surfaceAt(this.x, this.z - r) - m.surfaceAt(this.x, this.z + r),
       ).normalize();
       if (n.y < Math.cos(MAX_TILT)) {
-        const flat = Math.hypot(n.x, n.z);
+        const flat = hypot(n.x, n.z);
         const s = Math.sin(MAX_TILT) / flat;
         n.set(n.x * s, Math.cos(MAX_TILT), n.z * s);
       }

@@ -11,6 +11,8 @@ import { GameMap, ROCK, SPICE, type Cell } from '../map';
 import { mat } from '../materials/lambert';
 import { cellsAround, type Point } from './pathfinding';
 import { Terrain } from '../render/terrain';
+import { Hasher, mulberry32 } from './rng';
+import { hypot } from './hypot';
 
 /** Running totals for the end-of-game screen. */
 export interface TeamStats {
@@ -58,6 +60,9 @@ interface Projectile {
   /** Attacker's damage multiplier at the moment of firing (Weapons upgrade). */
   mult: number;
   trailTimer: number;
+  /** Mesh positions at the last two ticks, for drawing in between. */
+  from: THREE.Vector3;
+  to: THREE.Vector3;
 }
 
 const shellGeo = new THREE.IcosahedronGeometry(0.12, 0);
@@ -76,14 +81,19 @@ export class Game {
   teams: TeamState[];
   time = 0;
   winner: Team | null = null;
-  private tick = 0;
   /** The team that surrendered, when the game ended that way. */
   surrendered: Team | null = null;
   /** Called when a computer opponent offers to surrender; answer with `acceptSurrender` or ignore it to play on. */
   onSurrenderOffer: (team: Team) => void = () => {};
   difficulty: Difficulty = 'normal';
-  /** Called with player-facing notifications. */
+  /** Called with notifications for the local player. */
   onMessage: (text: string) => void = () => {};
+  /** The team this screen plays (presentation only: whose messages and alerts show). */
+  localTeam: Team = PLAYER;
+  /** Simulation steps run so far. */
+  ticks = 0;
+  /** The simulation's own random numbers (see rng.ts): same seed, same game. */
+  readonly random: () => number;
   private nextId = 1;
   private projectiles: Projectile[] = [];
   private lastAlert = -100;
@@ -92,6 +102,7 @@ export class Game {
 
   constructor(readonly scene: THREE.Scene, private camera: THREE.Camera, size: MapSize = 64, seed = 7) {
     this.map = new GameMap(size, seed);
+    this.random = mulberry32(seed * 2654435761 + 12345);
     this.terrain = new Terrain(this.map);
     scene.add(this.terrain.mesh);
     this.effects = new Effects(scene);
@@ -114,7 +125,7 @@ export class Game {
       const front = yard.frontCell();
       // Starting units gather a few tiles from the yard, toward the middle of the map, facing it.
       const mid = (this.map.size - 1) / 2;
-      const len = Math.hypot(mid - b.cx, mid - b.cz) || 1;
+      const len = hypot(mid - b.cx, mid - b.cz) || 1;
       const ux = (mid - b.cx) / len;
       const uz = (mid - b.cz) / len;
       const towardCenter = { cx: front.cx + Math.round(ux * 3), cz: front.cz + Math.round(uz * 3) };
@@ -217,7 +228,7 @@ export class Game {
     let bestD = Infinity;
     for (const b of this.buildings) {
       if (b.team !== team || b.type !== type || b.dead) continue;
-      const d = Math.hypot(b.x - x, b.z - z);
+      const d = hypot(b.x - x, b.z - z);
       if (d < bestD) {
         bestD = d;
         best = b;
@@ -317,6 +328,7 @@ export class Game {
   spawnUnit(type: UnitType, team: Team, x: number, z: number, heading = 0): Unit {
     const u = type === 'carryall' ? new Carryall(this.nextId++, team, x, z, heading) : new Unit(this.nextId++, team, type, x, z, heading);
     u.y = this.map.surfaceAt(x, z);
+    u.stagger(this.random);
     u.syncVisual(this, 0);
     this.scene.add(u.root);
     this.units.push(u);
@@ -371,7 +383,7 @@ export class Game {
     } else {
       const out = site.doorStep();
       const spots = cellsAround(this.map, front.cx + out.dx * 2, front.cz + out.dz * 2, 10);
-      const s = spots[Math.floor(Math.random() * spots.length)];
+      const s = spots[Math.floor(this.random() * spots.length)];
       if (s) u.command(this, { kind: 'move', x: this.map.center(s.cx), z: this.map.center(s.cz) });
     }
   }
@@ -433,15 +445,16 @@ export class Game {
   onDrop(carrier: Unit, u: Unit): void {
     for (const ts of this.teams) {
       if (ts.team === carrier.team || this.time - this.lastDropAlert < 12) continue;
-      if (this.buildings.some((b) => b.team === ts.team && !b.dead && Math.hypot(b.x - u.x, b.z - u.z) < 22 * TILE)) {
-        if (ts.team === PLAYER) this.lastDropAlert = this.time;
-        this.notify(ts.team, 'Enemy airdrop detected!');
+      if (this.buildings.some((b) => b.team === ts.team && !b.dead && hypot(b.x - u.x, b.z - u.z) < 22 * TILE)) {
+        if (ts.team === this.localTeam) this.lastDropAlert = this.time;
+        this.notifyTeam(ts.team, 'Enemy airdrop detected!');
       }
     }
   }
 
-  private notify(team: Team, text: string): void {
-    if (team === PLAYER) this.onMessage(text);
+  /** Shows a message, if the team is the one playing on this screen. */
+  notifyTeam(team: Team, text: string): void {
+    if (team === this.localTeam) this.onMessage(text);
   }
 
   startBuilding(team: Team, type: BuildingType): boolean {
@@ -449,7 +462,7 @@ export class Game {
     if (ts.building || !this.canBuild(team, type)) return false;
     const cost = BUILDINGS[type].cost;
     if (ts.credits < cost) {
-      this.notify(team, 'Insufficient funds.');
+      this.notifyTeam(team, 'Insufficient funds.');
       return false;
     }
     this.spend(ts, cost);
@@ -479,12 +492,12 @@ export class Game {
     const queue = ts.queues[UNITS[type].producer];
     if (!this.canTrain(team, type)) return false;
     if (queue.length >= QUEUE_MAX) {
-      this.notify(team, 'Production queue full.');
+      this.notifyTeam(team, 'Production queue full.');
       return false;
     }
     const cost = UNITS[type].cost;
     if (ts.credits < cost) {
-      this.notify(team, 'Insufficient funds.');
+      this.notifyTeam(team, 'Insufficient funds.');
       return false;
     }
     this.spend(ts, cost);
@@ -508,7 +521,7 @@ export class Game {
     if (ts.research || !this.canResearch(team, type)) return false;
     const cost = UPGRADES[type].cost;
     if (ts.credits < cost) {
-      this.notify(team, 'Insufficient funds.');
+      this.notifyTeam(team, 'Insufficient funds.');
       return false;
     }
     this.spend(ts, cost);
@@ -522,7 +535,7 @@ export class Game {
     if (!building || !this.canLevelUp(team, type)) return false;
     const cost = BUILDINGS[type].levelUp!.cost;
     if (ts.credits < cost) {
-      this.notify(team, 'Insufficient funds.');
+      this.notifyTeam(team, 'Insufficient funds.');
       return false;
     }
     this.spend(ts, cost);
@@ -551,7 +564,7 @@ export class Game {
       if (b.progress >= 1) {
         b.progress = 1;
         b.ready = true;
-        this.notify(ts.team, 'Construction complete. Click the card to place it.');
+        this.notifyTeam(ts.team, 'Construction complete. Click the card to place it.');
       }
     }
     for (const p of PRODUCERS) {
@@ -564,7 +577,7 @@ export class Game {
         if (q.progress >= 1) {
           queue.splice(i--, 1);
           this.spawnFromProducer(ts.team, q.type);
-          this.notify(ts.team, `${UNITS[q.type].name} ready.`);
+          this.notifyTeam(ts.team, `${UNITS[q.type].name} ready.`);
         }
       }
     }
@@ -580,7 +593,7 @@ export class Game {
       if (l.progress >= 1) {
         l.building.setLevel(2);
         delete ts.levelUps[type];
-        this.notify(ts.team, `${up.name} complete.`);
+        this.notifyTeam(ts.team, `${up.name} complete.`);
       }
     }
     const r = ts.research;
@@ -589,7 +602,7 @@ export class Game {
       if (r.progress >= 1) {
         ts.upgrades.add(r.type);
         ts.research = null;
-        this.notify(ts.team, `Upgrade complete: ${UPGRADES[r.type].name}.`);
+        this.notifyTeam(ts.team, `Upgrade complete: ${UPGRADES[r.type].name}.`);
       }
     }
   }
@@ -621,7 +634,7 @@ export class Game {
     this.scene.add(mesh);
     this.projectiles.push({
       kind: w.projectile, mesh, start: from, end: to, target, owner: u, t: 0,
-      duration: Math.max(0.1, from.distanceTo(to) / w.speed), weapon: w, mult, trailTimer: 0,
+      duration: Math.max(0.1, from.distanceTo(to) / w.speed), weapon: w, mult, trailTimer: 0, from: from.clone(), to: from.clone(),
     });
   }
 
@@ -633,7 +646,7 @@ export class Game {
       const arc = p.kind === 'rocket' ? 0.35 * p.start.distanceTo(p.end) : 0.4;
       const pos = new THREE.Vector3().lerpVectors(p.start, p.end, p.t);
       pos.y += arc * 4 * p.t * (1 - p.t);
-      const dir = pos.clone().sub(p.mesh.position);
+      const dir = pos.clone().sub(p.to);
       p.mesh.position.copy(pos);
       if (dir.lengthSq() > 1e-6) p.mesh.lookAt(pos.clone().add(dir));
       if (p.kind === 'rocket') {
@@ -677,7 +690,7 @@ export class Game {
       if (target.type === 'harvester') this.ferryFor(target)?.rescue(this, target);
     }
     const important = target instanceof Building || (target as Unit).type === 'harvester';
-    if (target.team === PLAYER && important && this.time - this.lastAlert > 15) {
+    if (target.team === this.localTeam && important && this.time - this.lastAlert > 15) {
       this.lastAlert = this.time;
       this.onMessage(target instanceof Building ? 'Our base is under attack!' : 'Harvester under attack!');
     }
@@ -710,14 +723,14 @@ export class Game {
         const p = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, e.y + 1 + Math.random(), e.z + (Math.random() - 0.5) * 4);
         this.effects.explosion(p, 1.5 + Math.random() * 1.5);
       }
-      this.notify(e.team, `${e.name} destroyed.`);
+      this.notifyTeam(e.team, `${e.name} destroyed.`);
     } else {
       this.effects.explosion(e.aimPoint(), (e as Unit).def.infantry ? 0.5 : 1.3);
     }
     if (e instanceof Carryall) {
       // Shot down: troopers bail out by parachute; vehicles go down with it.
       for (const p of e.releaseAll()) {
-        if (p.def.infantry) p.startFall(this, e.x + (Math.random() - 0.5) * 2, e.y - 0.5, e.z + (Math.random() - 0.5) * 2);
+        if (p.def.infantry) p.startFall(this, e.x + (this.random() - 0.5) * 2, e.y - 0.5, e.z + (this.random() - 0.5) * 2);
         else {
           p.hp = 0;
           this.kill(p, attacker);
@@ -778,7 +791,7 @@ export class Game {
       const gap = (t: Entity) => {
         if (t instanceof Building) {
           const reach = ((b.size + t.size) * TILE) / 2;
-          return Math.hypot(Math.max(0, Math.abs(t.x - b.x) - reach), Math.max(0, Math.abs(t.z - b.z) - reach));
+          return hypot(Math.max(0, Math.abs(t.x - b.x) - reach), Math.max(0, Math.abs(t.z - b.z) - reach));
         }
         return Math.max(0, distTo(b, t.x, t.z) - t.radius);
       };
@@ -792,7 +805,7 @@ export class Game {
         const w = this.weaponFor(u, t);
         if (!w || gap(t) > this.rangeFor(u, w, t)) continue;
         this.fire(u, t, w);
-        u.cooldown = this.cooldownFor(u, w) * (0.9 + Math.random() * 0.2);
+        u.cooldown = this.cooldownFor(u, w) * (0.9 + this.random() * 0.2);
       }
     }
   }
@@ -809,12 +822,18 @@ export class Game {
 
   // ---- Simulation -----------------------------------------------------------
 
+  /**
+   * One simulation step. Lockstep multiplayer runs this at a fixed rate (TICK) on every machine with the same
+   * commands, so it must depend on nothing but the game state: no frame time, camera or Math.random.
+   */
   update(dt: number): void {
+    this.ticks++;
+    // Frames draw units between ticks; put them back where the simulation left them (muzzles aim from there).
+    for (const u of this.units) u.beginTick();
     this.time += dt;
     for (const ts of this.teams) this.updateProduction(ts, dt);
     // Alternate the order units act in, so neither side always gets the first shot in a tick.
-    this.tick++;
-    const order = this.tick % 2 ? this.units : [...this.units].reverse();
+    const order = this.ticks % 2 ? this.units : [...this.units].reverse();
     for (const u of order) {
       if (u.dead || u.carrier) continue;
       if (u.falling) u.updateFall(this, dt);
@@ -827,13 +846,13 @@ export class Game {
     this.separate();
     for (const u of this.units) if (!u.carrier) u.syncVisual(this, dt);
     this.updateProjectiles(dt);
-    for (const b of this.buildings) if (b.spinner) b.spinner.rotation.y += dt * (b.type === 'factory' ? 1.5 : 0.25);
-    this.effects.update(dt);
-    this.terrain.flush();
     this.units = this.units.filter((u) => !u.dead);
     this.buildings = this.buildings.filter((b) => !b.dead);
-    for (const u of this.units) if (!u.carrier || !u.def.infantry) u.updateBar(this.camera);
-    for (const b of this.buildings) b.updateBar(this.camera);
+    for (const u of this.units) u.endTick();
+    for (const p of this.projectiles) {
+      p.from.copy(p.to);
+      p.to.copy(p.mesh.position);
+    }
 
     this.victoryTimer -= dt;
     if (this.winner === null && this.victoryTimer <= 0) {
@@ -842,6 +861,30 @@ export class Game {
       if (!alive(0)) this.winner = 1;
       else if (!alive(1)) this.winner = 0;
     }
+  }
+
+  /**
+   * Per drawn frame, outside the simulation: moves units and shots `alpha` (0-1) of the way from their last tick's
+   * pose to this tick's, and runs effects, health bars and other purely visual things.
+   */
+  frame(dt: number, alpha: number): void {
+    for (const u of this.units) u.interpolate(alpha);
+    for (const p of this.projectiles) p.mesh.position.lerpVectors(p.from, p.to, alpha);
+    for (const b of this.buildings) if (b.spinner) b.spinner.rotation.y += dt * (b.type === 'factory' ? 1.5 : 0.25);
+    this.effects.update(dt);
+    this.terrain.flush();
+    for (const u of this.units) if (!u.carrier || !u.def.infantry) u.updateBar(this.camera);
+    for (const b of this.buildings) b.updateBar(this.camera);
+  }
+
+  /** Checksum of the game state; lockstep players compare these to catch a desync early. */
+  hash(): number {
+    const h = new Hasher().int(this.ticks).int(this.nextId);
+    for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
+    for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.heading);
+    for (const b of this.buildings) h.int(b.id).num(b.hp);
+    for (const p of this.projectiles) h.num(p.t);
+    return h.value;
   }
 
   /** Pushes overlapping units apart, never into blocked cells. */
@@ -858,8 +901,8 @@ export class Game {
         let d2 = dx * dx + dz * dz;
         if (d2 >= minD * minD) continue;
         if (d2 < 1e-6) {
-          dx = Math.random() - 0.5;
-          dz = Math.random() - 0.5;
+          dx = this.random() - 0.5;
+          dz = this.random() - 0.5;
           d2 = dx * dx + dz * dz;
         }
         const d = Math.sqrt(d2);

@@ -5,6 +5,7 @@ import type { Point } from '../game/pathfinding';
 import { SAND, SPICE } from '../map';
 import { CARRYALL_HOOK_Y, NACELLES, SEAT_OFF, SEAT_ON, SEATS } from '../models';
 import { Unit, type Order } from './unit';
+import { hypot } from '../game/hypot';
 
 /** How far below the hook a hanging vehicle's wheels are. */
 const HANG_DEPTH = 1.35;
@@ -124,7 +125,7 @@ export class Carryall extends Unit {
       this.task = { kind: 'drop', x: m.center(c.cx), z: m.center(c.cz), back, heavy, exit: null, phase: 'in' };
     } else {
       // Keep flying past the drop point along the approach line before turning home.
-      const d = Math.hypot(x - this.x, z - this.z) || 1;
+      const d = hypot(x - this.x, z - this.z) || 1;
       const exit = this.inside(game, x + ((x - this.x) / d) * 14, z + ((z - this.z) / d) * 14);
       this.task = { kind: 'drop', x, z, back, heavy, exit, phase: 'in' };
     }
@@ -138,7 +139,7 @@ export class Carryall extends Unit {
     if (t.kind !== 'ferry' || t.harvester !== h || this.load.length) return false;
     if (t.rescue) return true;
     const goal = h.travelGoal(game);
-    return !!goal && Math.hypot(goal.x - h.x, goal.z - h.z) > CARRYALL.ferryMin * TILE;
+    return !!goal && hypot(goal.x - h.x, goal.z - h.z) > CARRYALL.ferryMin * TILE;
   }
 
   /** The ferried harvester is under fire: it heads for home, and waits there for this Carryall to fly it out. */
@@ -213,7 +214,7 @@ export class Carryall extends Unit {
       return;
     }
     const a = Math.atan2(this.z - z, this.x - x);
-    const far = Math.hypot(this.x - x, this.z - z) > CARRYALL.orbit * 2;
+    const far = hypot(this.x - x, this.z - z) > CARRYALL.orbit * 2;
     const p = this.inside(game, far ? x : x + Math.cos(a + 0.7) * CARRYALL.orbit, far ? z : z + Math.sin(a + 0.7) * CARRYALL.orbit);
     this.fly(game, p.x, p.z, dt, { cruise: this.def.speed * (far ? 1 : 0.45) });
   }
@@ -231,14 +232,14 @@ export class Carryall extends Unit {
     }
     const vehicles = t.units.filter((u) => !u.def.infantry);
     if (vehicles.length) {
-      const next = vehicles.reduce((a, b) => (Math.hypot(a.x - this.x, a.z - this.z) <= Math.hypot(b.x - this.x, b.z - this.z) ? a : b));
+      const next = vehicles.reduce((a, b) => (hypot(a.x - this.x, a.z - this.z) <= hypot(b.x - this.x, b.z - this.z) ? a : b));
       // Wait above them while they're still driving over to gather.
       if (vehicles.some((u) => u.order.kind === 'move')) {
         this.orbit(game, next.x, next.z, dt);
         return;
       }
       if (!this.touchAndGo(game, next.x, next.z, dt)) return;
-      for (const u of vehicles) if (Math.hypot(u.x - this.x, u.z - this.z) < 2.4 && this.fits(u)) this.take(game, u);
+      for (const u of vehicles) if (hypot(u.x - this.x, u.z - this.z) < 2.4 && this.fits(u)) this.take(game, u);
       const left = t.units.filter((u) => !u.carrier && this.fits(u));
       this.climbOut(game, left.length ? { kind: 'pickup', units: left } : { kind: 'orbit', x: this.x, z: this.z });
       return;
@@ -246,11 +247,11 @@ export class Carryall extends Unit {
     const cx = t.units.reduce((s, u) => s + u.x, 0) / t.units.length;
     const cz = t.units.reduce((s, u) => s + u.z, 0) / t.units.length;
     const ground = game.map.surfaceAt(cx, cz);
-    const near = Math.hypot(cx - this.x, cz - this.z) < 2;
+    const near = hypot(cx - this.x, cz - this.z) < 2;
     this.fly(game, cx, cz, dt, { stop: true, alt: near ? ground + LOW : undefined });
     if (this.y > ground + LOW + 0.6) return;
     for (const u of t.units) {
-      if (Math.hypot(u.x - this.x, u.z - this.z) < 3.2 && this.fits(u)) this.take(game, u);
+      if (hypot(u.x - this.x, u.z - this.z) < 3.2 && this.fits(u)) this.take(game, u);
     }
   }
 
@@ -279,7 +280,7 @@ export class Carryall extends Unit {
       return;
     }
     // Fly-by: straight over the point at full speed, troopers jumping one after another around it.
-    const toPoint = Math.hypot(t.x - this.x, t.z - this.z);
+    const toPoint = hypot(t.x - this.x, t.z - this.z);
     if (t.phase === 'in') {
       this.fly(game, t.x, t.z, dt, {});
       if (toPoint < 1.5 || (toPoint < 5 && toPoint > this.lastDropD)) t.phase = 'out';
@@ -303,7 +304,7 @@ export class Carryall extends Unit {
       }
       game.onDrop(this, u);
     }
-    if (t.phase === 'out' && this.load.length === 0 && Math.hypot(t.exit!.x - this.x, t.exit!.z - this.z) < 3) {
+    if (t.phase === 'out' && this.load.length === 0 && hypot(t.exit!.x - this.x, t.exit!.z - this.z) < 3) {
       this.task = { kind: 'move', x: t.back.x, z: t.back.z };
     }
   }
@@ -334,9 +335,9 @@ export class Carryall extends Unit {
     if (goal && this.wantsToLift(game, h)) {
       // Swoop down on the harvester as it drives.
       const ground = game.map.surfaceAt(h.x, h.z);
-      const near = Math.hypot(h.x - this.x, h.z - this.z) < 2.5;
+      const near = hypot(h.x - this.x, h.z - this.z) < 2.5;
       this.fly(game, h.x, h.z, dt, { stop: true, alt: near ? ground + LOW : undefined, chase: h.speed(game) });
-      if (near && this.y < ground + LOW + 0.6 && Math.hypot(h.x - this.x, h.z - this.z) < 1.6) {
+      if (near && this.y < ground + LOW + 0.6 && hypot(h.x - this.x, h.z - this.z) < 1.6) {
         this.take(game, h);
         t.goal = goal;
       }
@@ -351,7 +352,7 @@ export class Carryall extends Unit {
    * slow over enemy infantry doesn't last.
    */
   private touchAndGo(game: Game, x: number, z: number, dt: number): boolean {
-    const d = Math.hypot(x - this.x, z - this.z);
+    const d = hypot(x - this.x, z - this.z);
     const ground = game.map.surfaceAt(x, z) + LOW;
     const alt = ground + (CARRYALL.altitude - ground) * smoothstep((d - 1.5) / 11);
     const cruise = this.def.speed * THREE.MathUtils.lerp(0.5, 1, smoothstep((d - 2) / 14));
@@ -412,7 +413,7 @@ export class Carryall extends Unit {
   private fly(game: Game, tx: number, tz: number, dt: number, o: { cruise?: number; stop?: boolean; alt?: number; chase?: number; climb?: number }): number {
     const dx = tx - this.x;
     const dz = tz - this.z;
-    const d = Math.hypot(dx, dz);
+    const d = hypot(dx, dz);
     const cruise = o.cruise ?? this.def.speed;
     const want = o.stop ? Math.min(cruise, Math.max(o.chase ?? 0, d * 1.1)) : cruise;
     const accel = THREE.MathUtils.clamp(want - this.speedNow, -10 * dt, 6 * dt);

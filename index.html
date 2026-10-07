@@ -15,6 +15,7 @@
         <div id="selbox"></div>
         <div id="messages"></div>
         <div id="info"></div>
+        <div id="netwait" hidden></div>
       </div>
       <aside id="sidebar">
         <div class="credits">
@@ -47,7 +48,7 @@
 
         <div class="menu-page" data-page="main">
           <button class="mbtn" data-action="play">Play</button>
-          <button class="mbtn" disabled title="Coming soon">Multiplayer <span class="soon">soon</span></button>
+          <button class="mbtn" data-action="multiplayer">Multiplayer</button>
           <button class="mbtn" data-action="controls">Controls</button>
         </div>
 
@@ -65,6 +66,28 @@
           <button class="mbtn back" data-action="back">Back</button>
         </div>
 
+        <div class="menu-page" data-page="multiplayer" hidden>
+          <div class="page-head">Your name</div>
+          <input id="mp-name" class="mp-name" maxlength="16" spellcheck="false" />
+          <div class="page-head">Host a game</div>
+          <div class="size-pick">
+            <button class="sbtn" data-size="64">Small <span>64</span></button>
+            <button class="sbtn" data-size="96">Medium <span>96</span></button>
+            <button class="sbtn" data-size="128">Large <span>128</span></button>
+          </div>
+          <button class="mbtn" data-action="host">Host game</button>
+          <div class="page-head">Open games</div>
+          <div id="mp-rooms" class="mp-rooms"><p class="note">Connecting…</p></div>
+          <p id="mp-status" class="note mp-status"></p>
+          <button class="mbtn back" data-action="back">Back</button>
+        </div>
+
+        <div class="menu-page" data-page="hosting" hidden>
+          <div class="page-head">Waiting for an opponent</div>
+          <p class="note">Your game <b id="mp-code"></b> is listed under Open games for anyone on this server. It starts as soon as someone joins.</p>
+          <button class="mbtn back" data-action="cancel-host">Cancel</button>
+        </div>
+
         <div class="menu-page" data-page="controls" hidden>
           <div class="page-head">Controls</div>
           <dl class="controls">
@@ -76,7 +99,7 @@
             <dt>D</dt><dd>Carryall drop</dd>
             <dt>F</dt><dd>Unload a selected bunker</dd>
             <dt>Space</dt><dd>Jump to base</dd>
-            <dt>` (left of 1)</dt><dd>Pause</dd>
+            <dt>` (left of 1)</dt><dd>Pause (not online)</dd>
             <dt>Ctrl + 1-9</dt><dd>Set control group</dd>
             <dt>1-9 (twice)</dt><dd>Select group (and jump to it)</dd>
             <dt>Right click a Barracks / Factory</dt><dd>Set rally point</dd>
@@ -93,8 +116,10 @@
     <div id="pause" class="screen dim" hidden>
       <div class="panel">
         <h2>Paused</h2>
+        <p class="note online-note" hidden>Online games don't pause: the battle goes on behind this menu.</p>
         <button class="mbtn" data-action="resume">Resume</button>
         <button class="mbtn" data-action="restart">Restart</button>
+        <button class="mbtn" data-action="surrender" hidden>Surrender</button>
         <button class="mbtn" data-action="quit">Quit</button>
         <label class="fps-toggle"><input type="checkbox" class="fps-check" /> Show FPS</label>
       </div>

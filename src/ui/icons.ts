@@ -1,4 +1,4 @@
-import { PLAYER, TEAM_CSS, type BuildingType, type UnitType, type UpgradeType } from '../config';
+import { TEAM_CSS, type Team, type BuildingType, type UnitType, type UpgradeType } from '../config';
 
 // Sidebar card icons: small inline SVGs, team-colored through currentColor.
 
@@ -41,6 +41,6 @@ export const ALL_ICONS = { ...ICONS, conyard2: ICONS.conyard + CHEVRON, factory2
 export type IconKey = keyof typeof ALL_ICONS;
 
 /** A card icon as an SVG element string, in the player's team color. */
-export function icon(key: IconKey): string {
-  return `<svg viewBox="0 0 40 40" style="color:${TEAM_CSS[PLAYER]}">${ALL_ICONS[key]}</svg>`;
+export function icon(key: IconKey, team: Team): string {
+  return `<svg viewBox="0 0 40 40" style="color:${TEAM_CSS[team]}">${ALL_ICONS[key]}</svg>`;
 }

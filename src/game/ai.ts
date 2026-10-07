@@ -3,6 +3,7 @@ import { Building, type Entity, type Unit } from '../entities';
 import type { Difficulty, Game } from './game';
 import { MATCHUP_TYPES, MATCHUPS, type Matchup } from './matchups';
 import { SPICE, type Cell } from '../map';
+import { hypot } from './hypot';
 
 const RESEARCH_ORDER: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
 
@@ -138,7 +139,7 @@ export class AI {
   private nextUnit: UnitType | null = null;
   protected nextRaidTime: number;
   /** Tech path for this game: economy and anti-armor first, or heavy army first. */
-  private readonly techOrder: LevelUpType[] = Math.random() < 0.5 ? ['conyard', 'factory'] : ['factory', 'conyard'];
+  private readonly techOrder: LevelUpType[];
 
   /** Game time of the last harvester or refinery loss / damage, for the 'threat' refinery rule. */
   private lastEconHit = -Infinity;
@@ -168,6 +169,7 @@ export class AI {
 
   constructor(protected game: Game, protected team: Team, protected profile: AIProfile = NORMAL_PROFILE) {
     this.nextRaidTime = profile.raids.start;
+    this.techOrder = game.random() < 0.5 ? ['conyard', 'factory'] : ['factory', 'conyard'];
   }
 
   /** The first opening structure we don't have yet (a type listed twice needs two of it). */
@@ -403,7 +405,7 @@ export class AI {
     let p = 0;
     for (const u of g.units) {
       if (u.team === this.team || u.carrier) continue;
-      const home = g.buildings.some((b) => b.team === u.team && Math.hypot(b.x - u.x, b.z - u.z) < 20 * TILE);
+      const home = g.buildings.some((b) => b.team === u.team && hypot(b.x - u.x, b.z - u.z) < 20 * TILE);
       p += power(u) * (home ? 1.5 : 1);
     }
     return p;
@@ -465,7 +467,7 @@ export class AI {
   private pickCounter(): UnitType {
     const options = this.counterWeights();
     if (options.length === 0) return 'infantry';
-    let r = Math.random() * options.reduce((sum, [, w]) => sum + w, 0);
+    let r = this.game.random() * options.reduce((sum, [, w]) => sum + w, 0);
     for (const [type, w] of options) {
       r -= w;
       if (r <= 0) return type;
@@ -514,7 +516,7 @@ export class AI {
       for (const u of army) {
         const role = this.roles.get(u);
         if ((role !== 'home' && role !== 'defend') || u.order.kind === 'move') continue;
-        if (Math.hypot(u.x - this.rally.x, u.z - this.rally.z) <= LEASH) continue;
+        if (hypot(u.x - this.rally.x, u.z - this.rally.z) <= LEASH) continue;
         this.leaveGroups(u);
         this.roles.set(u, 'home');
         u.command(g, { kind: 'move', x: this.rally.x, z: this.rally.z });
@@ -525,7 +527,7 @@ export class AI {
     if (this.rally) {
       for (const u of army) {
         if (this.roles.get(u) !== 'home' || u.order.kind !== 'idle' || u.target) continue;
-        if (Math.hypot(u.x - this.rally.x, u.z - this.rally.z) > 8 * TILE) this.sendHome(u);
+        if (hypot(u.x - this.rally.x, u.z - this.rally.z) > 8 * TILE) this.sendHome(u);
       }
     }
   }
@@ -546,7 +548,7 @@ export class AI {
     // A few tiles out from the base toward the middle of the map, where attacks will come from.
     const map = this.game.map;
     const mid = map.worldSize() / 2;
-    const len = Math.hypot(mid - anchor.x, mid - anchor.z) || 1;
+    const len = hypot(mid - anchor.x, mid - anchor.z) || 1;
     const out = 7 * TILE;
     const x = anchor.x + ((mid - anchor.x) / len) * out;
     const z = anchor.z + ((mid - anchor.z) / len) * out;
@@ -561,8 +563,8 @@ export class AI {
       return;
     }
     // Spread out a little so the group doesn't pile onto one cell.
-    const a = Math.random() * Math.PI * 2;
-    const r = Math.random() * 3 * TILE;
+    const a = this.game.random() * Math.PI * 2;
+    const r = this.game.random() * 3 * TILE;
     u.command(this.game, { kind: 'amove', x: this.rally.x + Math.cos(a) * r, z: this.rally.z + Math.sin(a) * r });
   }
 
@@ -571,13 +573,13 @@ export class AI {
     const g = this.game;
     const buildings = g.buildings.filter((b) => b.team === this.team);
     const harvesters = g.units.filter((u) => u.team === this.team && u.type === 'harvester' && !u.carrier);
-    const near = (e: Entity, list: Entity[], r: number) => list.some((o) => Math.hypot(o.x - e.x, o.z - e.z) < r);
+    const near = (e: Entity, list: Entity[], r: number) => list.some((o) => hypot(o.x - e.x, o.z - e.z) < r);
     const groups: { units: Unit[]; x: number; z: number; base: boolean }[] = [];
     for (const e of g.units) {
       if (e.team === this.team || e.dead || e.carrier || !e.def.weapon) continue;
       const base = near(e, buildings, BASE_RADIUS);
       if (!base && !near(e, harvesters, HARVESTER_RADIUS)) continue;
-      let group = groups.find((c) => Math.hypot(c.x - e.x, c.z - e.z) < CLUSTER_RADIUS);
+      let group = groups.find((c) => hypot(c.x - e.x, c.z - e.z) < CLUSTER_RADIUS);
       if (!group) groups.push((group = { units: [], x: e.x, z: e.z, base: false }));
       group.units.push(e);
       group.base ||= base;
@@ -597,7 +599,7 @@ export class AI {
     const threats = this.findThreats();
     const seen = new Set<Defense>();
     for (const t of threats) {
-      let d = this.defenses.find((d) => !seen.has(d) && Math.hypot(d.x - t.x, d.z - t.z) < 16 * TILE);
+      let d = this.defenses.find((d) => !seen.has(d) && hypot(d.x - t.x, d.z - t.z) < 16 * TILE);
       if (!d) this.defenses.push((d = { ...t, lastSeen: g.time, units: new Set() }));
       Object.assign(d, t, { lastSeen: g.time });
       seen.add(d);
@@ -616,7 +618,7 @@ export class AI {
       let have = [...d.units].reduce((s, u) => s + power(u), 0);
       const need = d.power * this.profile.defenseMargin;
       if (have < need) {
-        const dist = (u: Unit) => Math.hypot(u.x - d.x, u.z - d.z);
+        const dist = (u: Unit) => hypot(u.x - d.x, u.z - d.z);
         const pool = army.filter((u) => this.roles.get(u) === 'home').sort((a, b) => dist(a) - dist(b));
         if (d.base) {
           const away = army.filter((u) => this.roles.get(u) === 'wave' || this.roles.get(u) === 'raid').sort((a, b) => dist(a) - dist(b));
@@ -634,7 +636,7 @@ export class AI {
       if (d.base && have < d.power) this.outgunned = true;
       // Defenders that got where they were sent and found nothing follow the attackers as they move.
       for (const u of d.units) {
-        if (u.order.kind === 'idle' && !u.target && Math.hypot(u.x - d.x, u.z - d.z) > 4 * TILE) u.command(g, { kind: 'amove', x: d.x, z: d.z });
+        if (u.order.kind === 'idle' && !u.target && hypot(u.x - d.x, u.z - d.z) > 4 * TILE) u.command(g, { kind: 'amove', x: d.x, z: d.z });
       }
     }
   }
@@ -649,7 +651,7 @@ export class AI {
       if (room <= 0) continue;
       const idle = army
         .filter((u) => u.def.infantry && this.roles.get(u) === 'home' && !u.target)
-        .sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z));
+        .sort((p, q) => hypot(p.x - b.x, p.z - b.z) - hypot(q.x - b.x, q.z - b.z));
       for (const u of idle) {
         if (room-- <= 0) break;
         this.roles.set(u, 'garrison');
@@ -675,15 +677,15 @@ export class AI {
     const rally = this.rally;
     if (!rally || !repairers.length) return;
     for (const r of repairers) {
-      if (r.order.kind === 'idle' && Math.hypot(r.x - rally.x, r.z - rally.z) > 5 * TILE) {
-        r.command(g, { kind: 'move', x: rally.x + (Math.random() - 0.5) * 2 * TILE, z: rally.z + (Math.random() - 0.5) * 2 * TILE });
+      if (r.order.kind === 'idle' && hypot(r.x - rally.x, r.z - rally.z) > 5 * TILE) {
+        r.command(g, { kind: 'move', x: rally.x + (this.game.random() - 0.5) * 2 * TILE, z: rally.z + (this.game.random() - 0.5) * 2 * TILE });
       }
     }
     for (const u of army) {
       if (u.def.infantry || u.hp >= u.maxHp * 0.95 || this.roles.get(u) !== 'home' || u.order.kind !== 'idle' || u.target) continue;
       let near = repairers[0];
-      for (const r of repairers) if (Math.hypot(r.x - u.x, r.z - u.z) < Math.hypot(near.x - u.x, near.z - u.z)) near = r;
-      if (Math.hypot(near.x - u.x, near.z - u.z) > 3 * TILE) u.command(g, { kind: 'move', x: near.x, z: near.z });
+      for (const r of repairers) if (hypot(r.x - u.x, r.z - u.z) < hypot(near.x - u.x, near.z - u.z)) near = r;
+      if (hypot(near.x - u.x, near.z - u.z) > 3 * TILE) u.command(g, { kind: 'move', x: near.x, z: near.z });
     }
   }
 
@@ -797,7 +799,7 @@ export class AI {
   private guardAround(p: { x: number; z: number }, tiles: number): number {
     let guard = 0;
     for (const e of this.game.units) {
-      if (e.team !== this.team && e.def.weapon && !e.carrier && Math.hypot(e.x - p.x, e.z - p.z) < tiles * TILE) guard += power(e);
+      if (e.team !== this.team && e.def.weapon && !e.carrier && hypot(e.x - p.x, e.z - p.z) < tiles * TILE) guard += power(e);
     }
     return guard;
   }
@@ -814,7 +816,7 @@ export class AI {
       if (h.team === this.team || h.type !== 'harvester' || h.dead || h.carrier) continue;
       const guard = this.guardAround(h, 12);
       if (guard > strength * 0.5) continue;
-      const score = guard + Math.hypot(h.x - from.x, h.z - from.z) * 5;
+      const score = guard + hypot(h.x - from.x, h.z - from.z) * 5;
       if (score < bestScore) {
         bestScore = score;
         best = h;
@@ -831,7 +833,7 @@ export class AI {
     for (const e of [...g.buildings, ...g.units]) {
       if (e.team === this.team || (!(e instanceof Building) && (e as Unit).carrier)) continue;
       const econ = economy && ((e as Building | Unit).type === 'refinery' || (e as Building | Unit).type === 'harvester');
-      const d = Math.hypot(e.x - from.x, e.z - from.z) + (e instanceof Building ? 0 : 20) - (econ ? 40 : 0);
+      const d = hypot(e.x - from.x, e.z - from.z) + (e instanceof Building ? 0 : 20) - (econ ? 40 : 0);
       if (d < bestD) {
         bestD = d;
         best = { x: e.x, z: e.z };
@@ -903,7 +905,7 @@ export class AI {
     const ax = anchor.cx + anchor.size / 2;
     const az = anchor.cz + anchor.size / 2;
     const mid = g.map.size / 2;
-    const len = Math.hypot(mid - ax, mid - az) || 1;
+    const len = hypot(mid - ax, mid - az) || 1;
     const tx = (mid - ax) / len;
     const tz = (mid - az) / len;
     let best: Cell | null = null;
@@ -914,7 +916,7 @@ export class AI {
         const x = cx + size / 2;
         const z = cz + size / 2;
         // Rounded so mirrored spots tie exactly despite floating point, then broken in the base's frame.
-        const d = Math.round(Math.hypot(x - goal.x, z - goal.z) * 1000);
+        const d = Math.round(hypot(x - goal.x, z - goal.z) * 1000);
         const along = Math.round(((x - ax) * tx + (z - az) * tz) * 1000);
         const across = Math.round(((x - ax) * -tz + (z - az) * tx) * 1000);
         const key = [d, -along, across];

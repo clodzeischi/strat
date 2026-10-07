@@ -7,13 +7,16 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc"
+    "serve": "tsx server/server.ts",
+    "typecheck": "tsc && tsc -p server"
   },
   "dependencies": {
-    "three": "^0.186.1"
+    "three": "^0.186.1",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
     "@types/three": "^0.186.0",
+    "@types/ws": "^8.18.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.2"

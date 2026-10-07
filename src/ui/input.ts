@@ -1,10 +1,9 @@
 import * as THREE from 'three';
 import type { RTSCamera } from '../render/camera';
-import { BUILDINGS, PLAYER, PRODUCERS, TILE, type BuildingType, type Producer } from '../config';
+import { BUILDINGS, PRODUCERS, TILE, type BuildingType, type Producer, type Team } from '../config';
 import { Building, Carryall, repairable, Unit, type Entity } from '../entities';
+import type { Command } from '../game/commands';
 import type { Game } from '../game/game';
-import { SPICE } from '../map';
-import { cellsAround } from '../game/pathfinding';
 import { PlacementGrid } from './placement';
 
 const EDGE = 12; // px from the screen edge that triggers scrolling
@@ -22,6 +21,10 @@ export class Input {
   actions = 0;
   /** Called when Esc has nothing else to cancel (opens the in-game menu). */
   onMenu: () => void = () => {};
+  /** Sends a command for this player to the game (through the lockstep, which applies it on the next tick it can). */
+  issue: (cmd: Command) => void = () => {};
+  /** Whether ` pauses: only against the computer. */
+  pausable = true;
 
   private keys = new Set<string>();
   private mouse = { x: 0, y: 0, inside: false };
@@ -71,6 +74,11 @@ export class Input {
       this.keys.clear();
       this.grab = null;
     });
+  }
+
+  /** The team this screen plays. */
+  get team(): Team {
+    return this.game.localTeam;
   }
 
   beginPlacement(type: BuildingType): void {
@@ -136,7 +144,7 @@ export class Input {
   }
 
   private ownUnits(): Unit[] {
-    return this.selection.filter((e): e is Unit => e instanceof Unit && e.team === PLAYER && !e.dead);
+    return this.selection.filter((e): e is Unit => e instanceof Unit && e.team === this.team && !e.dead);
   }
 
   private ownCarryalls(): Carryall[] {
@@ -217,8 +225,10 @@ export class Input {
       const g = this.groundPoint(p.x, p.y);
       if (!g) return;
       const c = this.placementCell(g, this.placing);
-      if (this.game.finishPlacement(PLAYER, c.cx, c.cz)) this.placing = null;
-      else this.game.onMessage('Cannot build there. Structures go on rock, near your base.');
+      if (this.game.canPlace(this.placing, this.team, c.cx, c.cz)) {
+        this.issue({ c: 'place', cx: c.cx, cz: c.cz });
+        this.placing = null;
+      } else this.game.onMessage('Cannot build there. Structures go on rock, near your base.');
       return;
     }
     if (this.attackMode) {
@@ -241,7 +251,7 @@ export class Input {
     const y0 = Math.min(a.y, b.y);
     const y1 = Math.max(a.y, b.y);
     const hits = this.game.units.filter((u) => {
-      if (u.team !== PLAYER || u.carrier) return false;
+      if (u.team !== this.team || u.carrier) return false;
       const s = this.toScreen(u.x, u.y + 0.5, u.z);
       return s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1;
     });
@@ -253,9 +263,9 @@ export class Input {
   private clickSelect(x: number, y: number, add: boolean): void {
     const e = this.pick(x, y);
     const now = performance.now();
-    if (e && e instanceof Unit && e.team === PLAYER && this.lastClick.id === e.id && now - this.lastClick.time < 350) {
+    if (e && e instanceof Unit && e.team === this.team && this.lastClick.id === e.id && now - this.lastClick.time < 350) {
       // Double click: every own unit of this type on screen.
-      const same = this.game.units.filter((u) => u.team === PLAYER && u.type === e.type && this.toScreen(u.x, u.y, u.z).visible);
+      const same = this.game.units.filter((u) => u.team === this.team && u.type === e.type && this.toScreen(u.x, u.y, u.z).visible);
       this.setSelection(same);
       this.lastClick.id = -1;
       return;
@@ -265,7 +275,7 @@ export class Input {
       if (!add) this.setSelection([]);
       return;
     }
-    if (add && e instanceof Unit && e.team === PLAYER) {
+    if (add && e instanceof Unit && e.team === this.team) {
       const own = this.ownUnits();
       this.setSelection(own.includes(e) ? own.filter((u) => u !== e) : [...own, e]);
     } else {
@@ -273,17 +283,18 @@ export class Input {
     }
   }
 
-  /** Right click (or A + left click when `attackMove`). */
+  /** Right click (or A + left click when `attackMove`): sends a `go` command, and marks the spot right away. */
   private commandAt(x: number, y: number, attackMove = false): void {
     const g = this.game;
-    let units = this.ownUnits();
+    const team = this.team;
+    const units = this.ownUnits();
     const point = this.groundPoint(x, y);
     if (!point) return;
 
     if (units.length === 0) {
       const b = this.selection[0];
-      if (b instanceof Building && b.team === PLAYER && PRODUCERS.includes(b.type as Producer)) {
-        g.teams[PLAYER].rally[b.type as Producer] = { x: point.x, z: point.z };
+      if (b instanceof Building && b.team === team && PRODUCERS.includes(b.type as Producer)) {
+        this.issue({ c: 'rally', building: b.id, x: point.x, z: point.z });
         g.effects.marker(point, 0x7cff7c);
         g.onMessage('Rally point set.');
       }
@@ -291,114 +302,23 @@ export class Input {
     }
 
     const target = this.pick(x, y);
-    const carryalls = units.filter((u): u is Carryall => u instanceof Carryall);
-    if (carryalls.length) {
-      this.commandCarryalls(carryalls, target, point);
-      units = units.filter((u) => !(u instanceof Carryall));
-      if (units.length === 0) return;
-    }
-    if (target instanceof Carryall && target.team === PLAYER) {
-      // Ground units right-clicking their own Carryall: it comes to pick them up.
-      const taken = target.orderPickup(g, units);
-      if (taken.length) {
-        g.effects.marker(new THREE.Vector3(target.x, g.map.surfaceAt(target.x, target.z), target.z), 0x7cff7c);
-        units = units.filter((u) => !taken.includes(u));
-        if (units.length === 0) return;
-      }
-    }
-    if (target instanceof Building && target.team === PLAYER && target.def.garrison) {
-      // Infantry right-clicking their own bunker: the nearest ones go in, as many as there's room for.
-      const inf = units.filter((u) => u.def.infantry).sort((a, b) => Math.hypot(a.x - target.x, a.z - target.z) - Math.hypot(b.x - target.x, b.z - target.z));
-      const going = inf.slice(0, Math.max(0, target.room));
-      for (const u of going) u.command(g, { kind: 'enter', target });
-      if (going.length) {
-        g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0x7cff7c);
-        units = units.filter((u) => !going.includes(u));
-        if (units.length === 0) return;
-      }
-    }
-    if (target && target.team === PLAYER && target.hp < target.maxHp && repairable(target)) {
-      const mechs = units.filter((u) => u.def.repair && u !== target);
-      for (const u of mechs) u.command(g, { kind: 'repair', target });
-      if (mechs.length) {
-        g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xffd27a);
-        units = units.filter((u) => !mechs.includes(u));
-        if (units.length === 0) return;
-      }
-    }
-    if (target && target.team !== PLAYER) {
-      g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xff5040);
-      const rest: Unit[] = [];
-      for (const u of units) {
-        if (g.weaponFor(u, target)) u.command(g, { kind: 'attack', target });
-        else rest.push(u);
-      }
-      this.formationMove(rest, target.x, target.z, false);
-      return;
-    }
-    if (target instanceof Building && target.type === 'refinery') {
-      const rest: Unit[] = [];
-      for (const u of units) {
-        if (u.type === 'harvester') u.commandReturn(g, target);
-        else rest.push(u);
-      }
-      this.formationMove(rest, point.x, point.z, false);
-      g.effects.marker(point, 0x7cff7c);
-      return;
-    }
-
-    const m = g.map;
-    const cell = { cx: m.cellOf(point.x), cz: m.cellOf(point.z) };
-    const onSpice = m.inBounds(cell.cx, cell.cz) && m.tile(cell.cx, cell.cz) === SPICE;
-    const rest: Unit[] = [];
-    for (const u of units) {
-      if (onSpice && u.type === 'harvester') u.commandHarvest(g, cell);
-      else rest.push(u);
-    }
-    this.formationMove(rest, point.x, point.z, attackMove);
-    g.effects.marker(point, attackMove ? 0xff9040 : 0x7cff7c);
-  }
-
-  /**
-   * Right-click with Carryalls selected: on one of our liftable units, pick it up along with nearby units of the
-   * same kind (a harvester becomes the Carryall's ferry assignment); anywhere else, fly there and circle.
-   */
-  private commandCarryalls(carryalls: Carryall[], target: Entity | null, point: THREE.Vector3): void {
-    const g = this.game;
-    if (target instanceof Unit && target.team === PLAYER && target.def.lift !== undefined && !target.carrier) {
-      const near = g.units
-        .filter((u) => u.team === PLAYER && u.type === target.type && u !== target && !u.carrier && !u.falling && Math.hypot(u.x - target.x, u.z - target.z) < 4 * TILE)
-        .sort((a, b) => Math.hypot(a.x - target.x, a.z - target.z) - Math.hypot(b.x - target.x, b.z - target.z));
-      let pool = target.type === 'harvester' ? [target] : [target, ...near];
-      for (const c of carryalls) {
-        if (pool.length === 0) break;
-        const taken = c.orderPickup(g, pool);
-        pool = pool.filter((u) => !taken.includes(u));
-      }
-      g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0x7cff7c);
-      return;
-    }
-    // Spread several Carryalls around the point so they don't stack.
-    carryalls.forEach((c, i) => {
-      const a = (i / carryalls.length) * Math.PI * 2;
-      const r = carryalls.length > 1 ? 3 : 0;
-      c.command(g, { kind: 'move', x: point.x + Math.cos(a) * r, z: point.z + Math.sin(a) * r });
-    });
-    g.effects.marker(point, 0x7cff7c);
+    this.issue({ c: 'go', units: units.map((u) => u.id), x: point.x, z: point.z, target: target?.id ?? null, attack: attackMove });
+    if (target && target.team !== team) g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xff5040);
+    else if (target && target.hp < target.maxHp && repairable(target) && units.some((u) => u.def.repair)) {
+      g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xffd27a);
+    } else if (target && (target instanceof Carryall || target instanceof Building || units.some((u) => u instanceof Carryall))) {
+      g.effects.marker(new THREE.Vector3(target.x, g.map.surfaceAt(target.x, target.z), target.z), 0x7cff7c);
+    } else g.effects.marker(point, attackMove ? 0xff9040 : 0x7cff7c);
   }
 
   /** Left click in drop mode: every selected loaded Carryall drops at the spot. */
   private dropAt(x: number, y: number): void {
-    const g = this.game;
     const point = this.groundPoint(x, y);
     if (!point) return;
     const loaded = this.ownCarryalls().filter((c) => c.load.length);
-    loaded.forEach((c, i) => {
-      const a = (i / loaded.length) * Math.PI * 2;
-      const r = loaded.length > 1 ? 2.5 : 0;
-      c.orderDrop(g, point.x + Math.cos(a) * r, point.z + Math.sin(a) * r);
-    });
-    if (loaded.length) g.effects.marker(point, 0xffb040);
+    if (!loaded.length) return;
+    this.issue({ c: 'drop', units: loaded.map((c) => c.id), x: point.x, z: point.z });
+    this.game.effects.marker(point, 0xffb040);
   }
 
   private carryallInfo(c: Carryall): string {
@@ -406,25 +326,7 @@ export class Input {
     if (c.load.length === 0) return '   Empty. Right-click a unit to pick it up';
     const counts = new Map<string, number>();
     for (const u of c.load) counts.set(u.name, (counts.get(u.name) ?? 0) + 1);
-    return `   Cargo: ${[...counts].map(([n, k]) => `${k}× ${n}`).join(', ')}   E: drop`;
-  }
-
-  /** Each unit gets its own nearby cell so groups don't pile onto one point. */
-  private formationMove(units: Unit[], x: number, z: number, attackMove: boolean): void {
-    if (!units.length) return;
-    const g = this.game;
-    const kind = attackMove ? 'amove' : 'move';
-    if (units.length === 1) {
-      units[0].command(g, { kind, x, z });
-      return;
-    }
-    const cells = cellsAround(g.map, g.map.cellOf(x), g.map.cellOf(z), units.length);
-    const sorted = [...units].sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z));
-    sorted.forEach((u, i) => {
-      const c = cells[i];
-      if (c) u.command(g, { kind, x: g.map.center(c.cx), z: g.map.center(c.cz) });
-      else u.command(g, { kind, x, z });
-    });
+    return `   Cargo: ${[...counts].map(([n, k]) => `${k}× ${n}`).join(', ')}   D: drop`;
   }
 
   // ---- Keyboard ---------------------------------------------------------------
@@ -466,11 +368,13 @@ export class Input {
         }
         break;
       case 's':
-        for (const u of this.ownUnits()) u.command(g, { kind: 'idle' });
+        if (this.ownUnits().length) this.issue({ c: 'stop', units: this.ownUnits().map((u) => u.id) });
         break;
-      case 'f':
-        for (const b of this.selection) if (b instanceof Building && b.team === PLAYER) g.unloadBunker(b);
+      case 'f': {
+        const bunkers = this.selection.filter((b): b is Building => b instanceof Building && b.team === this.team && b.occupants.length > 0);
+        if (bunkers.length) this.issue({ c: 'unload', buildings: bunkers.map((b) => b.id) });
         break;
+      }
       case 'a':
         if (this.ownUnits().some((u) => u.def.weapon)) {
           this.attackMode = true;
@@ -479,12 +383,12 @@ export class Input {
         break;
       case ' ': {
         e.preventDefault();
-        const home = g.buildings.find((b) => b.team === PLAYER && b.type === 'conyard') ?? g.buildings.find((b) => b.team === PLAYER);
+        const home = g.buildings.find((b) => b.team === this.team && b.type === 'conyard') ?? g.buildings.find((b) => b.team === this.team);
         if (home) this.cam.lookAt(home.x, home.z);
         break;
       }
       case '`':
-        this.paused = !this.paused;
+        if (this.pausable) this.paused = !this.paused;
         break;
     }
   }
@@ -510,7 +414,7 @@ export class Input {
     const gone = (e: Entity) => e.dead || (e instanceof Unit && !!e.carrier);
     if (this.selection.some(gone)) this.setSelection(this.selection.filter((e) => !gone(e)));
     if (this.dropMode && !this.ownCarryalls().some((c) => c.load.length)) this.dropMode = false;
-    if (this.placing && !this.game.teams[PLAYER].building?.ready) this.placing = null;
+    if (this.placing && !this.game.teams[this.team].building?.ready) this.placing = null;
 
     this.updateGhost();
     this.updateCursor();
@@ -522,18 +426,18 @@ export class Input {
     const p = type && this.mouse.inside ? this.groundPoint(this.mouse.x, this.mouse.y) : null;
     if (!type || !p) {
       this.ghost.visible = false;
-      this.grid.update(null, PLAYER, 0, 0);
+      this.grid.update(null, this.team, 0, 0);
       return;
     }
     const size = BUILDINGS[type].size;
     const c = this.placementCell(p, type);
-    this.grid.update(type, PLAYER, c.cx, c.cz);
+    this.grid.update(type, this.team, c.cx, c.cz);
     this.ghost.visible = true;
     this.ghost.scale.set(size * TILE, 1.2, size * TILE);
     const x = (c.cx + size / 2) * TILE;
     const z = (c.cz + size / 2) * TILE;
     this.ghost.position.set(x, this.game.map.surfaceAt(x, z) + 0.6, z);
-    this.ghostMat.color.setHex(this.game.canPlace(type, PLAYER, c.cx, c.cz) ? 0x40ff60 : 0xff4030);
+    this.ghostMat.color.setHex(this.game.canPlace(type, this.team, c.cx, c.cz) ? 0x40ff60 : 0xff4030);
   }
 
   private updateCursor(): void {
@@ -543,7 +447,7 @@ export class Input {
     else if (this.attackMode || this.dropMode) cursor = 'crosshair';
     else if (this.mouse.inside && this.ownUnits().length) {
       const t = this.pick(this.mouse.x, this.mouse.y);
-      if (t && t.team !== PLAYER) cursor = 'crosshair';
+      if (t && t.team !== this.team) cursor = 'crosshair';
       else cursor = 'pointer';
     }
     this.canvas.style.cursor = cursor;
@@ -559,10 +463,10 @@ export class Input {
       const e = sel[0];
       text = `${e.name}  ${Math.ceil(e.hp)} / ${e.maxHp}`;
       if (e instanceof Unit && e.type === 'harvester') text += `   Spice: ${Math.floor(e.cargo)}`;
-      if (e instanceof Building && PRODUCERS.includes(e.type as Producer) && e.team === PLAYER) text += '   Right-click to set a rally point';
-      if (e instanceof Carryall && e.team === PLAYER) text += this.carryallInfo(e);
-      if (e instanceof Unit && e.def.repair && e.team === PLAYER) text += '   Right-click a damaged vehicle or building to repair it';
-      if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === PLAYER && e.occupants.length ? '   F to unload' : ''}`;
+      if (e instanceof Building && PRODUCERS.includes(e.type as Producer) && e.team === this.team) text += '   Right-click to set a rally point';
+      if (e instanceof Carryall && e.team === this.team) text += this.carryallInfo(e);
+      if (e instanceof Unit && e.def.repair && e.team === this.team) text += '   Right-click a damaged vehicle or building to repair it';
+      if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === this.team && e.occupants.length ? '   F to unload' : ''}`;
     } else if (sel.length > 1) {
       const counts = new Map<string, number>();
       for (const e of sel) counts.set(e.name, (counts.get(e.name) ?? 0) + 1);

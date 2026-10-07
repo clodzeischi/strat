@@ -10,6 +10,7 @@ Living plan for upcoming features and the AI difficulty work. Decisions are mark
 4. Expansion mechanic (MCV, home fields that run out)
 5. Hard AI (economy, recovery, harassment, chokepoint awareness), tuned across many generated maps
 6. Brutal AI, once units and numbers have settled
+7. Online multiplayer, so balance can be tested by people instead of only sims. **Status: 1v1 lockstep done** (self-hosted server, LAN or Raspberry Pi); see [MULTIPLAYER.md](MULTIPLAYER.md) for the design, the rules game code must now follow, and next steps (reconnect, replays, VPS).
 
 Brutal waits because timing builds and micro depend on exact numbers (speeds, ranges, build times), so every balance change would break them. Hard's general systems (rebuilding, value-based spending) read costs and stats from `src/config/`, so they survive changes.
 

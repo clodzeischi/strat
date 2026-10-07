@@ -1,6 +1,7 @@
 import { SPICE_MAX, TILE } from '../config';
 import { blur, fbm, hash, percentile, valueNoise } from './noise';
 import { CLIFF, HIGH_Y, LARGE, NARROW, NORMAL, RAMP_WIDTH, ROCK, SAND, SPICE, SURFACE_RES, type Cell, type MoveClass } from './tiles';
+import { hypot } from '../game/hypot';
 
 // Generator tuning.
 
@@ -431,7 +432,7 @@ export class GameMap {
   nearestCell(cx: number, cz: number, ok: (cx: number, cz: number) => boolean, maxR = 12, fx = cx, fz = cz): Cell | null {
     if (ok(cx, cz)) return { cx, cz };
     const mid = (this.size - 1) / 2;
-    const len = Math.hypot(mid - fx, mid - fz) || 1;
+    const len = hypot(mid - fx, mid - fz) || 1;
     const tx = (mid - fx) / len;
     const tz = (mid - fz) / len;
     for (let r = 1; r <= maxR; r++) {
@@ -481,7 +482,7 @@ export class GameMap {
         const i = this.idx(cx, cz);
         h[i] = (fbm(cx / 7, cz / 7, seed) + fbm(mx / 7, mz / 7, seed)) / 2;
         s[i] = (fbm(cx / 5 + 50, cz / 5 + 50, seed + 9) + fbm(mx / 5 + 50, mz / 5 + 50, seed + 9)) / 2;
-        baseDist[i] = Math.min(...this.bases.map((b) => Math.hypot(cx - b.cx, cz - b.cz)));
+        baseDist[i] = Math.min(...this.bases.map((b) => hypot(cx - b.cx, cz - b.cz)));
       }
     }
 
@@ -522,7 +523,7 @@ export class GameMap {
       // Off to one side of the line toward the middle (as the original corner bases had it).
       // Offsets round the same way on both sides, so the two fields stay exact mirrors.
       const mid = (N - 1) / 2;
-      const len = Math.hypot(mid - b.cx, mid - b.cz) || 1;
+      const len = hypot(mid - b.cx, mid - b.cz) || 1;
       const ux = (mid - b.cx) / len;
       const uz = (mid - b.cz) / len;
       const round = (v: number) => Math.sign(v) * Math.round(Math.abs(v));
@@ -536,7 +537,7 @@ export class GameMap {
           const i = this.idx(x, z);
           if (baseDist[i] < 9) continue;
           this.tiles[i] = SPICE;
-          this.spice[i] = SPICE_MAX * (1 - Math.hypot(dx, dz) / 6);
+          this.spice[i] = SPICE_MAX * (1 - hypot(dx, dz) / 6);
         }
       }
     }
@@ -596,7 +597,7 @@ export class GameMap {
       const cz = Math.floor(hash(k, 12, seed) * N);
       const r = 2.8 + hash(k, 13, seed) * 1.8;
       // Far enough from its own mirror image that the pair stays two mesas.
-      if (Math.hypot(cx - (N - 1 - cx), cz - (N - 1 - cz)) < 2 * (r + 4)) continue;
+      if (hypot(cx - (N - 1 - cx), cz - (N - 1 - cz)) < 2 * (r + 4)) continue;
       const cells: number[] = [];
       let ok = true;
       for (let dz = -8; dz <= 8 && ok; dz++) {
@@ -604,7 +605,7 @@ export class GameMap {
           const x = cx + dx;
           const z = cz + dz;
           const edge = r + (fbm(x / 2.5 + 200, z / 2.5 + 200, seed + 61) - 0.5) * 3; // lumpy outline
-          const d = Math.hypot(dx, dz);
+          const d = hypot(dx, dz);
           if (d > edge + 2) continue;
           // The mesa and a 2-tile margin around it: open low sand, inside the map, away from the bases.
           if (x < 3 || z < 3 || x >= N - 3 || z >= N - 3) ok = false;

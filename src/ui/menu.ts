@@ -1,4 +1,5 @@
-import { MAP_SIZE_NAMES, MAP_SIZES, PLAYER, ENEMY, UNITS, type MapSize, type Team } from '../config';
+import { MAP_SIZE_NAMES, MAP_SIZES, UNITS, type MapSize, type Team } from '../config';
+import type { RoomInfo } from '../net/protocol';
 import type { Difficulty, Game, TeamStats } from '../game/game';
 import { heroTitle } from '../game/heroes';
 
@@ -10,10 +11,18 @@ export interface MenuHandlers {
   onFps: (show: boolean) => void;
   /** The player's answer to the enemy's surrender offer. */
   onSurrenderAnswer: (accept: boolean) => void;
+  /** Multiplayer page opened (connect and list games) or closed. */
+  onLobby: (open: boolean) => void;
+  onHost: (name: string, size: MapSize) => void;
+  onJoin: (code: string, name: string) => void;
+  onCancelHost: () => void;
+  /** Online: give up the match. */
+  onSurrender: () => void;
 }
 
 const FPS_KEY = 'strat.showFps';
 const SIZE_KEY = 'strat.mapSize';
+const NAME_KEY = 'strat.name';
 
 /** The map size picked last time, so the menu remembers it. */
 export function loadMapSize(): MapSize {
@@ -30,6 +39,22 @@ function saveMapSize(v: MapSize): void {
     localStorage.setItem(SIZE_KEY, String(v));
   } catch {
     // Storage unavailable: the choice just won't persist.
+  }
+}
+
+function loadName(): string {
+  try {
+    return localStorage.getItem(NAME_KEY) || 'Player';
+  } catch {
+    return 'Player';
+  }
+}
+
+function saveName(v: string): void {
+  try {
+    localStorage.setItem(NAME_KEY, v);
+  } catch {
+    // Storage unavailable: the name just won't persist.
   }
 }
 
@@ -63,11 +88,16 @@ export class Menus {
   readonly pause = document.getElementById('pause')!;
   readonly end = document.getElementById('end')!;
   readonly surrender = document.getElementById('surrender')!;
+  private nameInput = document.getElementById('mp-name') as HTMLInputElement;
+  private rooms = document.getElementById('mp-rooms')!;
+  private status = document.getElementById('mp-status')!;
   showFps = loadFps();
   mapSize = loadMapSize();
 
   constructor(private h: MenuHandlers) {
     this.showMapSize();
+    this.nameInput.value = loadName();
+    this.nameInput.addEventListener('change', () => saveName(this.playerName));
     for (const box of document.querySelectorAll<HTMLInputElement>('.fps-check')) {
       box.checked = this.showFps;
       box.addEventListener('change', () => this.setFps(box.checked));
@@ -81,9 +111,18 @@ export class Menus {
         saveMapSize(this.mapSize);
         this.showMapSize();
       } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize);
+      else if (btn.dataset.join) this.h.onJoin(btn.dataset.join, this.playerName);
       else if (btn.dataset.action === 'play') this.page('difficulty');
+      else if (btn.dataset.action === 'multiplayer') {
+        this.page('multiplayer');
+        this.h.onLobby(true);
+      } else if (btn.dataset.action === 'host') this.h.onHost(this.playerName, this.mapSize);
+      else if (btn.dataset.action === 'cancel-host') this.h.onCancelHost();
       else if (btn.dataset.action === 'controls') this.page('controls');
-      else if (btn.dataset.action === 'back') this.page('main');
+      else if (btn.dataset.action === 'back') {
+        if (this.currentPage === 'multiplayer') this.h.onLobby(false);
+        this.page('main');
+      }
     });
     this.surrender.addEventListener('click', (e) => {
       const action = (e.target as HTMLElement).closest('button')?.dataset.action;
@@ -93,6 +132,7 @@ export class Menus {
       screen.addEventListener('click', (e) => {
         const action = (e.target as HTMLElement).closest('button')?.dataset.action;
         if (action === 'resume') this.h.onResume();
+        else if (action === 'surrender') this.h.onSurrender();
         else if (action === 'restart') this.h.onRestart();
         else if (action === 'quit') this.h.onQuit();
       });
@@ -112,7 +152,14 @@ export class Menus {
     }
   }
 
-  private page(name: string): void {
+  private currentPage = 'main';
+
+  get playerName(): string {
+    return this.nameInput.value.trim().slice(0, 16) || 'Player';
+  }
+
+  page(name: string): void {
+    this.currentPage = name;
     for (const p of this.title.querySelectorAll<HTMLElement>('.menu-page')) p.hidden = p.dataset.page !== name;
   }
 
@@ -125,21 +172,49 @@ export class Menus {
     this.title.hidden = true;
   }
 
-  setPaused(open: boolean): void {
+  /** Opens or closes the in-game menu; online, it says the game goes on and offers Surrender instead of Restart. */
+  setPaused(open: boolean, online = false): void {
     this.pause.hidden = !open;
+    this.pause.querySelector('h2')!.textContent = online ? 'Menu' : 'Paused';
+    this.pause.querySelector<HTMLElement>('.online-note')!.hidden = !online;
+    this.pause.querySelector<HTMLElement>('[data-action="restart"]')!.hidden = online;
+    this.pause.querySelector<HTMLElement>('[data-action="surrender"]')!.hidden = !online;
+  }
+
+  /** Multiplayer page: the open games on the server. */
+  showRooms(rooms: RoomInfo[]): void {
+    this.rooms.innerHTML = rooms.length
+      ? rooms.map((r) => `<button class="mbtn diff" data-join="${r.code}">${escapeHtml(r.host)} <span>${MAP_SIZE_NAMES[r.size]} map · ${r.code}</span></button>`).join('')
+      : '<p class="note">No open games yet. Host one, or wait for someone to.</p>';
+  }
+
+  /** A line under the multiplayer page (connection trouble, errors). */
+  setLobbyStatus(text: string): void {
+    this.status.textContent = text;
+  }
+
+  /** Hosting: waiting for someone to join. */
+  showHosting(code: string): void {
+    document.getElementById('mp-code')!.textContent = code;
+    this.page('hosting');
   }
 
   setSurrenderOffer(open: boolean): void {
     this.surrender.hidden = !open;
   }
 
-  showEnd(game: Game, apm: number): void {
+  /** `opponent`: the other player's name online, or null against the computer. */
+  showEnd(game: Game, apm: number, opponent: string | null = null, note = ''): void {
+    const PLAYER = game.localTeam;
+    const ENEMY = (1 - PLAYER) as Team;
     const won = game.winner === PLAYER;
     const result = this.end.querySelector('.result')!;
     result.textContent = won ? 'Victory' : 'Defeat';
     result.className = `result ${won ? 'victory' : 'defeat'}`;
-    const how = game.surrendered === ENEMY ? 'Enemy surrendered  ·  ' : '';
-    this.end.querySelector('.sub')!.textContent = `${how}${formatTime(game.time)}  ·  ${DIFFICULTY_NAMES[game.difficulty]}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map  ·  seed ${game.map.seed}`;
+    const how = note ? `${note}  ·  ` : game.surrendered === ENEMY ? 'Enemy surrendered  ·  ' : game.surrendered === PLAYER ? 'You surrendered  ·  ' : '';
+    const against = opponent === null ? DIFFICULTY_NAMES[game.difficulty] : `Online vs ${opponent}`;
+    this.end.querySelector<HTMLElement>('[data-action="restart"]')!.hidden = opponent !== null;
+    this.end.querySelector('.sub')!.textContent = `${how}${formatTime(game.time)}  ·  ${against}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map  ·  seed ${game.map.seed}`;
 
     const you = game.teams[PLAYER];
     const foe = game.teams[ENEMY];
@@ -156,7 +231,7 @@ export class Menus {
       ['APM', (_, t) => (t === PLAYER ? Math.round(apm) : '—')],
     ];
     this.end.querySelector('.stats')!.innerHTML =
-      `<tr><th></th><th class="you">You</th><th class="foe">Enemy</th></tr>` +
+      `<tr><th></th><th class="you">You</th><th class="foe">${opponent ? escapeHtml(opponent) : 'Enemy'}</th></tr>` +
       rows.map(([label, f]) => `<tr><td>${label}</td><td>${f(you.stats, PLAYER)}</td><td>${f(foe.stats, ENEMY)}</td></tr>`).join('');
 
     const card = (team: Team, label: string, cls: string): string => {
@@ -167,7 +242,11 @@ export class Menus {
       return `<div class="hero ${cls}"><div class="label">${label}</div><div class="name">${t.rank} ${t.name}</div>` +
         `<div class="epithet">"${t.epithet}"</div><div class="detail">${UNITS[u.type].name} · ${u.kills} kill${u.kills === 1 ? '' : 's'} · ${fate}</div></div>`;
     };
-    this.end.querySelector('.heroes')!.innerHTML = card(PLAYER, 'Hero of the battle', 'you') + card(ENEMY, 'Enemy nemesis', 'foe');
+    this.end.querySelector('.heroes')!.innerHTML = card(PLAYER, 'Hero of the battle', 'you') + card(ENEMY, opponent ? `${escapeHtml(opponent)}'s nemesis` : 'Enemy nemesis', 'foe');
     this.end.hidden = false;
   }
+}
+
+function escapeHtml(t: string): string {
+  return t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }

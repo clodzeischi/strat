@@ -1,5 +1,6 @@
 import { TILE } from '../config';
 import type { Cell, GameMap, MoveClass } from '../map';
+import { hypot } from './hypot';
 
 export interface Point {
   x: number;
@@ -134,7 +135,7 @@ export function findPath(map: GameMap, sx: number, sz: number, gx: number, gz: n
 
 /** True if a straight segment stays on cells this class can cross (with a little clearance), never jumping a level edge. */
 export function lineClear(map: GameMap, a: Point, b: Point, cls: MoveClass = 'vehicle'): boolean {
-  const d = Math.hypot(b.x - a.x, b.z - a.z);
+  const d = hypot(b.x - a.x, b.z - a.z);
   const steps = Math.ceil(d / (TILE * 0.25));
   const nx = d > 0 ? -(b.z - a.z) / d : 0;
   const nz = d > 0 ? (b.x - a.x) / d : 0;
@@ -183,7 +184,7 @@ export function cellsAround(map: GameMap, cx: number, cz: number, count: number,
   // broken by distance to the map's middle, then by side, so mirrored calls on a point-symmetric map give mirrored
   // cells (a plain breadth-first order would depend on which neighbor is tried first).
   const mid = (map.size - 1) / 2;
-  const len = Math.hypot(mid - startCell.cx, mid - startCell.cz) || 1;
+  const len = hypot(mid - startCell.cx, mid - startCell.cz) || 1;
   const tx = (mid - startCell.cx) / len;
   const tz = (mid - startCell.cz) / len;
   const key = (c: Cell) => {

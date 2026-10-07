@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { RTSCamera } from '../render/camera';
 import {
-  BUILDING_ORDER, BUILDINGS, LEVEL_UP_ORDER, PLAYER, TEAM_CSS, TILE, UNIT_ORDER, UNITS, UPGRADE_ORDER, UPGRADES,
+  BUILDING_ORDER, BUILDINGS, LEVEL_UP_ORDER, TEAM_CSS, TILE, UNIT_ORDER, UNITS, UPGRADE_ORDER, UPGRADES,
   reqName, type BuildingType, type LevelUpType, type Req, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
 import type { Game } from '../game/game';
@@ -79,7 +79,7 @@ export class Sidebar {
     const el = document.createElement('div');
     el.className = 'card';
     el.title = tip;
-    el.innerHTML = `<div class="icon">${icon(type)}</div><div class="meta"><div class="name">${name}</div><div class="cost">$${cost}</div></div><div class="wipe"></div><div class="badge"></div><div class="status"></div>`;
+    el.innerHTML = `<div class="icon">${icon(type, this.game.localTeam)}</div><div class="meta"><div class="name">${name}</div><div class="cost">$${cost}</div></div><div class="wipe"></div><div class="badge"></div><div class="status"></div>`;
     const card: Card = {
       el,
       wipe: el.querySelector('.wipe')!,
@@ -101,40 +101,43 @@ export class Sidebar {
     this.input.actions++;
     const [kind, type] = key.split(':');
     const g = this.game;
-    const ts = g.teams[PLAYER];
+    const team = g.localTeam;
+    const ts = g.teams[team];
+    const issue = this.input.issue;
     if (kind === 'b') {
       const t = type as BuildingType;
       if (ts.building) {
         if (ts.building.type === t && ts.building.ready) this.input.beginPlacement(t);
         else if (ts.building.type !== t) this.showMessage(`Already building ${BUILDINGS[ts.building.type].name}.`);
-      } else if (g.canBuild(PLAYER, t)) {
-        g.startBuilding(PLAYER, t);
+      } else if (g.canBuild(team, t)) {
+        if (ts.credits < BUILDINGS[t].cost) this.showMessage('Insufficient funds.');
+        else issue({ c: 'build', type: t });
       }
     } else if (kind === 'u') {
-      g.queueUnit(PLAYER, type as UnitType);
+      issue({ c: 'train', type: type as UnitType });
     } else if (kind === 'g') {
       const t = type as UpgradeType;
       if (ts.research && ts.research.type !== t) this.showMessage(`Already researching ${UPGRADES[ts.research.type].name}.`);
-      else if (!ts.research) g.startResearch(PLAYER, t);
+      else if (!ts.research) issue({ c: 'research', type: t });
     } else if (kind === 'l') {
       const t = type as LevelUpType;
-      if (!ts.levelUps[t]) g.startLevelUp(PLAYER, t);
+      if (!ts.levelUps[t]) issue({ c: 'levelUp', type: t });
     }
   }
 
   private onCardRightClick(key: string): void {
     const [kind, type] = key.split(':');
-    const g = this.game;
-    const ts = g.teams[PLAYER];
+    const ts = this.game.teams[this.game.localTeam];
+    const issue = this.input.issue;
     if (kind === 'b' && ts.building?.type === type) {
-      g.cancelBuilding(PLAYER);
+      issue({ c: 'cancelBuild' });
       this.input.placing = null;
     } else if (kind === 'u') {
-      g.dequeueUnit(PLAYER, type as UnitType);
+      issue({ c: 'untrain', type: type as UnitType });
     } else if (kind === 'g' && ts.research?.type === type) {
-      g.cancelResearch(PLAYER);
+      issue({ c: 'cancelResearch' });
     } else if (kind === 'l') {
-      g.cancelLevelUp(PLAYER, type as LevelUpType);
+      issue({ c: 'cancelLevelUp', type: type as LevelUpType });
     }
   }
 
@@ -161,7 +164,7 @@ export class Sidebar {
   /** Hidden cards are ones not yet unlocked or already finished. */
   private setCard(key: string, opts: { hidden: boolean; disabled: boolean; progress: number | null; badge: string; status: string; extra: string; cost: number }): void {
     const c = this.cards.get(key)!;
-    const ts = this.game.teams[PLAYER];
+    const ts = this.game.teams[this.game.localTeam];
     const poor = ts.credits < opts.cost;
     const p = opts.progress === null ? -1 : Math.floor(opts.progress * 72);
     const state = `${opts.hidden}|${opts.disabled}|${p}|${opts.badge}|${opts.status}|${opts.extra}|${poor}`;
@@ -187,7 +190,8 @@ export class Sidebar {
 
   update(dt: number): void {
     const g = this.game;
-    const ts = g.teams[PLAYER];
+    const team = g.localTeam;
+    const ts = g.teams[team];
     const credits = Math.floor(ts.credits);
     if (credits !== this.shownCredits) {
       this.shownCredits = credits;
@@ -198,8 +202,8 @@ export class Sidebar {
       const b = ts.building;
       const mine = b?.type === t;
       this.setCard(`b:${t}`, {
-        hidden: !mine && !g.requirementsMet(PLAYER, BUILDINGS[t].requires),
-        disabled: !g.canBuild(PLAYER, t) || (!!b && !mine),
+        hidden: !mine && !g.requirementsMet(team, BUILDINGS[t].requires),
+        disabled: !g.canBuild(team, t) || (!!b && !mine),
         progress: mine && !b!.ready ? b!.progress : null,
         badge: '',
         status: mine && b!.ready ? (this.input.placing === t ? 'PLACING' : 'READY') : '',
@@ -210,12 +214,12 @@ export class Sidebar {
     for (const t of UNIT_ORDER) {
       const p = UNITS[t].producer;
       const queue = ts.queues[p];
-      const lines = g.activeLines(PLAYER, p);
+      const lines = g.activeLines(team, p);
       const queued = queue.filter((q) => q.type === t).length;
       const building = queue.slice(0, lines).filter((q) => q.type === t);
       this.setCard(`u:${t}`, {
-        hidden: !queued && !g.requirementsMet(PLAYER, UNITS[t].requires),
-        disabled: !g.canTrain(PLAYER, t),
+        hidden: !queued && !g.requirementsMet(team, UNITS[t].requires),
+        disabled: !g.canTrain(team, t),
         progress: queued ? Math.max(0, ...building.map((q) => q.progress)) : null,
         badge: queued > 1 ? `${queued}` : '',
         status: '',
@@ -226,7 +230,7 @@ export class Sidebar {
     for (const t of LEVEL_UP_ORDER) {
       const l = ts.levelUps[t];
       this.setCard(`l:${t}`, {
-        hidden: !l && !g.canLevelUp(PLAYER, t),
+        hidden: !l && !g.canLevelUp(team, t),
         disabled: false,
         progress: l ? l.progress : null,
         badge: '',
@@ -239,7 +243,7 @@ export class Sidebar {
       const r = ts.research;
       const mine = r?.type === t;
       this.setCard(`g:${t}`, {
-        hidden: !mine && !g.canResearch(PLAYER, t),
+        hidden: !mine && !g.canResearch(team, t),
         disabled: !!r && !mine,
         progress: mine ? r!.progress : null,
         badge: '',

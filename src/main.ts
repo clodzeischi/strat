@@ -1,12 +1,15 @@
 import * as THREE from 'three';
 import { AI, profileFor } from './game/ai';
 import { RTSCamera } from './render/camera';
-import { ENEMY, MAP_SIZES, PLAYER, TILE, type MapSize } from './config';
+import { MAP_SIZES, TILE, type MapSize, type Team } from './config';
 import { Game, type Difficulty } from './game/game';
 import { Input } from './ui/input';
 import { loadMapSize, Menus } from './ui/menu';
 import { ViewShadows } from './render/shadows';
 import { Sidebar } from './ui/sidebar';
+import { Lockstep, TICK } from './net/lockstep';
+import { NetClient } from './net/client';
+import { PROTOCOL_VERSION, type MatchInfo, type ServerMsg } from './net/protocol';
 import './style.css';
 
 const canvas = document.getElementById('c') as HTMLCanvasElement;
@@ -31,8 +34,10 @@ sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.05;
 scene.add(sun, sun.target);
 
-// Restart and changing map size reload the page; the next game's settings ride along in session storage.
+// Restart and changing map size reload the page; the next game's settings ride along in session storage. So does
+// an online match: the page reloads into it once the server has paired two players.
 const AUTOSTART_KEY = 'strat.autostart';
+const MATCH_KEY = 'strat.match';
 interface Autostart { difficulty: Difficulty; size: MapSize; seed: number }
 function readAutostart(): Autostart | null {
   try {
@@ -47,19 +52,31 @@ function readAutostart(): Autostart | null {
     return null;
   }
 }
+function readMatch(): MatchInfo | null {
+  try {
+    const raw = sessionStorage.getItem(MATCH_KEY);
+    sessionStorage.removeItem(MATCH_KEY);
+    return raw ? (JSON.parse(raw) as MatchInfo) : null;
+  } catch {
+    return null;
+  }
+}
 const randomSeed = () => Math.floor(Math.random() * 1_000_000);
 /** `?seed=123` in the address replays a map. */
 function urlSeed(): number | null {
   const v = new URLSearchParams(location.search).get('seed');
   return v !== null && /^\d+$/.test(v) ? Number(v) : null;
 }
-const autostart = readAutostart();
-const mapSize = autostart?.size ?? loadMapSize();
+const match = readMatch();
+const autostart = match ? null : readAutostart();
+const mapSize = match?.size ?? autostart?.size ?? loadMapSize();
 // Every visit gets a new map; Restart keeps the seed so the same map comes back.
-const mapSeed = autostart?.seed ?? urlSeed() ?? randomSeed();
+const mapSeed = match?.seed ?? autostart?.seed ?? urlSeed() ?? randomSeed();
 
 const rts = new RTSCamera(mapSize * TILE);
 const game = new Game(scene, rts.camera, mapSize, mapSeed);
+game.localTeam = match?.team ?? 0;
+const ENEMY = (1 - game.localTeam) as Team;
 
 // The sun's shadow map follows whatever the active camera is looking at.
 const shadows = new ViewShadows(sun);
@@ -67,12 +84,13 @@ const shadows = new ViewShadows(sun);
 const input = new Input(game, rts, canvas, document.getElementById('selbox')!, document.getElementById('info')!);
 const sidebar = new Sidebar(game, input, rts);
 game.onMessage = (t) => sidebar.showMessage(t);
-// Created when the game starts, with the profile for the chosen difficulty.
+// Created when the game starts: the computer opponent (offline) and the lockstep that runs the simulation.
 let ai: AI | null = null;
+let lockstep: Lockstep | null = null;
 if (import.meta.env.DEV) Object.assign(window, { game, input, rts, renderer });
 
 // Start looking at the home base, nudged toward the middle of the map where the action will come from.
-const home = game.buildings.find((b) => b.team === PLAYER)!;
+const home = game.buildings.find((b) => b.team === game.localTeam)!;
 const toMid = new THREE.Vector2(game.map.worldSize() / 2 - home.x, game.map.worldSize() / 2 - home.z).normalize().multiplyScalar(8);
 rts.lookAt(home.x + toMid.x, home.z + toMid.y);
 
@@ -112,19 +130,99 @@ resize();
 
 // ---- Screens and game flow -------------------------------------------------------
 
-type Mode = 'title' | 'playing' | 'paused' | 'offer' | 'ended';
+type Mode = 'title' | 'connecting' | 'playing' | 'paused' | 'offer' | 'ended';
 let mode: Mode = 'title';
 const fpsEl = document.getElementById('fps')!;
+const netWaitEl = document.getElementById('netwait')!;
+/** Online: the connection to the game server (also used by the multiplayer menu). */
+let net: NetClient | null = null;
+const online = match !== null;
+const opponentName = match ? match.names[ENEMY] : null;
 
-function startGame(difficulty: Difficulty): void {
-  game.difficulty = difficulty;
-  ai = new AI(game, ENEMY, profileFor(difficulty));
-  if (import.meta.env.DEV) Object.assign(window, { ai });
+function beginPlay(): void {
   mode = 'playing';
   menus.hideTitle();
   document.body.classList.remove('in-menu');
   scene.fog = gameFog;
+  input.issue = (cmd) => lockstep?.issue(cmd);
+  if (import.meta.env.DEV) Object.assign(window, { ai, lockstep });
+}
+
+function startGame(difficulty: Difficulty): void {
+  game.difficulty = difficulty;
+  ai = new AI(game, ENEMY, profileFor(difficulty));
+  lockstep = new Lockstep(game, game.localTeam);
+  const opponent = ai;
+  lockstep.onTick = () => opponent.update(TICK);
+  beginPlay();
   sidebar.showMessage('Build a Refinery and a Barracks, then a Factory. Destroy the red base.');
+}
+
+/** Online: the page has reloaded into a match; reconnect, and start when both players are back. */
+function startOnline(m: MatchInfo): void {
+  mode = 'connecting';
+  menus.hideTitle();
+  input.pausable = false;
+  showNetWait('Connecting to the game server…');
+  net = new NetClient();
+  const client = net;
+  client.onMessage = (msg) => onMatchMessage(msg);
+  client.onClose = () => {
+    if (mode === 'ended') return;
+    endGame('Connection to the server lost');
+  };
+  client.connect().then(
+    () => {
+      showNetWait(`Waiting for ${opponentName}…`);
+      client.send({ t: 'resume', code: m.code, token: m.token });
+    },
+    () => endGame("Couldn't reach the game server"),
+  );
+}
+
+function onMatchMessage(msg: ServerMsg): void {
+  switch (msg.t) {
+    case 'go': {
+      if (lockstep) return;
+      lockstep = new Lockstep(game, game.localTeam, net);
+      const ls = lockstep;
+      ls.onDesync = (tick) => {
+        console.error(`Desync with ${opponentName} at tick ${tick}`);
+        sidebar.showMessage(`Out of sync with ${opponentName} (tick ${tick}): your screens may no longer show the same game.`);
+      };
+      showNetWait('');
+      beginPlay();
+      sidebar.showMessage(`Online against ${opponentName}. Build a Refinery and a Barracks, then a Factory.`);
+      break;
+    }
+    case 'cmds':
+      lockstep?.receive(msg.team, msg.tick, msg.cmds);
+      break;
+    case 'hash':
+      lockstep?.receiveHash(msg.tick, msg.hash);
+      break;
+    case 'left':
+      if (mode !== 'ended') endGame(`${opponentName} left the game`);
+      break;
+    case 'error':
+      if (mode !== 'ended') endGame(msg.text);
+      break;
+  }
+}
+
+function showNetWait(text: string): void {
+  netWaitEl.textContent = text;
+  netWaitEl.hidden = !text;
+}
+
+/** Online games end early when the other player leaves or the connection drops: whoever's still here wins. */
+function endGame(note: string): void {
+  showNetWait('');
+  if (game.winner === null && mode !== 'connecting') game.winner = game.localTeam;
+  mode = 'ended';
+  menus.setPaused(false);
+  menus.showEnd(game, input.actions / Math.max(1, game.time / 60), opponentName, note);
+  net?.close();
 }
 
 /** Restart, Quit and a new map size reload the page for a clean match; with `next` set, the title is skipped. */
@@ -140,14 +238,54 @@ function reload(next: Autostart | null): void {
 function setPaused(paused: boolean): void {
   if (mode !== 'playing' && mode !== 'paused') return;
   mode = paused ? 'paused' : 'playing';
-  menus.setPaused(paused);
+  menus.setPaused(paused, online);
+}
+
+// ---- Multiplayer lobby (title screen) -----------------------------------------------
+
+function lobbyMessage(msg: ServerMsg): void {
+  if (msg.t === 'rooms') menus.showRooms(msg.rooms);
+  else if (msg.t === 'hosted') menus.showHosting(msg.code);
+  else if (msg.t === 'error') menus.setLobbyStatus(msg.text);
+  else if (msg.t === 'match') {
+    // Paired: reload into the match (a fresh page builds the agreed map).
+    try {
+      sessionStorage.setItem(MATCH_KEY, JSON.stringify(msg.match));
+    } catch {
+      menus.setLobbyStatus('This browser blocks session storage, which online games need.');
+      return;
+    }
+    location.reload();
+  }
+}
+
+function openLobby(): void {
+  menus.setLobbyStatus('');
+  if (net?.connected) {
+    net.send({ t: 'list' });
+    return;
+  }
+  net = new NetClient();
+  const client = net;
+  client.onMessage = lobbyMessage;
+  client.onClose = () => menus.setLobbyStatus('Disconnected from the game server.');
+  client.connect().then(
+    () => client.send({ t: 'list' }),
+    () => {
+      menus.showRooms([]);
+      menus.setLobbyStatus('No game server here. Start one with "npm run serve" (see the README) and open the page it prints.');
+    },
+  );
 }
 
 const menus = new Menus({
   onPlay: (difficulty, size) => (size === game.map.size ? startGame(difficulty) : reload({ difficulty, size, seed: urlSeed() ?? randomSeed() })),
   onResume: () => setPaused(false),
   onRestart: () => reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed }),
-  onQuit: () => reload(null),
+  onQuit: () => {
+    net?.send({ t: 'leave' });
+    reload(null);
+  },
   onFps: (show) => (fpsEl.hidden = !show),
   onSurrenderAnswer: (accept) => {
     if (mode !== 'offer') return;
@@ -155,6 +293,24 @@ const menus = new Menus({
     mode = 'playing';
     if (accept) game.acceptSurrender(ENEMY);
     else sidebar.showMessage('Surrender refused. The enemy fights on.');
+  },
+  onLobby: (open) => {
+    if (open) openLobby();
+    else {
+      net?.close();
+      net = null;
+    }
+  },
+  onHost: (name, size) => net?.send({ t: 'host', name, size, version: PROTOCOL_VERSION }),
+  onJoin: (code, name) => net?.send({ t: 'join', code, name, version: PROTOCOL_VERSION }),
+  onCancelHost: () => {
+    net?.send({ t: 'cancel' });
+    menus.page('multiplayer');
+    net?.send({ t: 'list' });
+  },
+  onSurrender: () => {
+    lockstep?.issue({ c: 'surrender' });
+    setPaused(false);
   },
 });
 // The game waits for the player's answer, like the pause menu.
@@ -173,8 +329,24 @@ window.addEventListener('keydown', (e) => {
     setPaused(false);
   }
 }, { capture: true });
+// Online, a hidden tab still has to keep its side of the game going, or the other player stalls. Browsers stop
+// drawing hidden tabs and slow their timers to about once a second, so each timer call runs the ticks it missed.
+let hiddenAt = 0;
+setInterval(() => {
+  if (!online || !document.hidden || !lockstep || (mode !== 'playing' && mode !== 'paused')) return;
+  const now = performance.now();
+  lockstep.advance((now - (hiddenAt || now)) / 1000, 5);
+  hiddenAt = now;
+}, 250);
+document.addEventListener('visibilitychange', () => {
+  hiddenAt = document.hidden ? performance.now() : 0;
+  last = performance.now();
+});
+// Closing the tab mid-match tells the other player straight away.
+window.addEventListener('pagehide', () => net?.send({ t: 'leave' }));
 
-if (autostart) startGame(autostart.difficulty);
+if (match) startOnline(match);
+else if (autostart) startGame(autostart.difficulty);
 else menus.showTitle();
 
 // ---- Main loop -------------------------------------------------------------------
@@ -182,6 +354,8 @@ else menus.showTitle();
 let fpsFrames = 0;
 let fpsTime = 0;
 let last = performance.now();
+/** After the game ends, the simulation runs on locally so the last explosions play out behind the stats. */
+let afterAcc = 0;
 function frame(now: number): void {
   const rawDt = (now - last) / 1000;
   const dt = Math.min(0.05, rawDt);
@@ -201,19 +375,29 @@ function frame(now: number): void {
     shadows.fit(titleCam, titleFog.far);
     renderer.render(scene, titleCam);
   } else {
-    if (mode === 'playing') {
+    let alpha = 1;
+    // Online, the menu doesn't stop the game: the other player is still playing.
+    const running = mode === 'playing' || (online && mode === 'paused');
+    if (running && lockstep) {
       input.update(dt);
-      if (!input.paused) {
-        game.update(dt);
-        ai?.update(dt);
-      }
+      if (!input.paused) alpha = lockstep.advance(Math.min(rawDt, 0.25));
+      if (online) showNetWait(lockstep.waiting > 0.5 ? `Waiting for ${opponentName}…` : '');
       if (game.winner !== null) {
-        mode = 'ended';
-        menus.showEnd(game, input.actions / Math.max(1, game.time / 60));
+        if (online) endGame(game.surrendered === null ? '' : game.surrendered === game.localTeam ? 'You surrendered' : `${opponentName} surrendered`);
+        else {
+          mode = 'ended';
+          menus.showEnd(game, input.actions / Math.max(1, game.time / 60));
+        }
       }
     } else if (mode === 'ended') {
-      game.update(dt); // let the last explosions play out behind the stats
+      afterAcc = Math.min(afterAcc + rawDt, 0.25);
+      while (afterAcc >= TICK) {
+        game.update(TICK);
+        afterAcc -= TICK;
+      }
+      alpha = afterAcc / TICK;
     }
+    game.frame(dt, alpha);
     sidebar.update(dt);
     shadows.fit(rts.camera, gameFog.far);
     renderer.render(scene, rts.camera);
