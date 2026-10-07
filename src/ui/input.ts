@@ -433,7 +433,7 @@ export class Input {
     const k = e.key.toLowerCase();
     this.keys.add(k);
     const g = this.game;
-    if (/^[0-9xfhe]$/.test(k)) this.actions++;
+    if (/^[0-9asdf ]$/.test(k)) this.actions++;
     if (/^[0-9]$/.test(k)) {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
@@ -457,30 +457,33 @@ export class Input {
         else if (this.dropMode) this.dropMode = false;
         else this.onMenu();
         break;
-      case 'e':
+      // Hotkeys stay on the left hand (as in Stormgate): A attack-move, S stop, D drop, F unload, Space base,
+      // ` pause. The right hand is on the mouse; the camera pans with the arrows, screen edges or middle-drag.
+      case 'd':
         if (this.ownCarryalls().some((c) => c.load.length)) {
           this.dropMode = true;
           this.attackMode = false;
         }
         break;
-      case 'x':
+      case 's':
         for (const u of this.ownUnits()) u.command(g, { kind: 'idle' });
         break;
-      case 'u':
+      case 'f':
         for (const b of this.selection) if (b instanceof Building && b.team === PLAYER) g.unloadBunker(b);
         break;
-      case 'f':
+      case 'a':
         if (this.ownUnits().some((u) => u.def.weapon)) {
           this.attackMode = true;
           this.dropMode = false;
         }
         break;
-      case 'h': {
+      case ' ': {
+        e.preventDefault();
         const home = g.buildings.find((b) => b.team === PLAYER && b.type === 'conyard') ?? g.buildings.find((b) => b.team === PLAYER);
         if (home) this.cam.lookAt(home.x, home.z);
         break;
       }
-      case 'p':
+      case '`':
         this.paused = !this.paused;
         break;
     }
@@ -491,10 +494,10 @@ export class Input {
   update(dt: number): void {
     let dx = 0;
     let dy = 0;
-    if (this.keys.has('a') || this.keys.has('arrowleft')) dx -= 1;
-    if (this.keys.has('d') || this.keys.has('arrowright')) dx += 1;
-    if (this.keys.has('w') || this.keys.has('arrowup')) dy += 1;
-    if (this.keys.has('s') || this.keys.has('arrowdown')) dy -= 1;
+    if (this.keys.has('arrowleft')) dx -= 1;
+    if (this.keys.has('arrowright')) dx += 1;
+    if (this.keys.has('arrowup')) dy += 1;
+    if (this.keys.has('arrowdown')) dy -= 1;
     if (this.screen.inside && !this.dragStart && !this.grab) {
       if (this.screen.x < EDGE) dx -= 1;
       if (this.screen.x > window.innerWidth - EDGE) dx += 1;
@@ -559,13 +562,13 @@ export class Input {
       if (e instanceof Building && PRODUCERS.includes(e.type as Producer) && e.team === PLAYER) text += '   Right-click to set a rally point';
       if (e instanceof Carryall && e.team === PLAYER) text += this.carryallInfo(e);
       if (e instanceof Unit && e.def.repair && e.team === PLAYER) text += '   Right-click a damaged vehicle or building to repair it';
-      if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === PLAYER && e.occupants.length ? '   U to unload' : ''}`;
+      if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === PLAYER && e.occupants.length ? '   F to unload' : ''}`;
     } else if (sel.length > 1) {
       const counts = new Map<string, number>();
       for (const e of sel) counts.set(e.name, (counts.get(e.name) ?? 0) + 1);
       text = [...counts].map(([n, c]) => `${c}× ${n}`).join('   ');
     }
-    if (this.paused) text = 'PAUSED (P to resume)';
+    if (this.paused) text = 'PAUSED (` to resume)';
     if (this.infoEl.textContent !== text) this.infoEl.textContent = text;
     this.infoEl.style.display = text ? 'block' : 'none';
   }

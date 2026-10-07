@@ -97,6 +97,60 @@ for (const type of ['tank', 'harvester', 'rocket'] as UnitType[]) {
   }
 }
 
+// ---- Carryall: a heavy drop is quick and low only for a moment ---------------
+{
+  const g = flatGame();
+  const c = g.spawnUnit('carryall', 0, at(g, 10), at(g, 10)) as Carryall;
+  const tank = g.spawnUnit('tank', 0, at(g, 16), at(g, 12));
+  c.orderPickup(g, [tank]);
+  run(g, 20, () => tank.carrier === c);
+  run(g, 3);
+  c.orderDrop(g, at(g, 40), at(g, 40));
+  let low = 0;
+  let slowest = Infinity;
+  let last = { x: c.x, z: c.z };
+  run(g, 30, () => {
+    const ground = g.map.surfaceAt(c.x, c.z);
+    const speed = Math.hypot(c.x - last.x, c.z - last.z) / 0.05;
+    last = { x: c.x, z: c.z };
+    if (c.y < ground + 3) {
+      low += 0.05;
+      slowest = Math.min(slowest, speed);
+    }
+    return !tank.carrier && c.task.kind !== 'drop' && c.task.kind !== 'climb';
+  });
+  check('heavy drop: low over the drop zone only briefly', low < 2.5, `${low.toFixed(1)}s below 3 units`);
+  check('  ...and never slows to a hover', slowest > 3.5, `slowest ${slowest.toFixed(1)} while low`);
+}
+
+// ---- Carryall: two trikes apart are gathered and picked up in one pass ---------
+{
+  const g = flatGame();
+  const c = g.spawnUnit('carryall', 0, at(g, 10), at(g, 10)) as Carryall;
+  const pair = [g.spawnUnit('trike', 0, at(g, 20), at(g, 20)), g.spawnUnit('trike', 0, at(g, 26), at(g, 23))];
+  c.orderPickup(g, pair);
+  const t = run(g, 25, () => c.load.length === 2);
+  check('two trikes six tiles apart are both picked up', c.load.length === 2, `${t.toFixed(1)}s`);
+}
+
+// ---- Carryall: at the map edge -------------------------------------------------
+{
+  const g = flatGame();
+  const size = g.map.worldSize();
+  const c = g.spawnUnit('carryall', 0, size / 2, size / 2) as Carryall;
+  c.command(g, { kind: 'move', x: 0.5, z: 0.5 });
+  run(g, 20);
+  c.command(g, { kind: 'move', x: size / 2, z: size / 2 });
+  const t = run(g, 20, () => Math.hypot(c.x - size / 2, c.z - size / 2) < 10);
+  check('carryall sent into a map corner comes back out when ordered', Math.hypot(c.x - size / 2, c.z - size / 2) < 10, `${t.toFixed(1)}s`);
+  const squad = [0, 1, 2].map((k) => g.spawnUnit('infantry', 0, at(g, 30 + k), at(g, 30)));
+  c.orderPickup(g, squad);
+  run(g, 30, () => c.load.length === 3);
+  c.orderDrop(g, at(g, 1), at(g, 1));
+  const td = run(g, 40, () => c.load.length === 0 && c.task.kind === 'move');
+  check('  ...and a fly-by drop in the corner ends with it heading home', c.load.length === 0 && c.task.kind !== 'drop', `${td.toFixed(1)}s`);
+}
+
 // ---- Carryall: six infantry, fly-by parachute drop ----------------------------
 {
   const g = flatGame();

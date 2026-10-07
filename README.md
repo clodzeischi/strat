@@ -47,15 +47,17 @@ Then open the address Vite prints (usually http://localhost:5173). `npm run buil
 | Left click / drag | Select units, or box-select |
 | Double click | Select every unit of that type on screen |
 | Right click | Move, attack, harvest, set a rally point, repair (Repair Vehicle), pick up (Carryall) |
-| **F**, then click | Attack-move |
-| **E**, then click | Carryall drop |
-| **X** | Stop |
-| **U** | Unload a selected bunker |
+| **A**, then click | Attack-move |
+| **S** | Stop |
+| **D**, then click | Carryall drop |
+| **F** | Unload a selected bunker |
 | **Ctrl+1-9** / **1-9** | Set / select a control group (double-tap to jump to it) |
-| **H** | Jump to your base |
-| **WASD**, arrow keys, screen edges, middle-drag | Pan the camera |
-| **P** | Pause |
+| **Space** | Jump to your base |
+| **`** (left of 1) | Pause |
+| Arrow keys, screen edges, middle-drag | Pan the camera |
 | **Esc** | Cancel, or open the menu |
+
+Hotkeys all sit under the left hand, as in Stormgate.
 
 Production is in the sidebar on the right. Click a card to build or train, and right-click it to cancel. A finished structure waits on its card until you click the card again and place the building on rock near your base.
 
@@ -66,7 +68,7 @@ Production is in the sidebar on the right. Click a card to build or train, and r
 | Construction Yard | Builds structures. Upgrades to HQ Level 2. |
 | Refinery | Turns spice into credits. Comes with a free Harvester. |
 | Barracks | Trains infantry. |
-| Bunker | Holds three infantry, who shoot from it and can't be hurt while inside. Right-click it with infantry to fill it. |
+| Bunker | Holds three infantry, who shoot from it and can't be hurt while inside. Right-click it with infantry to fill it, F to unload. |
 | Factory | Builds vehicles. Upgrades to Level 2 for Rocket Launchers and tier-2 upgrades. |
 | Hi-Tech Factory | Builds Carryalls. |
 

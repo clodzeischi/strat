@@ -46,6 +46,6 @@ export const UNITS: Record<UnitType, UnitDef> = {
   carryall: {
     name: 'Carryall', producer: 'hitech', cost: 700, buildTime: 12, hp: 380, speed: 9, turnRate: 2.2, radius: 1.4, sight: 12,
     turret: false, infantry: false, tags: ['mechanical', 'air'], weapon: null, requires: ['hitech'], air: true,
-    desc: 'Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, E to drop. Assigned to a harvester, it ferries it between spice and refinery.',
+    desc: 'Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, D to drop. Assigned to a harvester, it ferries it between spice and refinery.',
   },
 };
