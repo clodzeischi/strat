@@ -8,7 +8,8 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 
 - **Classic Dune economy.** Harvesters collect spice and bring it to Refineries for credits. Spice fields shimmer and run out as they're harvested.
 - **Procedural maps.** Every game gets a new, point-symmetric map in one of three sizes. The desert has dunes, scattered mesas and rock shelves with cliffs on one edge. Spawns are random, and the end screen shows the seed so you can replay a map with `?seed=N`.
-- **Elevation that matters.** Units only climb to high ground by ramps, and they shoot further downhill than up. A base on a rock shelf has a cliff flank that only rocket launchers can hit from below.
+- **Elevation that matters.** Units only climb to high ground by ramps, and they shoot further downhill than up. A base on a rock shelf has a cliff flank that only rocket launchers can hit from below, once something spots for them.
+- **Fog of war.** You only see what your units and buildings see. Low ground can't see up onto high ground, and high ground blocks the view past it, so mesas hide what's behind them. A Carryall overhead sees everything around it. Anything that shoots at you is revealed for a moment. Enemy structures stay on screen as last seen. Add `?reveal` to the address to lift the fog in single player.
 - **Bunkers.** Fill one with three infantry: they shoot out from cover, Infantry Rockets included, and can't be hit inside. Tanks and rocket launchers outrange them.
 - **Counter-based combat.** Units have StarCraft-style tags (light, armored, biological, mechanical) with bonus damage against them. Tanks and rocket launchers can fire on the move, and vehicles tilt with the ground.
 - **Tech and upgrades.** Level-2 Construction Yard and Factory, two tiers each of Weapons and Armor, Infantry Rockets, Trike Nitro and Harvesting. Each upgrade shows on the unit models.
@@ -115,6 +116,7 @@ Production is in the sidebar on the right. Click a card to build or train, and r
   - `npx tsx sim/matchups.ts`: re-measure unit matchups for the AI after changing unit stats; `npx tsx sim/duel.ts` for quick duels.
   - `npx tsx sim/terrain-check.ts 3`: AI matches, checked for illegal moves and stuck units.
   - `CHECK=60 QUIET=1 npx tsx sim/maps.ts`: generate 60 maps and validate them.
+  - `npx tsx sim/vision-check.ts`: fog of war rules (cliffs, mesas, aircraft, attackers revealed).
   - `npx tsx sim/determinism.ts`: the simulation is deterministic (same seed and commands, same game), which online play depends on.
   - `npx tsx sim/netplay-check.ts`: an online match between two headless players through the real server, checked for desyncs, and replayed from its command log.
 - [docs/CODE_LAYOUT.md](docs/CODE_LAYOUT.md): where everything lives in `src/`.

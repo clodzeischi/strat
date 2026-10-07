@@ -12,6 +12,8 @@ export class Effects {
   private debris: ParticlePool;
   private tracers: TracerPool;
   private lights: FireLights;
+  /** Whether the player can see a spot: effects in the fog of war aren't shown (they'd give away what's there). */
+  visibleAt: (x: number, z: number) => boolean = () => true;
   /** Command feedback rings, reused. */
   private rings: { mesh: THREE.Mesh; life: number }[] = [];
 
@@ -26,6 +28,7 @@ export class Effects {
 
   /** Fireball, sparks, flying debris and a column of dark smoke; `size` scales all of it. */
   explosion(p: THREE.Vector3, size: number): void {
+    if (!this.visibleAt(p.x, p.z)) return;
     this.glow.spawn({ x: p.x, y: p.y, z: p.z, life: 0.35, size: [size * 0.4, size * 1.3], color: [0xffa040, 0x701800], alpha: [1, 0] });
     this.lights.flare(p, size);
     for (let k = 0; k < 3 + size * 3; k++) {
@@ -60,15 +63,18 @@ export class Effects {
 
   /** Muzzle flash. */
   flash(p: THREE.Vector3, size = 0.25): void {
+    if (!this.visibleAt(p.x, p.z)) return;
     this.glow.spawn({ x: p.x, y: p.y, z: p.z, life: 0.07, size: [size, size * 0.6], color: [0xfff0a0, 0xffa040] });
   }
 
   tracer(a: THREE.Vector3, b: THREE.Vector3): void {
+    if (!this.visibleAt(a.x, a.z) && !this.visibleAt(b.x, b.z)) return;
     this.tracers.spawn(a, b);
   }
 
   /** A small rising puff: rocket trails, harvester spice spray. */
   puff(p: THREE.Vector3, color: number): void {
+    if (!this.visibleAt(p.x, p.z)) return;
     this.smoke.spawn({
       x: p.x, y: p.y, z: p.z, vx: rand(-0.5, 0.5), vy: 1.2, vz: rand(-0.5, 0.5),
       life: 0.8, size: [0.2, 0.6], color: [color, color], alpha: [0.7, 0],
@@ -77,6 +83,7 @@ export class Effects {
 
   /** Dust blown outward along the ground by an aircraft's downwash; `size` scales the cloud. */
   dust(p: THREE.Vector3, color: number, size = 1): void {
+    if (!this.visibleAt(p.x, p.z)) return;
     const yaw = rand(0, Math.PI * 2);
     const r = rand(0.3, 2.2) * size;
     const speed = rand(2.5, 7);

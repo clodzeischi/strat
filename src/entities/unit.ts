@@ -303,15 +303,19 @@ export class Unit extends Entity {
 
     // Pick or drop the current target.
     if (this.order.kind === 'attack') {
-      if (this.order.target.dead || !game.weaponFor(this, this.order.target)) {
+      const t = this.order.target;
+      if (t.dead || !game.weaponFor(this, t)) {
         this.order = { kind: 'idle' };
         this.target = null;
         this.path = [];
+      } else if (!game.sees(this.team, t)) {
+        // Lost in the fog: go to where it was last seen, fighting on the way.
+        this.command(game, { kind: 'amove', x: t.x, z: t.z });
       } else {
         this.target = this.order.target;
       }
     } else if (weapon && (this.order.kind === 'idle' || this.order.kind === 'amove')) {
-      if (this.target && (this.target.dead || distTo(this.target, this.x, this.z) > this.def.sight * 1.3)) {
+      if (this.target && (this.target.dead || !game.sees(this.team, this.target) || distTo(this.target, this.x, this.z) > this.def.sight * 1.3)) {
         this.target = null;
         if (this.order.kind === 'idle') this.path = [];
       }
@@ -377,7 +381,7 @@ export class Unit extends Entity {
    */
   private fireOnTheMove(game: Game, dt: number): boolean {
     const inReach = (e: Entity | null): e is Entity => {
-      if (!e || e.dead) return false;
+      if (!e || e.dead || !game.sees(this.team, e)) return false;
       const w = game.weaponFor(this, e);
       if (!w) return false;
       const d = distTo(e, this.x, this.z);

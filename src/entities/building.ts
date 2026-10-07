@@ -30,6 +30,8 @@ export class Building extends Entity {
   level = 1;
   /** Infantry inside (bunkers). */
   occupants: Unit[] = [];
+  /** Drawing only: the local player has seen it, so it stays on their screen in the fog (as last seen). */
+  known = false;
 
   constructor(id: number, team: Team, readonly type: BuildingType, readonly cx: number, readonly cz: number, groundY: number, readonly facing: Facing = 'south') {
     const def = BUILDINGS[type];

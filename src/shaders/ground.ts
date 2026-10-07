@@ -8,12 +8,15 @@ import { CLIFF, ROCK, SAND } from '../map';
  * - outcrops in brown, fading gradually over their sprawling base;
  * - cliff walls in their own brown with a crisp noisy outline, layers, streaks and cracks;
  * - spice with a crisp field edge, a dark rim, grain and bare patches that open up as it's harvested, plus the
- *   shimmer: tiny twinkling glints and a slow drifting sheen.
+ *   shimmer: tiny twinkling glints and a slow drifting sheen;
+ * - fog of war on top, from a one-texel-per-tile brightness map.
  */
-export function groundShader(material: THREE.MeshLambertMaterial, time: { value: number }): void {
+export function groundShader(material: THREE.MeshLambertMaterial, time: { value: number }, fog: { value: THREE.Texture }, worldSize: { value: number }): void {
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, {
       uTime: time,
+      uFogMap: fog,
+      uWorldSize: worldSize,
       uSand: { value: GROUND_COLORS[SAND] },
       uRock: { value: GROUND_COLORS[ROCK] },
       uOutcrop: { value: GROUND_COLORS[CLIFF] },
@@ -39,6 +42,8 @@ vGround = (modelMatrix * vec4(transformed, 1.0)).xyz;`);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
 uniform float uTime;
+uniform sampler2D uFogMap;
+uniform float uWorldSize;
 uniform vec3 uSand, uRock, uOutcrop, uWall, uSpiceLight, uSpiceDeep, uSpiceRim, uGlint;
 varying vec4 vSpice;
 varying float vWall;
@@ -118,6 +123,17 @@ if (wallMask > 0.0) {
   float spark = (1.0 - smoothstep(size * 0.3, size, d)) * twinkle * step(h, 0.2 + 0.4 * amount);
   float sheen = smoothstep(0.62, 0.9, gNoise(gp * 0.3 + vec2(uTime * 0.22, uTime * 0.09))) * 0.1;
   outgoingLight += uGlint * (spark * 1.5 + sheen) * inside;
+}
+{
+  // Fog of war: darker where the player can't see now, near black where they never have, a little greyer too.
+  // Four filtered taps half a tile apart blur the tile steps into soft edges.
+  vec2 fuv = vGround.xz / uWorldSize;
+  float tx = 0.5 / float(textureSize(uFogMap, 0).x);
+  float seen = 0.25 * (texture2D(uFogMap, fuv + vec2(-tx, -tx)).r + texture2D(uFogMap, fuv + vec2(tx, -tx)).r
+    + texture2D(uFogMap, fuv + vec2(-tx, tx)).r + texture2D(uFogMap, fuv + vec2(tx, tx)).r);
+  seen = smoothstep(0.0, 1.0, seen);
+  float grey = dot(outgoingLight, vec3(0.3, 0.5, 0.2));
+  outgoingLight = mix(vec3(grey), outgoingLight, 0.4 + 0.6 * seen) * seen;
 }
 #include <opaque_fragment>`);
   };

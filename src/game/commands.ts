@@ -101,6 +101,16 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
 function go(game: Game, selected: Unit[], x: number, z: number, target: Entity | null, attack: boolean, team: Team): void {
   let units = selected;
   if (target?.dead) target = null;
+  if (target && !game.sees(team, target)) {
+    // Clicked on something the team can't see (any more): a structure is attacked where it stands (it can't have
+    // moved); for a unit, the click is just a place to attack-move to.
+    if (target instanceof Building) {
+      x = target.x;
+      z = target.z;
+    }
+    target = null;
+    attack = true;
+  }
   const carryalls = units.filter((u): u is Carryall => u instanceof Carryall);
   if (carryalls.length) {
     commandCarryalls(game, carryalls, target, x, z, team);

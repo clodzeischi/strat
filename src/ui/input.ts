@@ -118,7 +118,7 @@ export class Input {
     let best: Entity | null = null;
     let bestD = Infinity;
     for (const u of this.game.units) {
-      if (u.carrier) continue;
+      if (u.carrier || !this.game.shown(u)) continue;
       const s = this.toScreen(u.x, u.y + 0.5, u.z);
       const d = Math.hypot(s.x - x, s.y - y);
       if (d < u.radius * 18 + 8 && d < bestD) {
@@ -134,7 +134,8 @@ export class Input {
     const cz = m.cellOf(p.z);
     if (!m.inBounds(cx, cz)) return null;
     const id = m.occupied[m.idx(cx, cz)];
-    return id ? this.game.buildings.find((b) => b.id === id) ?? null : null;
+    const b = id ? this.game.buildings.find((b) => b.id === id) : undefined;
+    return b?.known ? b : null;
   }
 
   private setSelection(list: Entity[]): void {
@@ -411,7 +412,7 @@ export class Input {
     if (dx || dy) this.cam.pan(Math.sign(dx) * PAN_SPEED * dt, Math.sign(dy) * PAN_SPEED * dt);
     this.cam.apply();
 
-    const gone = (e: Entity) => e.dead || (e instanceof Unit && !!e.carrier);
+    const gone = (e: Entity) => e.dead || (e instanceof Unit && (!!e.carrier || !this.game.shown(e)));
     if (this.selection.some(gone)) this.setSelection(this.selection.filter((e) => !gone(e)));
     if (this.dropMode && !this.ownCarryalls().some((c) => c.load.length)) this.dropMode = false;
     if (this.placing && !this.game.teams[this.team].building?.ready) this.placing = null;

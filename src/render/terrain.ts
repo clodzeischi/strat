@@ -25,6 +25,9 @@ interface Chunk {
  * gentle dunes would otherwise barely shade at all.
  */
 const RELIEF = 1.6;
+/** Ground brightness under fog: seen before but not now, and never seen. */
+export const FOG_EXPLORED = 0.5;
+export const FOG_UNKNOWN = 0.12;
 
 /**
  * The ground: one continuous smooth-shaded mesh over the map's surface, split into chunks. Materials (sand, rock,
@@ -34,6 +37,10 @@ export class Terrain {
   readonly mesh = new THREE.Group();
   private readonly material = new THREE.MeshLambertMaterial({ vertexColors: true });
   private readonly time = { value: 0 };
+  /** Fog of war over the ground, one texel per tile: 1 seen now, FOG_EXPLORED seen before, FOG_UNKNOWN never seen. */
+  private readonly fogData: Uint8Array;
+  private readonly fogShown: Float32Array;
+  readonly fogTexture: THREE.DataTexture;
   private chunks: Chunk[] = [];
   private dirty = new Set<number>();
   private tmp = new THREE.Color();
@@ -46,7 +53,14 @@ export class Terrain {
   constructor(private map: GameMap) {
     this.normals = new Float32Array(map.surfaceSize * map.surfaceSize * 3);
     this.computeNormals();
-    groundShader(this.material, this.time);
+    const N = map.size;
+    this.fogData = new Uint8Array(N * N).fill(255);
+    this.fogShown = new Float32Array(N * N).fill(1);
+    this.fogTexture = new THREE.DataTexture(this.fogData, N, N, THREE.RedFormat);
+    this.fogTexture.magFilter = THREE.LinearFilter;
+    this.fogTexture.minFilter = THREE.LinearFilter;
+    this.fogTexture.needsUpdate = true;
+    groundShader(this.material, this.time, { value: this.fogTexture }, { value: N * TILE });
     for (let cz0 = 0; cz0 < map.size; cz0 += CHUNK) {
       for (let cx0 = 0; cx0 < map.size; cx0 += CHUNK) this.buildChunk(cx0, cz0);
     }
@@ -55,6 +69,35 @@ export class Terrain {
   /** Advances the spice shimmer (seconds). */
   animate(t: number): void {
     this.time.value = t;
+  }
+
+  /**
+   * Eases the drawn fog toward what the player sees now (`visible`, `explored`: one byte per tile), so it opens and
+   * closes smoothly rather than in steps of a vision update. With `reveal`, everything is shown.
+   */
+  updateFog(visible: Uint8Array, explored: Uint8Array, reveal: boolean, dt: number): void {
+    const k = Math.min(1, dt * 6);
+    const shown = this.fogShown;
+    const data = this.fogData;
+    let changed = false;
+    for (let i = 0; i < shown.length; i++) {
+      const want = reveal || visible[i] ? 1 : explored[i] ? FOG_EXPLORED : FOG_UNKNOWN;
+      const v = shown[i];
+      if (v === want) continue;
+      const next = Math.abs(want - v) < 0.01 ? want : v + (want - v) * k;
+      shown[i] = next;
+      const byte = Math.round(next * 255);
+      if (data[i] !== byte) {
+        data[i] = byte;
+        changed = true;
+      }
+    }
+    if (changed) this.fogTexture.needsUpdate = true;
+  }
+
+  /** How bright the fog leaves a tile (0-1), for the minimap. */
+  fogAt(i: number): number {
+    return this.fogShown[i];
   }
 
   /** Marks a tile for repainting (its spice changed). Applied by `flush`, at most once per frame. */

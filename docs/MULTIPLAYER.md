@@ -40,6 +40,7 @@ Anything that changes game state must be deterministic:
 - **Never use `Math.hypot`** in `game/`, `entities/` or `map/`. Use `hypot` from `game/hypot.ts`.
 - **No frame time, `performance.now()` or `Date.now()` in game logic.** Use `game.time` or `game.ticks`.
 - **No camera or screen state in game logic.** Selection, the camera and hover live in the UI only.
+- **Vision: use `game.sees(team, e)` for the team that acts, never `game.localTeam`.** `game.shown(e)` is what this screen shows, and it's for drawing only.
 - **Player actions go through a command.** To add a new action, add a `Command` variant, apply it in `applyCommand`, and send it from the UI with `input.issue(...)`. Don't call game methods from `input.ts` or `sidebar.ts`.
 - **Messages for the player** go through `game.notifyTeam(team, text)`, which only shows them on that player's screen.
 - **After changing simulation code**, run `npx tsx sim/determinism.ts` and `npx tsx sim/netplay-check.ts`. If you change messages or the simulation in a way that would split two builds apart, bump `PROTOCOL_VERSION`.
@@ -48,7 +49,7 @@ Anything that changes game state must be deterministic:
 
 - **Different browsers might desync.** Chrome, Edge and Firefox share the same maths library for `sin`, `cos` and `atan2`, but Safari may differ in the last digit. The checksum catches it if it happens. The fix would be our own trig functions in the simulation.
 - **No reconnect.** A dropped connection ends the match. Resuming needs the server to keep the command log and the rejoining page to replay it, which the replay code already makes possible.
-- **No fog of war,** so a modified client could see everything (true of lockstep generally until there's fog). That's fine between friends.
+- **Fog of war is honor-system.** Vision is game state (`game/vision.ts`), computed for both teams on both machines, so units can only target what their side sees. What the screen hides is drawing only, though, and a modified client could show everything. Real protection against map hacks needs the server to run the game, which is a different architecture. Between friends it's fine.
 - **Fixed input delay** of 4 ticks (0.2 s). Fine on a home network or a VPS in the same country. It could adapt to the measured round trip.
 - **1v1 only.** The lockstep code handles any number of teams, but the server and lobby pair two players.
 - **Against the computer online** (co-op or 2v2 with AI) would work: the AI is deterministic, so every browser can run it.

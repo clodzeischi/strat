@@ -17,7 +17,8 @@ export abstract class Entity {
   z = 0;
   y = 0;
   readonly root = new THREE.Group();
-  private bar = new THREE.Group();
+  /** Health bar (hidden by the fog of war along with the rest when out of sight). */
+  readonly bar = new THREE.Group();
   private barFg: THREE.Mesh;
   private ring: THREE.Mesh;
 

@@ -43,6 +43,24 @@ Follow-ups: the AI still uses straight-line distance (`pickTarget`) and knows no
 - **Status: done** (`Game.rangeFor`, `HIGH_GROUND_RANGE` in `config.ts`; check with `npx tsx sim/range-check.ts`). The visual cue is still to do.
 - Needs a visual cue (for example, a range ring or an icon on units with the advantage); otherwise players won't understand why they lose a fight.
 
+## 2b. Fog of war and grid combat
+
+**Decided:** StarCraft-style vision. Low ground can't see onto high ground unless something of yours is up there or it shoots at you. High cells block low ground's view past them, so mesas hide what's behind them. Combat checks run on the tile grid, using tile levels instead of 3D geometry.
+
+**Status: done.**
+- `game/vision.ts`: per-team visible, in-range and explored grids, recomputed every 4 ticks.
+- Sight is measured from the unit's position to cell centers.
+- Sight lines are Bresenham lines over tile heights (low, ramp, high), which keeps them point-symmetric for mirrored bases.
+- Buildings see 8 units past their walls.
+- Aircraft and parachutists see from above. Aircraft are seen by anyone with the cell in range.
+- An attacker is revealed to the side it hit for 2 s.
+- Units only target what their team sees. An attack order on something that slips into the fog becomes an attack-move to where it was last seen.
+- A command clicked on something no longer visible attacks a structure where it stands, or attack-moves to the spot.
+- Shells and rockets fly on the ground grid (flat distance, impact at the target's tile position). The 3D muzzle-to-target arc is only drawn.
+- Drawing: a fog texture on the ground shader, enemies out of sight hidden, last-seen ghosts of enemy structures, effects in the fog suppressed, and fog on the minimap.
+
+Balance effect: rocket launchers below a cliff now need a spotter (a unit up top, a Carryall overhead, or being shot at). The AI still sees everything when it plans; only its units' targeting respects the fog.
+
 ## 3. Procedural maps
 
 **Decided:** sizes 64, 96 and 128. Plan for up to 4 players.

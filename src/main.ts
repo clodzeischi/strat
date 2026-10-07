@@ -76,6 +76,9 @@ const mapSeed = match?.seed ?? autostart?.seed ?? urlSeed() ?? randomSeed();
 const rts = new RTSCamera(mapSize * TILE);
 const game = new Game(scene, rts.camera, mapSize, mapSeed);
 game.localTeam = match?.team ?? 0;
+// `?reveal` lifts the fog of war on screen, offline only (for testing). The title fly-over shows the whole map.
+const revealParam = !match && new URLSearchParams(location.search).has('reveal');
+game.revealAll = true;
 const ENEMY = (1 - game.localTeam) as Team;
 
 // The sun's shadow map follows whatever the active camera is looking at.
@@ -141,6 +144,7 @@ const opponentName = match ? match.names[ENEMY] : null;
 
 function beginPlay(): void {
   mode = 'playing';
+  game.revealAll = revealParam;
   menus.hideTitle();
   document.body.classList.remove('in-menu');
   scene.fog = gameFog;
@@ -161,6 +165,7 @@ function startGame(difficulty: Difficulty): void {
 /** Online: the page has reloaded into a match; reconnect, and start when both players are back. */
 function startOnline(m: MatchInfo): void {
   mode = 'connecting';
+  game.revealAll = false;
   menus.hideTitle();
   input.pausable = false;
   showNetWait('Connecting to the game server…');
@@ -220,6 +225,7 @@ function endGame(note: string): void {
   showNetWait('');
   if (game.winner === null && mode !== 'connecting') game.winner = game.localTeam;
   mode = 'ended';
+  game.revealAll = true;
   menus.setPaused(false);
   menus.showEnd(game, input.actions / Math.max(1, game.time / 60), opponentName, note);
   net?.close();
@@ -386,6 +392,7 @@ function frame(now: number): void {
         if (online) endGame(game.surrendered === null ? '' : game.surrendered === game.localTeam ? 'You surrendered' : `${opponentName} surrendered`);
         else {
           mode = 'ended';
+          game.revealAll = true;
           menus.showEnd(game, input.actions / Math.max(1, game.time / 60));
         }
       }

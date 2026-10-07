@@ -12,6 +12,7 @@ import { mat } from '../materials/lambert';
 import { cellsAround, type Point } from './pathfinding';
 import { Terrain } from '../render/terrain';
 import { Hasher, mulberry32 } from './rng';
+import { Vision, VISION_EVERY } from './vision';
 import { hypot } from './hypot';
 
 /** Running totals for the end-of-game screen. */
@@ -47,8 +48,15 @@ export interface TeamState {
   spawnTurn: Record<Producer, number>;
 }
 
+/**
+ * A shell or rocket in flight. The simulation only knows where it will land, on the ground grid (`x`, `z`, which
+ * follow the target while it lives) and how far along it is (`t`); the flight time comes from the flat distance.
+ * The 3D arc from the model's muzzle to the target's middle (`start`, `end`, `mesh`) is only for drawing.
+ */
 interface Projectile {
   kind: ProjectileKind;
+  x: number;
+  z: number;
   mesh: THREE.Mesh;
   start: THREE.Vector3;
   end: THREE.Vector3;
@@ -76,6 +84,8 @@ export class Game {
   readonly map: GameMap;
   readonly terrain: Terrain;
   readonly effects: Effects;
+  /** Fog of war: what each team can see (game state; units only target what their team sees). */
+  readonly vision: Vision;
   units: Unit[] = [];
   buildings: Building[] = [];
   teams: TeamState[];
@@ -90,6 +100,10 @@ export class Game {
   onMessage: (text: string) => void = () => {};
   /** The team this screen plays (presentation only: whose messages and alerts show). */
   localTeam: Team = PLAYER;
+  /** Drawing only: show the whole map, fog or not (single player with ?reveal, and after the game). */
+  revealAll = false;
+  /** Drawing only: enemy structures destroyed out of the local player's sight, still shown where they were last seen. */
+  private ghosts: Building[] = [];
   /** Simulation steps run so far. */
   ticks = 0;
   /** The simulation's own random numbers (see rng.ts): same seed, same game. */
@@ -115,7 +129,10 @@ export class Game {
       building: null, queues: { barracks: [], factory: [], hitech: [] }, research: null,
       rally: { barracks: null, factory: null, hitech: null }, spawnTurn: { barracks: 0, factory: 0, hitech: 0 }, levelUps: {},
     }));
+    this.vision = new Vision(this.map, this.teams.length);
+    this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
     this.setupStart();
+    this.vision.update(this.units, this.buildings, 0);
   }
 
   private setupStart(): void {
@@ -139,6 +156,11 @@ export class Game {
   }
 
   // ---- Queries --------------------------------------------------------------
+
+  /** Whether a team can see an entity (its own always). */
+  sees(team: Team, e: Entity): boolean {
+    return this.vision.sees(team, e);
+  }
 
   has(team: Team, type: BuildingType): boolean {
     return this.buildings.some((b) => b.team === team && b.type === type && !b.dead);
@@ -202,7 +224,7 @@ export class Game {
     let best: Entity | null = null;
     let bestScore = Infinity;
     const consider = (e: Entity, penalty: number) => {
-      if (e.team === team || e.dead || (e instanceof Unit && e.carrier)) return;
+      if (e.team === team || e.dead || (e instanceof Unit && e.carrier) || !this.vision.sees(team, e)) return;
       const d = distTo(e, x, z);
       if (d > range) return;
       let score = d + penalty;
@@ -633,8 +655,8 @@ export class Game {
     mesh.position.copy(from);
     this.scene.add(mesh);
     this.projectiles.push({
-      kind: w.projectile, mesh, start: from, end: to, target, owner: u, t: 0,
-      duration: Math.max(0.1, from.distanceTo(to) / w.speed), weapon: w, mult, trailTimer: 0, from: from.clone(), to: from.clone(),
+      kind: w.projectile, x: target.x, z: target.z, mesh, start: from, end: to, target, owner: u, t: 0,
+      duration: Math.max(0.1, hypot(target.x - u.x, target.z - u.z) / w.speed), weapon: w, mult, trailTimer: 0, from: from.clone(), to: from.clone(),
     });
   }
 
@@ -642,7 +664,11 @@ export class Game {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
       p.t = Math.min(1, p.t + dt / p.duration);
-      if (!p.target.dead) p.end.copy(p.target.aimPoint());
+      if (!p.target.dead) {
+        p.x = p.target.x;
+        p.z = p.target.z;
+        p.end.copy(p.target.aimPoint());
+      }
       const arc = p.kind === 'rocket' ? 0.35 * p.start.distanceTo(p.end) : 0.4;
       const pos = new THREE.Vector3().lerpVectors(p.start, p.end, p.t);
       pos.y += arc * 4 * p.t * (1 - p.t);
@@ -663,10 +689,10 @@ export class Game {
           // The target takes the full hit; anything else in the blast takes half, fading toward the edge, so one
           // rocket into a tight group doesn't do full damage to every unit in it.
           const victims = [...this.units, ...this.buildings].filter(
-            (e) => e.team !== p.owner.team && !e.dead && distTo(e, p.end.x, p.end.z) <= splash,
+            (e) => e.team !== p.owner.team && !e.dead && distTo(e, p.x, p.z) <= splash,
           );
           for (const v of victims) {
-            const share = v === p.target ? 1 : SPLASH_SHARE * (1 - distTo(v, p.end.x, p.end.z) / splash / 2);
+            const share = v === p.target ? 1 : SPLASH_SHARE * (1 - distTo(v, p.x, p.z) / splash / 2);
             this.damage(v, p.weapon, p.mult * share, p.owner);
           }
         } else if (!p.target.dead) {
@@ -681,6 +707,8 @@ export class Game {
   damage(target: Entity, w: WeaponDef, mult: number, attacker: Unit | null): void {
     if (target.dead || (target instanceof Unit && target.carrier)) return;
     target.lastHurt = this.time;
+    // Whoever fires is seen by the side it hits for a moment, so units below a cliff can shoot back.
+    if (attacker && attacker.team !== target.team) this.vision.reveal(target.team, attacker.x, attacker.z, this.ticks);
     let dmg = weaponDamage(w, target) * mult;
     dmg *= 1 - ARMOR_BONUS * this.tier(target.team, 'armor');
     target.hp -= dmg;
@@ -713,7 +741,9 @@ export class Game {
       if (!killer.hero || attacker.kills > killer.hero.kills) killer.hero = attacker;
     }
     e.setSelected(false);
-    this.scene.remove(e.root);
+    // The local player keeps seeing a structure they knew about until they look again.
+    if (e instanceof Building && e.known && !this.shown(e)) this.ghosts.push(e);
+    else this.scene.remove(e.root);
     if (e instanceof Building) {
       for (let z = e.cz; z < e.cz + e.size; z++) {
         for (let x = e.cx; x < e.cx + e.size; x++) this.map.occupied[this.map.idx(x, z)] = 0;
@@ -799,7 +829,7 @@ export class Game {
         u.cooldown -= dt;
         if (u.cooldown > 0) continue;
         const reach = Math.max(u.def.weapon!.range, u.def.antiArmor?.range ?? 0) * 1.1;
-        const t = u.target && !u.target.dead && gap(u.target) <= reach ? u.target : this.nearestEnemy(b.team, b.x, b.z, reach + b.size * TILE, u);
+        const t = u.target && !u.target.dead && this.vision.sees(b.team, u.target) && gap(u.target) <= reach ? u.target : this.nearestEnemy(b.team, b.x, b.z, reach + b.size * TILE, u);
         u.target = t;
         if (!t) continue;
         const w = this.weaponFor(u, t);
@@ -831,6 +861,7 @@ export class Game {
     // Frames draw units between ticks; put them back where the simulation left them (muzzles aim from there).
     for (const u of this.units) u.beginTick();
     this.time += dt;
+    if ((this.ticks - 1) % VISION_EVERY === 0) this.vision.update(this.units, this.buildings, this.ticks);
     for (const ts of this.teams) this.updateProduction(ts, dt);
     // Alternate the order units act in, so neither side always gets the first shot in a tick.
     const order = this.ticks % 2 ? this.units : [...this.units].reverse();
@@ -869,12 +900,45 @@ export class Game {
    */
   frame(dt: number, alpha: number): void {
     for (const u of this.units) u.interpolate(alpha);
-    for (const p of this.projectiles) p.mesh.position.lerpVectors(p.from, p.to, alpha);
+    for (const p of this.projectiles) {
+      p.mesh.position.lerpVectors(p.from, p.to, alpha);
+      p.mesh.visible = this.revealAll || this.vision.seesAt(this.localTeam, p.mesh.position.x, p.mesh.position.z);
+    }
+    this.drawFog(dt);
     for (const b of this.buildings) if (b.spinner) b.spinner.rotation.y += dt * (b.type === 'factory' ? 1.5 : 0.25);
     this.effects.update(dt);
     this.terrain.flush();
-    for (const u of this.units) if (!u.carrier || !u.def.infantry) u.updateBar(this.camera);
-    for (const b of this.buildings) b.updateBar(this.camera);
+    for (const u of this.units) if (u.root.visible) u.updateBar(this.camera);
+    for (const b of this.buildings) if (this.shown(b)) b.updateBar(this.camera);
+  }
+
+  /** Whether the local player's screen shows an entity now: their own, or anything their side sees. */
+  shown(e: Entity): boolean {
+    if (this.revealAll || e.team === this.localTeam) return true;
+    if (e instanceof Unit && e.carrier instanceof Unit) return this.shown(e.carrier);
+    return this.vision.sees(this.localTeam, e);
+  }
+
+  /** Fog of war on the local player's screen: the ground, enemies out of sight, and last-seen structures. */
+  private drawFog(dt: number): void {
+    const local = this.localTeam;
+    this.terrain.updateFog(this.vision.visible[local], this.vision.explored[local], this.revealAll, dt);
+    for (const u of this.units) {
+      // Infantry ride inside bunkers and Carryalls; vehicles hang under the Carryall.
+      const aboard = u.carrier instanceof Building || (u.carrier !== null && u.def.infantry);
+      u.root.visible = !aboard && this.shown(u);
+    }
+    for (const b of this.buildings) {
+      if (this.shown(b)) b.known = true;
+      else b.bar.visible = false;
+      b.root.visible = b.known;
+    }
+    // A ghost of a destroyed structure goes once the player looks at the spot again.
+    this.ghosts = this.ghosts.filter((b) => {
+      const gone = this.revealAll || this.vision.sees(local, b);
+      if (gone) this.scene.remove(b.root);
+      return !gone;
+    });
   }
 
   /** Checksum of the game state; lockstep players compare these to catch a desync early. */
@@ -883,7 +947,7 @@ export class Game {
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
     for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.heading);
     for (const b of this.buildings) h.int(b.id).num(b.hp);
-    for (const p of this.projectiles) h.num(p.t);
+    for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);
     return h.value;
   }
 
