@@ -61,6 +61,28 @@ Follow-ups: the AI still uses straight-line distance (`pickTarget`) and knows no
 
 Balance effect: rocket launchers below a cliff now need a spotter (a unit up top, a Carryall overhead, or being shot at). The AI still sees everything when it plans; only its units' targeting respects the fog.
 
+**AI without map knowledge (done).** The AI plays under the fog like a person. `game/intel.ts` keeps what its side has seen:
+- **Units:** where each was last seen and how strong it was. A unit's position is trusted for 60 s, or until its spot is seen empty. It still counts toward the enemy army for 3 minutes, unless the AI saw it die or killed it.
+- **Structures:** remembered until their spot is seen empty.
+- **What it plans from:** strength, counters, threats, raids, wave targets and surrender judgments all use only this memory.
+- **Locating the enemy:** before it has seen anything, it assumes the enemy base is the mirror image of its own start (maps are point-symmetric). Once it has looked there and found nothing, it searches the map region it has gone longest without seeing.
+- **Scouting runs:** a trike, or infantry if there's no trike, visits the enemy base, then the spice field the enemy harvests, then the stalest region. Normal first scouts at 30 s, then every 150 s. Hard first scouts at 40 s, then every 75 s, twice as often in the first 4 minutes.
+- **Watch post (Hard):** after its look, Hard's scout parks 16 tiles outside the enemy base and watches for the army moving out.
+- **Reading a rush:** two barracks, or a barracks and no refinery a minute in, is read as an early attack, and the AI braces for it.
+- **Rush fix:** the rush response no longer cancels its own bunker.
+
+Cost of playing fair (gauntlet, 20 games each, Hard / Normal win %):
+
+| Opponent | Hard | Normal |
+|---|---|---|
+| Airdrop | 95 | 30 |
+| Harass | 75 | 10 |
+| Rockets | 65 | 5 |
+| Rush | 50 | 25 |
+| Turtle | 60 | 5 |
+
+The rush is the biggest loss: the AI used to watch it build at home. Tried and dropped: holding the factory until the scout reports (Hard 3/20 against the rush), and keeping a harvester's price while rushed (7/20, no better). A dead economy with a few infantry holding a bunker is now surrendered after 3 minutes, instead of stalemating.
+
 ## 3. Procedural maps
 
 **Decided:** sizes 64, 96 and 128. Plan for up to 4 players.

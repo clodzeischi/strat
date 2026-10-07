@@ -102,6 +102,8 @@ export class Game {
   localTeam: Team = PLAYER;
   /** Drawing only: show the whole map, fog or not (single player with ?reveal, and after the game). */
   revealAll = false;
+  /** Per team: ids of enemy entities it saw destroyed. */
+  private witnessed: Set<number>[] = [new Set(), new Set()];
   /** Drawing only: enemy structures destroyed out of the local player's sight, still shown where they were last seen. */
   private ghosts: Building[] = [];
   /** Simulation steps run so far. */
@@ -725,7 +727,14 @@ export class Game {
     if (target.hp <= 0) this.kill(target, attacker);
   }
 
+  /** Whether a team saw this entity destroyed (so its AI knows it's gone rather than just out of sight). */
+  witnessedDeath(team: Team, id: number): boolean {
+    return this.witnessed[team].has(id);
+  }
+
   private kill(e: Entity, attacker: Unit | null): void {
+    // Whoever saw it go, or made the kill, knows it's gone.
+    for (const ts of this.teams) if (ts.team !== e.team && (this.vision.sees(ts.team, e) || attacker?.team === ts.team)) this.witnessed[ts.team].add(e.id);
     e.dead = true;
     const victim = this.teams[e.team].stats;
     const killer = attacker && attacker.team !== e.team ? this.teams[attacker.team] : null;

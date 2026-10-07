@@ -2,6 +2,7 @@ import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, 
 import { Building, type Entity, type Unit } from '../entities';
 import type { Difficulty, Game } from './game';
 import { MATCHUP_TYPES, MATCHUPS, type Matchup } from './matchups';
+import { Intel, type Sighting } from './intel';
 import { SPICE, type Cell } from '../map';
 import { hypot } from './hypot';
 
@@ -59,13 +60,17 @@ export interface AIProfile {
    * enemies around it are `outmatched` times its strength.
    */
   sustain: { repairPer: number; maxRepair: number; outmatched: number };
+  /** Scouting: when the first scout sets out, and how long between scouting runs (seconds). */
+  scout: { first: number; interval: number };
+  /** After its first look, the scout stays parked outside the enemy base, watching for the army moving out. */
+  watch: boolean;
 }
 
 export const NORMAL_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
   raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3, waveGate: 0.6, counterFocus: 3, goodLinesOnly: false, bunkers: 1,
-  sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 },
+  sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 }, scout: { first: 30, interval: 150 }, watch: false,
 };
 
 /**
@@ -76,7 +81,7 @@ export const NORMAL_PROFILE: AIProfile = {
 export const HARD_PROFILE: AIProfile = {
   ...NORMAL_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
   initiative: 1.2, waveRetreat: 0.5, waveGate: 0.9, counterFocus: 8, goodLinesOnly: true, bunkers: 2, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
-  sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 },
+  sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 }, scout: { first: 40, interval: 75 }, watch: true,
 };
 
 /** The AI profile for a difficulty. Brutal isn't built yet and plays as Hard. */
@@ -104,7 +109,7 @@ const LEASH = 22 * TILE;
 const DEFENSE_TIMEOUT = 4;
 
 /** 'garrison': on its way into one of our bunkers, or in it. */
-export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison';
+export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -127,7 +132,8 @@ interface Wave {
 }
 
 /**
- * A scripted opponent. Priorities, in order: keep an income (rebuild refineries and harvesters first), meet each
+ * A scripted opponent. It plays by the same rules as a person: everything it knows about the enemy comes from what
+ * its side has seen (`Intel`), so it has to scout. Priorities, in order: keep an income (rebuild refineries and harvesters first), meet each
  * attack with enough force to beat it and bring the defenders home afterwards, then build counters to the enemy
  * army, raid and attack in waves. When its production and income are gone for good, it offers to surrender.
  */
@@ -163,12 +169,25 @@ export class AI {
   /** Once the opening is done, buildings missing from it are rebuilt before anything else is bought. */
   private openingDone = false;
 
+  /** What we know of the enemy: only what our side has seen. */
+  readonly intel: Intel;
+  /** The unit out scouting, and the places it still has to look at. */
+  private scout: Unit | null = null;
+  private scoutRoute: { x: number; z: number }[] = [];
+  /** The scout has had its look and is parked at a watch post (see `toWatchPost`). */
+  private watching = false;
+  private nextScoutTime: number;
+
   /** Consecutive thinks (seconds) the position has looked hopeless. */
   private hopelessFor = 0;
+  /** When we last ran out of income with no way to buy it back (Infinity while the economy works). */
+  private brokeSince = Infinity;
   surrenderOffered = false;
 
   constructor(protected game: Game, protected team: Team, protected profile: AIProfile = NORMAL_PROFILE) {
     this.nextRaidTime = profile.raids.start;
+    this.nextScoutTime = profile.scout.first;
+    this.intel = new Intel(game, team);
     this.techOrder = game.random() < 0.5 ? ['conyard', 'factory'] : ['factory', 'conyard'];
   }
 
@@ -227,6 +246,7 @@ export class AI {
     if (this.thinkTimer > 0) return;
     this.thinkTimer = 1;
     if (!this.openingStep()) this.openingDone = true;
+    this.intel.update();
     this.trackHarvesterLosses();
     this.trackStrength();
     this.manageConstruction();
@@ -279,8 +299,9 @@ export class AI {
       return;
     }
     const goal = this.econGoal();
-    // Rushed: anything but a refinery or barracks under construction is called off (full refund) for units.
-    if (ts.building && this.rushed() && g.has(this.team, 'refinery') && ts.building.type !== 'barracks' && ts.building.type !== 'refinery') {
+    // Rushed: anything but a refinery, barracks or bunker under construction is called off (full refund) for units.
+    const keepBuilding = ['barracks', 'refinery', 'bunker'];
+    if (ts.building && this.rushed() && g.has(this.team, 'refinery') && !keepBuilding.includes(ts.building.type)) {
       g.cancelBuilding(this.team);
       return;
     }
@@ -321,7 +342,7 @@ export class AI {
     const rushed = this.rushed();
     // More harvesters only while our army is holding its own; with a stronger enemy army about, units come first
     // (just the minimum, so income doesn't collapse).
-    const holding = this.armyPower(this.team, true) >= this.armyPower(this.team, false) * 0.8;
+    const holding = this.ownPower() >= this.intel.armyPower() * 0.8;
     const harvesterGoal = rushed ? 1 : holding ? this.wantHarvesters() : Math.min(this.wantHarvesters(), this.profile.minHarvesters);
     if (this.harvesterCount() < harvesterGoal && g.canTrain(this.team, 'harvester')) {
       if (!full('factory') && ts.credits >= UNITS.harvester.cost) g.queueUnit(this.team, 'harvester');
@@ -377,12 +398,26 @@ export class AI {
   }
 
   /**
-   * An early rush: in the first five minutes, the enemy's army is well ahead of ours (`trackStrength`). Until we
-   * catch up, only a
-   * refinery (if we have none), up to three barracks and units get bought.
+   * An early rush: in the first five minutes, the enemy's army is well ahead of ours (`trackStrength`), or scouting
+   * says one is coming (`rushSuspected`). Until we catch up, only a refinery (if we have none), up to three
+   * barracks and units get bought.
    */
   private rushed(): boolean {
-    return this.game.time < 300 && this.behindFor >= 5;
+    const g = this.game;
+    if (g.time >= 300) return false;
+    if (this.behindFor >= 5) return true;
+    // Read from scouting: braced until our army clearly outweighs what we've seen of theirs.
+    return this.rushSuspected() && this.ownPower() < Math.max(this.intel.armyPower(), 450) * 1.3;
+  }
+
+  /**
+   * What a scout's look at the enemy base says about an early attack coming, as a player would read it: two
+   * barracks before anything else, or a barracks and still no refinery a minute in.
+   */
+  private rushSuspected(): boolean {
+    const barracks = this.intel.structures('barracks').length;
+    const refineries = this.intel.structures('refinery').length;
+    return barracks >= 2 || (barracks >= 1 && refineries === 0 && this.game.time > 60 && this.game.time - this.intel.lastBaseSeen < 60);
   }
 
   /**
@@ -391,30 +426,30 @@ export class AI {
    * in a fight) from flipping the economy into emergency mode, which in an even game snowballs into a lead.
    */
   private trackStrength(): void {
-    const mine = this.armyPower(this.team, true);
-    const theirs = this.armyPower(this.team, false);
+    const mine = this.ownPower();
+    const theirs = this.intel.armyPower();
     this.behindFor = mine * 1.5 < theirs && theirs - mine > 600 ? this.behindFor + 1 : 0;
   }
 
   /**
-   * The enemy army's strength as an attacker would face it: units within 20 tiles of their own buildings count 1.5x,
-   * since they fight where they're set up, with their base around them and reinforcements arriving.
+   * The enemy army's strength as an attacker would face it, as far as we know it: units within 20 tiles of their
+   * own buildings count 1.5x, since they fight where they're set up, with their base around them and reinforcements
+   * arriving; so do units we've lost track of (they're most likely at home).
    */
   private enemyDefense(): number {
-    const g = this.game;
+    const known = [...this.intel.buildings.values()];
     let p = 0;
-    for (const u of g.units) {
-      if (u.team === this.team || u.carrier) continue;
-      const home = g.buildings.some((b) => b.team === u.team && hypot(b.x - u.x, b.z - u.z) < 20 * TILE);
-      p += power(u) * (home ? 1.5 : 1);
+    for (const s of this.intel.units.values()) {
+      const home = !s.placed || known.some((b) => hypot(b.x - s.x, b.z - s.z) < 20 * TILE);
+      p += s.power * (home ? 1.5 : 1);
     }
     return p;
   }
 
-  /** Combined strength of our army (`mine`), or of everyone else's. */
-  private armyPower(team: Team, mine: boolean): number {
+  /** Combined strength of our army, infantry in bunkers included (not units riding in a Carryall). */
+  private ownPower(): number {
     let p = 0;
-    for (const u of this.game.units) if ((u.team === team) === mine && !u.carrier) p += power(u);
+    for (const u of this.game.units) if (u.team === this.team && (!u.carrier || u.carrier instanceof Building)) p += power(u);
     return p;
   }
 
@@ -434,14 +469,14 @@ export class AI {
   private counterWeights(): [UnitType, number][] {
     const g = this.game;
     const options = (MATCHUP_TYPES as Matchup[]).filter((t) => g.requirementsMet(this.team, UNITS[t].requires));
+    // The enemy army as we've seen it.
     const enemy = new Map<Matchup, number>();
     let total = 0;
-    let foe: Team | null = null;
-    for (const u of g.units) {
-      if (u.team === this.team || u.carrier || !(MATCHUP_TYPES as UnitType[]).includes(u.type)) continue;
-      enemy.set(u.type as Matchup, (enemy.get(u.type as Matchup) ?? 0) + u.def.cost);
-      total += u.def.cost;
-      foe = u.team;
+    for (const s of this.intel.units.values()) {
+      if (!(MATCHUP_TYPES as string[]).includes(s.type)) continue;
+      const cost = UNITS[s.type as UnitType].cost;
+      enemy.set(s.type as Matchup, (enemy.get(s.type as Matchup) ?? 0) + cost);
+      total += cost;
     }
     const own = new Map<Matchup, number>();
     let ownTotal = 0;
@@ -451,8 +486,8 @@ export class AI {
       ownTotal += u.def.cost;
     }
     const base = (t: Matchup) => BASE_MIX[t] * (1 - (own.get(t) ?? 0) / Math.max(1, ownTotal)) ** 2;
-    if (foe === null) return options.map((t) => [t, base(t)]);
-    const key = `${g.teams[this.team].upgrades.has('rockets') ? 'R' : '-'}${g.teams[foe].upgrades.has('rockets') ? 'R' : '-'}`;
+    if (total === 0) return options.map((t) => [t, base(t)]);
+    const key = `${g.teams[this.team].upgrades.has('rockets') ? 'R' : '-'}${this.intel.enemyRockets ? 'R' : '-'}`;
     return options.map((t) => {
       let score = 0;
       for (const [e, value] of enemy) {
@@ -509,6 +544,7 @@ export class AI {
     const baseAttacked = this.defenses.some((d) => d.base);
     this.manageWaves(baseAttacked);
     this.manageRaids(army, baseAttacked);
+    this.manageScout(army, baseAttacked);
 
     // Leash: a unit at home or defending that has been drawn far out (chasing a kiting raider, say) comes straight
     // back with a plain move, which doesn't stop to fight, instead of an attack-move it would break off again.
@@ -576,7 +612,7 @@ export class AI {
     const near = (e: Entity, list: Entity[], r: number) => list.some((o) => hypot(o.x - e.x, o.z - e.z) < r);
     const groups: { units: Unit[]; x: number; z: number; base: boolean }[] = [];
     for (const e of g.units) {
-      if (e.team === this.team || e.dead || e.carrier || !e.def.weapon) continue;
+      if (e.team === this.team || e.dead || e.carrier || !e.def.weapon || !g.sees(this.team, e)) continue;
       const base = near(e, buildings, BASE_RADIUS);
       if (!base && !near(e, harvesters, HARVESTER_RADIUS)) continue;
       let group = groups.find((c) => hypot(c.x - e.x, c.z - e.z) < CLUSTER_RADIUS);
@@ -724,7 +760,9 @@ export class AI {
     const strength = ready.reduce((s, u) => s + power(u), 0);
     // Initiative: strong enough to win outright, so go now, whatever the timer says.
     const enemy = this.enemyDefense();
-    const seize = this.profile.initiative > 0 && ready.length >= 4 && strength >= enemy * this.profile.initiative;
+    // Only on recent scouting: an enemy we haven't looked at in a while may have built anything.
+    const fresh = g.time - this.intel.lastBaseSeen < 90;
+    const seize = this.profile.initiative > 0 && fresh && ready.length >= 4 && strength >= enemy * this.profile.initiative;
     if (!seize) {
       // The longer it's been since a wave was due, the less of an edge it waits for (down to half after five
       // minutes), so two evenly matched armies don't just stare at each other all game.
@@ -757,12 +795,13 @@ export class AI {
     for (const u of [...this.raiders]) if (u.dead) this.raiders.delete(u);
     const left = [...this.raiders].reduce((s, u) => s + power(u), 0);
     const beaten = r.hunt && this.raiders.size > 0 && (left < this.raidStart * 0.5 || this.guardAround(this.centroid(this.raiders), 9) > left * 0.6);
-    const done = [...this.raiders].filter((u) => beaten || u.order.kind !== 'attack');
+    // A raider is done when its attack is over, or it got to where the harvester was last seen and found nothing.
+    const done = [...this.raiders].filter((u) => beaten || (u.order.kind !== 'attack' && u.order.kind !== 'amove'));
     if (r.hunt && !beaten && done.length && done.length === this.raiders.size) {
       // Kill made and the group is still healthy: on to the next harvester.
       const next = this.pickHarvester(done[0], left);
       if (next) {
-        for (const u of done) u.command(g, { kind: 'attack', target: next });
+        for (const u of done) this.goAfter(u, next);
         done.length = 0;
       }
     }
@@ -774,15 +813,101 @@ export class AI {
     if (baseAttacked || g.time < this.nextRaidTime || this.raiders.size) return;
     const trikes = army.filter((u) => u.type === 'trike' && this.roles.get(u) === 'home');
     if (trikes.length < r.trikes) return;
-    const victim = r.hunt ? this.pickHarvester(trikes[0], trikes.reduce((s, u) => s + power(u), 0)) : g.units.find((u) => u.team !== this.team && u.type === 'harvester' && !u.dead && !u.carrier);
+    const victim = r.hunt ? this.pickHarvester(trikes[0], trikes.reduce((s, u) => s + power(u), 0)) : this.intel.placedUnits().find((s) => s.harvester) ?? null;
     if (!victim) return;
     for (const u of trikes) {
       this.roles.set(u, 'raid');
       this.raiders.add(u);
-      u.command(g, { kind: 'attack', target: victim });
+      this.goAfter(u, victim);
     }
     this.raidStart = trikes.reduce((s, u) => s + power(u), 0);
     this.nextRaidTime = g.time + r.interval;
+  }
+
+  /**
+   * Scouting: every so often one fast, cheap unit from home (a trike if there is one, else infantry) drives out to
+   * look at the enemy, first where the enemy base must be, then the spice field its harvesters work. It doesn't
+   * stop to fight, and turns back once it's hurt. What it sees goes into `intel`.
+   */
+  private manageScout(army: Unit[], baseAttacked: boolean): void {
+    const g = this.game;
+    const s = this.scout;
+    if (s && (s.dead || s.carrier || this.roles.get(s) !== 'scout')) this.endScout();
+    else if (s) {
+      if (this.watching) return;
+      if (s.hp < s.maxHp * 0.5) {
+        if (!this.toWatchPost()) this.endScout();
+        return;
+      }
+      const goal = this.scoutRoute[0];
+      if (goal && (hypot(s.x - goal.x, s.z - goal.z) < 4 * TILE || s.order.kind === 'idle')) {
+        this.scoutRoute.shift();
+        const next = this.scoutRoute[0];
+        if (next) s.command(g, { kind: 'move', x: next.x, z: next.z });
+        else if (!this.toWatchPost()) this.endScout();
+      }
+      return;
+    }
+    if (baseAttacked || this.rushed() || g.time < this.nextScoutTime) return;
+    const candidates = army
+      .filter((u) => this.roles.get(u) === 'home' && (u.type === 'trike' || u.type === 'infantry') && u.hp > u.maxHp * 0.7)
+      .sort((a, b) => b.def.speed - a.def.speed);
+    const scout = candidates[0];
+    if (!scout) {
+      this.nextScoutTime = g.time + 10;
+      return;
+    }
+    const base = this.intel.enemyBase();
+    const m = g.map;
+    const spice = m.nearestCell(m.cellOf(base.x), m.cellOf(base.z), (x, z) => m.tile(x, z) === SPICE, 24);
+    // The base first while we don't know where it is; once we do, the spice field (harvesters) on the way in.
+    const field = spice ? { x: m.center(spice.cx), z: m.center(spice.cz) } : null;
+    this.scoutRoute = this.intel.baseKnown && field ? [field, base] : field ? [base, field] : [base];
+    // Later runs also look in on wherever we've gone longest without a look (a hidden expansion, say).
+    if (this.intel.baseKnown) this.scoutRoute.push(this.intel.searchSpot());
+    this.leaveGroups(scout);
+    this.roles.set(scout, 'scout');
+    this.scout = scout;
+    scout.command(g, { kind: 'move', x: this.scoutRoute[0].x, z: this.scoutRoute[0].z });
+  }
+
+  /**
+   * Hard: once the scout has had its look, it parks outside the enemy base on the way toward the middle of the map
+   * (out of reach of the base's own sight), where an army heading out has to pass. Returns false if not watching.
+   */
+  private toWatchPost(): boolean {
+    const s = this.scout;
+    if (!this.profile.watch || !s || this.watching) return false;
+    const m = this.game.map;
+    const base = this.intel.enemyBase();
+    const mid = m.worldSize() / 2;
+    const len = hypot(mid - base.x, mid - base.z) || 1;
+    const out = 16 * TILE;
+    const x = base.x + ((mid - base.x) / len) * out;
+    const z = base.z + ((mid - base.z) / len) * out;
+    const cell = m.nearestCell(m.cellOf(x), m.cellOf(z), (cx, cz) => m.canEnter(cx, cz, 'vehicle'), 6);
+    if (!cell) return false;
+    this.watching = true;
+    s.command(this.game, { kind: 'move', x: m.center(cell.cx), z: m.center(cell.cz) });
+    return true;
+  }
+
+  private endScout(): void {
+    const s = this.scout;
+    this.scout = null;
+    this.watching = false;
+    this.scoutRoute = [];
+    // The opening is when a look matters most (an early attack has to be seen coming): more often then.
+    const t = this.game.time;
+    this.nextScoutTime = t + this.profile.scout.interval * (t < 240 ? 0.5 : 1);
+    if (s && !s.dead && this.roles.get(s) === 'scout') this.sendHome(s);
+  }
+
+  /** Attacks a sighted enemy if it's in view, else heads (attack-moving) to where it was last seen. */
+  private goAfter(u: Unit, s: Sighting): void {
+    const live = this.intel.visibleUnit(s);
+    if (live) u.command(this.game, { kind: 'attack', target: live });
+    else u.command(this.game, { kind: 'amove', x: s.x, z: s.z });
   }
 
   private centroid(units: Set<Unit>): { x: number; z: number } {
@@ -795,25 +920,20 @@ export class AI {
     return { x: x / Math.max(1, units.size), z: z / Math.max(1, units.size) };
   }
 
-  /** Enemy fighting strength within `tiles` of a point. */
+  /** Known enemy fighting strength within `tiles` of a point. */
   private guardAround(p: { x: number; z: number }, tiles: number): number {
-    let guard = 0;
-    for (const e of this.game.units) {
-      if (e.team !== this.team && e.def.weapon && !e.carrier && hypot(e.x - p.x, e.z - p.z) < tiles * TILE) guard += power(e);
-    }
-    return guard;
+    return this.intel.powerAround(p.x, p.z, tiles * TILE);
   }
 
   /**
    * The enemy harvester with the least protection around it, nearer ones preferred; none if every one is guarded by
    * more than half of `strength`.
    */
-  private pickHarvester(from: { x: number; z: number }, strength: number): Unit | null {
-    const g = this.game;
-    let best: Unit | null = null;
+  private pickHarvester(from: { x: number; z: number }, strength: number): Sighting | null {
+    let best: Sighting | null = null;
     let bestScore = Infinity;
-    for (const h of g.units) {
-      if (h.team === this.team || h.type !== 'harvester' || h.dead || h.carrier) continue;
+    for (const h of this.intel.placedUnits()) {
+      if (!h.harvester) continue;
       const guard = this.guardAround(h, 12);
       if (guard > strength * 0.5) continue;
       const score = guard + hypot(h.x - from.x, h.z - from.z) * 5;
@@ -825,28 +945,35 @@ export class AI {
     return best;
   }
 
-  /** The nearest enemy building (or, a little less eagerly, unit); with `economy`, refineries and harvesters come first. */
+  /**
+   * The nearest enemy structure we know of (or, a little less eagerly, a unit we know the whereabouts of); with
+   * `economy`, refineries and harvesters come first. Knowing of nothing, where the enemy base must be.
+   */
   protected pickTarget(from: Unit, economy = false): { x: number; z: number } | null {
-    const g = this.game;
     let best: { x: number; z: number } | null = null;
     let bestD = Infinity;
-    for (const e of [...g.buildings, ...g.units]) {
-      if (e.team === this.team || (!(e instanceof Building) && (e as Unit).carrier)) continue;
-      const econ = economy && ((e as Building | Unit).type === 'refinery' || (e as Building | Unit).type === 'harvester');
-      const d = hypot(e.x - from.x, e.z - from.z) + (e instanceof Building ? 0 : 20) - (econ ? 40 : 0);
+    const consider = (s: Sighting, building: boolean) => {
+      const econ = economy && (s.type === 'refinery' || s.type === 'harvester');
+      const d = hypot(s.x - from.x, s.z - from.z) + (building ? 0 : 20) - (econ ? 40 : 0);
       if (d < bestD) {
         bestD = d;
-        best = { x: e.x, z: e.z };
+        best = { x: s.x, z: s.z };
       }
-    }
-    return best;
+    };
+    for (const s of this.intel.buildings.values()) consider(s, true);
+    for (const s of this.intel.placedUnits()) consider(s, false);
+    if (best) return best;
+    // Nothing known: where the base must be, unless we've looked there lately and found nothing; then search.
+    const guess = this.intel.enemyBase();
+    return this.game.vision.explored[this.team][this.game.map.idx(this.game.map.cellOf(guess.x), this.game.map.cellOf(guess.z))] ? this.intel.searchSpot() : guess;
   }
 
   // ---- Surrender --------------------------------------------------------------
 
   /**
    * Lost for good: no income and no way to buy it back (a harvester needs a refinery and a factory, a refinery needs
-   * a construction yard), or nothing left to build units with; and an army well short of the enemy's.
+   * a construction yard), or nothing left to build units with; and an army well short of the enemy's as far as we
+   * know it, or, three minutes on, too small to win the game with anyway (a few infantry holding a bunker).
    */
   private hopeless(): boolean {
     const g = this.game;
@@ -856,9 +983,13 @@ export class AI {
     const canBuyIncome = (g.has(t, 'refinery') && g.has(t, 'factory') && credits >= UNITS.harvester.cost)
       || (g.has(t, 'conyard') && credits >= BUILDINGS.refinery.cost);
     const canProduce = g.has(t, 'conyard') || g.has(t, 'barracks') || g.has(t, 'factory');
-    if ((income || canBuyIncome) && canProduce) return false;
-    const strength = (team: (u: Unit) => boolean) => g.units.filter(team).reduce((s, u) => s + power(u), 0);
-    return strength((u) => u.team === t) < strength((u) => u.team !== t) * 0.5;
+    if ((income || canBuyIncome) && canProduce) {
+      this.brokeSince = Infinity;
+      return false;
+    }
+    this.brokeSince = Math.min(this.brokeSince, g.time);
+    const own = this.ownPower();
+    return own < this.intel.armyPower() * 0.5 || (g.time - this.brokeSince > 180 && own < 1500);
   }
 
   private considerSurrender(): void {

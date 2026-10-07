@@ -20,7 +20,7 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 - **Anti-air.** Infantry and rocket launchers can shoot Carryalls down. Troopers aboard a downed Carryall bail out by parachute.
 - **Repair.** Repair Vehicles fix vehicles, aircraft and buildings for credits. Infantry heal on their own once out of combat.
 - **Online 1v1.** Host a game on your own server (a Raspberry Pi is plenty) and play a friend on your network. See [Multiplayer](#multiplayer).
-- **A computer opponent** that defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Hard it runs a bigger economy, attacks when it's stronger, raids your harvesters, repairs its vehicles after defending and pulls back from fights it's losing. Brutal is coming. End-of-game stats screen.
+- **A computer opponent** that plays under the same fog of war as you, with no map knowledge: it scouts to find your base and see what you're building, and plans only from what it has seen. It defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Hard it runs a bigger economy, attacks when it's stronger, raids your harvesters, repairs its vehicles after defending and pulls back from fights it's losing. Brutal is coming. End-of-game stats screen.
 
 ## Screenshots
 
@@ -116,6 +116,7 @@ Production is in the sidebar on the right. Click a card to build or train, and r
   - `npx tsx sim/matchups.ts`: re-measure unit matchups for the AI after changing unit stats; `npx tsx sim/duel.ts` for quick duels.
   - `npx tsx sim/terrain-check.ts 3`: AI matches, checked for illegal moves and stuck units.
   - `CHECK=60 QUIET=1 npx tsx sim/maps.ts`: generate 60 maps and validate them.
+  - `npx tsx sim/ai-fog-check.ts`: the AI knows only what it has seen, and scouts.
   - `npx tsx sim/vision-check.ts`: fog of war rules (cliffs, mesas, aircraft, attackers revealed).
   - `npx tsx sim/determinism.ts`: the simulation is deterministic (same seed and commands, same game), which online play depends on.
   - `npx tsx sim/netplay-check.ts`: an online match between two headless players through the real server, checked for desyncs, and replayed from its command log.

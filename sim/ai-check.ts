@@ -29,8 +29,9 @@ function setup(warmup = 420, waves = false): Setup {
   g.onSurrenderOffer = () => s.offers++;
   for (const b of g.buildings) if (b.team === PLAYER_TEAM) b.hp = b.maxHp = 1e9;
   for (const u of g.units) if (u.team === PLAYER_TEAM) kill(g, u);
-  // No attacks of its own (Hard attacks whenever it's stronger, and the player here has no army), so the army stays home.
-  if (!waves) Object.assign(ai, { nextWaveTime: Infinity, nextRaidTime: Infinity, profile: { ...profileFor(DIFFICULTY), initiative: 0 } });
+  // No attacks or scouting runs of its own (Hard attacks whenever it's stronger, and the player here has no army), so
+  // the army stays home.
+  if (!waves) Object.assign(ai, { nextWaveTime: Infinity, nextRaidTime: Infinity, nextScoutTime: Infinity, profile: { ...profileFor(DIFFICULTY), initiative: 0 } });
   run(s, warmup);
   return s;
 }
@@ -200,10 +201,13 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
     const t = (e as Unit | Building).type;
     if (t === 'conyard' || t === 'factory' || t === 'barracks' || t === 'refinery' || t === 'harvester') kill(s.g, e);
   }
-  for (const u of army(s.g, AI_TEAM).slice(3)) kill(s.g, u); // the army was lost along with the base
+  // The army was lost along with the base, bunkered infantry included.
+  for (const u of s.g.units.filter((u) => u.team === AI_TEAM && u.def.weapon).slice(3)) kill(s.g, u);
   s.g.teams[AI_TEAM].credits = 300;
-  const player = s.g.buildings.find((b) => b.team === PLAYER_TEAM)!;
-  for (let k = 0; k < 8; k++) s.g.spawnUnit('tank', PLAYER_TEAM, player.x + 6 + (k % 4) * 2, player.z + 6 + Math.floor(k / 4) * 2);
+  // The army that did it is still there, in the AI's sight (it only knows what it sees). It holds its fire, so the
+  // AI isn't wiped out before it gets to answer.
+  const left = s.g.buildings.find((b) => b.team === AI_TEAM) ?? army(s.g, AI_TEAM)[0];
+  for (const t of spawnAttackers(s.g, 'tank', 8, left, 8)) t.cooldown = 1e9;
   const t0 = s.g.time;
   run(s, 60, () => s.offers > 0);
   check(s.offers === 1, 'crippled AI offers to surrender', s.offers ? `after ${Math.round(s.g.time - t0)}s` : 'no offer');
