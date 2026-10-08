@@ -1,6 +1,6 @@
 import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType } from '../config';
 import { Building, type Entity, type Unit } from '../entities';
-import type { Difficulty, Game } from './game';
+import { weaponDamage, type Difficulty, type Game } from './game';
 import { MATCHUP_TYPES, MATCHUPS, type Matchup } from './matchups';
 import { Intel, type Sighting } from './intel';
 import { SPICE, type Cell } from '../map';
@@ -64,6 +64,11 @@ export interface AIProfile {
   scout: { first: number; interval: number };
   /** After its first look, the scout stays parked outside the enemy base, watching for the army moving out. */
   watch: boolean;
+  /**
+   * Fight control, `every` seconds (0: none): units in a fight pick targets together, the most dangerous enemy they
+   * can kill soonest first and no overkill, and vehicles below `mend` of their health pull out to a Repair Vehicle.
+   */
+  micro: { every: number; mend: number };
 }
 
 export const NORMAL_PROFILE: AIProfile = {
@@ -71,6 +76,7 @@ export const NORMAL_PROFILE: AIProfile = {
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
   raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3, waveGate: 0.6, counterFocus: 3, goodLinesOnly: false, bunkers: 1,
   sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 }, scout: { first: 30, interval: 150 }, watch: false,
+  micro: { every: 0, mend: 0 },
 };
 
 /**
@@ -84,9 +90,17 @@ export const HARD_PROFILE: AIProfile = {
   sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 }, scout: { first: 40, interval: 75 }, watch: true,
 };
 
-/** The AI profile for a difficulty. Brutal isn't built yet and plays as Hard. */
+/**
+ * Brutal: Hard's game plan with a player's hands. It sees no more than Hard (only what its side has seen); it fights
+ * better: focus fire several times a second, and badly damaged vehicles pulled out to be repaired.
+ */
+export const BRUTAL_PROFILE: AIProfile = {
+  ...HARD_PROFILE, micro: { every: 0.25, mend: 0.3 },
+};
+
+/** The AI profile for a difficulty. */
 export function profileFor(difficulty: Difficulty): AIProfile {
-  return difficulty === 'normal' ? NORMAL_PROFILE : HARD_PROFILE;
+  return difficulty === 'normal' ? NORMAL_PROFILE : difficulty === 'hard' ? HARD_PROFILE : BRUTAL_PROFILE;
 }
 
 /** Rough fighting strength: what the unit cost, scaled by the health it has left. Unarmed units count for nothing. */
@@ -108,8 +122,8 @@ const LEASH = 22 * TILE;
 /** An attack that hasn't been seen for this long is over, and its defenders go home. */
 const DEFENSE_TIMEOUT = 4;
 
-/** 'garrison': on its way into one of our bunkers, or in it. */
-export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout';
+/** 'garrison': on its way into one of our bunkers, or in it. 'mend': pulled out of a fight to be repaired. */
+export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -139,6 +153,7 @@ interface Wave {
  */
 export class AI {
   private thinkTimer = 2;
+  private microTimer = 2;
   private waveSize = 5;
   protected nextWaveTime = 150;
   /** Unit we're saving up for, so expensive units still get built. */
@@ -242,6 +257,13 @@ export class AI {
   }
 
   update(dt: number): void {
+    if (this.profile.micro.every) {
+      this.microTimer -= dt;
+      if (this.microTimer <= 0) {
+        this.microTimer += this.profile.micro.every;
+        this.micro();
+      }
+    }
     this.thinkTimer -= dt;
     if (this.thinkTimer > 0) return;
     this.thinkTimer = 1;
@@ -966,6 +988,90 @@ export class AI {
     // Nothing known: where the base must be, unless we've looked there lately and found nothing; then search.
     const guess = this.intel.enemyBase();
     return this.game.vision.explored[this.team][this.game.map.idx(this.game.map.cellOf(guess.x), this.game.map.cellOf(guess.z))] ? this.intel.searchSpot() : guess;
+  }
+
+  // ---- Fight control (Brutal) -------------------------------------------------------
+
+  /**
+   * Target picking for every unit in a fight, done together: each takes the visible enemy in its reach worth the
+   * most to kill now, its damage per second against it times what the enemy is worth (its price; half for unarmed
+   * ones like harvesters, which raiders want most) over the health it has left after what allies already aimed at it
+   * will do in the next second and a half. So shots go where they finish someone, the same way a player focuses
+   * fire, and nobody wastes a volley on a unit about to die. A unit keeps its target unless another is clearly
+   * better, so it doesn't twitch between two. Vehicles too hurt to keep fighting pull out to be repaired.
+   */
+  private micro(): void {
+    const g = this.game;
+    const enemies = g.units.filter((e) => e.team !== this.team && !e.dead && !e.carrier && g.sees(this.team, e));
+    this.manageMending(enemies);
+    if (!enemies.length) return;
+    const aimed = new Map<Unit, number>();
+    const army = g.units.filter((u) => u.team === this.team && u.def.weapon && !u.dead && !u.carrier && !u.falling);
+    for (const u of army) {
+      const role = this.roles.get(u);
+      if (role !== 'wave' && role !== 'defend' && role !== 'raid' && role !== 'home') continue;
+      if (u.order.kind === 'move' || u.order.kind === 'enter') continue; // on its way somewhere on purpose
+      let best: Unit | null = null;
+      let bestScore = 0;
+      let current = 0;
+      for (const e of enemies) {
+        const w = g.weaponFor(u, e);
+        if (!w) continue;
+        const d = hypot(e.x - u.x, e.z - u.z);
+        if (d < w.minRange || d > g.rangeFor(u, w, e) + TILE) continue;
+        const dps = weaponDamage(w, e) / g.cooldownFor(u, w);
+        const left = e.hp - (aimed.get(e) ?? 0);
+        if (left <= 0) continue;
+        const worth = e.def.weapon ? e.def.cost : e.def.cost * (role === 'raid' ? 3 : 0.5);
+        const score = (dps * worth) / Math.max(left, e.maxHp * 0.1);
+        if (e === u.target) current = score;
+        if (score > bestScore) {
+          bestScore = score;
+          best = e;
+        }
+      }
+      if (!best) continue;
+      // Stay on the current target unless the best is clearly better.
+      const pick = current > 0 && current >= bestScore * 0.75 ? (u.target as Unit) : best;
+      const w = g.weaponFor(u, pick)!;
+      aimed.set(pick, (aimed.get(pick) ?? 0) + (weaponDamage(w, pick) / g.cooldownFor(u, w)) * 1.5);
+      if (u.target === pick && u.order.kind === 'attack') continue;
+      u.command(g, { kind: 'attack', target: pick });
+    }
+  }
+
+  /**
+   * Vehicles in a fight below `micro.mend` of their health drive back to the nearest Repair Vehicle (a plain move:
+   * they don't stop to fight), and rejoin the units at home once mended. Without Repair Vehicles, nobody leaves.
+   */
+  private manageMending(enemies: Unit[]): void {
+    const g = this.game;
+    const repairers = g.units.filter((u) => u.team === this.team && u.def.repair && !u.dead && !u.carrier);
+    for (const [u, role] of this.roles) {
+      if (u.dead) continue;
+      if (role === 'mend') {
+        if (u.hp >= u.maxHp * 0.9 || !repairers.length) this.sendHome(u);
+        else if (u.order.kind === 'idle' && !u.target) {
+          const near = this.nearest(repairers, u);
+          if (hypot(near.x - u.x, near.z - u.z) > 3 * TILE) u.command(g, { kind: 'move', x: near.x, z: near.z });
+        }
+        continue;
+      }
+      if (!repairers.length || u.def.infantry || u.def.air || u.def.repair || !u.def.weapon || u.carrier) continue;
+      if ((role !== 'wave' && role !== 'defend' && role !== 'home') || u.hp >= u.maxHp * this.profile.micro.mend) continue;
+      // Only out of a fight: a unit hurt earlier and sitting at home is manageRepairs' job.
+      if (!enemies.some((e) => e.def.weapon && hypot(e.x - u.x, e.z - u.z) < u.def.sight)) continue;
+      const near = this.nearest(repairers, u);
+      this.leaveGroups(u);
+      this.roles.set(u, 'mend');
+      u.command(g, { kind: 'move', x: near.x, z: near.z });
+    }
+  }
+
+  private nearest<T extends Entity>(list: T[], from: { x: number; z: number }): T {
+    let best = list[0];
+    for (const e of list) if (hypot(e.x - from.x, e.z - from.z) < hypot(best.x - from.x, best.z - from.z)) best = e;
+    return best;
   }
 
   // ---- Surrender --------------------------------------------------------------

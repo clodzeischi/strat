@@ -1,9 +1,10 @@
-import { HARD_PROFILE, type AIProfile } from '../src/game/ai';
+import { BRUTAL_PROFILE, HARD_PROFILE, type AIProfile } from '../src/game/ai';
 
 /** Candidate Hard economy profiles. Anything not set falls back to Normal. */
 export const VARIANTS: Record<string, Partial<AIProfile>> = {
   normal: {},
   hard: HARD_PROFILE,
+  brutal: BRUTAL_PROFILE,
   // Normal's mass-infantry accident from the first run, kept as a reference point.
   'h4-nosave': { harvesters: 4, extraRefinery: 'threat' },
   'h3-threat': { harvesters: 3, extraRefinery: 'threat', saveForOpening: true },
@@ -41,4 +42,8 @@ export const VARIANTS: Record<string, Partial<AIProfile>> = {
   'hard-repair': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 0 } },
   'hard-outmatch': { ...HARD_PROFILE, sustain: { repairPer: 0, maxRepair: 0, outmatched: 1.3 } },
   'hard-sustain-2': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 2 } },
+  // Brutal's fight control, piece by piece (BRUTAL_PROFILE is brutal).
+  'brutal-focus': { ...BRUTAL_PROFILE, micro: { every: 0.25, mend: 0 } },
+  'brutal-mend': { ...BRUTAL_PROFILE, micro: { every: 0.25, mend: 0.3 } },
+  'brutal-slow': { ...BRUTAL_PROFILE, micro: { every: 1, mend: 0.3 } },
 };
