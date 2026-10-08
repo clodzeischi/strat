@@ -2,7 +2,7 @@
 // Usage: npx tsx sim/gauntlet.ts <difficulty> <bot> <games> [offset]     prints one JSON line per game
 // All bots, in parallel: sim/gauntlet.sh <games-per-bot> [difficulty...]
 import * as THREE from 'three';
-import { AI, profileFor } from '../src/game/ai';
+import { createAI } from '../src/game/brutal';
 import type { MapSize, Team } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 import { BOTS } from './bots';
@@ -15,7 +15,7 @@ for (let k = 0; k < games; k++) {
   const side = (n % 2) as Team; // the AI's team
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, 1000 + Math.floor(n / 2));
   g.onSurrenderOffer = (t) => g.acceptSurrender(t);
-  const ai = new AI(g, side, profileFor(difficulty as Difficulty));
+  const ai = createAI(g, side, difficulty as Difficulty);
   const player = new BOTS[bot](g, (1 - side) as Team);
   let lostHarv = 0;
   while (g.winner === null && g.time < 30 * 60) {

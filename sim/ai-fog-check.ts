@@ -1,7 +1,7 @@
 // The AI plays fair under fog of war: it knows only what its side has seen, so it scouts to find the enemy.
 // Usage: npx tsx sim/ai-fog-check.ts [difficulty] [seed]
 import * as THREE from 'three';
-import { AI, profileFor } from '../src/game/ai';
+import { createAI } from '../src/game/brutal';
 import type { Team, UnitType } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 
@@ -19,7 +19,7 @@ console.log(`seed ${seed}, ${difficulty}`);
 
 function setup() {
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, seed);
-  const ai = new AI(g, AI_TEAM, profileFor(difficulty));
+  const ai = createAI(g, AI_TEAM, difficulty);
   const step = (seconds: number, until?: () => boolean) => {
     const end = g.time + seconds;
     while (g.time < end && !until?.()) {

@@ -9,7 +9,7 @@ Living plan for upcoming features and the AI difficulty work. Decisions are mark
 3. Procedural maps: sizes, up to 4 players, validation
 4. Expansion mechanic (MCV, home fields that run out)
 5. Hard AI (economy, recovery, harassment, chokepoint awareness), tuned across many generated maps
-6. Brutal AI, once units and numbers have settled
+6. Brutal AI, once units and numbers have settled. **Status: first version done** (micro, harassment and Carryall drops; see [AI difficulty plan](#ai-difficulty-plan))
 7. Online multiplayer, so balance can be tested by people instead of only sims. **Status: 1v1 lockstep done** (self-hosted server, LAN or Raspberry Pi); see [MULTIPLAYER.md](MULTIPLAYER.md) for the design, the rules game code must now follow, and next steps (reconnect, replays, VPS).
 
 Brutal waits because timing builds and micro depend on exact numbers (speeds, ranges, build times), so every balance change would break them. Hard's general systems (rebuilding, value-based spending) read costs and stats from `src/config/`, so they survive changes.
@@ -143,7 +143,7 @@ Follow-ups: the AI doesn't build Repair Vehicles, the Hi-Tech Factory or Carryal
 - **Surrender.** When it has no income and no way to buy it back (or nothing left to build units with), and its army is under half the enemy's, for 15 seconds, it offers to surrender, once. The game pauses for the answer. Declining plays on to the end.
 - Against the old Normal it won 17 of 32 games (random maps), so it's about as strong; wave size and timing, the knobs that set its pressure, are unchanged. 14 of its 15 losses ended in a surrender rather than being wiped out. In 16 games against itself every game was decided (no stalemates), 15 by surrender.
 
-**Hard, first version (done).** `HARD_PROFILE` in `src/game/ai.ts`, picked from the menu. Brutal is on the menu as "coming soon". Tuned on random maps (`MAPS=random sim/run.sh`, 40-80 games per row, against Normal):
+**Hard, first version (done).** `HARD_PROFILE` in `src/game/ai.ts`, picked from the menu. Tuned on random maps (`MAPS=random sim/run.sh`, 40-80 games per row, against Normal):
 
 | Variant | Win % vs Normal | What it adds |
 |---|---|---|
@@ -185,6 +185,30 @@ Raids barely matter against Normal, whose defense now answers them in seconds; t
 - **Hotkeys on the left hand** (decided, as in Stormgate): A attack-move, S stop, D drop, F unload, Space base, ` pause. The camera pans with arrows, screen edges and middle-drag (WASD panning dropped, since those keys are commands now). Q W E R and Z X C V are free for production hotkeys later.
 - The AI keeps one (Normal) or two (Hard) bunkers at the front of its base and fills them with idle infantry. Under pressure (an early rush, or an enemy army well ahead of its own) it builds a bunker first, keeps only its minimum harvesters, and spends on the best unit a free production line can start right away instead of saving for an ideal one.
 - With bunkers, Hard beats the infantry rush 65% (was 25%) and Normal 50% (was 20%); the other matchups held (drop 100%, rockets 70%, harass 65%, turtle 55%), and Hard beats Normal 93%.
+
+**Brutal, first version (done).** `BrutalAI` in `src/game/brutal.ts` (a subclass of the AI, with Hard's economy and planning) and `Micro` in `src/game/micro.ts`. It adds what a strong player does with their hands:
+- **Kiting** (`Micro`): a turreted unit that outranges the enemies closing on it (tanks against infantry, rocket launchers against tanks, anything against a manned bunker it outranges) backs off while its turret keeps firing. Only against enemies it can keep away from (not trikes).
+- **Focus fire:** units shoot the target in range that dies to the fewest shots, dangerous ones first, and spread out once a target already has enough fire on it.
+- **Rotating damaged units out:** a unit under 35% health that's still being hit leaves the fight (vehicles to a Repair Vehicle, infantry home to heal) and rejoins the next wave. Only when nothing faster than it is chasing it and two healthy friends are nearby to take its place; otherwise it would just be shot in the back.
+- **Marching:** until a wave makes contact, units that get 7 tiles ahead of the slowest stop and wait, so trikes don't arrive alone.
+- **Harvesters run** for the refinery when they're down a third of their health and there's more enemy strength around them than ours (fleeing at every bullet cost more income than raids did).
+- **Two-front attacks:** a wave of 8 or more sends its fastest units, up to a third of its strength, at a refinery or harvester away from the main target. Trike raids are bigger and more frequent (4 trikes from 2:00, every 45 s).
+- **Carryall operations,** once it has a Hi-Tech Factory (from 10:00, or 6:00 on Large maps, with 10 combat units, an army 1.2x the enemy's and 1,600 credits to spare). Two Carryalls:
+  - *Sniping drops:* a rocket launcher is set down about 13 tiles from an enemy harvester, on the side away from their base, kites anything it outranges, and is lifted out as soon as more than it can handle closes in (or it's hurt, or there's nothing left to shoot), then goes on to the next harvester. A second Carryall with another launcher joins in on the same harvester from another side.
+  - *Troop strikes:* six infantry dropped on a harvester guarded by less than half their strength, lifted out the same way. If the Carryall is hit on the way in, the troopers jump right there and draw the fire while it gets away.
+  - Flights avoid known anti-air: if the straight line passes near infantry, rocket launchers or bunkers it has seen, the Carryall detours through a waypoint to one side; with no safe way in, it doesn't go. Idle Carryalls ferry the harvester with the longest trips and wait behind the base, not over the rally point (where they got shot down).
+- Faster reactions: it thinks every 0.5 s (Hard: 1 s), and runs micro, retreats and Carryall operations every 0.2 s.
+- Economy tweaks: the army gathers 10 tiles out instead of 7 (in a cramped base the waiting army blocked harvester lanes) and a second Factory comes at 1,200 credits banked instead of 2,500.
+
+How it was measured (`sim/brutal.sh`, Brutal against Hard on paired random maps; `SEEDS=2000` for fresh maps; `sim/micro-check.ts` for equal-cost battles with micro on one side; `sim/snap.sh` runs a batch from a snapshot of the code so edits made meanwhile don't leak into it):
+- Equal-cost battles, micro against plain attack-move (value left, own / enemy): tanks against infantry with Infantry Rockets 0% / 84% → 58% / 72%; rocket launchers against tanks 0% / 62% → 18% / 13%; tanks against infantry behind two bunkers 28% → 62% left.
+- Against Hard on 100 fresh small maps (200 games each): Hard through the Brutal class with every switch off 50% (the harness is fair); Hard plus micro only 60%; Brutal without air 72% (kill/death 1.56); without mending 60%; marching, the flank split and harvester retreat ±2% each (kept: they matter more against a person, who reacts slower than Hard's instant defense).
+- **Overfitting:** the first round of tuning used maps 1000-1039, where Brutal reached 80%; on maps 1040-1079 the same AI won 55%. Games are deterministic, so replaying the same maps doesn't average anything out. Check decisions on a fresh seed range.
+- **Air pays poorly against Hard.** A Hi-Tech Factory and two Carryalls cost 2,600 credits, and Hard answers anything near a harvester within seconds; a harvester takes 43 s to kill with one rocket launcher. Hi-Tech at 6:00: 63% on small maps (−9 against no air), 65% on medium (−11); from 10:00: 70% and 73% (no air: 72%, 76%). Large maps are the exception, where Carryalls cross distances ground units take long to: 80% with Hi-Tech at 6:00, 75% from 10:00, 70% without air (80 games each). So air comes at 10:00 on Small and Medium maps and 6:00 on Large ones. Things that didn't help: tanks instead of rocket launchers for sniping, timing troop strikes with waves (−2 to −4%), a unit mix leaning toward turreted units (neutral), holding outmatched fights longer (−7%), diving under rocket launchers' minimum range. Air is kept, from 10:00, for the pressure it puts on a person's attention, which the sims can't measure.
+- **Final:** Brutal beats Hard 71% (kill/death 1.55) on 100 small maps never used in tuning (`SEEDS=3000`, 200 games).
+- Against the scripted bots (`sim/gauntlet.sh 20 hard brutal`, measured with Hi-Tech at 6:00), Brutal / Hard: rush 65% / 50%, turtle 75% / 65%, harass 75% / 70%, rockets 65% / 65%, drop 90% / 95%; Brutal beats Normal 90%.
+
+Next for Brutal: rocket-launcher armies and turtles are its weakest matchups (kill/death below 1), and the early game (before tanks, where micro has little to work with) decides most of its losses.
 
 **Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
 

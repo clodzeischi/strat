@@ -64,13 +64,22 @@ export interface AIProfile {
   scout: { first: number; interval: number };
   /** After its first look, the scout stays parked outside the enemy base, watching for the army moving out. */
   watch: boolean;
+  /** Combined-arms preference for unit picks, before counters (see `counterWeights`). */
+  mix: Record<Matchup, number>;
+  /** Credits in the bank at which a second Barracks / Factory gets built, for more production. */
+  more: { barracks: number; factory: number };
+  /** How far out from the construction yard, toward the middle of the map, the army gathers (tiles). */
+  rallyOut: number;
 }
+
+/** Combined-arms base preference for unit picks, before counters (see `counterWeights`). */
+const BASE_MIX: Record<Matchup, number> = { infantry: 0.7, trike: 0.4, tank: 1, rocket: 1 };
 
 export const NORMAL_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
   raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3, waveGate: 0.6, counterFocus: 3, goodLinesOnly: false, bunkers: 1,
-  sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 }, scout: { first: 30, interval: 150 }, watch: false,
+  sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 }, scout: { first: 30, interval: 150 }, watch: false, mix: BASE_MIX, more: { barracks: 1500, factory: 2500 }, rallyOut: 7,
 };
 
 /**
@@ -94,9 +103,6 @@ export function power(u: Unit): number {
   return u.def.weapon ? u.def.cost * (u.hp / u.maxHp) : 0;
 }
 
-/** Combined-arms base preference for unit picks, before counters (see `counterWeights`). */
-const BASE_MIX: Record<Matchup, number> = { infantry: 0.7, trike: 0.4, tank: 1, rocket: 1 };
-
 /** Enemies this close to one of our buildings are attacking the base. */
 const BASE_RADIUS = 14 * TILE;
 /** Enemies this close to one of our harvesters are hunting it. */
@@ -109,7 +115,8 @@ const LEASH = 22 * TILE;
 const DEFENSE_TIMEOUT = 4;
 
 /** 'garrison': on its way into one of our bunkers, or in it. */
-export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout';
+/** 'mend': pulled out of a fight to heal or be repaired; 'drop': on a Carryall operation (Brutal). */
+export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -123,7 +130,7 @@ interface Defense {
   units: Set<Unit>;
 }
 
-interface Wave {
+export interface Wave {
   units: Set<Unit>;
   /** Strength when it set out. */
   start: number;
@@ -139,6 +146,8 @@ interface Wave {
  */
 export class AI {
   private thinkTimer = 2;
+  /** Seconds between thinks. */
+  protected thinkEvery = 1;
   private waveSize = 5;
   protected nextWaveTime = 150;
   /** Unit we're saving up for, so expensive units still get built. */
@@ -152,10 +161,10 @@ export class AI {
   private harvesterIds = new Set<number>();
 
   protected roles = new Map<Unit, Role>();
-  private defenses: Defense[] = [];
+  protected defenses: Defense[] = [];
   /** An attack on the base is stronger than everything we could send against it (as of the last think). */
   private outgunned = false;
-  private waves: Wave[] = [];
+  protected waves: Wave[] = [];
   private raiders = new Set<Unit>();
   /** Strength of the current raid when it set out. */
   private raidStart = 0;
@@ -167,7 +176,7 @@ export class AI {
   /** Building types there was no room for, and until when not to try them again. */
   private noRoom = new Map<BuildingType, number>();
   /** Once the opening is done, buildings missing from it are rebuilt before anything else is bought. */
-  private openingDone = false;
+  protected openingDone = false;
 
   /** What we know of the enemy: only what our side has seen. */
   readonly intel: Intel;
@@ -244,7 +253,7 @@ export class AI {
   update(dt: number): void {
     this.thinkTimer -= dt;
     if (this.thinkTimer > 0) return;
-    this.thinkTimer = 1;
+    this.thinkTimer = this.thinkEvery;
     if (!this.openingStep()) this.openingDone = true;
     this.intel.update();
     this.trackHarvesterLosses();
@@ -289,7 +298,7 @@ export class AI {
     return this.game.teams[this.team];
   }
 
-  private manageConstruction(): void {
+  protected manageConstruction(): void {
     const g = this.game;
     const ts = this.ts;
     if (ts.building?.ready) {
@@ -324,8 +333,8 @@ export class AI {
       // getting income back, still in the opening, or rebuilding what the opening had
     } else if (refineries < this.wantRefineries()) want = 'refinery';
     else if (g.count(this.team, 'bunker') < this.profile.bunkers && barracks > 0 && (ts.credits > 900 || this.behindFor > 0)) want = 'bunker';
-    else if (barracks < 2 && ts.credits > 1500) want = 'barracks';
-    else if (factories < 2 && ts.credits > 2500) want = 'factory';
+    else if (barracks < 2 && ts.credits > this.profile.more.barracks) want = 'barracks';
+    else if (factories < 2 && ts.credits > this.profile.more.factory) want = 'factory';
     else if (g.count(this.team, 'conyard') < 2 && ts.credits > 4000) want = 'conyard';
     if (!want || ts.credits < BUILDINGS[want].cost || (this.noRoom.get(want) ?? -Infinity) > g.time) return;
     // Only start what there's room for: a cramped base would otherwise build, fail to place, refund and retry forever.
@@ -447,7 +456,7 @@ export class AI {
   }
 
   /** Combined strength of our army, infantry in bunkers included (not units riding in a Carryall). */
-  private ownPower(): number {
+  protected ownPower(): number {
     let p = 0;
     for (const u of this.game.units) if (u.team === this.team && (!u.carrier || u.carrier instanceof Building)) p += power(u);
     return p;
@@ -485,7 +494,7 @@ export class AI {
       own.set(u.type as Matchup, (own.get(u.type as Matchup) ?? 0) + u.def.cost);
       ownTotal += u.def.cost;
     }
-    const base = (t: Matchup) => BASE_MIX[t] * (1 - (own.get(t) ?? 0) / Math.max(1, ownTotal)) ** 2;
+    const base = (t: Matchup) => this.profile.mix[t] * (1 - (own.get(t) ?? 0) / Math.max(1, ownTotal)) ** 2;
     if (total === 0) return options.map((t) => [t, base(t)]);
     const key = `${g.teams[this.team].upgrades.has('rockets') ? 'R' : '-'}${this.intel.enemyRockets ? 'R' : '-'}`;
     return options.map((t) => {
@@ -585,7 +594,7 @@ export class AI {
     const map = this.game.map;
     const mid = map.worldSize() / 2;
     const len = hypot(mid - anchor.x, mid - anchor.z) || 1;
-    const out = 7 * TILE;
+    const out = this.profile.rallyOut * TILE;
     const x = anchor.x + ((mid - anchor.x) / len) * out;
     const z = anchor.z + ((mid - anchor.z) / len) * out;
     const cell = map.nearestCell(map.cellOf(x), map.cellOf(z), (cx, cz) => map.canEnter(cx, cz, 'vehicle'), 8);
@@ -696,7 +705,7 @@ export class AI {
     }
   }
 
-  private leaveGroups(u: Unit): void {
+  protected leaveGroups(u: Unit): void {
     for (const w of this.waves) w.units.delete(u);
     for (const d of this.defenses) d.units.delete(u);
     this.raiders.delete(u);
@@ -746,7 +755,7 @@ export class AI {
         continue;
       }
       // Reached its target and nothing left to shoot there: push on to the next one.
-      const idle = [...w.units].filter((u) => u.order.kind === 'idle' && !u.target);
+      const idle = [...w.units].filter((u) => u.order.kind === 'idle' && !u.target && !this.waiting(u));
       if (idle.length) {
         const target = this.pickTarget(idle[0], w.economy);
         if (target) for (const u of idle) u.command(g, { kind: 'amove', x: target.x, z: target.z });
@@ -782,6 +791,11 @@ export class AI {
     this.waves.push(wave);
     this.waveSize = Math.min(this.waveSize + 2, 16);
     this.nextWaveTime = g.time + 60;
+  }
+
+  /** A wave unit held back on purpose (Brutal: waiting for the rest of its wave to catch up). */
+  protected waiting(_u: Unit): boolean {
+    return false;
   }
 
   /**
@@ -904,7 +918,7 @@ export class AI {
   }
 
   /** Attacks a sighted enemy if it's in view, else heads (attack-moving) to where it was last seen. */
-  private goAfter(u: Unit, s: Sighting): void {
+  protected goAfter(u: Unit, s: Sighting): void {
     const live = this.intel.visibleUnit(s);
     if (live) u.command(this.game, { kind: 'attack', target: live });
     else u.command(this.game, { kind: 'amove', x: s.x, z: s.z });
@@ -921,7 +935,7 @@ export class AI {
   }
 
   /** Known enemy fighting strength within `tiles` of a point. */
-  private guardAround(p: { x: number; z: number }, tiles: number): number {
+  protected guardAround(p: { x: number; z: number }, tiles: number): number {
     return this.intel.powerAround(p.x, p.z, tiles * TILE);
   }
 
@@ -929,7 +943,7 @@ export class AI {
    * The enemy harvester with the least protection around it, nearer ones preferred; none if every one is guarded by
    * more than half of `strength`.
    */
-  private pickHarvester(from: { x: number; z: number }, strength: number): Sighting | null {
+  protected pickHarvester(from: { x: number; z: number }, strength: number): Sighting | null {
     let best: Sighting | null = null;
     let bestScore = Infinity;
     for (const h of this.intel.placedUnits()) {
@@ -1005,7 +1019,7 @@ export class AI {
    * refinery: to the nearest spice), ties going toward the middle of the map. Positions are compared in the base's
    * own frame (toward the middle, and across), so two mirrored bases pick mirrored spots.
    */
-  private findSpot(type: BuildingType): Cell | null {
+  protected findSpot(type: BuildingType): Cell | null {
     const g = this.game;
     const size = BUILDINGS[type].size;
     const anchor = this.home();

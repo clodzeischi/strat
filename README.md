@@ -20,7 +20,7 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 - **Anti-air.** Infantry and rocket launchers can shoot Carryalls down. Troopers aboard a downed Carryall bail out by parachute.
 - **Repair.** Repair Vehicles fix vehicles, aircraft and buildings for credits. Infantry heal on their own once out of combat.
 - **Online 1v1.** Host a game on your own server (a Raspberry Pi is plenty) and play a friend on your network. See [Multiplayer](#multiplayer).
-- **A computer opponent** that plays under the same fog of war as you, with no map knowledge: it scouts to find your base and see what you're building, and plans only from what it has seen. It defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Hard it runs a bigger economy, attacks when it's stronger, raids your harvesters, repairs its vehicles after defending and pulls back from fights it's losing. Brutal is coming. End-of-game stats screen.
+- **A computer opponent** that plays under the same fog of war as you, with no map knowledge: it scouts to find your base and see what you're building, and plans only from what it has seen. It defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Hard it runs a bigger economy, attacks when it's stronger, raids your harvesters, repairs its vehicles after defending and pulls back from fights it's losing. On Brutal its units kite and focus fire, pull badly hurt units out of fights, and march in formation; it splits its attacks, raids more, and late in the game drops rocket launchers and paratroopers on your harvesters by Carryall, lifting them out again before you can catch them. End-of-game stats screen.
 
 ## Screenshots
 
@@ -111,9 +111,10 @@ Click a button or press its key to build, train or research, and right-click it 
 - `npm run typecheck`: type-check the game and the server.
 - `sim/`: headless simulations and checks that run the real game code without a browser. For example:
   - `npx tsx sim/air-repair-check.ts`: Carryall, paradrop and repair behavior.
-  - `npx tsx sim/ai-check.ts`: AI defense, economy recovery and surrender (`DIFFICULTY=hard` for Hard).
+  - `npx tsx sim/ai-check.ts`: AI defense, economy recovery and surrender (`DIFFICULTY=hard` or `brutal`).
+  - `sim/brutal.sh 80 hard brutal no-air`: Brutal and variants of it (`sim/brutal-match.ts`) against Hard; `SEEDS=2000` for a fresh set of maps. `npx tsx sim/micro-check.ts`: equal-cost battles with Brutal's micro on one side.
   - `MAPS=random sim/run.sh 10 4 hard`: a profile from `sim/variants.ts` against Normal, 40 games on random maps.
-  - `sim/gauntlet.sh 20`: Normal and Hard against scripted player strategies (rush, turtle, harass, rockets, drop).
+  - `sim/gauntlet.sh 20 hard brutal`: Hard and Brutal against scripted player strategies (rush, turtle, harass, rockets, drop).
   - `npx tsx sim/side-bias.ts`: spawn fairness, the same AI on both sides of each map.
   - `npx tsx sim/matchups.ts`: re-measure unit matchups for the AI after changing unit stats; `npx tsx sim/duel.ts` for quick duels.
   - `npx tsx sim/terrain-check.ts 3`: AI matches, checked for illegal moves and stuck units.

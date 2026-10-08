@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { AI, profileFor } from './game/ai';
+import type { AI } from './game/ai';
+import { createAI } from './game/brutal';
 import { RTSCamera } from './render/camera';
 import { MAP_SIZES, TILE, type MapSize, type Team } from './config';
 import { Game, type Difficulty } from './game/game';
@@ -156,7 +157,7 @@ function beginPlay(): void {
 
 function startGame(difficulty: Difficulty): void {
   game.difficulty = difficulty;
-  ai = new AI(game, ENEMY, profileFor(difficulty));
+  ai = createAI(game, ENEMY, difficulty);
   lockstep = new Lockstep(game, game.localTeam);
   const opponent = ai;
   lockstep.onTick = () => opponent.update(TICK);

@@ -1,8 +1,9 @@
 // AI behavior checks: defense sized to the attack, defenders returning home, economy recovery and surrender.
 // The AI plays team 1 alone for a few minutes; the scenario then spawns attackers or destroys its buildings.
-// Usage: npx tsx sim/ai-check.ts [seed]      DIFFICULTY=hard checks the Hard profile.
+// Usage: npx tsx sim/ai-check.ts [seed]      DIFFICULTY=hard (or brutal) checks that difficulty.
 import * as THREE from 'three';
-import { AI, profileFor } from '../src/game/ai';
+import { profileFor } from '../src/game/ai';
+import { BRUTAL_PROFILE, createAI } from '../src/game/brutal';
 import { TILE, type Team } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 import { Building, type Entity, type Unit } from '../src/entities';
@@ -12,6 +13,7 @@ const AI_TEAM: Team = 1;
 const PLAYER_TEAM: Team = 0;
 const DIFFICULTY = (process.env.DIFFICULTY ?? 'normal') as Difficulty;
 type Brain = { update(dt: number): void };
+const PROFILE = DIFFICULTY === 'brutal' ? BRUTAL_PROFILE : profileFor(DIFFICULTY);
 
 let failures = 0;
 function check(ok: boolean, label: string, detail = ''): void {
@@ -24,14 +26,14 @@ interface Setup { g: Game; ai: Brain; offers: number }
 /** A game where only the AI plays, for `warmup` seconds. The player's base can't be destroyed and has no units. */
 function setup(warmup = 420, waves = false): Setup {
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, SEED);
-  const ai: Brain = new AI(g, AI_TEAM, profileFor(DIFFICULTY));
+  const ai: Brain = createAI(g, AI_TEAM, DIFFICULTY);
   const s: Setup = { g, ai, offers: 0 };
   g.onSurrenderOffer = () => s.offers++;
   for (const b of g.buildings) if (b.team === PLAYER_TEAM) b.hp = b.maxHp = 1e9;
   for (const u of g.units) if (u.team === PLAYER_TEAM) kill(g, u);
   // No attacks or scouting runs of its own (Hard attacks whenever it's stronger, and the player here has no army), so
   // the army stays home.
-  if (!waves) Object.assign(ai, { nextWaveTime: Infinity, nextRaidTime: Infinity, nextScoutTime: Infinity, profile: { ...profileFor(DIFFICULTY), initiative: 0 } });
+  if (!waves) Object.assign(ai, { nextWaveTime: Infinity, nextRaidTime: Infinity, nextScoutTime: Infinity, profile: { ...PROFILE, initiative: 0 } });
   run(s, warmup);
   return s;
 }
@@ -53,6 +55,8 @@ function kill(g: Game, e: Entity): void {
 
 const army = (g: Game, team: Team) => g.units.filter((u) => u.team === team && u.def.weapon && !u.carrier);
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
+/** Where the AI's units gather at home. */
+const rallyOf = (s: Setup) => (s.ai as unknown as { rally: { x: number; z: number } }).rally;
 const conyard = (g: Game) => g.buildings.find((b) => b.team === AI_TEAM && b.type === 'conyard')!;
 
 /** Spawns player units `tiles` away from `near`, on the side facing the map center, attack-moving onto it. */
@@ -114,7 +118,7 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
   check(r.units.size <= 4, 'only a few units respond to one trike', `${r.units.size} of ${total}`);
   run(s, 45);
   const home = conyard(s.g);
-  const strays = army(s.g, AI_TEAM).filter((u) => dist(u, home) > 16 * TILE);
+  const strays = army(s.g, AI_TEAM).filter((u) => dist(u, rallyOf(s)) > 14 * TILE);
   check(strays.length === 0, 'defenders are back home 45s later', `${strays.length} still out`);
 }
 
@@ -128,7 +132,7 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
   run(s, 60);
   const home = conyard(s.g);
   if (home) {
-    const strays = army(s.g, AI_TEAM).filter((u) => dist(u, home) > 16 * TILE);
+    const strays = army(s.g, AI_TEAM).filter((u) => dist(u, rallyOf(s)) > 14 * TILE);
     check(strays.length === 0, 'after the attack, the defenders return', `${strays.length} still out`);
   }
 }
@@ -219,7 +223,7 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
 
 // 7-8. Hard keeps its army alive: vehicles back from a fight get repaired at home (nobody leaves a fight for it),
 // and an outmatched wave pulls back.
-if (profileFor(DIFFICULTY).sustain.repairPer) {
+if (PROFILE.sustain.repairPer) {
   {
     const s = setup();
     const a = s.ai as unknown as { roles: Map<Unit, string>; rally: { x: number; z: number } };

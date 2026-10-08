@@ -570,11 +570,6 @@ body.in-menu #messages {
   color: var(--muted);
 }
 
-.mbtn .soon {
-  margin-left: auto;
-  text-transform: uppercase;
-}
-
 .size-pick {
   display: flex;
   gap: 8px;
