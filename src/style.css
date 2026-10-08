@@ -5,7 +5,6 @@
   --accent: #e0902a;
   --text: #e9dcc6;
   --muted: #a8977f;
-  --sidebar-w: 330px;
 }
 
 * {
@@ -24,14 +23,12 @@ body {
 }
 
 #app {
-  display: flex;
   height: 100vh;
 }
 
 #view {
   position: relative;
-  flex: 1;
-  min-width: 0;
+  height: 100%;
 }
 
 #c {
@@ -70,42 +67,53 @@ body {
   opacity: 0;
 }
 
-#info {
+/* ---- HUD ---- */
+
+#hud {
   position: absolute;
-  bottom: 12px;
-  left: 12px;
-  display: none;
-  background: rgba(20, 16, 12, 0.75);
-  border: 1px solid var(--bar-edge);
-  padding: 5px 10px;
-  font-size: 13px;
+  inset: 0;
   pointer-events: none;
+  --cell: 60px;
+  --gap: 4px;
 }
 
-/* ---- Sidebar ---- */
-
-#sidebar {
-  width: var(--sidebar-w);
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--bar-bg);
-  border-left: 3px solid var(--bar-edge);
-  padding: 8px;
-  gap: 8px;
+#hud > * {
+  pointer-events: auto;
 }
 
-.credits {
+#topbar,
+#hud-map,
+#command-card {
+  background: rgba(43, 38, 33, 0.94);
+  border: 2px solid var(--bar-edge);
+}
+
+#topbar {
+  position: absolute;
+  top: 0;
+  right: 0;
   display: flex;
   gap: 10px;
   align-items: baseline;
-  background: #15110d;
-  border: 1px solid var(--bar-edge);
   padding: 4px 10px;
+  border-top: none;
+  border-right: none;
+}
+
+#topbar .label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+
+#credits {
+  min-width: 5ch;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 20px;
+  color: var(--accent);
 }
 
 #menu-btn {
-  margin-left: auto;
   align-self: center;
   background: var(--bar-panel);
   color: var(--muted);
@@ -122,20 +130,18 @@ body {
   border-color: var(--accent);
 }
 
-.credits .label {
-  font-size: 11px;
-  letter-spacing: 2px;
-  color: var(--muted);
-}
-
-#credits {
-  font-family: ui-monospace, Menlo, monospace;
-  font-size: 20px;
-  color: var(--accent);
+#hud-map {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  padding: 6px;
+  border-left: none;
+  border-bottom: none;
 }
 
 #minimap {
-  width: 100%;
+  display: block;
+  width: calc(3 * var(--cell) + 2 * var(--gap) + 34px);
   aspect-ratio: 1;
   border: 1px solid var(--bar-edge);
   background: #000;
@@ -143,42 +149,120 @@ body {
   image-rendering: pixelated;
 }
 
-.col-heads {
+#info {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100% - 2 * (4 * var(--cell) + 3 * var(--gap) + 20px) - 24px);
+  display: none;
+  background: rgba(20, 16, 12, 0.85);
+  border: 2px solid var(--bar-edge);
+  border-bottom: none;
+  padding: 6px 12px;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+/* ---- Command card: tabs (Q W E R) over two rows of buttons (A S D F, Z X C V) ---- */
+
+#command-card {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 6px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.card-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 5px;
-  font-size: 9px;
-  letter-spacing: 1px;
+  grid-template-columns: repeat(4, var(--cell));
+  grid-template-rows: 34px var(--cell) var(--cell);
+  gap: var(--gap);
+}
+
+.card-grid .key {
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  font: bold 10px ui-monospace, Menlo, monospace;
   color: var(--muted);
-  text-align: center;
+  pointer-events: none;
 }
 
-.columns {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 5px;
-  align-content: start;
-}
-
-.col {
+.tab {
+  position: relative;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  align-items: center;
+  justify-content: center;
+  background: #221d18;
+  border: 1px solid var(--bar-edge);
+  cursor: pointer;
+  overflow: hidden;
 }
 
+.tab-name {
+  font-size: 9px;
+  font-weight: bold;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-top: 6px;
+}
+
+.tab:hover {
+  border-color: var(--accent);
+}
+
+.tab.on {
+  background: var(--bar-panel);
+  border-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.tab.on .tab-name,
+.tab.on .key {
+  color: var(--text);
+}
+
+.tab .tab-bar {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.5);
+  visibility: hidden;
+}
+
+.tab .tab-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.tab.ready {
+  border-color: #7cff7c;
+  animation: pulse 1s infinite alternate;
+}
+
+.tab .badge {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  display: none;
+  font-size: 9px;
+  font-weight: bold;
+  color: var(--accent);
+}
 
 .card {
   position: relative;
-  height: 62px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  padding: 3px;
   background: var(--bar-panel);
   border: 1px solid var(--bar-edge);
   cursor: pointer;
@@ -189,11 +273,23 @@ body {
   border-color: var(--accent);
 }
 
+.card.empty {
+  background: rgba(34, 29, 24, 0.6);
+  cursor: default;
+}
+
+.card.empty:hover {
+  border-color: var(--bar-edge);
+}
+
 .card .icon {
-  width: 34px;
-  height: 34px;
-  flex-shrink: 0;
-  background: #221d18;
+  width: 38px;
+  height: 38px;
+  margin-top: 2px;
+}
+
+.card .icon:empty {
+  display: none;
 }
 
 .card .icon svg {
@@ -202,23 +298,9 @@ body {
   display: block;
 }
 
-.card .meta {
-  width: 100%;
-  min-width: 0;
-  line-height: 1.1;
-  text-align: center;
-}
-
-.card .name {
-  font-size: 10px;
-  font-weight: bold;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .card .cost {
   font-size: 10px;
+  line-height: 1;
   font-family: ui-monospace, Menlo, monospace;
   color: var(--accent);
 }
@@ -248,13 +330,16 @@ body {
 
 .card .status {
   position: absolute;
-  left: 3px;
-  top: 2px;
+  left: 0;
+  right: 0;
+  bottom: 2px;
   display: none;
-  font-size: 10px;
+  text-align: center;
+  font-size: 9px;
   font-weight: bold;
   letter-spacing: 1px;
   color: #7cff7c;
+  text-shadow: 0 1px 2px #000;
 }
 
 .card.disabled {
@@ -262,8 +347,26 @@ body {
   cursor: default;
 }
 
-.card.disabled:hover {
+.card.locked {
+  filter: grayscale(1) brightness(0.4);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.card.done {
+  filter: grayscale(0.6) brightness(0.7);
+  cursor: default;
+}
+
+.card.disabled:hover,
+.card.locked:hover,
+.card.done:hover {
   border-color: var(--bar-edge);
+}
+
+.card.active {
+  border-color: #ff9040;
+  box-shadow: inset 0 0 10px 0 rgba(255, 144, 64, 0.6);
 }
 
 .card.ready {
@@ -280,16 +383,61 @@ body {
   }
 }
 
-.help {
-  font-size: 10px;
-  line-height: 1.5;
-  color: var(--muted);
-  border-top: 1px solid var(--bar-edge);
-  padding-top: 6px;
+/* The hovered button's details, above the card. */
+.card-tip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: 290px;
+  background: rgba(20, 16, 12, 0.95);
+  border: 1px solid var(--bar-edge);
+  border-left: 3px solid var(--accent);
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
 }
 
-.help b {
-  color: var(--text);
+.card-tip[hidden] {
+  display: none;
+}
+
+.tip-head {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin-bottom: 3px;
+}
+
+.tip-name {
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.tip-key {
+  font: bold 10px ui-monospace, Menlo, monospace;
+  border: 1px solid var(--muted);
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+.tip-cost {
+  margin-left: auto;
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--accent);
+}
+
+.tip-locked {
+  color: #d05a4a;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.tip-body {
+  white-space: pre-line;
+  color: var(--muted);
 }
 
 /* ---- FPS ---- */
@@ -311,9 +459,8 @@ body {
 
 /* ---- Screens (title, pause, end) ---- */
 
-body.in-menu #sidebar,
-body.in-menu #messages,
-body.in-menu #info {
+body.in-menu #hud,
+body.in-menu #messages {
   display: none !important;
 }
 

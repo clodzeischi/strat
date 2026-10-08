@@ -18,7 +18,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   },
   bunker: {
     name: 'Bunker', short: 'Bunker', cost: 400, buildTime: 10, hp: 1400, size: 2, requires: ['barracks'], garrison: 3,
-    desc: 'Holds three infantry, who shoot from it and can\'t be hurt while inside. Right-click it with infantry selected; F unloads.',
+    desc: 'Holds three infantry, who shoot from it and can\'t be hurt while inside. Right-click it with infantry selected; Unload on the command card lets them out.',
   },
   factory: {
     name: 'Factory', short: 'Factory', cost: 1000, buildTime: 14, hp: 1100, size: 3, requires: ['refinery', 'barracks'],

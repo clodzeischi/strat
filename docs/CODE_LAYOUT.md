@@ -13,7 +13,7 @@
 | `materials/` | Colors and materials: model `palette.ts`, the shared `lambert.ts` cache, `ground.ts` (ground colors), `overlays.ts` (health bars, selection rings), `upgrade-fx.ts` (lasers, nitro flames). |
 | `shaders/` | Shader patches: `ground.ts` (sand, rock, outcrops, cliff walls, spice and its shimmer), `instance-alpha.ts` and `dithered-shadow.ts` (particles). |
 | `render/` | Drawing: `terrain.ts` (ground mesh), `camera.ts`, `shadows.ts`, `effects/` (one file per effect pool, plus `effects.ts`). |
-| `ui/` | Player-facing: `input.ts` (mouse and keys, turned into commands), `sidebar.ts` and its `icons.ts`, `menu.ts`, `placement.ts` (building placement grid). |
+| `ui/` | Player-facing: `input.ts` (mouse and keys, turned into commands), `command-card.ts` (the 4×3 grid of tabs and buttons) with `keys.ts` (hotkeys by key position) and `icons.ts`, `hud.ts` (credits, minimap, messages), `menu.ts`, `placement.ts` (building placement grid). |
 
 Folders that are split into several files have an `index.ts`, so the rest of the code imports `../config`, `../map`, `../entities` or `../models` without caring which file something is in.
 

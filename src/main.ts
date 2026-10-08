@@ -6,7 +6,8 @@ import { Game, type Difficulty } from './game/game';
 import { Input } from './ui/input';
 import { loadMapSize, Menus } from './ui/menu';
 import { ViewShadows } from './render/shadows';
-import { Sidebar } from './ui/sidebar';
+import { CommandCard } from './ui/command-card';
+import { Hud } from './ui/hud';
 import { Lockstep, TICK } from './net/lockstep';
 import { NetClient } from './net/client';
 import { PROTOCOL_VERSION, type MatchInfo, type ServerMsg } from './net/protocol';
@@ -85,12 +86,13 @@ const ENEMY = (1 - game.localTeam) as Team;
 const shadows = new ViewShadows(sun);
 
 const input = new Input(game, rts, canvas, document.getElementById('selbox')!, document.getElementById('info')!);
-const sidebar = new Sidebar(game, input, rts);
-game.onMessage = (t) => sidebar.showMessage(t);
+const hud = new Hud(game, rts);
+const card = new CommandCard(game, input, document.getElementById('command-card')!);
+game.onMessage = (t) => hud.showMessage(t);
 // Created when the game starts: the computer opponent (offline) and the lockstep that runs the simulation.
 let ai: AI | null = null;
 let lockstep: Lockstep | null = null;
-if (import.meta.env.DEV) Object.assign(window, { game, input, rts, renderer });
+if (import.meta.env.DEV) Object.assign(window, { game, input, rts, renderer, card });
 
 // Start looking at the home base, nudged toward the middle of the map where the action will come from.
 const home = game.buildings.find((b) => b.team === game.localTeam)!;
@@ -159,7 +161,7 @@ function startGame(difficulty: Difficulty): void {
   const opponent = ai;
   lockstep.onTick = () => opponent.update(TICK);
   beginPlay();
-  sidebar.showMessage('Build a Refinery and a Barracks, then a Factory. Destroy the red base.');
+  hud.showMessage('Build a Refinery and a Barracks, then a Factory. Destroy the red base.');
 }
 
 /** Online: the page has reloaded into a match; reconnect, and start when both players are back. */
@@ -193,11 +195,11 @@ function onMatchMessage(msg: ServerMsg): void {
       const ls = lockstep;
       ls.onDesync = (tick) => {
         console.error(`Desync with ${opponentName} at tick ${tick}`);
-        sidebar.showMessage(`Out of sync with ${opponentName} (tick ${tick}): your screens may no longer show the same game.`);
+        hud.showMessage(`Out of sync with ${opponentName} (tick ${tick}): your screens may no longer show the same game.`);
       };
       showNetWait('');
       beginPlay();
-      sidebar.showMessage(`Online against ${opponentName}. Build a Refinery and a Barracks, then a Factory.`);
+      hud.showMessage(`Online against ${opponentName}. Build a Refinery and a Barracks, then a Factory.`);
       break;
     }
     case 'cmds':
@@ -298,7 +300,7 @@ const menus = new Menus({
     menus.setSurrenderOffer(false);
     mode = 'playing';
     if (accept) game.acceptSurrender(ENEMY);
-    else sidebar.showMessage('Surrender refused. The enemy fights on.');
+    else hud.showMessage('Surrender refused. The enemy fights on.');
   },
   onLobby: (open) => {
     if (open) openLobby();
@@ -405,7 +407,8 @@ function frame(now: number): void {
       alpha = afterAcc / TICK;
     }
     game.frame(dt, alpha);
-    sidebar.update(dt);
+    hud.update(dt);
+    card.update();
     shadows.fit(rts.camera, gameFog.far);
     renderer.render(scene, rts.camera);
   }

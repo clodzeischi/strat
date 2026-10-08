@@ -41,7 +41,7 @@ Anything that changes game state must be deterministic:
 - **No frame time, `performance.now()` or `Date.now()` in game logic.** Use `game.time` or `game.ticks`.
 - **No camera or screen state in game logic.** Selection, the camera and hover live in the UI only.
 - **Vision: use `game.sees(team, e)` for the team that acts, never `game.localTeam`.** `game.shown(e)` is what this screen shows, and it's for drawing only.
-- **Player actions go through a command.** To add a new action, add a `Command` variant, apply it in `applyCommand`, and send it from the UI with `input.issue(...)`. Don't call game methods from `input.ts` or `sidebar.ts`.
+- **Player actions go through a command.** To add a new action, add a `Command` variant, apply it in `applyCommand`, and send it from the UI with `input.issue(...)`. Don't call game methods from `input.ts` or `command-card.ts`.
 - **Messages for the player** go through `game.notifyTeam(team, text)`, which only shows them on that player's screen.
 - **After changing simulation code**, run `npx tsx sim/determinism.ts` and `npx tsx sim/netplay-check.ts`. If you change messages or the simulation in a way that would split two builds apart, bump `PROTOCOL_VERSION`.
 

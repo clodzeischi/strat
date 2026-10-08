@@ -69,19 +69,21 @@ It prints addresses like `http://192.168.1.20:8080`. Both players open that addr
 | Left click / drag | Select units, or box-select |
 | Double click | Select every unit of that type on screen |
 | Right click | Move, attack, harvest, set a rally point, repair (Repair Vehicle), pick up (Carryall) |
-| **A**, then click | Attack-move |
-| **S** | Stop |
-| **D**, then click | Carryall drop |
-| **F** | Unload a selected bunker |
+| **Q W E R** | Command card tabs: Build, Train, Upgrade, Command |
+| **A S D F**, **Z X C V** | The buttons on the open tab |
+| **A**, then click (Command tab) | Attack-move |
+| **S** (Command tab) | Stop |
+| **D**, then click (Command tab) | Carryall drop |
+| **F** (Command tab) | Unload a selected bunker |
 | **Ctrl+1-9** / **1-9** | Set / select a control group (double-tap to jump to it) |
 | **Space** | Jump to your base |
 | **`** (left of 1) | Pause (not in online games) |
 | Arrow keys, screen edges, middle-drag | Pan the camera |
 | **Esc** | Cancel, or open the menu |
 
-Hotkeys all sit under the left hand, as in Stormgate.
+Hotkeys all sit under the left hand, as in Stormgate. The command card in the bottom right is a 4×3 grid: the top row picks a tab, and the two rows below hold that tab's buttons, always in the same places. Keys go by position, so on Colemak the same grid is Q W F P, A R S T and Z X C V (Chrome and Edge print your layout's letters on the buttons). Selecting units opens the Command tab, so A is always attack-move with an army selected; deselecting them goes back to the tab you were on.
 
-Production is in the sidebar on the right. Click a card to build or train, and right-click it to cancel. A finished structure waits on its card until you click the card again and place the building on rock near your base.
+Click a button or press its key to build, train or research, and right-click it to cancel. A finished structure waits on its button until you press it again and place the building on rock near your base. The tabs show progress too: a bar under Build, Train and Upgrade while something is underway, and Build pulses when a structure is ready to place.
 
 ## Units and buildings
 
@@ -90,7 +92,7 @@ Production is in the sidebar on the right. Click a card to build or train, and r
 | Construction Yard | Builds structures. Upgrades to HQ Level 2. |
 | Refinery | Turns spice into credits. Comes with a free Harvester. |
 | Barracks | Trains infantry. |
-| Bunker | Holds three infantry, who shoot from it and can't be hurt while inside. Right-click it with infantry to fill it, F to unload. |
+| Bunker | Holds three infantry, who shoot from it and can't be hurt while inside. Right-click it with infantry to fill it; Unload on the Command tab lets them out. |
 | Factory | Builds vehicles. Upgrades to Level 2 for Rocket Launchers and tier-2 upgrades. |
 | Hi-Tech Factory | Builds Carryalls. |
 

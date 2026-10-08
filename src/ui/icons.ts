@@ -1,6 +1,6 @@
 import { TEAM_CSS, type Team, type BuildingType, type UnitType, type UpgradeType } from '../config';
 
-// Sidebar card icons: small inline SVGs, team-colored through currentColor.
+// Command card icons: small inline SVGs, team-colored through currentColor.
 
 const C = 'currentColor';
 const SAND = '#c9b48a';
@@ -37,7 +37,15 @@ const ICONS: Record<BuildingType | UnitType | UpgradeType, string> = {
 
 /** Green chevrons over the building icon mark a level-2 upgrade. */
 const CHEVRON = `<polyline points="26,14 32,8 38,14" fill="none" stroke="#7cff7c" stroke-width="2.5"/><polyline points="26,20 32,14 38,20" fill="none" stroke="#7cff7c" stroke-width="2.5"/>`;
-export const ALL_ICONS = { ...ICONS, conyard2: ICONS.conyard + CHEVRON, factory2: ICONS.factory + CHEVRON };
+/** Unit commands on the command card. */
+const COMMANDS = {
+  attack: `<circle cx="20" cy="20" r="11" fill="none" stroke="#e05a40" stroke-width="3"/><circle cx="20" cy="20" r="2.5" fill="#e05a40"/><rect x="18.5" y="3" width="3" height="9" fill="#e05a40"/><rect x="18.5" y="28" width="3" height="9" fill="#e05a40"/><rect x="3" y="18.5" width="9" height="3" fill="#e05a40"/><rect x="28" y="18.5" width="9" height="3" fill="#e05a40"/>`,
+  stop: `<polygon points="14,4 26,4 36,14 36,26 26,36 14,36 4,26 4,14" fill="#b8402e" stroke="#e9dcc6" stroke-width="2"/><rect x="11" y="18" width="18" height="4" fill="#e9dcc6"/>`,
+  drop: `<rect x="6" y="6" width="28" height="5" fill="${METAL}"/><rect x="8" y="5" width="20" height="2" fill="${C}"/><rect x="17" y="13" width="6" height="10" fill="#e0b030"/><polygon points="11,22 29,22 20,32" fill="#e0b030"/><rect x="5" y="34" width="30" height="3" fill="#9c968a"/>`,
+  unload: `<rect x="3" y="28" width="34" height="6" fill="#9c968a"/><rect x="5" y="13" width="18" height="16" fill="${SAND}"/><rect x="4" y="10" width="20" height="4" fill="${C}"/><rect x="11" y="20" width="6" height="9" fill="${DARK}"/><rect x="24" y="18" width="7" height="5" fill="#e0b030"/><polygon points="30,13 38,20.5 30,28" fill="#e0b030"/>`,
+};
+
+export const ALL_ICONS = { ...ICONS, ...COMMANDS, conyard2: ICONS.conyard + CHEVRON, factory2: ICONS.factory + CHEVRON };
 export type IconKey = keyof typeof ALL_ICONS;
 
 /** A card icon as an SVG element string, in the player's team color. */

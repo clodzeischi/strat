@@ -14,28 +14,18 @@
         <canvas id="c"></canvas>
         <div id="selbox"></div>
         <div id="messages"></div>
-        <div id="info"></div>
         <div id="netwait" hidden></div>
+        <!-- HUD: credits top right; minimap, selection and the command card along the bottom. -->
+        <div id="hud">
+          <div id="topbar">
+            <span class="label">CREDITS</span><span id="credits">0</span>
+            <button id="menu-btn" title="Menu (Esc)">MENU</button>
+          </div>
+          <div id="hud-map"><canvas id="minimap" width="240" height="240"></canvas></div>
+          <div id="info"></div>
+          <div id="command-card"></div>
+        </div>
       </div>
-      <aside id="sidebar">
-        <div class="credits">
-          <span class="label">CREDITS</span><span id="credits">0</span>
-          <button id="menu-btn" title="Menu (Esc)">MENU</button>
-        </div>
-        <canvas id="minimap" width="240" height="240"></canvas>
-        <div class="col-heads"><span>STRUCTURES</span><span>UNITS</span><span>UPGRADES</span></div>
-        <div class="columns">
-          <div class="col" id="col-build"></div>
-          <div class="col" id="col-units"></div>
-          <div class="col" id="col-upgrades"></div>
-        </div>
-        <div class="help">
-          <b>LMB</b> select / drag box &nbsp; <b>RMB</b> move, attack, harvest<br />
-          Arrows/edges/middle-drag pan<br />
-          <b>A</b> attack-move &nbsp; <b>S</b> stop &nbsp; <b>D</b> drop &nbsp; <b>F</b> unload &nbsp; <b>Space</b> base &nbsp; <b>`</b> pause &nbsp; <b>Esc</b> menu<br />
-          <b>Ctrl+1-9</b> set group &nbsp; <b>1-9</b> select group
-        </div>
-      </aside>
     </div>
 
     <div id="fps" hidden></div>
@@ -94,16 +84,17 @@
             <dt>Left click / drag</dt><dd>Select units</dd>
             <dt>Right click</dt><dd>Move, attack, harvest</dd>
             <dt>Arrows / edges / middle-drag</dt><dd>Pan the map</dd>
-            <dt>A</dt><dd>Attack-move</dd>
-            <dt>S</dt><dd>Stop</dd>
-            <dt>D</dt><dd>Carryall drop</dd>
-            <dt>F</dt><dd>Unload a selected bunker</dd>
+            <dt>Q W E R</dt><dd>Command card tabs: Build, Train, Research, Command</dd>
+            <dt>A S D F / Z X C V</dt><dd>The buttons on the open tab</dd>
+            <dt>Command tab</dt><dd>A attack-move, S stop, D Carryall drop, F unload a bunker</dd>
             <dt>Space</dt><dd>Jump to base</dd>
             <dt>` (left of 1)</dt><dd>Pause (not online)</dd>
             <dt>Ctrl + 1-9</dt><dd>Set control group</dd>
             <dt>1-9 (twice)</dt><dd>Select group (and jump to it)</dd>
             <dt>Right click a Barracks / Factory</dt><dd>Set rally point</dd>
             <dt>Esc</dt><dd>Menu</dd>
+          </dl>
+          <p class="note">Card keys go by position, as on a QWERTY keyboard: on Colemak they are Q W F P, A R S T and Z X C V. Selecting units opens the Command tab.</p>
           </dl>
           <button class="mbtn back" data-action="back">Back</button>
         </div>

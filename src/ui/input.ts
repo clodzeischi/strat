@@ -4,6 +4,7 @@ import { BUILDINGS, PRODUCERS, TILE, type BuildingType, type Producer, type Team
 import { Building, Carryall, repairable, Unit, type Entity } from '../entities';
 import type { Command } from '../game/commands';
 import type { Game } from '../game/game';
+import { keyLabel } from './keys';
 import { PlacementGrid } from './placement';
 
 const EDGE = 12; // px from the screen edge that triggers scrolling
@@ -25,6 +26,8 @@ export class Input {
   issue: (cmd: Command) => void = () => {};
   /** Whether ` pauses: only against the computer. */
   pausable = true;
+  /** Called whenever the selection changes (the command card follows it). */
+  onSelect: () => void = () => {};
 
   private keys = new Set<string>();
   private mouse = { x: 0, y: 0, inside: false };
@@ -64,7 +67,7 @@ export class Input {
     canvas.addEventListener('mouseenter', () => (this.mouse.inside = true));
     canvas.addEventListener('mouseleave', () => (this.mouse.inside = false));
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-    // Edge scrolling uses the whole window, so the right edge is the screen edge, past the sidebar.
+    // Edge scrolling uses the whole window, so the screen edges work even under the HUD.
     document.addEventListener('mouseout', (e) => {
       if (!e.relatedTarget) this.screen.inside = false;
     });
@@ -142,14 +145,63 @@ export class Input {
     for (const e of this.selection) e.setSelected(false);
     this.selection = list;
     for (const e of list) e.setSelected(true);
+    this.onSelect();
   }
 
-  private ownUnits(): Unit[] {
+  ownUnits(): Unit[] {
     return this.selection.filter((e): e is Unit => e instanceof Unit && e.team === this.team && !e.dead);
   }
 
   private ownCarryalls(): Carryall[] {
     return this.ownUnits().filter((u): u is Carryall => u instanceof Carryall);
+  }
+
+  /** Own selected bunkers with someone inside. */
+  private loadedBunkers(): Building[] {
+    return this.selection.filter((b): b is Building => b instanceof Building && b.team === this.team && b.occupants.length > 0);
+  }
+
+  // ---- Unit commands (from the command card) ------------------------------------
+
+  canAttackMove(): boolean {
+    return this.ownUnits().some((u) => u.def.weapon);
+  }
+
+  /** Arms attack-move: the next left click picks the target or spot. */
+  attackMove(): void {
+    if (!this.canAttackMove()) return;
+    this.attackMode = true;
+    this.dropMode = false;
+    this.placing = null;
+  }
+
+  canStop(): boolean {
+    return this.ownUnits().length > 0;
+  }
+
+  stop(): void {
+    if (this.canStop()) this.issue({ c: 'stop', units: this.ownUnits().map((u) => u.id) });
+  }
+
+  canDrop(): boolean {
+    return this.ownCarryalls().some((c) => c.load.length);
+  }
+
+  /** Arms drop: the next left click is where the selected Carryalls set down their load. */
+  drop(): void {
+    if (!this.canDrop()) return;
+    this.dropMode = true;
+    this.attackMode = false;
+    this.placing = null;
+  }
+
+  canUnload(): boolean {
+    return this.loadedBunkers().length > 0;
+  }
+
+  unload(): void {
+    const bunkers = this.loadedBunkers();
+    if (bunkers.length) this.issue({ c: 'unload', buildings: bunkers.map((b) => b.id) });
   }
 
   private placementCell(p: THREE.Vector3, type: BuildingType): { cx: number; cz: number } {
@@ -327,7 +379,7 @@ export class Input {
     if (c.load.length === 0) return '   Empty. Right-click a unit to pick it up';
     const counts = new Map<string, number>();
     for (const u of c.load) counts.set(u.name, (counts.get(u.name) ?? 0) + 1);
-    return `   Cargo: ${[...counts].map(([n, k]) => `${k}× ${n}`).join(', ')}   D: drop`;
+    return `   Cargo: ${[...counts].map(([n, k]) => `${k}× ${n}`).join(', ')}   ${keyLabel('KeyD')}: drop`;
   }
 
   // ---- Keyboard ---------------------------------------------------------------
@@ -336,7 +388,7 @@ export class Input {
     const k = e.key.toLowerCase();
     this.keys.add(k);
     const g = this.game;
-    if (/^[0-9asdf ]$/.test(k)) this.actions++;
+    if (/^[0-9 ]$/.test(k)) this.actions++;
     if (/^[0-9]$/.test(k)) {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
@@ -360,28 +412,8 @@ export class Input {
         else if (this.dropMode) this.dropMode = false;
         else this.onMenu();
         break;
-      // Hotkeys stay on the left hand (as in Stormgate): A attack-move, S stop, D drop, F unload, Space base,
+      // Hotkeys stay on the left hand (as in Stormgate): the command card's grid (ui/command-card.ts), Space base,
       // ` pause. The right hand is on the mouse; the camera pans with the arrows, screen edges or middle-drag.
-      case 'd':
-        if (this.ownCarryalls().some((c) => c.load.length)) {
-          this.dropMode = true;
-          this.attackMode = false;
-        }
-        break;
-      case 's':
-        if (this.ownUnits().length) this.issue({ c: 'stop', units: this.ownUnits().map((u) => u.id) });
-        break;
-      case 'f': {
-        const bunkers = this.selection.filter((b): b is Building => b instanceof Building && b.team === this.team && b.occupants.length > 0);
-        if (bunkers.length) this.issue({ c: 'unload', buildings: bunkers.map((b) => b.id) });
-        break;
-      }
-      case 'a':
-        if (this.ownUnits().some((u) => u.def.weapon)) {
-          this.attackMode = true;
-          this.dropMode = false;
-        }
-        break;
       case ' ': {
         e.preventDefault();
         const home = g.buildings.find((b) => b.team === this.team && b.type === 'conyard') ?? g.buildings.find((b) => b.team === this.team);
@@ -467,7 +499,7 @@ export class Input {
       if (e instanceof Building && PRODUCERS.includes(e.type as Producer) && e.team === this.team) text += '   Right-click to set a rally point';
       if (e instanceof Carryall && e.team === this.team) text += this.carryallInfo(e);
       if (e instanceof Unit && e.def.repair && e.team === this.team) text += '   Right-click a damaged vehicle or building to repair it';
-      if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === this.team && e.occupants.length ? '   F to unload' : ''}`;
+      if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === this.team && e.occupants.length ? `   ${keyLabel('KeyF')} to unload` : ''}`;
     } else if (sel.length > 1) {
       const counts = new Map<string, number>();
       for (const e of sel) counts.set(e.name, (counts.get(e.name) ?? 0) + 1);
