@@ -73,7 +73,7 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  --cell: 60px;
+  --cell: 64px;
   --gap: 4px;
 }
 
@@ -132,10 +132,10 @@ body {
 
 #hud-map {
   position: absolute;
-  left: 0;
+  right: 0;
   bottom: 0;
   padding: 6px;
-  border-left: none;
+  border-right: none;
   border-bottom: none;
 }
 
@@ -164,14 +164,14 @@ body {
   pointer-events: none;
 }
 
-/* ---- Command card: tabs (Q W E R) over two rows of buttons (A S D F, Z X C V) ---- */
+/* ---- Command card, bottom left: tabs (Q W E R) over two rows of buttons (A S D F, Z X C V) ---- */
 
 #command-card {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: 0;
   padding: 6px;
-  border-right: none;
+  border-left: none;
   border-bottom: none;
 }
 
@@ -203,9 +203,9 @@ body {
 }
 
 .tab-name {
+  white-space: nowrap;
   font-size: 9px;
   font-weight: bold;
-  letter-spacing: 0.3px;
   text-transform: uppercase;
   color: var(--muted);
   padding-top: 6px;
@@ -386,7 +386,7 @@ body {
 /* The hovered button's details, above the card. */
 .card-tip {
   position: absolute;
-  right: 0;
+  left: 0;
   bottom: calc(100% + 6px);
   width: 290px;
   background: rgba(20, 16, 12, 0.95);

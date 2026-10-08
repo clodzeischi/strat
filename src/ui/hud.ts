@@ -4,7 +4,7 @@ import { TEAM_CSS, TILE } from '../config';
 import type { Game } from '../game/game';
 import { tileColor } from '../materials/ground';
 
-/** The HUD around the view: credits along the top, the minimap bottom left, and messages. */
+/** The HUD around the view: credits along the top, the minimap bottom right, and messages. */
 export class Hud {
   private creditsEl: HTMLElement;
   private shownCredits = -1;

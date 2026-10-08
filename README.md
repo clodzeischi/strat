@@ -81,7 +81,7 @@ It prints addresses like `http://192.168.1.20:8080`. Both players open that addr
 | Arrow keys, screen edges, middle-drag | Pan the camera |
 | **Esc** | Cancel, or open the menu |
 
-Hotkeys all sit under the left hand, as in Stormgate. The command card in the bottom right is a 4×3 grid: the top row picks a tab, and the two rows below hold that tab's buttons, always in the same places. Keys go by position, so on Colemak the same grid is Q W F P, A R S T and Z X C V (Chrome and Edge print your layout's letters on the buttons). Selecting units opens the Command tab, so A is always attack-move with an army selected; deselecting them goes back to the tab you were on.
+Hotkeys all sit under the left hand, as in Stormgate. The command card in the bottom left is a 4×3 grid: the top row picks a tab, and the two rows below hold that tab's buttons, always in the same places. Keys go by position, so on Colemak the same grid is Q W F P, A R S T and Z X C V (Chrome and Edge print your layout's letters on the buttons). Selecting units opens the Command tab, so A is always attack-move with an army selected; deselecting them goes back to the tab you were on.
 
 Click a button or press its key to build, train or research, and right-click it to cancel. A finished structure waits on its button until you press it again and place the building on rock near your base. The tabs show progress too: a bar under Build, Train and Upgrade while something is underway, and Build pulses when a structure is ready to place.
 

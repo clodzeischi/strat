@@ -70,7 +70,7 @@ interface CardEl {
 }
 
 /**
- * Stormgate-style 4x3 command card, bottom right. The top row (Q W E R by position) picks a tab: Build, Train,
+ * Stormgate-style 4x3 command card, bottom left. The top row (Q W E R by position) picks a tab: Build, Train,
  * Research or Command. The two rows below (A S D F, Z X C V) hold that tab's buttons, always in the same places.
  * Selecting units opens the Command tab, so A is attack-move whenever an army is selected; letting go of them
  * returns to the tab you were on. Everything is sent through `input.issue` as commands, like any player action.
