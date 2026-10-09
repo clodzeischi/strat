@@ -28,6 +28,8 @@ interface FactionKit {
   levels: LevelUpType[];
   research: UpgradeType[];
   fallback: UnitType;
+  /** A unit that sets up to shell from range, kept with the army (see `siegeWanted`): one per `per` combat units, up to `max`. */
+  siege: { unit: UnitType; per: number; max: number } | null;
   /** What earns the money: harvesters (with refineries), or Spice Crews setting up camps (Fremen). */
   worker: UnitType;
 }
@@ -36,18 +38,18 @@ const KITS: Record<Faction, FactionKit> = {
   atreides: {
     factory: 'factory', defense: 'bunker', raider: 'trike', scouts: ['trike', 'infantry'], mender: { unit: 'repair' }, tech: [],
     levels: ['conyard', 'factory'], research: ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'], fallback: 'infantry',
-    worker: 'harvester',
+    siege: null, worker: 'harvester',
   },
   corrino: {
     factory: 'fab', defense: 'turret', raider: 'razor', scouts: ['raider', 'razor', 'trooper'], mender: { building: 'pad' }, tech: ['tleilaxu'],
     levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'], fallback: 'trooper',
-    worker: 'harvester',
+    siege: { unit: 'artillery', per: 10, max: 3 }, worker: 'harvester',
   },
   // The Sietch stands in for the factory (the second step of the opening).
   fremen: {
     factory: 'sietch', defense: 'bunker', raider: 'warrior', scouts: ['warrior'], mender: null, tech: [],
     levels: ['sietch'], research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush'], fallback: 'warrior',
-    worker: 'crew',
+    siege: { unit: 'mortar', per: 5, max: 5 }, worker: 'crew',
   },
 };
 
@@ -560,19 +562,20 @@ export class AI {
 
   /** The next unit to save up for and build. */
   protected chooseUnit(): UnitType {
-    return this.raidTrikeWanted() ? this.kit.raider : this.repairWanted() ? 'repair' : this.siegeWanted() ? 'artillery' : this.pickCounter();
+    return this.raidTrikeWanted() ? this.kit.raider : this.repairWanted() ? 'repair' : this.siegeWanted() ? this.kit.siege!.unit : this.pickCounter();
   }
 
   /**
-   * Corrino keeps a few Artillery pieces with the army for sieges, one per ten combat units (up to three), once
-   * it can build them: they lose straight fights, so the counter picks would never choose them.
+   * A few siege pieces travel with the army (Corrino Artillery, Fremen Mortars), one per so many combat units, once
+   * we can build them: they fight from where they've set up, which the duels behind the counter picks don't see.
    */
   private siegeWanted(): boolean {
     const g = this.game;
-    if (!FACTIONS[this.ts.faction].train.includes('artillery') || !g.canTrain(this.team, 'artillery')) return false;
+    const s = this.kit.siege;
+    if (!s || !g.canTrain(this.team, s.unit)) return false;
     const army = g.units.filter((u) => u.team === this.team && u.def.weapon && u.type !== 'harvester').length;
-    const have = g.count(this.team, 'artillery') + this.ts.queues.fab.filter((q) => q.type === 'artillery').length;
-    return have < Math.min(3, Math.floor(army / 10));
+    const have = g.count(this.team, s.unit) + this.ts.queues[g.unitDef(this.team, s.unit).producer].filter((q) => q.type === s.unit).length;
+    return have < Math.min(s.max, Math.floor(army / s.per));
   }
 
   /**

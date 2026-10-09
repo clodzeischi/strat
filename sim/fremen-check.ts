@@ -292,6 +292,49 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   check(!gl.def.weapon && gl.def.speed > UNITS.raider.speed && gl.def.sight > UNITS.raider.sight, 'unarmed, but faster and sharper-eyed than a Sky Raider');
 }
 
+// ---- Fremen Mortar ----
+{
+  check(g.canTrain(F, 'mortar'), 'the Great Sietch unlocks the Fremen Mortar');
+  const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
+  const tick = (seconds: number) => {
+    for (let k = 0; k < seconds * 20; k++) t.update(0.05);
+  };
+  check(!t.canTrain(F, 'mortar'), 'not before');
+  const mo = t.spawnUnit('mortar', F, sx - 5, sz);
+  const d = mo.def.deploy!;
+  applyCommand(t, F, { c: 'deploy', units: [mo.id], on: true });
+  tick(d.time - 0.2);
+  check(mo.deployState === 'deploying', `it takes ${d.time} s to set up`);
+  tick(0.4);
+  check(mo.deployState === 'deployed', 'then it is set up');
+  applyCommand(t, F, { c: 'go', units: [mo.id], x: sx - 15, z: sz, target: null, attack: false });
+  tick(1);
+  check(hypot(mo.x - (sx - 5), mo.z - sz) < 0.1, 'set up, it ignores move orders');
+  // A tank driving across, out beyond the tank's own reach: guided rockets follow it.
+  const tank = t.spawnUnit('tank', A, sx + 6, sz - 6);
+  tank.command(t, { kind: 'move', x: sx + 6, z: sz + 6 });
+  tick(4);
+  const hurt = tank.maxHp - tank.hp;
+  console.log(`      mortar set up: ${hurt.toFixed(0)} damage to a tank crossing at range ~11 in 4 s`);
+  check(hurt >= 80, 'set up, it hits a moving tank at long range with guided rockets');
+  const close = t.spawnUnit('infantry', A, mo.x + 2, mo.z);
+  close.command(t, { kind: 'hold' });
+  const before = close.hp;
+  t.damage(tank, UNITS.tank.weapon!, 100, null);
+  tick(2);
+  check(close.hp === before, 'it cannot fire at something right next to it');
+  t.damage(close, UNITS.tank.weapon!, 100, null);
+  applyCommand(t, F, { c: 'deploy', units: [mo.id], on: false });
+  tick(d.time + 0.1);
+  check(mo.deployState === 'mobile', 'it packs up again');
+  // Mobile it fights with a pistol: far less damage than set up.
+  check(mo.def.weapon!.damage < d.weapon.damage / 3 && mo.def.weapon!.range < d.weapon.range / 2, 'on the move it only has a pistol');
+  // Set up in the sand, it digs in like any Fremen.
+  applyCommand(t, F, { c: 'deploy', units: [mo.id], on: true });
+  tick(d.time + HIDE.delay + 0.5);
+  check(mo.hidden, 'set up and still on the sand, it hides');
+}
+
 // ---- Healing ----
 {
   const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);

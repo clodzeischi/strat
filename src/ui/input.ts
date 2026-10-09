@@ -19,7 +19,7 @@ const PAN_SPEED = 45;
 const TIER: Record<UnitType, number> = {
   carryall: 6, rocket: 5, repair: 4, tank: 3, trike: 2, infantry: 1, harvester: 0,
   devastator: 6, artillery: 5, raider: 4, sardaukar: 3, razor: 2, trooper: 1,
-  fedaykin: 4, glider: 3, warrior: 2, crew: 1,
+  mortar: 5, fedaykin: 4, glider: 3, warrior: 2, crew: 1,
 };
 
 /** One kind of thing in the selection: a unit type or a building type. */

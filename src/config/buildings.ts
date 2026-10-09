@@ -60,8 +60,8 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   // ---- Fremen (who also build on open sand) ----
   sietch: {
     name: 'Sietch', short: 'Sietch', cost: 1000, buildTime: 15, hp: 1400, size: 3, requires: ['barracks'],
-    desc: 'A Fremen stronghold. Unlocks Fedaykin, Thumpers and research.',
-    levelUp: { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades the Sietch. Unlocks Ambush.' },
+    desc: 'A Fremen stronghold. Unlocks Fedaykin, Wind Gliders, Thumpers and research.',
+    levelUp: { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades the Sietch. Unlocks Fremen Mortars and Ambush.' },
   },
   thumper: {
     name: 'Thumper', short: 'Thumper', cost: 200, buildTime: 0, hp: 150, size: 1, requires: ['sietch'], onSand: true, deployed: true,

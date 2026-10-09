@@ -644,7 +644,7 @@ export class Unit extends Entity {
     this.path = [];
     if (this.deployState === 'deploying' || this.deployState === 'packing') {
       // The turret swings back to the front before the gun comes down.
-      if (this.deployState === 'packing') this.turretHeading = this.rotateToward(this.turretHeading, this.heading, 1.5 * dt);
+      if (this.deployState === 'packing' && this.turret) this.turretHeading = this.rotateToward(this.turretHeading, this.heading, 1.5 * dt);
       this.deployTimer -= dt;
       if (this.deployTimer <= 0) {
         this.deployState = this.deployState === 'deploying' ? 'deployed' : 'mobile';
@@ -672,10 +672,18 @@ export class Unit extends Entity {
     }
     const t = this.target;
     if (!t) return;
-    // Dug in, the hull stays put and the turret turns (slowly: it's a heavy gun).
+    // Dug in, the hull stays put and the turret turns (slowly: it's a heavy gun); without a turret (a Fremen Mortar),
+    // the gunner turns where he kneels.
     const angle = Math.atan2(t.z - this.z, t.x - this.x);
-    this.turretHeading = this.rotateToward(this.turretHeading, angle, 1.5 * dt);
-    if (Math.abs(wrapAngle(angle - this.turretHeading)) < 0.08 && this.cooldown <= 0) {
+    let aligned: boolean;
+    if (this.turret) {
+      this.turretHeading = this.rotateToward(this.turretHeading, angle, 1.5 * dt);
+      aligned = Math.abs(wrapAngle(angle - this.turretHeading)) < 0.08;
+    } else {
+      this.heading = this.rotateToward(this.heading, angle, Math.min(this.def.turnRate, 3) * dt);
+      aligned = Math.abs(wrapAngle(angle - this.heading)) < 0.15;
+    }
+    if (aligned && this.cooldown <= 0) {
       game.fire(this, t, w);
       this.cooldown = w.cooldown * (0.9 + game.random() * 0.2);
     }

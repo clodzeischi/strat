@@ -2,7 +2,7 @@ import type { UnitDef, UnitType } from './types';
 
 export const UNIT_ORDER: UnitType[] = [
   'harvester', 'infantry', 'trike', 'tank', 'rocket', 'repair', 'carryall', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery',
-  'warrior', 'fedaykin', 'crew', 'glider',
+  'warrior', 'fedaykin', 'crew', 'glider', 'mortar',
 ];
 
 export const UNITS: Record<UnitType, UnitDef> = {
@@ -119,6 +119,16 @@ export const UNITS: Record<UnitType, UnitDef> = {
     name: 'Spice Crew', producer: 'barracks', cost: 450, buildTime: 12, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
     turret: false, infantry: true, tags: ['biological', 'light'], weapon: null, requires: ['barracks'], hides: true, camp: 'camp',
     desc: 'Unarmed spice hunters. Walk them onto a spice field and Set Up Camp (D): the Spice Camp turns the spice around it into credits. Pack it up again when the spice runs out.',
+  },
+  mortar: {
+    name: 'Fremen Mortar', producer: 'barracks', cost: 250, buildTime: 9, hp: 120, speed: 2.8, turnRate: 12, radius: 0.5, sight: 12,
+    turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch2'], hides: true,
+    weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 3, armored: -4, structure: -3 }, cooldown: 0.8, projectile: 'bullet', speed: 0, splash: 0 },
+    deploy: {
+      time: 1.5,
+      weapon: { range: 12, minRange: 4, damage: 24, bonus: { mechanical: 16, structure: 30, biological: -10 }, cooldown: 1.4, projectile: 'rocket', speed: 16, splash: 1.5 },
+    },
+    desc: 'A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the move he barely fights; set up (D, 1.5 s), he lobs guided rockets at anything your side can see out to 12: strong vs vehicles and structures. Can\'t fire up close, and in the sand he digs in like any Fremen.',
   },
   glider: {
     name: 'Wind Glider', producer: 'barracks', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,

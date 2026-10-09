@@ -11,7 +11,7 @@ export type Faction = 'atreides' | 'corrino' | 'fremen';
 export type UnitType =
   | 'harvester' | 'infantry' | 'trike' | 'tank' | 'rocket' | 'repair' | 'carryall'
   | 'trooper' | 'sardaukar' | 'razor' | 'devastator' | 'raider' | 'artillery'
-  | 'warrior' | 'fedaykin' | 'crew' | 'glider';
+  | 'warrior' | 'fedaykin' | 'crew' | 'glider' | 'mortar';
 export type BuildingType =
   | 'conyard' | 'refinery' | 'barracks' | 'bunker' | 'factory' | 'hitech' | 'fab' | 'tleilaxu' | 'pad' | 'turret'
   | 'sietch' | 'thumper' | 'camp';

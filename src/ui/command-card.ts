@@ -441,7 +441,11 @@ export class CommandCard {
         icon: () => 'deploy',
         name: () => (input.deployedShare() > 0.5 ? 'Pack Up' : 'Deploy'),
         cost: () => 0,
-        tip: () => 'Selected Soulcrushers set up (3 s) to shell anything your side can see at long range, or pack up to move again. Deployed, they ignore move orders.',
+        tip: () => {
+          const u = input.ownUnits().find((u) => u.def.deploy);
+          const d = u?.def.deploy;
+          return d ? `Selected ${u!.name}s set up (${d.time} s) to fire on anything your side can see out to ${d.weapon.range}, or pack up to move again. Set up, they ignore move orders.` : '';
+        },
         view: () => ({ active: input.deployedShare() > 0.5 }),
         use: () => input.toggleDeploy(),
       },

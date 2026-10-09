@@ -32,6 +32,7 @@ import { trooper } from './units/trooper';
 import { crew } from './units/crew';
 import { fedaykin } from './units/fedaykin';
 import { glider } from './units/glider';
+import { mortar } from './units/mortar';
 import { warrior } from './units/warrior';
 
 export type { BuildingModel, UnitModel, UpgradeKit, UpgradeLook } from './types';
@@ -42,7 +43,7 @@ export { CARRYALL_HOOK_Y, NACELLES, SEATS, SEAT_OFF, SEAT_ON } from './units/car
 
 const UNIT_MODELS: Record<UnitType, UnitBlueprint> = {
   harvester, infantry, trike, tank, rocket, repair, carryall, trooper, sardaukar, razor, devastator, raider, artillery,
-  warrior, fedaykin, crew, glider,
+  warrior, fedaykin, crew, glider, mortar,
 };
 const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = {
   conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret, sietch, thumper, camp,
