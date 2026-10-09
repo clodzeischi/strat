@@ -223,49 +223,53 @@ For reference, Atreides Brutal beats Atreides Hard 85% of the time. So at equal 
 2. **Special mechanics,** one at a time, re-running the matchup sims after each: drop pods, deployed Artillery firing at the ground, the flamethrower, the Devastator firing while moving and self-destructing, Sky Raider mines.
 3. **AI that can play Corrino** (Brutal is tuned for Atreides).
 
-### Fremen **Proposal, built** (branch `fremen`; numbers from the sims, open to playtesting)
+### Fremen **Proposal, built** (numbers from the sims, open to playtesting)
 
-The Zerg of the game: cheap, fast infantry that live in the open desert. Low tech, speed, surprise, violence of action. Every Fremen unit is infantry except the Sandworm.
+The Zerg of the game: cheap, fast infantry that live in the open desert. Low tech, speed, surprise, violence of action. Every Fremen unit is infantry except the Wind Glider. Their reach across the map is the wild Sandworm: they can't bring armies across it fast, but they can call down a disaster on the enemy's fields.
 
-- **No harvesters, no refinery.** A **Spice Crew** (infantry, 450 credits, trained at the Barracks) walks to a spice field and **sets up camp** (D) on the spot. The **Spice Camp** turns the spice within 3.5 tiles into credits (10/s with 12 or more spice tiles in reach, less on a field's edge), with no trips to make. Camps sit out on the fields where everyone can find them; when the spice in reach runs out, a camp **packs up** (D) into a crew again and moves on. The other AIs raid camps as they would harvesters.
+- **No harvesters, no refinery.** A **Spice Crew** (infantry, 450 credits, trained at the Barracks) walks to a spice field and **sets up camp** (D) on the spot. The **Spice Camp** turns the spice within 3.5 tiles into credits (8.5/s with 12 or more spice tiles in reach, less on a field's edge), with no trips to make. Camps sit out on the fields where everyone can find them; when the spice in reach runs out, a camp **packs up** (D) into a crew again and moves on. The other AIs raid camps as they would harvesters.
 - **Build on sand.** Fremen structures go on sand as well as rock (not on spice). Other factions are bound to rock.
 - **Hide in the sand.** Fremen infantry that stand still on sand or spice for 3 s dig in (they sink into the sand on their owner's screen): the enemy can't see or target them unless one of its units or structures is within 2 tiles. Firing or being hit brings them out; they dig in again 3 s later. Hidden, they don't go after enemies in sight, only shoot what walks into range. Rock gives no cover. Mines still go off under them.
 - **Sand walking.** Fremen infantry move 20% faster on sand and spice (45% with Sandwalk).
 - **Water discipline.** Fremen units heal 1.5% of their health a second, and structures 0.6%, once unhurt for 6 s (twice as fast, after 3 s, with Stillsuits). No repairs.
+- **Thumpers and the wild Sandworm.** Warriors and Fedaykin plant Thumpers (D, then click open sand or spice; needs a Sietch): 250 credits, one at a time, every 60 s. The Thumper drums for 10 s; then a wild Sandworm erupts where it stands, swallowing it and anything around it. For 20 s the worm hunts within 15 of that spot: whatever **moves** on sand or spice (units still for 1.5 s don't draw it), **harvesters even standing still** (their machinery never stops), and **structures on the sand** (so Fremen can raid each other's camps). A bite every 2.5 s hits everything on the sand within 4: 400 damage (+400 vs vehicles, -100 vs structures), straight through shields. It belongs to nobody, can't be hurt, eats the caller's units as readily as the enemy's, and can't reach anything on rock or ramps. Counterplay: enemies with anything within 30 of a drumming Thumper hear it (it's revealed to them every second, with a warning), and a Thumper destroyed in time (150 HP) calls nothing.
+
+**Hold Position** (F, every faction): armed ground units stay put, shoot only what is within reach, don't chase or back off, and aren't pushed aside. It's how to stand still in front of a worm.
 
 **Units**
 
 | Unit | Cost | Built at | Requires | Stats | Role |
 |---|---|---|---|---|---|
-| Fremen Warrior | 80 | Barracks | | 70 HP, speed 3, range 4.5 | The Zergling: cheap and fast, shoots aircraft. Beats infantry and Troopers, loses to vehicles, flamers and MLRS |
-| Fedaykin | 200 | Barracks | Sietch | 230 HP, range 7, +20 vs mechanical, **sonic: ignores shields** | Anti-vehicle infantry. Beats tanks, Devastators, Razors (+0.34), MLRS (+0.2); loses to infantry |
-| Death Commando | 125 | Barracks | Sietch | 120 HP, speed 4; blows up within 2.5: 60 damage (+200 structures, +40 mechanical) in a 4-unit blast, its target takes it all | Structures, defenses, vehicles. Doesn't chase anything faster than itself |
+| Fremen Warrior | 80 | Barracks | | 70 HP, speed 3, range 4.5 | The Zergling: cheap and fast, shoots aircraft, plants Thumpers. Beats infantry and Troopers, loses to vehicles, flamers and MLRS |
+| Fedaykin | 200 | Barracks | Sietch | 230 HP, range 7, +20 vs mechanical, **sonic: ignores shields** | Anti-vehicle infantry, plants Thumpers. Beats tanks, Devastators, Razors, MLRS; loses to infantry |
+| Wind Glider | 100 | Barracks | Sietch | 60 HP, speed 10, sight 16, unarmed, flies | Recon. The fastest thing in the sky. Can't hover: it flies to where it's sent and circles there (radius 8) |
+| Fremen Mortar | 250 | Barracks | Great Sietch | 120 HP, speed 2.8; pistol on the move (range 4.5); set up (D, 1.5 s): guided rockets 4-12, 24 (+16 vehicles, +30 structures, -10 infantry) every 1.4 s, small splash | Siege and anti-vehicle from range. Hides like any Fremen while set up |
 | Spice Crew | 450 | Barracks | | 120 HP, unarmed | Sets up a Spice Camp |
-| Sandworm | 1500 | Thumper | Great Sietch | 2400 HP, speed 5, sand and spice only; bite 120 (+120 mechanical) with splash. At most two | Beats nearly everything that stands on sand; Troopers and aircraft beat it; can't follow onto rock |
 
-**Buildings:** Construction Yard, Barracks, **Sietch** (1000: Fedaykin, Commandos, research; levels up to the **Great Sietch**, 1200), **Thumper** (600, on sand only: calls Sandworms), Bunker, and the **Spice Camp** (from a crew).
+**Buildings:** Construction Yard, Barracks, **Sietch** (1000: Fedaykin, Gliders, Thumpers, research; levels up to the **Great Sietch**, 1200: Mortars, Ambush), Bunker, the **Spice Camp** (from a crew) and the **Thumper** (planted by infantry).
 
 **Upgrades:** Great Sietch, Weapons +1, Armor +1, Ambush (units striking out of hiding deal +50% for 4 s; needs the Great Sietch), Stillsuits, Sandwalk, Spice Mining (camps +25%).
 
-**Status: stages 1-3 done** (roster, mechanics, AI). Check with `npx tsx sim/fremen-check.ts`. AI vs AI: `FACTIONS=fremen,corrino sim/faction-match.sh <games> <fremenLevel> <otherLevel>`. Also `sim/unit-row.ts` (a unit's duels against every other type) and `sim/kill-tally.ts` (who kills whom).
+**AI.** Plants Thumpers where a worm will catch the most enemy economy it knows of (harvesters seen in the last 20 s, camps), never near its own camps or structures on the sand; the planter walks clear and holds still until the worm is gone. Every faction's AI: units on the sand near a worm (or a Thumper about to bring one) hold still; harvesters working near a Thumper it can hear or see park at a refinery and go back once the worm is gone; up to three nearby units go after an enemy Thumper it sees. Fremen keep one Glider to scout with, and one Mortar per five combat units (up to five) as siege, like Corrino's Artillery.
 
-**Balance, Hard vs Hard, 30 games each (Fremen win rate):** 60% against Atreides, 43% against Corrino (each about +-9% at this sample size). Brutal Fremen vs Brutal Atreides 40% (10 games; Brutal's micro was written for Atreides). What it took, in order:
-- Camps first earned 12/s for a 300-credit crew: 84 credits/s by 2:00 against Atreides' 17; then 9/s for 400 was too little (15% wins). Settled at 10/s, crews 450 and 12 s to train.
-- Before Sandworms, nothing Fremen beat trikes or MLRS (15%): Fedaykin became the anti-vehicle unit (+20 vs mechanical) rather than anti-armor.
+**Status: built** (branch `fremen-mobility`). Check with `npx tsx sim/fremen-check.ts`. AI vs AI: `FACTIONS=fremen,corrino sim/faction-match.sh <games> <fremenLevel> <otherLevel>` (prints worm stats). Also `sim/unit-row.ts` and `sim/kill-tally.ts`. The counter table (`src/game/matchups.ts`) still has the old numbers with the Commando and Sandworm taken out; it hasn't been regenerated with the Mortar.
+
+**Balance, AI vs AI (Fremen win rate):** Hard vs Hard, 60 games each: 58% against Atreides, 41% against Corrino. Brutal vs Brutal, 30 games: 66% and 60%. Fremen mirror: 26% of games time out at 30 minutes (66% before). Worms are called about twice a game and eat 1000-1300 credits of the enemy's (200-600 of the caller's own).
+
+What it took (this round), in order:
+- **Bug, also on main: the Fremen AI never researched or levelled up anything.** Production held credits at the tech reserve, tech waited for the reserve plus the 800 harvester fund, and camp income trickles in rather than arriving by the harvester load, so it never got there (which is also why the old Sandworm "hardly ever appeared"). Fremen keep no harvester fund now; they reach the Great Sietch around 3:00.
+- With tech, worms and Mortars: 96% vs Atreides, 90% vs Corrino. Without worms 70% / 63%; without Mortars 93% / 86%. So the worm was worth about 25 points and the Mortar little, the rest coming from the AI finally teching.
+- Harvesters only started running 3 s before the worm came, too late to outrun it. Now they leave as soon as the Thumper is heard and wait at the refinery: worms ate half as much (3100 to 1500 vs Atreides), 86% / 63%.
+- Warriors 90, a dearer Great Sietch, pricier upgrades and slower Thumpers alone each stayed within noise. Camps at 9/s took Atreides to 76%. Settled at camps 8.5/s and Thumpers 250 every 60 s (9/s with those Thumpers: 73% / 41%).
+
+Earlier rounds (Atreides and Corrino AIs then never faced a teching Fremen):
+- Camps first earned 12/s for a 300-credit crew: 84 credits/s by 2:00 against Atreides' 17; then 9/s for 400 was too little (15% wins). Crews 450 and 12 s to train.
+- Nothing Fremen beat trikes or MLRS (15%): Fedaykin became the anti-vehicle unit (+20 vs mechanical) rather than anti-armor.
 - Against Corrino, Razors burned through everything (25-30%). Fedaykin weirding modules are sonic, and sound passes through a Holtzman shield: their shots ignore shields. That moved Fremen vs Corrino from 30% to 60% and left Atreides alone. (Shield-piercing Warriors were tried too: full piercing let them beat Sardaukar, and half piercing does nothing at all, since when health exceeds shields the total damage to kill is the same.)
-- Commandos were burned on trikes they could never catch; now they skip faster targets unless they're right there.
 - Warriors first beat tanks (+0.51) and Sardaukar (+0.60): range 5.5 to 4.5, weaker vs armor, 70 HP (two Sardaukar shots).
+- Death Commandos (suicide bombers) and a 1500-credit Sandworm unit from a Thumper building were cut: the Commando was too like the Devastator's self-destruct, and the worm unit almost never came into play.
 
-**Makeups compared** (`sim/fremen-variants.ts`, `FREMEN_VARIANT=<name>`; 30 Hard-vs-Hard games each):
-
-| Makeup | What changes | vs Atreides | vs Corrino | How games go |
-|---|---|---|---|---|
-| Swarm (as built) | | 60% | 43% | Over in 8-9 min; Sandworms almost never show up (0-0.4 a game) |
-| Desert ghosts | Hide after 1.5 s, found within 1.5 tiles, Ambush +100% from the Sietch; Warriors 70 / 60 HP | 63% | 43% | Same as the swarm: the AI doesn't use stealth on purpose, so faster hiding changes little |
-| Worm riders | Thumper from the Sietch; worms 900, 1500 HP, smaller bite, up to 3; Fedaykin 240 | 66% | 33% | 7-9 worms a game, longer games, K/D 1.03 vs Atreides (the swarm's: 0.56) |
-| Fedaykin host | Warriors 110 / 100 HP; Fedaykin from the Barracks; sand speed +35%; no Commandos | 63% | 46% | Fewer, sturdier units; K/D 0.72 vs Atreides |
-
-Win rates don't separate the makeups (all within noise); what differs is what a game looks like. The AI attacks rather than ambushes, so it undersells stealth (the ghosts), and a player would get more out of hiding than these numbers show. **Open decision:** the Sandworm, the faction's signature, hardly ever appears in the swarm makeup because games are decided before the Great Sietch pays off. The riders makeup brings it in as a core unit, at the cost of a worse Corrino matchup (Troopers eat worms). Options: keep the swarm; adopt the riders' early Thumper with the swarm's worm stats; or something between.
+`sim/fremen-variants.ts` (`FREMEN_VARIANT=<name>`) keeps the makeups compared: `noworm`, `nomortar`, `ghosts` (faster, harder-to-find hiding), `drums` (more worms), `host` (fewer, sturdier units) and the balance candidates above.
 
 ## AI difficulty plan
 

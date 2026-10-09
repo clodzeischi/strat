@@ -794,6 +794,8 @@ export class AI {
 
   /** Our units told to stand still while a worm is about (they go back to what they were doing once it's gone). */
   private frozen = new Set<Unit>();
+  /** Harvesters waiting at a refinery for a worm to leave their field, and where they were working. */
+  private evacuated = new Map<Unit, { x: number; z: number }>();
   /** The Thumper we're planting: who, where, since when; `away` once it's planted and the planter is getting clear. */
   private thumpJob: { u: Unit; x: number; z: number; since: number; away: boolean } | null = null;
 
@@ -806,20 +808,38 @@ export class AI {
     const g = this.game;
     const m = g.map;
     const danger: { x: number; z: number }[] = g.worms.map((w) => ({ x: w.lairX, z: w.lairZ }));
+    // Harvesters get going as soon as a Thumper is heard: they're slow, and the worm hears them however still.
+    const drums: { x: number; z: number }[] = [...danger];
     for (const b of g.buildings) {
       if (b.type !== 'thumper' || b.dead) continue;
       const due = g.drumDue(b.team);
       // Ours we know about; the enemy's, once we hear or see them.
-      if (due !== null && due < 3 && (b.team === this.team || g.sees(this.team, b))) danger.push({ x: b.x, z: b.z });
+      if (due === null || (b.team !== this.team && !g.sees(this.team, b))) continue;
+      drums.push({ x: b.x, z: b.z });
+      if (due < 3) danger.push({ x: b.x, z: b.z });
     }
+    const reach = WORM.range + WORM.bite + 2 * TILE;
     const onSand = (u: Unit) => m.canEnter(m.cellOf(u.x), m.cellOf(u.z), 'worm');
-    const near = (u: Unit) => danger.some((d) => hypot(u.x - d.x, u.z - d.z) <= WORM.range + WORM.bite + 2 * TILE);
+    const near = (p: { x: number; z: number }, list = danger) => list.some((d) => hypot(p.x - d.x, p.z - d.z) <= reach);
+    // Harvesters at work around a Thumper or worm go and wait by a refinery until it's gone, then go back to work.
     for (const u of g.units) {
-      if (u.team !== this.team || u.dead || u.carrier || u.falling || u.def.air || !onSand(u) || !near(u)) continue;
-      if (u.type === 'harvester') {
-        u.retreat(g);
-        continue;
+      if (u.team !== this.team || u.type !== 'harvester' || u.dead || u.carrier || this.evacuated.has(u)) continue;
+      const goal = u.travelGoal(g);
+      const at = u.order.kind === 'harvest' && u.hstate === 'harvest' ? u : u.hstate === 'toSpice' ? goal : null;
+      const ref = g.nearestBuilding(this.team, 'refinery', u.x, u.z);
+      if (!at || !ref || !near(at, drums)) continue;
+      this.evacuated.set(u, { x: at.x, z: at.z });
+      u.command(g, { kind: 'move', x: ref.x, z: ref.z });
+    }
+    for (const [u, spot] of [...this.evacuated]) {
+      if (u.dead) this.evacuated.delete(u);
+      else if (!near(spot, drums)) {
+        this.evacuated.delete(u);
+        u.commandHarvest(g, null);
       }
+    }
+    for (const u of g.units) {
+      if (u.team !== this.team || u.dead || u.carrier || u.falling || u.def.air || u.type === 'harvester' || !onSand(u) || !near(u)) continue;
       // (Again, if something else has given it an order since.)
       if (u.deployState !== 'mobile' || u.order.kind === 'hold') continue;
       this.frozen.add(u);

@@ -64,11 +64,11 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     levelUp: { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades the Sietch. Unlocks Fremen Mortars and Ambush.' },
   },
   thumper: {
-    name: 'Thumper', short: 'Thumper', cost: 200, buildTime: 0, hp: 150, size: 1, requires: ['sietch'], onSand: true, deployed: true,
+    name: 'Thumper', short: 'Thumper', cost: 250, buildTime: 0, hp: 150, size: 1, requires: ['sietch'], onSand: true, deployed: true,
     desc: 'Planted in the sand by a Warrior or Fedaykin, it drums until a wild Sandworm comes. The worm swallows whatever moves on the sand around it, whoever it belongs to, and harvesters even standing still. Destroy it before then and no worm comes.',
   },
   camp: {
-    name: 'Spice Camp', short: 'Spice Camp', cost: 450, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 10, radius: 7 },
+    name: 'Spice Camp', short: 'Spice Camp', cost: 450, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 8.5, radius: 7 },
     desc: 'Set up by a Spice Crew on a spice field: turns the spice around it into credits. Packs up into a crew again (D) when the field runs dry.',
   },
 };

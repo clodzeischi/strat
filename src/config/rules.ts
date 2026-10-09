@@ -63,7 +63,7 @@ export const FREMEN_REGEN = { unit: 0.015, building: 0.006, delay: 6, stillsuit:
  * one at a time. A planted Thumper drums for `delay` s; then a wild Sandworm comes, unless the Thumper was destroyed.
  * Every `revealEvery` s its drumming gives it away to sides with anything within `hear` of it.
  */
-export const THUMPER = { cost: 200, cooldown: 45, delay: 10, hear: 30, revealEvery: 1 };
+export const THUMPER = { cost: 250, cooldown: 60, delay: 10, hear: 30, revealEvery: 1 };
 /**
  * The wild Sandworm a Thumper calls: nobody's, and it can't be hurt. It surfaces where the Thumper stands (swallowing
  * it), then for `hunt` s goes after whatever moves on sand or spice within `range` of that spot, harvesters even

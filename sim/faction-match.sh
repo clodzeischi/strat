@@ -22,6 +22,7 @@ print(f"{a} {rows[0]['corrino']} vs {b} {rows[0]['atreides']}: {n} games, {a} wi
 print(f"  avg minutes {avg('time')/60:.1f}, K/D {sum(r['killed'] for r in rows)/max(1,sum(r['lost'] for r in rows)):.2f}, spice vs opponent {avg('spice')/max(1,avg('oppSpice')):.2f}")
 print(f"  per game: deploys {avg('deploys'):.1f}, self-destructs {avg('detonations'):.1f}, mines {avg('mines'):.1f}, pod drops {avg('pods'):.1f}, pad-seconds {avg('padSeconds'):.0f}, self-repair seconds {avg('selfRepairSeconds'):.0f}")
 print(f"  camps set up {avg('camps'):.1f}, unit-seconds hidden {avg('hiddenSeconds'):.0f}")
+if 'worms' in rows[0]: print(f"  worms called {avg('worms'):.1f}, ate enemy {avg('wormEnemy'):.0f} / own {avg('wormOwn'):.0f} credits per game")
 print('  built per game: ' + ', '.join(f"{t} {c/n:.1f}" for t, c in built.most_common()))
 PY
 echo "raw: $OUT"
