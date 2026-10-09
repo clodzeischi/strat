@@ -14,7 +14,7 @@ const reqList = (reqs: Req[]) => reqs.map(reqName).join(', ');
 function weaponLine(w: WeaponDef): string {
   const bonus = Object.entries(w.bonus).map(([t, v]) => `${v! > 0 ? '+' : ''}${v} vs ${cap(t)}`).join(', ');
   const range = w.minRange ? `${w.minRange / TILE}-${w.range / TILE}` : `${w.range / TILE}`;
-  return `Damage ${w.damage}${bonus ? ` (${bonus})` : ''}  Range ${range} tiles`;
+  return `Damage ${w.damage}${bonus ? ` (${bonus})` : ''}  Range ${range} tiles${w.pierce ? '  Ignores shields' : ''}`;
 }
 
 type Tab = 'build' | 'train' | 'research' | 'command';

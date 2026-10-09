@@ -104,25 +104,25 @@ export const UNITS: Record<UnitType, UnitDef> = {
 
   // ---- Fremen: cheap, fast infantry that dig into the sand (`hides`); the Sandworm is the one big thing ----
   warrior: {
-    name: 'Fremen Warrior', producer: 'barracks', cost: 75, buildTime: 3.5, hp: 80, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
+    name: 'Fremen Warrior', producer: 'barracks', cost: 75, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
-    weapon: { range: 5.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -3, structure: -2 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true },
-    desc: 'Cheap, fast desert fighter with a maula rifle. Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers.',
+    weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -2 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true },
+    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers.',
   },
   fedaykin: {
-    name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 170, speed: 2.8, turnRate: 12, radius: 0.5, sight: 11,
+    name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 230, speed: 3, turnRate: 12, radius: 0.5, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch'], hides: true,
-    weapon: { range: 7, minRange: 0, damage: 10, bonus: { armored: 18, mechanical: 4, structure: 6, biological: -3 }, cooldown: 1.1, projectile: 'bullet', speed: 0, splash: 0, air: true },
-    desc: 'Death commandos with weirding modules, sonic weapons that tear through armor. Strong vs vehicles and structures, can shoot at aircraft. Weak vs infantry.',
+    weapon: { range: 7, minRange: 0, damage: 10, bonus: { mechanical: 20, armored: 4, structure: 6, biological: -3 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, air: true, pierce: true },
+    desc: 'Elite fighters with weirding modules: sonic weapons that tear vehicles apart and pass straight through shields. Strong vs vehicles and structures, can shoot at aircraft. Weak vs infantry.',
   },
   commando: {
-    name: 'Death Commando', producer: 'barracks', cost: 125, buildTime: 5, hp: 90, speed: 3.4, turnRate: 12, radius: 0.45, sight: 10,
+    name: 'Death Commando', producer: 'barracks', cost: 125, buildTime: 5, hp: 120, speed: 4, turnRate: 12, radius: 0.45, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch'], hides: true,
-    weapon: { range: 2.5, minRange: 0, damage: 60, bonus: { structure: 200, armored: 40, light: 30 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 4, suicide: true },
+    weapon: { range: 2.5, minRange: 0, damage: 60, bonus: { structure: 200, mechanical: 40 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 4, suicide: true },
     desc: 'Runs up to its target and blows itself up, wrecking everything around it. Devastating vs structures, defenses and packed armies. Has to get there first.',
   },
   crew: {
-    name: 'Spice Crew', producer: 'barracks', cost: 300, buildTime: 6, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
+    name: 'Spice Crew', producer: 'barracks', cost: 400, buildTime: 9, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
     turret: false, infantry: true, tags: ['biological', 'light'], weapon: null, requires: ['barracks'], hides: true, camp: 'camp',
     desc: 'Unarmed spice hunters. Walk them onto a spice field and Set Up Camp (D): the Spice Camp turns the spice around it into credits. Pack it up again when the spice runs out.',
   },

@@ -48,6 +48,8 @@ export interface WeaponDef {
   cone?: number;
   /** Firing it blows the shooter up (Death Commandos): a blast of `splash` around itself, and it's gone. */
   suicide?: boolean;
+  /** Passes straight through shields to health (sound: the Fedaykin's weirding modules). */
+  pierce?: boolean;
 }
 
 export interface UnitDef {

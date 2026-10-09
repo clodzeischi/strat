@@ -2,8 +2,10 @@
 // random map played from both sides. One JSON line per game, with what the Corrino side built and which of its
 // abilities it used, so it's easy to see it plays the faction and not just its numbers.
 // Usage: npx tsx sim/faction-match.ts <corrinoLevel> <atreidesLevel> <games> [offset]      levels: normal, hard, brutal, brutal-noair, brutal-nomicro
-// In parallel with a summary: sim/faction-match.sh <games> <corrinoLevel> <atreidesLevel>
+// Other pairs: FACTIONS=fremen,corrino npx tsx sim/faction-match.ts <fremenLevel> <corrinoLevel> <games> [offset]
+// (the first faction is the one reported on, in the 'corrino' fields). In parallel: FACTIONS=... sim/faction-match.sh
 import * as THREE from 'three';
+import './fremen-variants'; // FREMEN_VARIANT=<name> plays an alternative Fremen makeup
 import { BRUTAL_OPTIONS, BRUTAL_PROFILE, BrutalAI, createAI } from '../src/game/brutal';
 import type { Difficulty } from '../src/game/game';
 import { Game } from '../src/game/game';
@@ -14,10 +16,12 @@ const games = Number(gamesArg ?? 10);
 const offset = Number(offsetArg ?? 0);
 const MAX_TIME = 30 * 60;
 
+const [mine, theirs] = (process.env.FACTIONS ?? 'corrino,atreides').split(',') as Faction[];
+
 for (let k = 0; k < games; k++) {
   const i = k + offset;
   const corrino = (i % 2) as Team;
-  const factions: Faction[] = corrino === 0 ? ['corrino', 'atreides'] : ['atreides', 'corrino'];
+  const factions: Faction[] = corrino === 0 ? [mine, theirs] : [theirs, mine];
   const seed = 1000 + Math.floor(i / 2);
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed, factions);
   g.onSurrenderOffer = (t) => g.acceptSurrender(t);
@@ -31,7 +35,8 @@ for (let k = 0; k < games; k++) {
   const ais = ([0, 1] as Team[]).map((t) => make(t, t === corrino ? cLevel : aLevel));
   const built: Partial<Record<UnitType, number>> = {};
   const seen = new Set<number>();
-  let deploys = 0, detonations = 0, mines = 0, pods = 0, padHeal = 0, mends = 0;
+  let deploys = 0, detonations = 0, mines = 0, pods = 0, padHeal = 0, mends = 0, camps = 0, hiddenSeconds = 0, commandos = 0;
+  const campIds = new Set<number>();
   const wasDeployed = new Set<number>();
   const startDet = g.startDetonation.bind(g);
   g.startDetonation = (u) => { if (u.detonateAt === null) detonations++; startDet(u); };
@@ -52,6 +57,8 @@ for (let k = 0; k < games; k++) {
       if (u.deployState === 'mobile') wasDeployed.delete(u.id);
     }
     for (const b of g.buildings) if (b.team === corrino && b.repairing) mends += 0.05;
+    for (const b of g.buildings) if (b.team === corrino && b.type === 'camp' && !campIds.has(b.id)) { campIds.add(b.id); camps++; }
+    for (const u of g.units) if (u.team === corrino && u.hidden) hiddenSeconds += 0.05;
     for (const b of g.buildings) if (b.team === corrino && b.patients.length) padHeal += 0.05;
     void before;
   }
@@ -60,5 +67,6 @@ for (let k = 0; k < games; k++) {
     corrino: cLevel, atreides: aLevel, side: corrino, seed, result: g.winner === null ? 'timeout' : g.winner === corrino ? 'win' : 'loss', time: Math.round(g.time),
     killed: s.unitsKilled, lost: s.unitsLost, spice: Math.round(s.spiceHarvested), oppSpice: Math.round(g.teams[1 - corrino].stats.spiceHarvested),
     built, deploys, detonations, mines, pods, padSeconds: Math.round(padHeal), selfRepairSeconds: Math.round(mends),
+    camps, hiddenSeconds: Math.round(hiddenSeconds), factions: `${mine}-${theirs}`, variant: process.env.FREMEN_VARIANT ?? 'swarm',
   }));
 }

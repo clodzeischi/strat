@@ -13,12 +13,14 @@ import { writeFileSync } from 'node:fs';
 import { Game } from '../src/game/game';
 import { FACTIONS, unitDef, type Faction, type Team, type UnitType } from '../src/config';
 
-const TYPES: UnitType[] = ['infantry', 'trike', 'tank', 'rocket', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery'];
+const TYPES: UnitType[] = [
+  'infantry', 'trike', 'tank', 'rocket', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery', 'warrior', 'fedaykin', 'commando', 'worm',
+];
 const BUDGET = 4000;
 const SEEDS = [1003, 1007, 1012];
 const KEYS = ['--', '-R', 'R-', 'RR'];
 
-const factionOf = (t: UnitType): Faction => (FACTIONS.corrino.train.includes(t) && t !== 'harvester' ? 'corrino' : 'atreides');
+const factionOf = (t: UnitType): Faction => (t === 'harvester' ? 'atreides' : FACTIONS.corrino.train.includes(t) ? 'corrino' : FACTIONS.fremen.train.includes(t) ? 'fremen' : 'atreides');
 
 function duel(a: UnitType, b: UnitType, rocketsA: boolean, rocketsB: boolean, seed: number, swap: boolean): number {
   const [ta, tb]: Team[] = swap ? [1, 0] : [0, 1];

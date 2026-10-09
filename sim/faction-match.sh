@@ -17,9 +17,11 @@ res = Counter(r['result'] for r in rows)
 avg = lambda k: sum(r[k] for r in rows) / n
 built = Counter()
 for r in rows: built.update(r['built'])
-print(f"Corrino {rows[0]['corrino']} vs Atreides {rows[0]['atreides']}: {n} games, Corrino wins {100*res['win']//n}%, losses {100*res['loss']//n}%, timeouts {100*res['timeout']//n}%")
+a, b = rows[0].get('factions', 'corrino-atreides').split('-')
+print(f"{a} {rows[0]['corrino']} vs {b} {rows[0]['atreides']}: {n} games, {a} wins {100*res['win']//n}%, losses {100*res['loss']//n}%, timeouts {100*res['timeout']//n}%")
 print(f"  avg minutes {avg('time')/60:.1f}, K/D {sum(r['killed'] for r in rows)/max(1,sum(r['lost'] for r in rows)):.2f}, spice vs opponent {avg('spice')/max(1,avg('oppSpice')):.2f}")
 print(f"  per game: deploys {avg('deploys'):.1f}, self-destructs {avg('detonations'):.1f}, mines {avg('mines'):.1f}, pod drops {avg('pods'):.1f}, pad-seconds {avg('padSeconds'):.0f}, self-repair seconds {avg('selfRepairSeconds'):.0f}")
+print(f"  camps set up {avg('camps'):.1f}, unit-seconds hidden {avg('hiddenSeconds'):.0f}")
 print('  built per game: ' + ', '.join(f"{t} {c/n:.1f}" for t, c in built.most_common()))
 PY
 echo "raw: $OUT"

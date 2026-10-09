@@ -19,8 +19,8 @@ export const worm: UnitBlueprint = {
       const t = i / (segs - 1);
       const r = 1.05 - t * 0.55;
       const x = 1.1 - i * 0.75;
-      // An arch: highest just behind the head, sinking toward the tail.
-      const y = 0.25 + Math.sin(Math.min(1, t * 1.6) * Math.PI) * 0.55 - t * 0.6;
+      // Half buried: an arch just behind the head, the rest sinking into the sand toward the tail.
+      const y = -0.15 + Math.sin(Math.min(1, t * 1.6) * Math.PI) * 0.45 - t * 0.7;
       const seg = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.95, 0.72, 12), i % 2 ? ring : hide);
       seg.rotation.z = Math.PI / 2;
       seg.position.set(x, y, 0);

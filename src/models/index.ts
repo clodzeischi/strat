@@ -57,9 +57,11 @@ export function makeUnitModel(type: UnitType, color: number): UnitModel {
 export function makeBuildingModel(type: BuildingType, color: number, size: number): BuildingModel {
   const group = new THREE.Group();
   const w = size * TILE - 0.3;
-  box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
-  // Team-colored trim on the slab edge.
-  box(group, w + 0.05, 0.12, 0.2, color, 0, 0.3, w / 2 - 0.1);
+  if (!BUILDING_MODELS[type].bare) {
+    box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
+    // Team-colored trim on the slab edge.
+    box(group, w + 0.05, 0.12, 0.2, color, 0, 0.3, w / 2 - 0.1);
+  }
   const spinner = BUILDING_MODELS[type].build(group, color);
   return { group, spinner };
 }

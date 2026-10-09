@@ -6,6 +6,7 @@ import type { BuildingBlueprint } from '../types';
 
 /** Spice Camp: a stilltent beside a spice drill turning slowly (the spinner), and sacks of spice ready to go. */
 export const camp: BuildingBlueprint = {
+  bare: true,
   build(g, color) {
     const tent = new THREE.Mesh(new THREE.ConeGeometry(1.0, 1.2, 4), mat(shade(ROBE, 1.1)));
     tent.position.set(-0.6, 0.9, -0.5);

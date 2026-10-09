@@ -278,6 +278,9 @@ export class Game {
       let score = d + penalty;
       const w = seeker && this.weaponFor(seeker, e);
       if (seeker && !w) return; // e.g. an aircraft and no anti-air weapon
+      // A Death Commando doesn't go after what it can't catch (trikes and the like would just lead it about), unless
+      // it's right there.
+      if (w?.suicide && e instanceof Unit && seeker instanceof Unit && e.def.speed > seeker.def.speed && d > w.range + 2) return;
       if (w) {
         const ratio = THREE.MathUtils.clamp(weaponDamage(w, e) / w.damage - 1, -1, 2);
         score -= ratio * 4;
@@ -949,7 +952,7 @@ export class Game {
     // Whoever fires is seen by the side it hits for a moment, so units below a cliff can shoot back.
     if (attacker && attacker.team !== target.team) this.vision.reveal(target.team, attacker.x, attacker.z, this.ticks);
     let dmg = weaponDamage(w, target) * mult;
-    if (target.shields > 0) {
+    if (target.shields > 0 && !w.pierce) {
       // Shields take the hit first (less with Shields upgrades); whatever gets through goes on to health.
       const onShields = dmg * (1 - SHIELDS_BONUS * this.tier(target.team, 'shields'));
       const absorbed = Math.min(target.shields, onShields);

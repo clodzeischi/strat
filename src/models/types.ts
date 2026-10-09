@@ -41,6 +41,8 @@ export interface BuildingModel {
  * `build` adds the structure and returns its spinning piece, if any; `levelKit` adds the level-2 structure.
  */
 export interface BuildingBlueprint {
+  /** Stands on the bare ground, with no concrete slab (Fremen camps out in the desert). */
+  bare?: boolean;
   build(g: THREE.Group, color: number): THREE.Object3D | null;
   levelKit?(g: THREE.Group, color: number): void;
 }

@@ -119,6 +119,7 @@ export interface AIProfile {
 const BASE_MIX: Record<Matchup, number> = {
   infantry: 0.7, trike: 0.4, tank: 1, rocket: 1,
   trooper: 0.8, sardaukar: 0.7, razor: 0.5, devastator: 1, raider: 0.5, artillery: 0.4,
+  warrior: 1, fedaykin: 1, commando: 0.35, worm: 0.8,
 };
 
 export const NORMAL_PROFILE: AIProfile = {
@@ -829,7 +830,9 @@ export class AI {
     const out = this.profile.rallyOut * TILE;
     const x = anchor.x + ((mid - anchor.x) / len) * out;
     const z = anchor.z + ((mid - anchor.z) / len) * out;
-    const cell = map.nearestCell(map.cellOf(x), map.cellOf(z), (cx, cz) => map.canEnter(cx, cz, 'vehicle'), 8);
+    // Fremen gather on the sand in front of the base, where they lie hidden.
+    const ground = this.camps ? (cx: number, cz: number) => map.canEnter(cx, cz, 'worm') : (cx: number, cz: number) => map.canEnter(cx, cz, 'vehicle');
+    const cell = map.nearestCell(map.cellOf(x), map.cellOf(z), ground, 8) ?? map.nearestCell(map.cellOf(x), map.cellOf(z), (cx, cz) => map.canEnter(cx, cz, 'vehicle'), 8);
     this.rally = cell ? { x: map.center(cell.cx), z: map.center(cell.cz) } : { x: anchor.x, z: anchor.z };
   }
 
