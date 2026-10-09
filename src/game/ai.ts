@@ -162,6 +162,8 @@ interface Defense {
   power: number;
   /** True when it threatens buildings, not just harvesters out in the field. */
   base: boolean;
+  /** Every attacker flies: only units with anti-air can do anything about it. */
+  air: boolean;
   lastSeen: number;
   units: Set<Unit>;
 }
@@ -703,13 +705,14 @@ export class AI {
       group.x = group.units.reduce((s, u) => s + u.x, 0) / group.units.length;
       group.z = group.units.reduce((s, u) => s + u.z, 0) / group.units.length;
     }
-    return groups.map((c) => ({ x: c.x, z: c.z, base: c.base, power: c.units.reduce((s, u) => s + power(u), 0) }));
+    return groups.map((c) => ({ x: c.x, z: c.z, base: c.base, air: c.units.every((u) => u.def.air), power: c.units.reduce((s, u) => s + power(u), 0) }));
   }
 
   /**
    * Meets each attack with about `defenseMargin` times its strength, nearest units first, so a lone trike draws a
    * couple of defenders rather than the whole army. A wave out in the field is only called back when the base itself
    * is attacked and the units at home aren't enough. Once an attack is over, its defenders return to the rally point.
+   * An attack by aircraft alone is only met by units that can shoot them.
    */
   private manageDefense(army: Unit[]): void {
     const g = this.game;
@@ -732,13 +735,20 @@ export class AI {
       }
       if (!seen.has(d)) continue; // briefly out of sight: keep the defenders where they are
 
+      // Against aircraft alone, only units that can shoot them are any use; the rest stay (or go back) home.
+      const useful = (u: Unit) => !d.air || !!u.def.weapon?.air;
+      for (const u of d.units) {
+        if (useful(u)) continue;
+        d.units.delete(u);
+        this.sendHome(u);
+      }
       let have = [...d.units].reduce((s, u) => s + power(u), 0);
       const need = d.power * this.profile.defenseMargin;
       if (have < need) {
         const dist = (u: Unit) => hypot(u.x - d.x, u.z - d.z);
-        const pool = army.filter((u) => this.roles.get(u) === 'home').sort((a, b) => dist(a) - dist(b));
+        const pool = army.filter((u) => this.roles.get(u) === 'home' && useful(u)).sort((a, b) => dist(a) - dist(b));
         if (d.base) {
-          const away = army.filter((u) => this.roles.get(u) === 'wave' || this.roles.get(u) === 'raid').sort((a, b) => dist(a) - dist(b));
+          const away = army.filter((u) => (this.roles.get(u) === 'wave' || this.roles.get(u) === 'raid') && useful(u)).sort((a, b) => dist(a) - dist(b));
           pool.push(...away);
         }
         for (const u of pool) {
