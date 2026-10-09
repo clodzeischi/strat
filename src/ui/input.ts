@@ -59,8 +59,10 @@ export class Input {
   onMenu: () => void = () => {};
   /** Sends a command for this player to the game (through the lockstep, which applies it on the next tick it can). */
   issue: (cmd: Command) => void = () => {};
-  /** Whether ` pauses: only against the computer. */
+  /** Whether P pauses: only against the computer. */
   pausable = true;
+  /** Harvesters and Spice Crews with nothing to do, and dry camps (the HUD keeps the list): ~ selects them. */
+  idleWorkers: () => Entity[] = () => [];
   /** Called whenever the selection changes (the command card follows it). */
   onSelect: () => void = () => {};
 
@@ -269,6 +271,22 @@ export class Input {
     const next = list[(at + 1) % list.length];
     this.select([next]);
     this.cam.lookAt(next.x, next.z);
+  }
+
+  /** ` : every own fighting unit (not harvesters, Spice Crews or Carryalls); pressed twice quickly, look at them. */
+  selectArmy(): void {
+    const army = this.game.units.filter((u) => u.team === this.team && !u.dead && !u.carrier && !u.falling
+      && u.type !== 'harvester' && !u.def.camp && !(u instanceof Carryall));
+    this.select(army);
+    const now = performance.now();
+    if (this.lastGroupKey.key === '`' && now - this.lastGroupKey.time < 400 && army.length) {
+      // The unit nearest the middle of the army, so the camera lands on the bulk of it rather than a straggler.
+      const mx = army.reduce((s, u) => s + u.x, 0) / army.length;
+      const mz = army.reduce((s, u) => s + u.z, 0) / army.length;
+      const mid = army.reduce((b, u) => (Math.hypot(u.x - mx, u.z - mz) < Math.hypot(b.x - mx, b.z - mz) ? u : b));
+      this.cam.lookAt(mid.x, mid.z);
+    }
+    this.lastGroupKey = { key: '`', time: now };
   }
 
   ownUnits(): Unit[] {
@@ -702,6 +720,22 @@ export class Input {
     this.keys.add(k);
     const g = this.game;
     if (/^[0-9 ]$/.test(k)) this.actions++;
+    if (e.code === 'Backquote' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // ` all army, ~ (Shift+`) all idle gatherers.
+      e.preventDefault();
+      if (e.repeat) return;
+      this.actions++;
+      if (e.shiftKey) {
+        const idle = this.idleWorkers();
+        if (idle.length) this.selectIdle(idle, true);
+        else g.onMessage('No idle gatherers.');
+      } else this.selectArmy();
+      return;
+    }
+    if (e.code === 'KeyP' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (this.pausable && !e.repeat) this.paused = !this.paused;
+      return;
+    }
     if (/^[0-9]$/.test(k)) {
       e.preventDefault();
       if (e.ctrlKey || e.metaKey) {
@@ -729,16 +763,13 @@ export class Input {
         if (!e.repeat) this.cycleSubgroup();
         break;
       // Hotkeys stay on the left hand (as in Stormgate): the command card's grid (ui/command-card.ts), Space base,
-      // ` pause. The right hand is on the mouse; the camera pans with the arrows, screen edges or middle-drag.
+      // ` army, ~ idle gatherers, P pause. The right hand is on the mouse; the camera pans with the arrows, screen edges or middle-drag.
       case ' ': {
         e.preventDefault();
         const home = g.buildings.find((b) => b.team === this.team && b.type === 'conyard') ?? g.buildings.find((b) => b.team === this.team);
         if (home) this.cam.lookAt(home.x, home.z);
         break;
       }
-      case '`':
-        if (this.pausable) this.paused = !this.paused;
-        break;
     }
   }
 
@@ -850,7 +881,7 @@ export class Input {
       this.setInfo(html + hint, true);
       return;
     }
-    if (this.paused) text = 'PAUSED (` to resume)';
+    if (this.paused) text = `PAUSED (${keyLabel('KeyP')} to resume)`;
     this.setInfo(text.replace(/&/g, '&amp;').replace(/</g, '&lt;'), !!text);
   }
 
@@ -858,7 +889,7 @@ export class Input {
 
   private setInfo(html: string, show: boolean): void {
     if (this.paused) {
-      html = 'PAUSED (` to resume)';
+      html = `PAUSED (${keyLabel('KeyP')} to resume)`;
       show = true;
     }
     if (html !== this.shownInfo) {

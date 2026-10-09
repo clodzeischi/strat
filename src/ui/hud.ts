@@ -189,6 +189,12 @@ export class Hud {
     return `Idle: ${parts.join(', ')}`;
   }
 
+  /** The idle workers right now (not waiting for the next refresh). */
+  idleWorkers(): Entity[] {
+    this.findIdle();
+    return this.idle;
+  }
+
   private findIdle(): void {
     const g = this.game;
     const team = g.localTeam;
@@ -202,7 +208,7 @@ export class Hud {
       this.shownIdle = this.idle.length;
       this.idleBtn.hidden = this.idle.length === 0;
       this.idleCount.textContent = `${this.idle.length}`;
-      this.idleBtn.title = `${this.idleText()}. Click: select the next one. Shift-click: select them all.`;
+      this.idleBtn.title = `${this.idleText()}. Click: select the next one. Shift-click or ~: select them all.`;
     }
   }
 

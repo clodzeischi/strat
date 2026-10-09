@@ -11,7 +11,7 @@ export const GRID_KEYS = [
 export type GridKey = (typeof GRID_KEYS)[number][number];
 
 /** What each key prints on this keyboard. Starts as QWERTY; the browser's layout map replaces it where supported. */
-const labels = new Map<string, string>(GRID_KEYS.flat().map((code) => [code, code.slice(3)]));
+const labels = new Map<string, string>([...GRID_KEYS.flat().map((code) => [code, code.slice(3)] as const), ['KeyP', 'P'], ['Backquote', '`']]);
 const listeners: (() => void)[] = [];
 
 interface KeyboardLayoutApi {
