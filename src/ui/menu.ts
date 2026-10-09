@@ -4,7 +4,7 @@ import type { Difficulty, Game, TeamStats } from '../game/game';
 import { heroTitle } from '../game/heroes';
 
 export interface MenuHandlers {
-  onPlay: (difficulty: Difficulty, size: MapSize, faction: Faction) => void;
+  onPlay: (difficulty: Difficulty, size: MapSize, faction: Faction, enemy: EnemyChoice) => void;
   onResume: () => void;
   onRestart: () => void;
   onQuit: () => void;
@@ -24,6 +24,27 @@ const FPS_KEY = 'strat.showFps';
 const SIZE_KEY = 'strat.mapSize';
 const NAME_KEY = 'strat.name';
 const FACTION_KEY = 'strat.faction';
+const ENEMY_KEY = 'strat.enemy';
+
+/** The computer opponent's faction, or a random one each game. */
+export type EnemyChoice = Faction | 'random';
+
+export function loadEnemy(): EnemyChoice {
+  try {
+    const v = localStorage.getItem(ENEMY_KEY);
+    return v === 'random' || FACTION_LIST.includes(v as Faction) ? (v as EnemyChoice) : 'atreides';
+  } catch {
+    return 'atreides';
+  }
+}
+
+function saveEnemy(v: EnemyChoice): void {
+  try {
+    localStorage.setItem(ENEMY_KEY, v);
+  } catch {
+    // Storage unavailable: the choice just won't persist.
+  }
+}
 
 /** The faction picked last time. */
 export function loadFaction(): Faction {
@@ -113,6 +134,7 @@ export class Menus {
   showFps = loadFps();
   mapSize = loadMapSize();
   faction = loadFaction();
+  enemy = loadEnemy();
 
   constructor(private h: MenuHandlers) {
     this.showMapSize();
@@ -135,7 +157,11 @@ export class Menus {
         this.faction = btn.dataset.faction as Faction;
         saveFaction(this.faction);
         this.showFaction();
-      } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize, this.faction);
+      } else if (btn.dataset.enemy) {
+        this.enemy = btn.dataset.enemy as EnemyChoice;
+        saveEnemy(this.enemy);
+        this.showFaction();
+      } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize, this.faction, this.enemy);
       else if (btn.dataset.join) this.h.onJoin(btn.dataset.join, this.playerName, this.faction);
       else if (btn.dataset.action === 'play') this.page('difficulty');
       else if (btn.dataset.action === 'multiplayer') {
@@ -179,6 +205,7 @@ export class Menus {
 
   private showFaction(): void {
     for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-faction]')) b.classList.toggle('picked', b.dataset.faction === this.faction);
+    for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-enemy]')) b.classList.toggle('picked', b.dataset.enemy === this.enemy);
   }
 
   private currentPage = 'main';
@@ -241,7 +268,8 @@ export class Menus {
     result.textContent = won ? 'Victory' : 'Defeat';
     result.className = `result ${won ? 'victory' : 'defeat'}`;
     const how = note ? `${note}  ·  ` : game.surrendered === ENEMY ? 'Enemy surrendered  ·  ' : game.surrendered === PLAYER ? 'You surrendered  ·  ' : '';
-    const against = opponent === null ? DIFFICULTY_NAMES[game.difficulty] : `Online vs ${opponent}`;
+    const vs = `${FACTIONS[game.teams[PLAYER].faction].name} vs ${FACTIONS[game.teams[ENEMY].faction].name}`;
+    const against = `${opponent === null ? `${DIFFICULTY_NAMES[game.difficulty]} AI` : `Online vs ${opponent}`}  ·  ${vs}`;
     this.end.querySelector<HTMLElement>('[data-action="restart"]')!.hidden = opponent !== null;
     this.end.querySelector('.sub')!.textContent = `${how}${formatTime(game.time)}  ·  ${against}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map  ·  seed ${game.map.seed}`;
 

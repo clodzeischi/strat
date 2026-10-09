@@ -55,7 +55,7 @@ export class Intel {
       if (u.team === this.team || u.dead || u.carrier || !g.sees(this.team, u)) continue;
       this.units.set(u.id, {
         id: u.id, team: u.team, type: u.type, x: u.x, z: u.z, seen: t, harvester: u.type === 'harvester', placed: true,
-        power: u.def.weapon ? u.def.cost * (u.hp / u.maxHp) : 0,
+        power: u.def.weapon ? u.def.cost * ((u.hp + u.shields) / (u.maxHp + u.maxShields)) : 0,
       });
       if (u.def.infantry && g.teams[u.team].upgrades.has('rockets')) this.enemyRockets = true;
     }

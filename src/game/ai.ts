@@ -1,12 +1,45 @@
-import { BUILDINGS, TILE, UNITS, UPGRADES, type BuildingType, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType } from '../config';
+import {
+  BUILDINGS, FACTIONS, TILE, UNITS, UPGRADES,
+  type BuildingType, type Faction, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType,
+} from '../config';
 import { Building, type Entity, type Unit } from '../entities';
 import type { Difficulty, Game } from './game';
 import { MATCHUP_TYPES, MATCHUPS, type Matchup } from './matchups';
 import { Intel, type Sighting } from './intel';
 import { SPICE, type Cell } from '../map';
 import { hypot } from './hypot';
+import { cellsAround } from './pathfinding';
+import { distTo } from '../entities';
 
-const RESEARCH_ORDER: UpgradeType[] = ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'];
+/**
+ * What the AI's plans mean for each faction: its vehicle factory, its defensive structure, the fast unit that raids
+ * and scouts, how it mends its army, its tech path and research order, and its cheapest fallback unit. The profiles
+ * and the rest of the AI talk in Atreides terms ('factory', 'bunker'); these translate them.
+ */
+interface FactionKit {
+  factory: BuildingType;
+  defense: BuildingType;
+  raider: UnitType;
+  scouts: UnitType[];
+  /** Atreides: Repair Vehicles at home. Corrino: a Repair Pad. */
+  mender: { unit: UnitType } | { building: BuildingType };
+  /** Structures to put up before levelling up (Corrino needs Tleilaxu Research). */
+  tech: BuildingType[];
+  levels: [LevelUpType, LevelUpType];
+  research: UpgradeType[];
+  fallback: UnitType;
+}
+
+const KITS: Record<Faction, FactionKit> = {
+  atreides: {
+    factory: 'factory', defense: 'bunker', raider: 'trike', scouts: ['trike', 'infantry'], mender: { unit: 'repair' }, tech: [],
+    levels: ['conyard', 'factory'], research: ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'], fallback: 'infantry',
+  },
+  corrino: {
+    factory: 'fab', defense: 'turret', raider: 'razor', scouts: ['raider', 'razor', 'trooper'], mender: { building: 'pad' }, tech: ['tleilaxu'],
+    levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'], fallback: 'trooper',
+  },
+};
 
 /** Economy and army knobs that differ between difficulties. Experimental: tuned with the sims in `sim/`. */
 export interface AIProfile {
@@ -73,7 +106,10 @@ export interface AIProfile {
 }
 
 /** Combined-arms base preference for unit picks, before counters (see `counterWeights`). */
-const BASE_MIX: Record<Matchup, number> = { infantry: 0.7, trike: 0.4, tank: 1, rocket: 1 };
+const BASE_MIX: Record<Matchup, number> = {
+  infantry: 0.7, trike: 0.4, tank: 1, rocket: 1,
+  trooper: 0.8, sardaukar: 0.7, razor: 0.5, devastator: 1, raider: 0.5, artillery: 0.4,
+};
 
 export const NORMAL_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
@@ -98,9 +134,9 @@ export function profileFor(difficulty: Difficulty): AIProfile {
   return difficulty === 'normal' ? NORMAL_PROFILE : HARD_PROFILE;
 }
 
-/** Rough fighting strength: what the unit cost, scaled by the health it has left. Unarmed units count for nothing. */
+/** Rough fighting strength: what the unit cost, scaled by the health (and shields) it has left. Unarmed units count for nothing. */
 export function power(u: Unit): number {
-  return u.def.weapon ? u.def.cost * (u.hp / u.maxHp) : 0;
+  return u.def.weapon ? u.def.cost * ((u.hp + u.shields) / (u.maxHp + u.maxShields)) : 0;
 }
 
 /** Enemies this close to one of our buildings are attacking the base. */
@@ -193,16 +229,26 @@ export class AI {
   private brokeSince = Infinity;
   surrenderOffered = false;
 
+  /** This faction's names for the AI's plans. */
+  protected readonly kit: FactionKit;
+
   constructor(protected game: Game, protected team: Team, protected profile: AIProfile = NORMAL_PROFILE) {
     this.nextRaidTime = profile.raids.start;
     this.nextScoutTime = profile.scout.first;
     this.intel = new Intel(game, team);
-    this.techOrder = game.random() < 0.5 ? ['conyard', 'factory'] : ['factory', 'conyard'];
+    this.kit = KITS[game.teams[team].faction];
+    const [a, b] = this.kit.levels;
+    this.techOrder = game.random() < 0.5 ? [a, b] : [b, a];
+  }
+
+  /** A profile's building, in this faction's terms ('factory' is a Fab for Corrino, 'bunker' a turret). */
+  protected own(t: BuildingType): BuildingType {
+    return t === 'factory' ? this.kit.factory : t === 'bunker' ? this.kit.defense : t;
   }
 
   /** The first opening structure we don't have yet (a type listed twice needs two of it). */
   private openingStep(): BuildingType | null {
-    const opening = this.profile.opening;
+    const opening = this.profile.opening.map((t) => this.own(t));
     return opening.find((t, i) => this.game.count(this.team, t) < opening.slice(0, i + 1).filter((o) => o === t).length) ?? null;
   }
 
@@ -226,7 +272,8 @@ export class AI {
 
   /** Harvesters alive plus ones in the factory queue. */
   private harvesterCount(): number {
-    return this.game.count(this.team, 'harvester') + this.ts.queues.factory.filter((q) => q.type === 'harvester').length;
+    const p = this.game.unitDef(this.team, 'harvester').producer;
+    return this.game.count(this.team, 'harvester') + this.ts.queues[p].filter((q) => q.type === 'harvester').length;
   }
 
   /**
@@ -240,7 +287,7 @@ export class AI {
     const refinery = { type: 'refinery' as const, cost: BUILDINGS.refinery.cost };
     if (!g.has(this.team, 'refinery')) return g.has(this.team, 'conyard') ? refinery : null;
     if (this.harvesterCount() >= Math.min(this.profile.minHarvesters, this.wantHarvesters())) return null;
-    if (g.has(this.team, 'factory')) return { type: 'harvester', cost: UNITS.harvester.cost };
+    if (g.has(this.team, this.kit.factory)) return { type: 'harvester', cost: UNITS.harvester.cost };
     // Only once the opening is done: before that, the factory is on its way anyway.
     return this.openingDone && g.has(this.team, 'conyard') ? refinery : null;
   }
@@ -277,13 +324,13 @@ export class AI {
   private techGoal(): { kind: 'level'; type: LevelUpType; cost: number } | { kind: 'research'; type: UpgradeType; cost: number } | null {
     const g = this.game;
     const ts = this.ts;
-    if (!g.has(this.team, 'factory') || g.count(this.team, 'refinery') < this.wantRefineries() || this.econGoal() || this.rebuildStep()) return null;
-    if (!ts.levelUps.conyard && !ts.levelUps.factory) {
+    if (!g.has(this.team, this.kit.factory) || g.count(this.team, 'refinery') < this.wantRefineries() || this.econGoal() || this.rebuildStep()) return null;
+    if (!this.kit.levels.some((t) => ts.levelUps[t])) {
       const level = this.techOrder.find((t) => g.canLevelUp(this.team, t));
       if (level) return { kind: 'level', type: level, cost: BUILDINGS[level].levelUp!.cost };
     }
     if (!ts.research) {
-      const research = RESEARCH_ORDER.find((u) => g.canResearch(this.team, u));
+      const research = this.kit.research.find((u) => g.canResearch(this.team, u));
       if (research) return { kind: 'research', type: research, cost: UPGRADES[research].cost };
     }
     return null;
@@ -309,7 +356,7 @@ export class AI {
     }
     const goal = this.econGoal();
     // Rushed: anything but a refinery, barracks or bunker under construction is called off (full refund) for units.
-    const keepBuilding = ['barracks', 'refinery', 'bunker'];
+    const keepBuilding = ['barracks', 'refinery', this.kit.defense];
     if (ts.building && this.rushed() && g.has(this.team, 'refinery') && !keepBuilding.includes(ts.building.type)) {
       g.cancelBuilding(this.team);
       return;
@@ -318,8 +365,9 @@ export class AI {
 
     if (this.rushed() && !goal && g.has(this.team, 'refinery')) {
       // A bunker first (the infantry we're making anyway hold out far better in it), then more barracks.
-      if (g.has(this.team, 'barracks') && g.count(this.team, 'bunker') < 1 && ts.credits >= BUILDINGS.bunker.cost && this.findSpot('bunker')) {
-        g.startBuilding(this.team, 'bunker');
+      const def = this.kit.defense;
+      if (g.has(this.team, 'barracks') && g.count(this.team, def) < 1 && ts.credits >= BUILDINGS[def].cost && this.findSpot(def)) {
+        g.startBuilding(this.team, def);
         return;
       }
       if (g.count(this.team, 'barracks') < 3 && ts.credits >= BUILDINGS.barracks.cost && this.findSpot('barracks')) g.startBuilding(this.team, 'barracks');
@@ -327,14 +375,21 @@ export class AI {
     }
     const refineries = g.count(this.team, 'refinery');
     const barracks = g.count(this.team, 'barracks');
-    const factories = g.count(this.team, 'factory');
+    const factories = g.count(this.team, this.kit.factory);
+    const army = g.units.filter((u) => u.team === this.team && u.def.weapon).length;
+    // Tech structures (Tleilaxu Research), once there's an army and the economy is up.
+    const techBuilding = this.kit.tech.find((t) => !g.has(this.team, t) && g.canBuild(this.team, t));
+    // The faction's way of mending the army, if it's a structure (Corrino's Repair Pad).
+    const mender = 'building' in this.kit.mender && this.profile.sustain.repairPer ? this.kit.mender.building : null;
     let want: BuildingType | null = goal && goal.type !== 'harvester' ? goal.type : this.openingStep();
     if (want) {
       // getting income back, still in the opening, or rebuilding what the opening had
     } else if (refineries < this.wantRefineries()) want = 'refinery';
-    else if (g.count(this.team, 'bunker') < this.profile.bunkers && barracks > 0 && (ts.credits > 900 || this.behindFor > 0)) want = 'bunker';
+    else if (g.count(this.team, this.kit.defense) < this.profile.bunkers && barracks > 0 && (ts.credits > 900 || this.behindFor > 0)) want = this.kit.defense;
+    else if (techBuilding && army >= this.profile.techArmy) want = techBuilding;
+    else if (mender && !g.has(this.team, mender) && g.canBuild(this.team, mender) && army >= this.profile.techArmy) want = mender;
     else if (barracks < 2 && ts.credits > this.profile.more.barracks) want = 'barracks';
-    else if (factories < 2 && ts.credits > this.profile.more.factory) want = 'factory';
+    else if (factories < 2 && ts.credits > this.profile.more.factory) want = this.kit.factory;
     else if (g.count(this.team, 'conyard') < 2 && ts.credits > 4000) want = 'conyard';
     if (!want || ts.credits < BUILDINGS[want].cost || (this.noRoom.get(want) ?? -Infinity) > g.time) return;
     // Only start what there's room for: a cramped base would otherwise build, fail to place, refund and retry forever.
@@ -354,7 +409,7 @@ export class AI {
     const holding = this.ownPower() >= this.intel.armyPower() * 0.8;
     const harvesterGoal = rushed ? 1 : holding ? this.wantHarvesters() : Math.min(this.wantHarvesters(), this.profile.minHarvesters);
     if (this.harvesterCount() < harvesterGoal && g.canTrain(this.team, 'harvester')) {
-      if (!full('factory') && ts.credits >= UNITS.harvester.cost) g.queueUnit(this.team, 'harvester');
+      if (!full(g.unitDef(this.team, 'harvester').producer) && ts.credits >= UNITS.harvester.cost) g.queueUnit(this.team, 'harvester');
       return;
     }
     // Money set aside, most urgent first: getting income back, rebuilding lost production, the opening (if the
@@ -374,7 +429,8 @@ export class AI {
     // Under pressure, spend now: the best counter that a free line can start and we can afford, down the list, so
     // idle barracks don't wait on a factory unit we can't pay for yet. The first bunker's price is kept aside.
     if (this.outgunned || rushed || behind) {
-      const bunker = !g.has(this.team, 'bunker') && g.canBuild(this.team, 'bunker') ? BUILDINGS.bunker.cost : 0;
+      const def = this.kit.defense;
+      const bunker = !g.has(this.team, def) && g.canBuild(this.team, def) ? BUILDINGS[def].cost : 0;
       const keepNow = this.outgunned ? 0 : bunker;
       const options = this.counterWeights().filter(([t]) => g.canTrain(this.team, t) && !full(UNITS[t].producer) && ts.credits - UNITS[t].cost >= keepNow);
       options.sort((a, b) => b[1] - a[1]);
@@ -464,7 +520,19 @@ export class AI {
 
   /** The next unit to save up for and build. */
   protected chooseUnit(): UnitType {
-    return this.raidTrikeWanted() ? 'trike' : this.repairWanted() ? 'repair' : this.pickCounter();
+    return this.raidTrikeWanted() ? this.kit.raider : this.repairWanted() ? 'repair' : this.siegeWanted() ? 'artillery' : this.pickCounter();
+  }
+
+  /**
+   * Corrino keeps a few Artillery pieces with the army for sieges, one per ten combat units (up to three), once
+   * it can build them: they lose straight fights, so the counter picks would never choose them.
+   */
+  private siegeWanted(): boolean {
+    const g = this.game;
+    if (!FACTIONS[this.ts.faction].train.includes('artillery') || !g.canTrain(this.team, 'artillery')) return false;
+    const army = g.units.filter((u) => u.team === this.team && u.def.weapon && u.type !== 'harvester').length;
+    const have = g.count(this.team, 'artillery') + this.ts.queues.fab.filter((q) => q.type === 'artillery').length;
+    return have < Math.min(3, Math.floor(army / 10));
   }
 
   /**
@@ -477,7 +545,8 @@ export class AI {
    */
   private counterWeights(): [UnitType, number][] {
     const g = this.game;
-    const options = (MATCHUP_TYPES as Matchup[]).filter((t) => g.requirementsMet(this.team, UNITS[t].requires));
+    const roster = FACTIONS[this.ts.faction].train;
+    const options = (MATCHUP_TYPES as Matchup[]).filter((t) => roster.includes(t) && g.requirementsMet(this.team, g.unitDef(this.team, t).requires));
     // The enemy army as we've seen it.
     const enemy = new Map<Matchup, number>();
     let total = 0;
@@ -510,7 +579,7 @@ export class AI {
   /** Weighted pick that leans toward whatever counters the enemy's current army. */
   private pickCounter(): UnitType {
     const options = this.counterWeights();
-    if (options.length === 0) return 'infantry';
+    if (options.length === 0) return this.kit.fallback;
     let r = this.game.random() * options.reduce((sum, [, w]) => sum + w, 0);
     for (const [type, w] of options) {
       r -= w;
@@ -522,10 +591,11 @@ export class AI {
   /** Hunting raiders keep enough trikes for the next raid, while there's a harvester worth raiding. */
   private raidTrikeWanted(): boolean {
     const r = this.profile.raids;
-    if (!r.hunt || this.game.time < this.nextRaidTime - 20 || !this.game.canTrain(this.team, 'trike')) return false;
-    const trikes = this.game.count(this.team, 'trike');
-    const queued = this.ts.queues.factory.filter((q) => q.type === 'trike').length;
-    return trikes + queued < r.trikes && !!this.rally && !!this.pickHarvester(this.rally, r.trikes * UNITS.trike.cost);
+    const raider = this.kit.raider;
+    if (!r.hunt || this.game.time < this.nextRaidTime - 20 || !this.game.canTrain(this.team, raider)) return false;
+    const trikes = this.game.count(this.team, raider);
+    const queued = this.ts.queues[this.game.unitDef(this.team, raider).producer].filter((q) => q.type === raider).length;
+    return trikes + queued < r.trikes && !!this.rally && !!this.pickHarvester(this.rally, r.trikes * UNITS[raider].cost);
   }
 
   /** Short of Repair Vehicles for the size of the vehicle army. */
@@ -548,6 +618,8 @@ export class AI {
     this.updateRally();
 
     this.manageRepairs(army);
+    this.managePads(army);
+    this.manageAbilities(army);
     this.manageGarrisons(army);
     this.manageDefense(army);
     const baseAttacked = this.defenses.some((d) => d.base);
@@ -712,6 +784,148 @@ export class AI {
   }
 
   /**
+   * Where a damaged unit of ours can be mended: next to a Repair Pad (Corrino, any unit), or at a Repair Vehicle
+   * (Atreides, vehicles only; infantry heal on their own).
+   */
+  protected menders(u: Unit): { x: number; z: number }[] {
+    const g = this.game;
+    if ('building' in this.kit.mender) {
+      const type = this.kit.mender.building;
+      return g.buildings.filter((b) => b.team === this.team && b.type === type && !b.dead);
+    }
+    if (u.def.infantry) return [];
+    return g.units.filter((r) => r.team === this.team && r.def.repair && !r.carrier);
+  }
+
+  /** The nearest of the places that can mend this unit, if any. */
+  protected nearestMender(u: Unit): { x: number; z: number } | null {
+    const list = this.menders(u);
+    return list.length ? list.reduce((a, b) => (hypot(a.x - u.x, a.z - u.z) <= hypot(b.x - u.x, b.z - u.z) ? a : b)) : null;
+  }
+
+  /**
+   * Corrino health only comes back at a Repair Pad: damaged units that are home and idle go and park next to one
+   * (role 'mend'), and come home once mended. Nobody is pulled out of a fight.
+   */
+  private managePads(army: Unit[]): void {
+    if (!('building' in this.kit.mender)) return;
+    for (const u of army) {
+      const role = this.roles.get(u);
+      const pad = this.nearestMender(u);
+      if (role === 'mend') {
+        if (!pad || u.hp >= u.maxHp * 0.97) this.sendHome(u);
+        else if (u.order.kind === 'idle' && hypot(pad.x - u.x, pad.z - u.z) > 4 * TILE) this.toPad(u, pad);
+        continue;
+      }
+      if (!pad || role !== 'home' || u.order.kind !== 'idle' || u.target || u.hp >= u.maxHp * 0.8 || u.deployState !== 'mobile') continue;
+      this.roles.set(u, 'mend');
+      this.toPad(u, pad);
+    }
+  }
+
+  /** Parks a unit on an open cell beside a Repair Pad. */
+  private toPad(u: Unit, pad: { x: number; z: number }): void {
+    const m = this.game.map;
+    const cells = cellsAround(m, m.cellOf(pad.x), m.cellOf(pad.z), 8, u.moveClass);
+    const c = cells[Math.floor(this.game.random() * cells.length)];
+    if (c) u.command(this.game, { kind: 'move', x: m.center(c.cx), z: m.center(c.cz) });
+  }
+
+  /**
+   * Corrino abilities: damaged structures repair themselves, Artillery deploys when it has something to shell and
+   * packs up when it hasn't (or enemies get inside its minimum range), a Devastator about to die among enemies
+   * blows itself up, and Sky Raiders lay mines where enemies walk.
+   */
+  private manageAbilities(army: Unit[]): void {
+    const g = this.game;
+    for (const b of g.buildings) {
+      if (b.team === this.team && !b.repairing && b.hp < b.maxHp * 0.9 && this.ts.credits > 400 && g.canSelfRepair(b)) b.repairing = true;
+    }
+    for (const u of army) {
+      if (u.def.deploy) this.useArtillery(u);
+      else if (u.def.detonate) this.useDetonation(u);
+      else if (u.def.mines) this.useMines(u);
+    }
+    if (g.meets(this.team, 'barracks2')) this.useDropPods(army);
+  }
+
+  /**
+   * Imperial Barracks: while a wave is out and our side can see where it is, new infantry drop by pod right next to
+   * it and join it; otherwise they come out at home as usual.
+   */
+  private useDropPods(army: Unit[]): void {
+    const g = this.game;
+    const wave = this.waves.find((w) => w.units.size >= 3);
+    let front: { x: number; z: number } | null = null;
+    if (wave) {
+      const us = [...wave.units];
+      front = { x: us.reduce((s, u) => s + u.x, 0) / us.length, z: us.reduce((s, u) => s + u.z, 0) / us.length };
+      if (!g.vision.seesAt(this.team, front.x, front.z)) front = null;
+    }
+    for (const b of g.buildings) {
+      if (b.team !== this.team || b.type !== 'barracks' || b.dead) continue;
+      if (front) {
+        if (!b.rally || hypot(b.rally.x - front.x, b.rally.z - front.z) > 4 * TILE) g.setRally(b, front.x, front.z);
+      } else if (!b.rallyDefault && this.rally) {
+        g.setRally(b, this.rally.x, this.rally.z);
+      }
+    }
+    // Infantry that just came down near the wave join it, rather than walking home.
+    if (!wave || !front) return;
+    const target = [...wave.units].find((u) => u.order.kind === 'amove');
+    for (const u of army) {
+      if (!u.def.infantry || this.roles.get(u) !== 'home' || u.falling || hypot(u.x - front.x, u.z - front.z) > 12 * TILE) continue;
+      this.roles.set(u, 'wave');
+      wave.units.add(u);
+      if (target && target.order.kind === 'amove') u.command(g, { kind: 'amove', x: target.order.x, z: target.order.z });
+    }
+  }
+
+  /** When each deployed Artillery last had something to shell. */
+  private lastShelled = new Map<Unit, number>();
+
+  private useArtillery(u: Unit): void {
+    const g = this.game;
+    const w = u.def.deploy!.weapon;
+    const enemies = [...g.units, ...g.buildings].filter((e) => e.team !== this.team && !e.dead && !e.tags.includes('air') && g.sees(this.team, e));
+    const near = (r: number) => enemies.some((e) => e instanceof Building ? false : distTo(e, u.x, u.z) < r && !!(e as Unit).def.weapon);
+    const inReach = enemies.some((e) => {
+      const d = distTo(e, u.x, u.z);
+      return d >= w.minRange && d <= w.range * 0.9;
+    });
+    if (u.deployState === 'mobile') {
+      if (inReach && !near(w.minRange + 2 * TILE) && this.roles.get(u) !== 'mend') {
+        u.setDeployed(true);
+        this.lastShelled.set(u, g.time);
+      }
+      return;
+    }
+    if (u.deployState !== 'deployed') return;
+    if (inReach) this.lastShelled.set(u, g.time);
+    // Pack up once there's been nothing to shell for a while, or enemies are about to get under the guns.
+    if (g.time - (this.lastShelled.get(u) ?? 0) > 8 || near(w.minRange)) u.setDeployed(false);
+  }
+
+  private useDetonation(u: Unit): void {
+    const g = this.game;
+    if (u.detonateAt !== null || (u.hp + u.shields) / (u.maxHp + u.maxShields) > 0.2) return;
+    const w = u.def.detonate!.weapon;
+    let value = 0;
+    for (const e of g.units) if (e.team !== this.team && !e.dead && !e.def.air && g.sees(this.team, e) && distTo(e, u.x, u.z) < w.splash * 0.7) value += e.def.cost;
+    for (const b of g.buildings) if (b.team !== this.team && !b.dead && g.sees(this.team, b) && distTo(b, u.x, u.z) < w.splash * 0.7) value += BUILDINGS[b.type].cost;
+    if (value >= u.def.cost * 0.6) g.startDetonation(u);
+  }
+
+  private useMines(u: Unit): void {
+    const g = this.game;
+    if (g.time < u.nextMine) return;
+    // Where enemies come by: near their harvesters and refineries, or right under enemy ground units.
+    const spot = g.units.some((e) => e.team !== this.team && !e.dead && !e.def.air && g.sees(this.team, e) && hypot(e.x - u.x, e.z - u.z) < (e.type === 'harvester' ? 10 : 6) * TILE)
+      || g.buildings.some((b) => b.team !== this.team && b.type === 'refinery' && g.sees(this.team, b) && distTo(b, u.x, u.z) < 6 * TILE);
+    if (spot) g.layMine(u);
+  }
+
+  /**
    * Repair Vehicles wait at the rally point between jobs, and damaged vehicles that are home and idle (back from
    * defending, or from a wave that fell back) drive over to the nearest one. Nobody is pulled out of a fight.
    */
@@ -765,7 +979,7 @@ export class AI {
     if (baseAttacked) return;
     // Hunting raiders keep their trikes out of the waves.
     const hunt = this.profile.raids.hunt;
-    const ready = [...this.roles].filter(([u, r]) => r === 'home' && !u.dead && !u.carrier && !(hunt && u.type === 'trike')).map(([u]) => u);
+    const ready = [...this.roles].filter(([u, r]) => r === 'home' && !u.dead && !u.carrier && !(hunt && u.type === this.kit.raider)).map(([u]) => u);
     const strength = ready.reduce((s, u) => s + power(u), 0);
     // Initiative: strong enough to win outright, so go now, whatever the timer says.
     const enemy = this.enemyDefense();
@@ -825,7 +1039,7 @@ export class AI {
     }
 
     if (baseAttacked || g.time < this.nextRaidTime || this.raiders.size) return;
-    const trikes = army.filter((u) => u.type === 'trike' && this.roles.get(u) === 'home');
+    const trikes = army.filter((u) => u.type === this.kit.raider && this.roles.get(u) === 'home');
     if (trikes.length < r.trikes) return;
     const victim = r.hunt ? this.pickHarvester(trikes[0], trikes.reduce((s, u) => s + power(u), 0)) : this.intel.placedUnits().find((s) => s.harvester) ?? null;
     if (!victim) return;
@@ -864,7 +1078,7 @@ export class AI {
     }
     if (baseAttacked || this.rushed() || g.time < this.nextScoutTime) return;
     const candidates = army
-      .filter((u) => this.roles.get(u) === 'home' && (u.type === 'trike' || u.type === 'infantry') && u.hp > u.maxHp * 0.7)
+      .filter((u) => this.roles.get(u) === 'home' && this.kit.scouts.includes(u.type) && u.hp > u.maxHp * 0.7)
       .sort((a, b) => b.def.speed - a.def.speed);
     const scout = candidates[0];
     if (!scout) {
@@ -1030,7 +1244,7 @@ export class AI {
       if (spice) goal = { x: spice.cx + 0.5, z: spice.cz + 0.5 };
     }
     // Bunkers go at the front of the base, where the rally point is and attacks come from.
-    if (type === 'bunker' && this.rally) goal = { x: this.rally.x / TILE, z: this.rally.z / TILE };
+    if ((type === 'bunker' || type === 'turret') && this.rally) goal = { x: this.rally.x / TILE, z: this.rally.z / TILE };
     const ok = (cx: number, cz: number) => {
       if (!g.canPlace(type, this.team, cx, cz)) return false;
       for (let z = cz - 1; z <= cz + size; z++) {

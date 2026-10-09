@@ -5,7 +5,7 @@ import { RTSCamera } from './render/camera';
 import { FACTION_LIST, MAP_SIZES, TILE, type Faction, type MapSize, type Team } from './config';
 import { Game, type Difficulty } from './game/game';
 import { Input } from './ui/input';
-import { loadFaction, loadMapSize, Menus } from './ui/menu';
+import { loadEnemy, loadFaction, loadMapSize, Menus, type EnemyChoice } from './ui/menu';
 import { ViewShadows } from './render/shadows';
 import { CommandCard } from './ui/command-card';
 import { Hud } from './ui/hud';
@@ -40,18 +40,18 @@ scene.add(sun, sun.target);
 // an online match: the page reloads into it once the server has paired two players.
 const AUTOSTART_KEY = 'strat.autostart';
 const MATCH_KEY = 'strat.match';
-interface Autostart { difficulty: Difficulty; size: MapSize; seed: number; faction: Faction }
+interface Autostart { difficulty: Difficulty; size: MapSize; seed: number; faction: Faction; enemy: Faction }
 function readAutostart(): Autostart | null {
   try {
     const raw = sessionStorage.getItem(AUTOSTART_KEY);
     sessionStorage.removeItem(AUTOSTART_KEY);
-    const [difficulty, size, seed, faction] = (raw ?? '').split(':');
+    const [difficulty, size, seed, faction, enemy] = (raw ?? '').split(':');
     const okDifficulty = difficulty === 'normal' || difficulty === 'hard' || difficulty === 'brutal';
     const okSize = (MAP_SIZES as readonly number[]).includes(Number(size));
     const okSeed = seed !== '' && Number.isInteger(Number(seed));
-    const okFaction = FACTION_LIST.includes(faction as Faction);
+    const okFaction = FACTION_LIST.includes(faction as Faction) && FACTION_LIST.includes(enemy as Faction);
     return okDifficulty && okSize && okSeed && okFaction
-      ? { difficulty, size: Number(size) as MapSize, seed: Number(seed), faction: faction as Faction }
+      ? { difficulty, size: Number(size) as MapSize, seed: Number(seed), faction: faction as Faction, enemy: enemy as Faction }
       : null;
   } catch {
     return null;
@@ -78,9 +78,11 @@ const mapSize = match?.size ?? autostart?.size ?? loadMapSize();
 // Every visit gets a new map; Restart keeps the seed so the same map comes back.
 const mapSeed = match?.seed ?? autostart?.seed ?? urlSeed() ?? randomSeed();
 
-// The player's faction; the computer opponent plays Atreides (the only side its AI knows so far).
+// The player's faction and the computer opponent's ('random' is rolled once per page, so Restart keeps it).
 const playerFaction = autostart?.faction ?? loadFaction();
-const factions: Faction[] = match?.factions ?? [playerFaction, 'atreides'];
+const rollEnemy = (c: EnemyChoice): Faction => (c === 'random' ? FACTION_LIST[Math.floor(Math.random() * FACTION_LIST.length)] : c);
+const enemyFaction = autostart?.enemy ?? rollEnemy(loadEnemy());
+const factions: Faction[] = match?.factions ?? [playerFaction, enemyFaction];
 
 const rts = new RTSCamera(mapSize * TILE);
 const game = new Game(scene, rts.camera, mapSize, mapSeed, factions);
@@ -250,7 +252,7 @@ function endGame(note: string): void {
 /** Restart, Quit and a new map size reload the page for a clean match; with `next` set, the title is skipped. */
 function reload(next: Autostart | null): void {
   try {
-    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}:${next.seed}:${next.faction}`);
+    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}:${next.seed}:${next.faction}:${next.enemy}`);
   } catch {
     // Without session storage, Restart falls back to the title screen.
   }
@@ -302,10 +304,14 @@ function openLobby(): void {
 
 const menus = new Menus({
   // A different map size or faction needs a fresh page (the map and starting units are built at load).
-  onPlay: (difficulty, size, faction) =>
-    size === game.map.size && faction === playerFaction ? startGame(difficulty) : reload({ difficulty, size, seed: urlSeed() ?? randomSeed(), faction }),
+  onPlay: (difficulty, size, faction, enemy) => {
+    // 'random' accepts whichever faction this page rolled.
+    const same = size === game.map.size && faction === playerFaction && (enemy === 'random' || enemy === enemyFaction);
+    if (same) startGame(difficulty);
+    else reload({ difficulty, size, seed: urlSeed() ?? randomSeed(), faction, enemy: rollEnemy(enemy) });
+  },
   onResume: () => setPaused(false),
-  onRestart: () => reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed, faction: playerFaction }),
+  onRestart: () => reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed, faction: playerFaction, enemy: enemyFaction }),
   onQuit: () => {
     net?.send({ t: 'leave' });
     reload(null);

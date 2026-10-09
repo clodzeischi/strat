@@ -177,7 +177,7 @@ Corrino builds the same **Harvester** (with shields) at the Fab.
 
 ### Order of work
 
-**Status: stages 1 and 2 done.** Check with `npx tsx sim/corrino-check.ts` (tech tree, shields, Repair Pad, self-repair, turret, Sky Raider flight, every stage 2 ability, determinism) and `npx tsx sim/faction-duels.ts` (balance). The computer opponent still always plays Atreides.
+**Status: stages 1-3 done.** Check with `npx tsx sim/corrino-check.ts` (tech tree, shields, Repair Pad, self-repair, turret, Sky Raider flight, every stage 2 ability, determinism) and `npx tsx sim/faction-duels.ts` (balance). The computer opponent can play either faction (menu: Enemy Atreides / Corrino / Random); AI-vs-AI between factions: `sim/faction-match.sh <games> <corrinoLevel> <atreidesLevel>`.
 
 Stage 2 abilities, as built:
 - **Artillery: Deploy** (D). Takes 3 s to set up and 3 s to pack up. Deployed, it ignores move orders and shells anything its side can see from 8 to 26 units (13 tiles): slow shells, aimed at the ground where the target stood, with a red marker where they'll land. Two deployed Artillery destroy a manned Bunker in about 19 s from outside its reach, four in 9 s.
@@ -198,6 +198,21 @@ Equal-cost duels after stage 2 ($4500 a side; +1 Corrino wins untouched, -1 Atre
 | Artillery | -0.15 | -0.43 | -0.60 | -0.51 |
 
 Open point: the Devastator beats Rocket Launchers in a straight fight; they only win by kiting with their longer range (17 against 10).
+
+**Stage 3: the AI plays Corrino.** The AI's plans are written in Atreides terms; a per-faction kit in `ai.ts` translates them (Fab for Factory, Auto Turret for Bunker, Razors raid and scout, a Repair Pad instead of Repair Vehicles, Tleilaxu Research before levelling up the Barracks and Fab, Corrino's research order). On top of that, Corrino-only behavior: damaged units at home park at a Repair Pad, damaged structures repair themselves, Artillery travels with the army (one per ten units, up to three) and deploys when there's something to shell, a Devastator about to die among enemies self-destructs, Sky Raiders mine harvester routes and enemy troops, and with an Imperial Barracks new infantry drop by pod next to a wave that's out and join it. The counter table (`src/game/matchups.ts`, from `sim/matchups.ts`) now covers all ten combat units of both factions, each fighting for its own side; refreshing it moved the Atreides numbers by at most 0.03 (Brutal vs Hard: 85% with it, 80% with the old one over 40 games, within noise).
+
+AI vs AI between the factions, 40 games each on random maps from both sides (Corrino win rate):
+
+| Corrino AI | Atreides AI | Corrino wins |
+|---|---|---|
+| Hard | Hard | 55% |
+| Brutal | Hard | 82% |
+| Hard | Brutal | 20% |
+| Brutal | Brutal | 30% |
+| Brutal | Brutal without micro | 80% |
+| Brutal without micro | Brutal without micro | 60% |
+
+For reference, Atreides Brutal beats Atreides Hard 85% of the time. So at equal skill without micro the factions are close, with Corrino a little ahead; Brutal's micro (kiting and focus fire) is worth far more to Atreides against slow Corrino armies than the other way round. That fits Atreides as the faction that rewards APM, but the size of the swing (60% to 30%) is worth a decision: make Corrino tougher, give it ways to punish kiting (longer ranges, faster Razors), or teach the Corrino AI to stop chasing kiters. Carryalls are not the reason: Brutal Atreides without them does the same.
 
 1. **Plumbing:** a faction per player (menu, lobby, AI), a roster per faction (units, buildings, upgrades, tech tree), shields and their regeneration, the Repair Pad. The six units go in using today's mechanics. Run the matchup sims for a first balance pass.
 2. **Special mechanics,** one at a time, re-running the matchup sims after each: drop pods, deployed Artillery firing at the ground, the flamethrower, the Devastator firing while moving and self-destructing, Sky Raider mines.

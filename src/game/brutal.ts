@@ -211,7 +211,7 @@ export class BrutalAI extends AI {
         }
       }
       if (!flank) continue;
-      const fast = units.filter((u) => u.type === 'trike' || u.type === 'tank').sort((a, b) => b.def.speed - a.def.speed);
+      const fast = units.filter((u) => ['trike', 'tank', 'razor'].includes(u.type)).sort((a, b) => b.def.speed - a.def.speed);
       const picked: Unit[] = [];
       let p = 0;
       for (const u of fast) {
@@ -281,23 +281,21 @@ export class BrutalAI extends AI {
    */
   private manageMend(army: Unit[]): void {
     const g = this.game;
-    const repairers = g.units.filter((u) => u.team === this.team && u.def.repair && !u.carrier);
     const rally = this.rally;
     if (!rally) return;
     for (const u of army) {
       const role = this.roles.get(u);
+      const near = this.nearestMender(u);
       if (role === 'mend') {
         const healed = u.hp >= u.maxHp * 0.9;
         const home = hypot(u.x - rally.x, u.z - rally.z) < 6 * TILE;
-        // A vehicle with nobody to fix it only needed to get out alive.
-        if (healed || (!u.def.infantry && !repairers.length && home)) {
+        // A unit with nothing to mend it (and no healing of its own) only needed to get out alive.
+        const selfHeals = u.def.infantry && !u.maxShields;
+        if (healed || (!selfHeals && !near && home)) {
           this.sendHome(u);
           continue;
         }
-        if (!u.def.infantry && repairers.length && u.order.kind === 'idle') {
-          const near = repairers.reduce((a, b) => (hypot(a.x - u.x, a.z - u.z) <= hypot(b.x - u.x, b.z - u.z) ? a : b));
-          if (hypot(near.x - u.x, near.z - u.z) > 3 * TILE) u.command(g, { kind: 'move', x: near.x, z: near.z });
-        }
+        if (near && u.order.kind === 'idle' && hypot(near.x - u.x, near.z - u.z) > 3 * TILE) u.command(g, { kind: 'move', x: near.x, z: near.z });
         continue;
       }
       if (role !== 'wave' && role !== 'defend' && role !== 'raid' && role !== 'home') continue;
@@ -306,9 +304,7 @@ export class BrutalAI extends AI {
       this.micro.release(u);
       this.roles.set(u, 'mend');
       this.stats.mends++;
-      const to = !u.def.infantry && repairers.length
-        ? repairers.reduce((a, b) => (hypot(a.x - u.x, a.z - u.z) <= hypot(b.x - u.x, b.z - u.z) ? a : b))
-        : rally;
+      const to = near ?? rally;
       u.command(g, { kind: 'move', x: to.x, z: to.z });
     }
   }
@@ -477,6 +473,7 @@ export class BrutalAI extends AI {
       if (!s.placed) continue;
       if (s.type === 'infantry') out.push({ x: s.x, z: s.z, r: rifle + 3 * TILE });
       else if (s.type === 'rocket') out.push({ x: s.x, z: s.z, r: UNITS.rocket.weapon!.range + 2 * TILE });
+      else if (s.type === 'sardaukar') out.push({ x: s.x, z: s.z, r: UNITS.sardaukar.weapon!.range + 3 * TILE });
     }
     for (const s of this.intel.buildings.values()) {
       if (s.type === 'bunker') out.push({ x: s.x, z: s.z, r: rifle + BUILDINGS.bunker.size * TILE + 3 * TILE });
