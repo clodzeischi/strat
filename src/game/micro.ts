@@ -56,7 +56,8 @@ export class Micro {
    * True while kiting.
    */
   private kite(u: Unit, threats: Unit[], bunkers: Building[]): boolean {
-    if (!u.def.turret) return false;
+    // Not units whose main gun only fires standing still (Devastator, Soulcrusher): backing off would silence it.
+    if (!u.def.turret || u.def.holdFire) return false;
     const g = this.game;
     let fx = 0;
     let fz = 0;

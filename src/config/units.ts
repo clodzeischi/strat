@@ -56,7 +56,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   trooper: {
     name: 'Harkonnen Trooper', producer: 'barracks', cost: 100, buildTime: 5, hp: 100, shields: 60, speed: 2.1, turnRate: 12, radius: 0.45, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'],
-    weapon: { range: 7, minRange: 0, damage: 9, bonus: { armored: 14, structure: -3 }, cooldown: 0.7, projectile: 'rocket', speed: 20, splash: 0 },
+    weapon: { range: 9, minRange: 0, damage: 8, bonus: { armored: 14, structure: -3 }, cooldown: 0.7, projectile: 'rocket', speed: 20, splash: 0 },
     desc: 'Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, and beats trikes by numbers. Weak vs MLRS.',
   },
   sardaukar: {
