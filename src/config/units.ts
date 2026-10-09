@@ -104,7 +104,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
 
   // ---- Fremen: cheap, fast infantry that dig into the sand (`hides`); the Sandworm is the one big thing ----
   warrior: {
-    name: 'Fremen Warrior', producer: 'barracks', cost: 75, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
+    name: 'Fremen Warrior', producer: 'barracks', cost: 80, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
     weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -2 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true },
     desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers.',
@@ -122,7 +122,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Runs up to its target and blows itself up, wrecking everything around it. Devastating vs structures, defenses and packed armies. Has to get there first.',
   },
   crew: {
-    name: 'Spice Crew', producer: 'barracks', cost: 400, buildTime: 9, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
+    name: 'Spice Crew', producer: 'barracks', cost: 450, buildTime: 12, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
     turret: false, infantry: true, tags: ['biological', 'light'], weapon: null, requires: ['barracks'], hides: true, camp: 'camp',
     desc: 'Unarmed spice hunters. Walk them onto a spice field and Set Up Camp (D): the Spice Camp turns the spice around it into credits. Pack it up again when the spice runs out.',
   },

@@ -68,7 +68,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     desc: 'Drums on the sand to call a Sandworm. Must stand on open sand. Each Thumper adds a production line.',
   },
   camp: {
-    name: 'Spice Camp', short: 'Spice Camp', cost: 400, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 10, radius: 7 },
+    name: 'Spice Camp', short: 'Spice Camp', cost: 450, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 10, radius: 7 },
     desc: 'Set up by a Spice Crew on a spice field: turns the spice around it into credits. Packs up into a crew again (D) when the field runs dry.',
   },
 };
