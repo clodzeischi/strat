@@ -6,7 +6,7 @@ import {
 import type { Game } from '../game/game';
 import { findPath, type Point } from '../game/pathfinding';
 import { SPICE, type Cell, type MoveClass } from '../map';
-import { disposeParts, makeParachute, makeUnitModel, makeUpgradeKit } from '../models';
+import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit } from '../models';
 import { Building } from './building';
 import { distTo } from './distance';
 import { Entity } from './entity';
@@ -39,6 +39,11 @@ const AIR_HEIGHT = CARRYALL.altitude - 2;
 
 /** Paratroopers come down at this speed; vehicles on their bigger canopies a little slower. */
 const FALL_SPEED = { foot: 2.2, vehicle: 1.7 };
+/** Corrino drop pods come in fast from this high, braking at the last moment. */
+const POD = { height: 30, speed: 12 };
+
+/** An Artillery piece setting up, deployed, or packing up to move again. */
+export type DeployState = 'mobile' | 'deploying' | 'deployed' | 'packing';
 
 /** Whether a repair vehicle can mend this: structures and anything mechanical, not infantry. */
 export function repairable(e: Entity): boolean {
@@ -69,8 +74,17 @@ export class Unit extends Entity {
   /** The Carryall this unit is riding in, if any: it's off the map until dropped. */
   /** The Carryall carrying this unit, or the bunker it's in. */
   carrier: Unit | Building | null = null;
-  /** Paratrooper on the way down: drifts toward the landing cell under its parachute. */
-  falling: { x: number; z: number; chute: THREE.Object3D } | null = null;
+  /** Paratrooper (or drop pod) on the way down: drifts toward the landing cell under its parachute. */
+  falling: { x: number; z: number; chute: THREE.Object3D; pod?: boolean } | null = null;
+  /** Units that deploy (Artillery): can't move unless mobile; `deployTimer` counts down setting up or packing. */
+  deployState: DeployState = 'mobile';
+  deployTimer = 0;
+  /** Self-destruct: the game time it goes off, once ordered. */
+  detonateAt: number | null = null;
+  /** Game time the next mine can be laid. */
+  nextMine = 0;
+  /** Seconds until the second gun (Devastator machine gun) can fire again. */
+  private cooldown2 = 0;
   protected body: THREE.Group;
   private turret: THREE.Group | null;
   /** Parts showing researched upgrades, rebuilt when the team's upgrades change. */
@@ -182,6 +196,8 @@ export class Unit extends Entity {
   // ---- Orders ---------------------------------------------------------------
 
   command(game: Game, order: Order): void {
+    // Deployed Artillery stays put: it only takes targets and stop until it packs up.
+    if (this.deployState !== 'mobile' && order.kind !== 'attack' && order.kind !== 'idle') return;
     this.order = order;
     this.target = null;
     this.chasing = false;
@@ -264,8 +280,33 @@ export class Unit extends Entity {
     this.target = null;
   }
 
+  /** Corrino drop pod: comes down fast onto (x, z), already over the spot. */
+  startPod(game: Game, x: number, z: number): void {
+    const pod = makePod(TEAM_COLORS[this.team]);
+    this.root.add(pod);
+    this.falling = { x, z, chute: pod, pod: true };
+    this.x = x;
+    this.z = z;
+    this.y = game.map.surfaceAt(x, z) + POD.height;
+    this.order = { kind: 'idle' };
+    this.path = [];
+    this.target = null;
+  }
+
   updateFall(game: Game, dt: number): void {
     const f = this.falling!;
+    if (f.pod) {
+      const ground = game.map.surfaceAt(this.x, this.z);
+      // Retro-rockets brake the last few units.
+      this.y -= POD.speed * (this.y - ground < 4 ? 0.35 : 1) * dt;
+      if (this.y <= ground) {
+        this.y = ground;
+        this.root.remove(f.chute);
+        this.falling = null;
+        game.effects.dust(new THREE.Vector3(this.x, ground + 0.2, this.z), 0xd8c49a, 1.4);
+      }
+      return;
+    }
     const dx = f.x - this.x;
     const dz = f.z - this.z;
     const d = hypot(dx, dz);
@@ -321,6 +362,10 @@ export class Unit extends Entity {
     this.scanTimer -= dt;
     this.sideScanTimer -= dt;
     const weapon = this.def.weapon;
+    if (this.deployState !== 'mobile') {
+      this.updateDeployed(game, dt);
+      return;
+    }
 
     // Pick or drop the current target.
     if (this.order.kind === 'attack') {
@@ -392,9 +437,88 @@ export class Unit extends Entity {
       }
     }
 
-    if (this.turret && weapon && !aiming) aiming = this.fireOnTheMove(game, dt);
+    // A main gun that holds fire on the move (Devastator) waits for the hull to stop.
+    const moving = this.path.length > 0;
+    if (this.turret && weapon && !aiming && !(this.def.holdFire && moving)) aiming = this.fireOnTheMove(game, dt);
     if (this.turret && !aiming) this.turretHeading = this.rotateToward(this.turretHeading, this.heading, 3 * dt);
+    if (this.def.secondary) this.fireSecondary(game, dt);
     this.checkStuck(game, dt);
+  }
+
+  /** The second gun shoots whatever ground enemy is in its short reach, whatever the hull or main gun is doing. */
+  private fireSecondary(game: Game, dt: number): void {
+    const w = this.def.secondary!;
+    this.cooldown2 -= dt;
+    if (this.cooldown2 > 0) return;
+    const ok = (e: Entity | null): e is Entity =>
+      !!e && !e.dead && !e.tags.includes('air') && game.sees(this.team, e) && distTo(e, this.x, this.z) <= game.rangeFor(this, w, e);
+    const t = ok(this.target) ? this.target : game.nearestEnemy(this.team, this.x, this.z, w.range, undefined, 'ground');
+    if (!ok(t)) {
+      this.cooldown2 = 0.2;
+      return;
+    }
+    game.fire(this, t, w);
+    this.cooldown2 = w.cooldown * (0.9 + game.random() * 0.2);
+  }
+
+  /** Starts setting up (Artillery), or packing up to move again. */
+  setDeployed(on: boolean): void {
+    const d = this.def.deploy;
+    if (!d) return;
+    if (on && this.deployState === 'mobile') {
+      this.order = { kind: 'idle' };
+      this.path = [];
+      this.target = null;
+      this.chasing = false;
+      this.deployState = 'deploying';
+      this.deployTimer = d.time;
+    } else if (!on && (this.deployState === 'deployed' || this.deployState === 'deploying')) {
+      this.deployState = 'packing';
+      this.deployTimer = d.time;
+      this.target = null;
+    }
+  }
+
+  /**
+   * Deployed: stays put and shells the best target it can see within its long reach (an attack order's target if
+   * that's in reach), turning the hull to aim. Setting up and packing up just wait.
+   */
+  private updateDeployed(game: Game, dt: number): void {
+    this.path = [];
+    if (this.deployState === 'deploying' || this.deployState === 'packing') {
+      this.deployTimer -= dt;
+      if (this.deployTimer <= 0) {
+        this.deployState = this.deployState === 'deploying' ? 'deployed' : 'mobile';
+        this.order = { kind: 'idle' };
+      }
+      return;
+    }
+    const w = this.def.deploy!.weapon;
+    const inReach = (e: Entity | null): e is Entity => {
+      if (!e || e.dead || !game.sees(this.team, e) || !game.weaponFor(this, e)) return false;
+      const d = distTo(e, this.x, this.z);
+      return d >= w.minRange && d <= game.rangeFor(this, w, e);
+    };
+    if (this.order.kind === 'attack') {
+      if (inReach(this.order.target)) this.target = this.order.target;
+      else this.order = { kind: 'idle' };
+    }
+    if (!inReach(this.target)) {
+      this.target = null;
+      if (this.scanTimer <= 0) {
+        this.scanTimer = 0.4 + game.random() * 0.2;
+        const found = game.nearestEnemy(this.team, this.x, this.z, w.range * 1.1, this);
+        if (inReach(found)) this.target = found;
+      }
+    }
+    const t = this.target;
+    if (!t) return;
+    const angle = Math.atan2(t.z - this.z, t.x - this.x);
+    this.heading = this.rotateToward(this.heading, angle, this.def.turnRate * dt);
+    if (Math.abs(wrapAngle(angle - this.heading)) < 0.1 && this.cooldown <= 0) {
+      game.fire(this, t, w);
+      this.cooldown = w.cooldown * (0.9 + game.random() * 0.2);
+    }
   }
 
   /**

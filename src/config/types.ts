@@ -35,6 +35,10 @@ export interface WeaponDef {
   splash: number; // splash radius, 0 = single target
   /** Can hit aircraft. Weapons without it only hit ground targets. */
   air?: boolean;
+  /** Shells aimed at the ground where the target stood when fired; anything that moves out of the blast is safe. */
+  unguided?: boolean;
+  /** Flamethrower: hits every enemy within range inside this half-angle (radians) around the aim. */
+  cone?: number;
 }
 
 export interface UnitDef {
@@ -63,6 +67,16 @@ export interface UnitDef {
   repair?: { rate: number; range: number };
   /** Corrino: shield points on top of health. They absorb damage first and recover on their own. */
   shields?: number;
+  /** Main weapon only fires while standing still (the Devastator's big gun). */
+  holdFire?: boolean;
+  /** A second gun that fires on its own, also on the move (the Devastator's machine gun). */
+  secondary?: WeaponDef;
+  /** Can deploy (taking `time` seconds, and as long to pack up): it can't move, and fires `weapon` instead. */
+  deploy?: { time: number; weapon: WeaponDef };
+  /** Can self-destruct: blows up `delay` seconds after the order, hitting everything in the weapon's splash. */
+  detonate?: { delay: number; weapon: WeaponDef };
+  /** Lays mines: one every `cooldown` s; an enemy on the ground within `trigger` sets one off. At most `max` per side. */
+  mines?: { cooldown: number; trigger: number; max: number; weapon: WeaponDef };
 }
 
 export interface BuildingDef {

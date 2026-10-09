@@ -29,6 +29,7 @@ import { trooper } from './units/trooper';
 
 export type { BuildingModel, UnitModel, UpgradeKit, UpgradeLook } from './types';
 export { makeParachute } from './parachute';
+export { makePod } from './pod';
 export { CARRYALL_HOOK_Y, NACELLES, SEATS, SEAT_OFF, SEAT_ON } from './units/carryall';
 
 const UNIT_MODELS: Record<UnitType, UnitBlueprint> = {

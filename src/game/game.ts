@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   ARMOR_BONUS, BUILDINGS, FACTIONS, FLAME_RANGE, HIGH_GROUND_RANGE, INFANTRY_REGEN, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX,
-  REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
+  REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS, TEAM_COLORS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
   factionLevelUps, factionUpgrades, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
@@ -78,6 +78,21 @@ interface Projectile {
   to: THREE.Vector3;
 }
 
+/** A Sky Raider's mine: armed a moment after it's laid, set off by an enemy on the ground coming close. */
+interface Mine {
+  team: Team;
+  x: number;
+  z: number;
+  armedAt: number;
+  trigger: number;
+  weapon: WeaponDef;
+  mesh: THREE.Mesh;
+}
+
+const MINE_ARM = 1;
+const mineGeo = new THREE.CylinderGeometry(0.4, 0.45, 0.16, 8);
+const DEPLOY_CODE = { mobile: 0, deploying: 1, deployed: 2, packing: 3 } as const;
+
 const shellGeo = new THREE.IcosahedronGeometry(0.12, 0);
 const rocketGeo = new THREE.ConeGeometry(0.12, 0.6, 5);
 rocketGeo.rotateX(Math.PI / 2); // point along +Z so lookAt aims it
@@ -117,6 +132,8 @@ export class Game {
   readonly random: () => number;
   private nextId = 1;
   private projectiles: Projectile[] = [];
+  /** Mines on the ground, oldest first. Nobody's are hidden: they're area denial, not traps. */
+  mines: Mine[] = [];
   private lastAlert = -100;
   private lastDropAlert = -100;
   private victoryTimer = 0;
@@ -239,11 +256,12 @@ export class Game {
    * Best enemy within range of a point. When `seeker` is given, targets it counters are preferred
    * and ones inside its minimum range are avoided.
    */
-  nearestEnemy(team: Team, x: number, z: number, range: number, seeker?: Shooter): Entity | null {
+  nearestEnemy(team: Team, x: number, z: number, range: number, seeker?: Shooter, only?: 'ground'): Entity | null {
     let best: Entity | null = null;
     let bestScore = Infinity;
     const consider = (e: Entity, penalty: number) => {
       if (e.team === team || e.dead || (e instanceof Unit && e.carrier) || !this.vision.sees(team, e)) return;
+      if (only === 'ground' && e.tags.includes('air')) return;
       const d = distTo(e, x, z);
       if (d > range) return;
       let score = d + penalty;
@@ -476,6 +494,17 @@ export class Game {
     }
     // Out of the side facing the rally point, heading for it.
     const rally = site.rally ?? { x: site.x, z: site.z };
+    if (producer === 'barracks' && this.meets(team, 'barracks2') && !site.rallyDefault && this.vision.seesAt(team, rally.x, rally.z)) {
+      // Imperial Barracks: infantry come down by drop pod on the rally point, anywhere the side can see.
+      const spots = cellsAround(this.map, this.map.cellOf(rally.x), this.map.cellOf(rally.z), 8, 'foot');
+      const c = spots[Math.floor(this.random() * spots.length)] ?? { cx: this.map.cellOf(rally.x), cz: this.map.cellOf(rally.z) };
+      const x = this.map.center(c.cx);
+      const z = this.map.center(c.cz);
+      const u = this.spawnUnit(type, team, x, z, site.doorHeading());
+      u.startPod(this, x, z);
+      this.onDrop(u, u);
+      return;
+    }
     const cls = UNITS[type].infantry ? 'foot' : 'vehicle';
     const cell = this.exitCell(site, rally.x, rally.z, cls);
     const x = this.map.center(cell.cx);
@@ -757,7 +786,8 @@ export class Game {
   /** The weapon a unit or turret uses against this target: Infantry Rockets swap in against Armored. */
   weaponFor(u: Shooter, target: Entity): WeaponDef | null {
     const anti = u instanceof Unit ? u.def.antiArmor : undefined;
-    const w = anti && target.tags.includes('armored') && this.teams[u.team].upgrades.has('rockets') ? anti : u.def.weapon ?? null;
+    let w = anti && target.tags.includes('armored') && this.teams[u.team].upgrades.has('rockets') ? anti : u.def.weapon ?? null;
+    if (u instanceof Unit && u.deployState === 'deployed') w = u.def.deploy!.weapon;
     if (w && target.tags.includes('air') && !w.air) return null;
     return w;
   }
@@ -766,6 +796,10 @@ export class Game {
     const mult = 1 + WEAPONS_BONUS * this.tier(u.team, 'weapons');
     const from = u.muzzleWorld();
     const to = target.aimPoint();
+    if (w.cone) {
+      this.flame(u, target, w, mult, from);
+      return;
+    }
     this.effects.flash(from, w.projectile === 'bullet' ? 0.15 : 0.35);
     if (w.projectile === 'bullet') {
       to.x += (Math.random() - 0.5) * 0.5;
@@ -777,22 +811,52 @@ export class Game {
     const mesh = new THREE.Mesh(w.projectile === 'shell' ? shellGeo : rocketGeo, mat(w.projectile === 'shell' ? 0x403020 : 0xeeeeee));
     mesh.position.copy(from);
     this.scene.add(mesh);
+    if (w.unguided) {
+      // Aimed at the ground where the target stands now; anyone who can see the spot sees where it will land.
+      to.set(target.x, this.map.surfaceAt(target.x, target.z), target.z);
+      this.effects.marker(to.clone(), 0xff5030);
+    }
     this.projectiles.push({
       kind: w.projectile, x: target.x, z: target.z, mesh, start: from, end: to, target, owner: u, t: 0,
       duration: Math.max(0.1, hypot(target.x - u.x, target.z - u.z) / w.speed), weapon: w, mult, trailTimer: 0, from: from.clone(), to: from.clone(),
     });
   }
 
+  /** Flamethrower: burns every enemy within reach inside the cone around the aim (the target always). */
+  private flame(u: Shooter, target: Entity, w: WeaponDef, mult: number, from: THREE.Vector3): void {
+    const aim = Math.atan2(target.z - u.z, target.x - u.x);
+    const reach = this.rangeFor(u, w, target) + 0.3;
+    const burn = (e: Entity) => {
+      if (e === target || e.team === u.team || e.dead || e.tags.includes('air') || (e instanceof Unit && e.carrier)) return;
+      if (distTo(e, u.x, u.z) > reach) return;
+      const off = Math.atan2(e.z - u.z, e.x - u.x) - aim;
+      if (Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) <= w.cone!) this.damage(e, w, mult, u);
+    };
+    for (const e of this.units) burn(e);
+    for (const e of this.buildings) burn(e);
+    this.damage(target, w, mult, u);
+    // Drawn as a gout of fire toward the target (visual only, so Math.random is fine).
+    const to = target.aimPoint();
+    for (let k = 1; k <= 4; k++) {
+      const p = from.clone().lerp(to, k / 4);
+      p.x += (Math.random() - 0.5) * 0.5 * k;
+      p.z += (Math.random() - 0.5) * 0.5 * k;
+      this.effects.puff(p, k < 3 ? 0xffd060 : 0xff6a20);
+    }
+    this.effects.flash(from, 0.3);
+  }
+
   private updateProjectiles(dt: number): void {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
       p.t = Math.min(1, p.t + dt / p.duration);
-      if (!p.target.dead) {
+      const unguided = !!p.weapon.unguided;
+      if (!p.target.dead && !unguided) {
         p.x = p.target.x;
         p.z = p.target.z;
         p.end.copy(p.target.aimPoint());
       }
-      const arc = p.kind === 'rocket' ? 0.35 * p.start.distanceTo(p.end) : 0.4;
+      const arc = p.kind === 'rocket' ? 0.35 * p.start.distanceTo(p.end) : unguided ? 0.3 * p.start.distanceTo(p.end) : 0.4;
       const pos = new THREE.Vector3().lerpVectors(p.start, p.end, p.t);
       pos.y += arc * 4 * p.t * (1 - p.t);
       const dir = pos.clone().sub(p.to);
@@ -808,7 +872,10 @@ export class Game {
       if (p.t >= 1) {
         const splash = p.weapon.splash;
         this.effects.explosion(p.end, splash > 0 ? 1.3 : p.kind === 'rocket' ? 0.8 : 0.6);
-        if (splash > 0) {
+        if (unguided) {
+          // Falls where it was aimed: whoever is in the blast takes full damage at its center, half at its edge.
+          this.blast(p.x, p.z, p.weapon, p.mult, p.owner);
+        } else if (splash > 0) {
           // The target takes the full hit; anything else in the blast takes half, fading toward the edge, so one
           // rocket into a tight group doesn't do full damage to every unit in it.
           const victims = [...this.units, ...this.buildings].filter(
@@ -853,6 +920,17 @@ export class Game {
       this.onMessage(target instanceof Building ? 'Our base is under attack!' : 'Harvester under attack!');
     }
     if (target.hp <= 0) this.kill(target, attacker);
+  }
+
+  /**
+   * An explosion on the ground at (x, z): every enemy of `owner`'s side within the weapon's splash takes its damage,
+   * full at the center and half at the edge. Aircraft are above it.
+   */
+  blast(x: number, z: number, w: WeaponDef, mult: number, owner: Shooter | null, team: Team = owner!.team): void {
+    const victims = [...this.units, ...this.buildings].filter(
+      (e) => e.team !== team && !e.dead && !e.tags.includes('air') && !(e instanceof Unit && (e.carrier || e.falling)) && distTo(e, x, z) <= w.splash,
+    );
+    for (const v of victims) this.damage(v, w, mult * (1 - distTo(v, x, z) / w.splash / 2), owner);
   }
 
   /** Whether a team saw this entity destroyed (so its AI knows it's gone rather than just out of sight). */
@@ -987,6 +1065,69 @@ export class Game {
     for (const b of this.buildings) if (b.maxShields) regen(b);
   }
 
+  /** Self-destruct: the unit blows up after its delay, hitting every enemy in the blast. */
+  startDetonation(u: Unit): void {
+    const d = u.def.detonate;
+    if (!d || u.dead || u.detonateAt !== null || u.carrier) return;
+    u.detonateAt = this.time + d.delay;
+    for (const ts of this.teams) if (ts.team !== u.team && this.vision.sees(ts.team, u)) this.notifyTeam(ts.team, `Enemy ${u.name} is about to self-destruct!`);
+  }
+
+  private updateDetonations(): void {
+    for (const u of this.units) {
+      if (u.detonateAt === null || u.dead) continue;
+      if (this.time < u.detonateAt) {
+        if (this.ticks % 4 === 0) this.effects.flash(u.aimPoint(), 0.6); // warning blinks
+        continue;
+      }
+      const w = u.def.detonate!.weapon;
+      this.blast(u.x, u.z, w, 1, u);
+      for (let k = 0; k < 6; k++) {
+        const a = (k / 6) * Math.PI * 2;
+        this.effects.explosion(new THREE.Vector3(u.x + Math.cos(a) * w.splash * 0.4, u.y + 0.5, u.z + Math.sin(a) * w.splash * 0.4), 1.8);
+      }
+      this.effects.explosion(u.aimPoint(), 3);
+      u.hp = 0;
+      this.kill(u, null);
+    }
+  }
+
+  /** Lays a mine under a unit that carries them (Sky Raider), if its cooldown allows. */
+  layMine(u: Unit): boolean {
+    const d = u.def.mines;
+    if (!d || u.dead || this.time < u.nextMine) return false;
+    const mine = this.mines.filter((m) => m.team === u.team);
+    if (mine.length >= d.max) this.removeMine(mine[0]);
+    const y = this.map.surfaceAt(u.x, u.z);
+    const mesh = new THREE.Mesh(mineGeo, mat(TEAM_COLORS[u.team]));
+    mesh.position.set(u.x, y + 0.08, u.z);
+    mesh.castShadow = true;
+    this.scene.add(mesh);
+    this.mines.push({ team: u.team, x: u.x, z: u.z, armedAt: this.time + MINE_ARM, trigger: d.trigger, weapon: d.weapon, mesh });
+    u.nextMine = this.time + d.cooldown;
+    this.effects.puff(new THREE.Vector3(u.x, y + 0.3, u.z), 0xd8c49a);
+    return true;
+  }
+
+  private removeMine(m: Mine): void {
+    this.scene.remove(m.mesh);
+    this.mines.splice(this.mines.indexOf(m), 1);
+  }
+
+  /** An armed mine goes off when an enemy on the ground comes within its trigger distance. */
+  private updateMines(): void {
+    for (const m of [...this.mines]) {
+      if (this.time < m.armedAt) continue;
+      const hit = this.units.some(
+        (u) => u.team !== m.team && !u.dead && !u.def.air && !u.carrier && !u.falling && hypot(u.x - m.x, u.z - m.z) - u.radius <= m.trigger,
+      );
+      if (!hit) continue;
+      this.removeMine(m);
+      this.effects.explosion(new THREE.Vector3(m.x, this.map.surfaceAt(m.x, m.z) + 0.4, m.z), 1.4);
+      this.blast(m.x, m.z, m.weapon, 1, null, m.team);
+    }
+  }
+
   /** Gun emplacements pick the best enemy in range and shoot it. */
   private updateTurrets(dt: number): void {
     for (const b of this.buildings) {
@@ -1077,6 +1218,8 @@ export class Game {
       }
     }
     this.regenShields(dt);
+    this.updateDetonations();
+    this.updateMines();
     this.updateBunkers(dt);
     this.updateTurrets(dt);
     this.updatePads(dt);
@@ -1144,6 +1287,7 @@ export class Game {
       else b.bar.visible = false;
       b.root.visible = b.known;
     }
+    for (const m of this.mines) m.mesh.visible = this.revealAll || m.team === local || this.vision.seesAt(local, m.x, m.z);
     // A ghost of a destroyed structure goes once the player looks at the spot again.
     this.ghosts = this.ghosts.filter((b) => {
       const gone = this.revealAll || this.vision.sees(local, b);
@@ -1157,7 +1301,9 @@ export class Game {
     const h = new Hasher().int(this.ticks).int(this.nextId);
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
     for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading);
+    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1);
     for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
+    for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
     for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);
     return h.value;
   }

@@ -177,20 +177,27 @@ Corrino builds the same **Harvester** (with shields) at the Fab.
 
 ### Order of work
 
-**Status: stage 1 done.** Check with `npx tsx sim/corrino-check.ts` (tech tree, shields, Repair Pad, self-repair, turret, Sky Raider flight, determinism) and `npx tsx sim/faction-duels.ts` (balance). The computer opponent still always plays Atreides.
+**Status: stages 1 and 2 done.** Check with `npx tsx sim/corrino-check.ts` (tech tree, shields, Repair Pad, self-repair, turret, Sky Raider flight, every stage 2 ability, determinism) and `npx tsx sim/faction-duels.ts` (balance). The computer opponent still always plays Atreides.
 
-Equal-cost duels after the first balance pass ($4500 a side; +1 Corrino wins untouched, -1 Atreides does):
+Stage 2 abilities, as built:
+- **Artillery: Deploy** (D). Takes 3 s to set up and 3 s to pack up. Deployed, it ignores move orders and shells anything its side can see from 8 to 26 units (13 tiles): slow shells, aimed at the ground where the target stood, with a red marker where they'll land. Two deployed Artillery destroy a manned Bunker in about 19 s from outside its reach, four in 9 s.
+- **Razor flamethrower:** burns every enemy in a 40-degree cone within reach, not just its target.
+- **Devastator:** the machine gun fires at any ground enemy within 5, also on the move; the main gun only fires standing still. **Self-Destruct** (V): blows up 2.5 s later (blinking, and the enemy is told if it sees it), hitting every enemy within 9 units (500 damage at the center, half at the edge, +300 vs structures).
+- **Drop pods:** with an Imperial Barracks, new infantry land by pod on the Barracks' rally point when your side can see it (otherwise they walk out as usual). The enemy gets the airdrop warning near its base.
+- **Sky Raider mines** (D): one every 15 s, at most 12 per side (the oldest goes). Visible to everyone; armed after 1 s; an enemy on the ground within 2.2 sets it off: 30 damage (+90 vs infantry, -10 vs armor) in a 4-unit blast.
 
-| Corrino \ Atreides | Infantry | Trike | Tank | Rocket Launcher |
+Equal-cost duels after stage 2 ($4500 a side; +1 Corrino wins untouched, -1 Atreides does). Artillery here fights mobile; deployed, see above:
+
+| Corrino \\ Atreides | Infantry | Trike | Tank | Rocket Launcher |
 |---|---|---|---|---|
 | Harkonnen Trooper | 0.18 | 0.10 | 0.79 | -0.17 |
 | Sardaukar | 0.31 | -0.56 | 0.66 | -0.90 |
-| Razor | 0.53 | 0.13 | -0.58 | -0.11 |
-| Devastator | 0.31 | 0.43 | 0.25 | 0.46 |
+| Razor | 0.77 | 0.28 | -0.58 | 0.00 |
+| Devastator | 0.51 | 0.47 | 0.23 | 0.47 |
 | Sky Raider | -0.78 | 1.00 | 0.96 | -0.23 |
 | Artillery | -0.15 | -0.43 | -0.60 | -0.51 |
 
-Open points: the Devastator beats Rocket Launchers in a straight fight (they only win by kiting with their longer range), and Artillery loses everywhere until it can deploy (stage 2). The Razor's flamethrower is still a plain short-range gun.
+Open point: the Devastator beats Rocket Launchers in a straight fight; they only win by kiting with their longer range (17 against 10).
 
 1. **Plumbing:** a faction per player (menu, lobby, AI), a roster per faction (units, buildings, upgrades, tech tree), shields and their regeneration, the Repair Pad. The six units go in using today's mechanics. Run the matchup sims for a first balance pass.
 2. **Special mechanics,** one at a time, re-running the matchup sims after each: drop pods, deployed Artillery firing at the ground, the flamethrower, the Devastator firing while moving and self-destructing, Sky Raider mines.

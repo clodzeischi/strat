@@ -286,6 +286,45 @@ export class Input {
     this.dropMode = true;
   }
 
+  /** Selected units of the lead kind that have an ability (deploy, detonate, mines). */
+  private withAbility(has: (u: Unit) => boolean): Unit[] {
+    return this.ownUnits().filter(has);
+  }
+
+  /** Artillery: deploys the selection if any of it is mobile, else packs it all up. */
+  toggleDeploy(): void {
+    const arty = this.withAbility((u) => !!u.def.deploy);
+    if (!arty.length) return;
+    const on = arty.some((u) => u.deployState === 'mobile' || u.deployState === 'packing');
+    this.issue({ c: 'deploy', units: arty.map((u) => u.id), on });
+  }
+
+  /** Share of the selected Artillery that is deployed or setting up (for the card's look). */
+  deployedShare(): number {
+    const arty = this.withAbility((u) => !!u.def.deploy);
+    return arty.length ? arty.filter((u) => u.deployState === 'deployed' || u.deployState === 'deploying').length / arty.length : 0;
+  }
+
+  detonate(): void {
+    const devs = this.withAbility((u) => !!u.def.detonate && u.detonateAt === null);
+    if (devs.length) this.issue({ c: 'detonate', units: devs.map((u) => u.id) });
+  }
+
+  canLayMine(): boolean {
+    return this.withAbility((u) => !!u.def.mines && this.game.time >= u.nextMine).length > 0;
+  }
+
+  /** Seconds until the selected Sky Raiders can lay their next mine (the soonest one). */
+  mineCooldown(): number {
+    const r = this.withAbility((u) => !!u.def.mines);
+    return r.length ? Math.max(0, Math.min(...r.map((u) => u.nextMine - this.game.time))) : 0;
+  }
+
+  layMine(): void {
+    const r = this.withAbility((u) => !!u.def.mines && this.game.time >= u.nextMine);
+    if (r.length) this.issue({ c: 'mine', units: r.map((u) => u.id) });
+  }
+
   // ---- Building commands (from the command card) --------------------------------
 
   /** Arms rally: the next left click (on the view or the minimap) sets the selected producers' rally point. */
@@ -668,6 +707,11 @@ export class Input {
       if (isProducer(e) && e.team === this.team) text += '   Right-click to set a rally point';
       if (e instanceof Building && e.salvage !== null) text += `   Salvaging ${Math.floor(e.salvage * 100)}%`;
       if (e instanceof Carryall && e.team === this.team) text += this.carryallInfo(e);
+      if (e instanceof Unit && e.def.deploy) {
+        const st = { mobile: '', deploying: 'Setting up…', deployed: `Deployed (${keyLabel('KeyD')} to pack up)`, packing: 'Packing up…' }[e.deployState];
+        if (st) text += `   ${st}`;
+      }
+      if (e instanceof Unit && e.detonateAt !== null) text += '   SELF-DESTRUCTING';
       if (e instanceof Unit && e.def.repair && e.team === this.team) text += '   Right-click a damaged vehicle or building to repair it';
       if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === this.team && e.occupants.length ? `   ${keyLabel('KeyF')} to unload` : ''}`;
     } else if (sel.length > 1) {

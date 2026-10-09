@@ -19,6 +19,12 @@ export type Command =
   | { c: 'rally'; buildings: number[]; x: number; z: number }
   | { c: 'salvage'; buildings: number[] }
   | { c: 'cancelSalvage'; buildings: number[] }
+  /** Artillery sets up (`on`) or packs up. */
+  | { c: 'deploy'; units: number[]; on: boolean }
+  /** Devastators self-destruct. */
+  | { c: 'detonate'; units: number[] }
+  /** Sky Raiders lay a mine where they are. */
+  | { c: 'mine'; units: number[] }
   /** Corrino: structures start (or stop) repairing themselves. */
   | { c: 'mend'; buildings: number[]; on: boolean }
   | { c: 'build'; type: BuildingType }
@@ -80,6 +86,15 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       return;
     case 'cancelSalvage':
       for (const b of ownBuildings(game, team, cmd.buildings)) game.cancelSalvage(b);
+      return;
+    case 'deploy':
+      for (const u of own(game, team, cmd.units)) u.setDeployed(cmd.on);
+      return;
+    case 'detonate':
+      for (const u of own(game, team, cmd.units)) game.startDetonation(u);
+      return;
+    case 'mine':
+      for (const u of own(game, team, cmd.units)) game.layMine(u);
       return;
     case 'mend':
       for (const b of ownBuildings(game, team, cmd.buildings)) b.repairing = cmd.on && game.canSelfRepair(b);

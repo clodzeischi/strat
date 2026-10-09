@@ -87,7 +87,7 @@ export class CommandCard {
   /** The selection's lead kind last frame, to follow Tab. */
   private lead: string | null = null;
   /** Command tab buttons by name, laid out per selection in `commandLayout`. */
-  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend', Slot>;
+  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine', Slot>;
   private tabEls: { el: HTMLElement; key: HTMLElement; bar: HTMLElement; badge: HTMLElement; state: string }[] = [];
   private cells: CardEl[] = [];
   private slots: Record<Tab, (Slot | null)[]>;
@@ -211,8 +211,10 @@ export class CommandCard {
       return [this.input.ownProducers().length ? c.rally : null, null, null, null, null, null, null, mend];
     }
     if (!this.input.ownUnits().length) return [];
-    const carryalls = lead instanceof Unit && lead.type === 'carryall';
-    return [c.attack, c.stop, carryalls ? c.drop : null, null, null, null, null, null];
+    const u = lead instanceof Unit ? lead : null;
+    // D: the kind's ability (Carryall drop, Artillery deploy, Sky Raider mine). V, out of the way: self-destruct.
+    const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : null;
+    return [c.attack, c.stop, ability, null, null, null, null, u?.def.detonate ? c.detonate : null];
   }
 
   private use(i: number): void {
@@ -400,6 +402,28 @@ export class CommandCard {
       rally: command('rally', 'Rally Point',
         'Then click a spot (or the minimap): new units from the selected buildings go there, leaving by the side that faces it. Right-clicking the ground does the same.',
         () => input.ownProducers().length > 0, () => input.rallyMode, () => input.rally()),
+      deploy: {
+        icon: () => 'deploy',
+        name: () => (input.deployedShare() > 0.5 ? 'Pack Up' : 'Deploy'),
+        cost: () => 0,
+        tip: () => 'Selected Artillery sets up (3 s) to shell anything your side can see at long range, or packs up to move again. Deployed, it ignores move orders.',
+        view: () => ({ active: input.deployedShare() > 0.5 }),
+        use: () => input.toggleDeploy(),
+      },
+      detonate: command('detonate', 'Self-Destruct',
+        'Selected Devastators blow up after a short delay, wrecking every enemy around them. The enemy is warned if they can see it.',
+        () => input.ownUnits().some((u) => !!u.def.detonate && u.detonateAt === null), () => false, () => input.detonate()),
+      mine: {
+        icon: () => 'mine',
+        name: () => 'Lay Mine',
+        cost: () => 0,
+        tip: () => 'Selected Sky Raiders drop a mine where they are. Mines are visible to everyone; an enemy on the ground walking over one sets it off. Deadly to infantry, wears down vehicles.',
+        view: () => {
+          const wait = input.mineCooldown();
+          return { disabled: !input.canLayMine(), status: wait > 0 ? `${Math.ceil(wait)}` : '' };
+        },
+        use: () => input.layMine(),
+      },
       mend: {
         icon: () => 'mend',
         name: () => 'Repair',

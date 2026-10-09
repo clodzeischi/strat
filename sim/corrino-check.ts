@@ -118,6 +118,176 @@ raider.command(g, { kind: 'move', x: far, z: far });
 run(30);
 check(Math.hypot(raider.x - far, raider.z - far) < 2 && raider.y > g.map.surfaceAt(raider.x, raider.z) + 3, 'the Sky Raider flies straight across the map');
 
+// ---- Stage 2 abilities, each on a fresh map with just the units involved ----
+function arena(): { g2: Game; at: (dx: number, dz: number) => { x: number; z: number }; step: (s: number) => void } {
+  const g2 = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['corrino', 'atreides']);
+  for (const u of [...g2.units]) {
+    u.hp = 0;
+    (g2 as unknown as { kill(e: unknown, by: null): void }).kill(u, null);
+  }
+  g2.update(0.05);
+  const m = g2.map;
+  const mid = m.size / 2;
+  const at = (dx: number, dz: number) => {
+    const c = m.nearestCell(Math.round(mid + dx), Math.round(mid + dz), (x, z) => m.canEnter(x, z, 'vehicle'), 20)!;
+    return { x: m.center(c.cx), z: m.center(c.cz) };
+  };
+  const step = (seconds: number) => {
+    for (let t = 0; t < seconds; t += 0.05) g2.update(0.05);
+  };
+  return { g2, at, step };
+}
+
+{
+  const { g2, at, step } = arena();
+  const p0 = at(0, -6);
+  const arty = g2.spawnUnit('artillery', C, p0.x, p0.z, Math.PI / 2);
+  applyCommand(g2, C, { c: 'deploy', units: [arty.id], on: true });
+  step(UNITS.artillery.deploy!.time + 0.2);
+  check(arty.deployState === 'deployed', 'Artillery deploys');
+  const x0 = arty.x;
+  applyCommand(g2, C, { c: 'go', units: [arty.id], x: arty.x + 20, z: arty.z, target: null, attack: false });
+  step(1);
+  check(arty.x === x0, 'deployed Artillery ignores move orders');
+  // A spotter by the target, so the Artillery's side can see it.
+  const spot = at(0, 5);
+  g2.spawnUnit('trooper', C, spot.x, spot.z);
+  const pt = at(0, 6);
+  const sitter = g2.spawnUnit('tank', A, pt.x, pt.z);
+  sitter.order = { kind: 'idle' };
+  (sitter.def as { weapon: unknown }) === sitter.def; // keep the tank from wandering: it has no target in sight
+  step(8);
+  check(sitter.dead || sitter.hp < sitter.maxHp, 'deployed Artillery shells a target its side can see, out of its own sight');
+  applyCommand(g2, C, { c: 'deploy', units: [arty.id], on: false });
+  step(UNITS.artillery.deploy!.time + 0.2);
+  check(arty.deployState === 'mobile', 'and packs up again');
+}
+{
+  // Unguided: a trike driving across the line of fire gets away; one parked doesn't.
+  const { g2, at, step } = arena();
+  const p0 = at(-12, 0);
+  const arty = g2.spawnUnit('artillery', C, p0.x, p0.z, 0);
+  arty.setDeployed(true);
+  step(UNITS.artillery.deploy!.time + 0.2);
+  const pt = at(2, -8);
+  const mover = g2.spawnUnit('trike', A, pt.x, pt.z);
+  const goal = at(2, 8);
+  const spot = at(0, 0);
+  g2.spawnUnit('trooper', C, spot.x, spot.z).hp = 1e6; // spotter that survives the trike
+  let hits = 0;
+  const dmg = g2.damage.bind(g2);
+  (g2 as { damage: Game['damage'] }).damage = (t, w, mult, by) => {
+    if (t === mover && w === UNITS.artillery.deploy!.weapon) hits++;
+    dmg(t, w, mult, by);
+  };
+  arty.target = mover;
+  mover.command(g2, { kind: 'move', x: goal.x, z: goal.z });
+  step(2);
+  check(hits === 0, 'a moving trike drives out from under the shells');
+}
+{
+  const { g2, at, step } = arena();
+  const p0 = at(0, 0);
+  const razor = g2.spawnUnit('razor', C, p0.x, p0.z, Math.PI / 2);
+  const inf: Unit[] = [];
+  for (const dx of [-0.6, 0, 0.6]) inf.push(g2.spawnUnit('infantry', A, p0.x + dx, p0.z + 3));
+  for (const u of inf) u.hp = 1e4;
+  step(1.5);
+  check(inf.filter((u) => u.hp < 1e4).length >= 2, 'the Razor flamethrower burns several infantry at once');
+  void razor;
+}
+{
+  const { g2, at, step } = arena();
+  const p0 = at(-6, 0);
+  const dev = g2.spawnUnit('devastator', C, p0.x, p0.z, 0);
+  const pi = at(-6, 2);
+  const inf = g2.spawnUnit('infantry', A, pi.x, pi.z);
+  inf.hp = 1e4;
+  const pt = at(-2, 3);
+  const tank = g2.spawnUnit('tank', A, pt.x, pt.z);
+  tank.hp = 1e4;
+  let mainOnMove = 0;
+  let mainStill = 0;
+  const fire = g2.fire.bind(g2);
+  (g2 as { fire: Game['fire'] }).fire = (u, t, w) => {
+    if (u === dev && w === dev.def.weapon) {
+      if (dev.path.length > 0) mainOnMove++;
+      else mainStill++;
+    }
+    fire(u, t, w);
+  };
+  const far = at(-6, 14);
+  dev.command(g2, { kind: 'move', x: far.x, z: far.z });
+  step(2);
+  check(inf.hp < 1e4, 'the Devastator machine gun fires on the move');
+  check(mainOnMove === 0, 'its main gun does not');
+  dev.command(g2, { kind: 'idle' });
+  step(4);
+  check(mainStill > 0, 'standing still, the main gun fires');
+}
+{
+  const { g2, at, step } = arena();
+  const p0 = at(0, 0);
+  const dev = g2.spawnUnit('devastator', C, p0.x, p0.z);
+  dev.shields = 1e6; // keep it alive until it blows
+  const near: Unit[] = [];
+  for (const [dx, dz] of [[2, 0], [-2, 1], [0, 3]]) {
+    const p = at(dx, dz);
+    near.push(g2.spawnUnit('tank', A, p.x, p.z));
+  }
+  const pf = at(14, 0);
+  const far = g2.spawnUnit('tank', A, pf.x, pf.z);
+  applyCommand(g2, C, { c: 'detonate', units: [dev.id] });
+  step(UNITS.devastator.detonate!.delay - 0.3);
+  check(!dev.dead, 'self-destruct waits for its delay');
+  step(0.6);
+  check(dev.dead && near.every((u) => u.dead || u.hp < u.maxHp * 0.4) && !far.dead && far.hp === far.maxHp, 'then wrecks what is near and spares what is far');
+}
+{
+  const { g2, at, step } = arena();
+  const p0 = at(0, 0);
+  const raider = g2.spawnUnit('raider', C, p0.x, p0.z);
+  applyCommand(g2, C, { c: 'mine', units: [raider.id] });
+  applyCommand(g2, C, { c: 'mine', units: [raider.id] });
+  check(g2.mines.length === 1, 'a Sky Raider lays a mine, then waits for its cooldown');
+  const ph = at(8, 0);
+  const harv = g2.spawnUnit('harvester', A, ph.x, ph.z);
+  const pi = at(-6, 0);
+  const inf = g2.spawnUnit('infantry', A, pi.x, pi.z);
+  step(1.5);
+  inf.command(g2, { kind: 'move', x: p0.x + 4, z: p0.z });
+  step(4);
+  check(inf.dead && g2.mines.length === 0, 'an infantryman walking over a mine is killed');
+  raider.nextMine = 0;
+  raider.x = harv.x - 4;
+  raider.z = harv.z;
+  applyCommand(g2, C, { c: 'mine', units: [raider.id] });
+  step(1.5);
+  harv.command(g2, { kind: 'move', x: harv.x - 8, z: harv.z });
+  step(4);
+  check(!harv.dead && harv.hp < harv.maxHp, 'a harvester survives a mine, worn down');
+}
+{
+  const { g2, at, step } = arena();
+  g2.teams[C].credits = 1e5;
+  const yard = g2.placeBuilding('conyard', C, 4, 4);
+  const bk = g2.placeBuilding('barracks', C, 9, 4);
+  bk.setLevel(2);
+  void yard;
+  const rally = at(4, 4);
+  g2.spawnUnit('trooper', C, rally.x + 1, rally.z); // eyes on the rally point
+  step(0.5);
+  applyCommand(g2, C, { c: 'rally', buildings: [bk.id], x: rally.x, z: rally.z });
+  applyCommand(g2, C, { c: 'train', type: 'trooper' });
+  let sawPod = false;
+  for (let t = 0; t < UNITS.trooper.buildTime + 5; t += 0.05) {
+    g2.update(0.05);
+    if (g2.units.some((u) => u.falling?.pod)) sawPod = true;
+  }
+  const landed = g2.units.filter((u) => u.team === C && u.type === 'trooper' && Math.hypot(u.x - rally.x, u.z - rally.z) < 10 && !u.falling);
+  check(sawPod && landed.length === 2, 'Imperial Barracks drop new infantry by pod on a visible rally point');
+}
+
 // Lockstep: the same mixed battle played twice gives the same game, checksum for checksum.
 function battle(): number[] {
   const b = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 11, ['corrino', 'atreides']);

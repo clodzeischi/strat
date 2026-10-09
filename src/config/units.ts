@@ -67,25 +67,36 @@ export const UNITS: Record<UnitType, UnitDef> = {
   razor: {
     name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 200, shields: 100, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['fab'],
-    weapon: { range: 4, minRange: 0, damage: 5, bonus: { biological: 9, armored: -3, structure: -2 }, cooldown: 0.25, projectile: 'bullet', speed: 0, splash: 0 },
-    desc: 'Dune buggy with a flamethrower. Burns infantry. Weak vs tanks.',
+    weapon: { range: 4, minRange: 0, damage: 4, bonus: { biological: 8, armored: -2, structure: -2 }, cooldown: 0.3, projectile: 'bullet', speed: 0, splash: 0, cone: 0.35 },
+    desc: 'Dune buggy with a flamethrower that burns everything in front of it. Shreds infantry. Weak vs tanks.',
   },
   devastator: {
     name: 'Devastator', producer: 'fab', cost: 900, buildTime: 16, hp: 900, shields: 400, speed: 2.4, turnRate: 1.6, radius: 1.4, sight: 12,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu', 'fab2'],
     weapon: { range: 10, minRange: 0, damage: 35, bonus: { armored: 65, biological: -15 }, cooldown: 2, projectile: 'shell', speed: 28, splash: 0 },
-    desc: 'Slow heavy tank. Crushes armor. Weak vs aircraft and Rocket Launchers.',
+    holdFire: true,
+    secondary: { range: 5, minRange: 0, damage: 4, bonus: { biological: 6, armored: -3, structure: -3 }, cooldown: 0.2, projectile: 'bullet', speed: 0, splash: 0 },
+    detonate: { delay: 2.5, weapon: { range: 0, minRange: 0, damage: 500, bonus: { structure: 300 }, cooldown: 0, projectile: 'shell', speed: 0, splash: 9 } },
+    desc: "Slow heavy tank. Crushes armor; its machine gun cuts down infantry up close, even on the move, but the main gun only fires standing still. Can self-destruct in a huge blast. Weak vs aircraft and Rocket Launchers.",
   },
   raider: {
     name: 'Sky Raider', producer: 'fab', cost: 500, buildTime: 11, hp: 260, shields: 120, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
     turret: false, infantry: false, tags: ['mechanical', 'air'], requires: ['tleilaxu'], air: true,
     weapon: { range: 8, minRange: 0, damage: 12, bonus: { armored: 24, structure: -4 }, cooldown: 1.2, projectile: 'rocket', speed: 22, splash: 0 },
-    desc: 'Light ornithopter for scouting and raids. Rockets strong vs armor. Weak vs anti-air.',
+    mines: {
+      cooldown: 15, trigger: 2.2, max: 12,
+      weapon: { range: 0, minRange: 0, damage: 30, bonus: { biological: 90, armored: -10 }, cooldown: 0, projectile: 'shell', speed: 0, splash: 4 },
+    },
+    desc: 'Light ornithopter for scouting and raids. Rockets strong vs armor. Lays mines that wreck infantry and wear down harvesters. Weak vs anti-air.',
   },
   artillery: {
     name: 'Artillery', producer: 'fab', cost: 650, buildTime: 13, hp: 260, shields: 140, speed: 2.8, turnRate: 2, radius: 1.1, sight: 12,
     turret: false, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu'],
     weapon: { range: 8, minRange: 0, damage: 14, bonus: { structure: 12 }, cooldown: 1.5, projectile: 'shell', speed: 26, splash: 0 },
-    desc: "Self-propelled howitzer. Can't fire on the move. Brutal on buildings. Weak vs tanks.",
+    deploy: {
+      time: 3,
+      weapon: { range: 26, minRange: 8, damage: 60, bonus: { structure: 120, biological: 20 }, cooldown: 4.5, projectile: 'shell', speed: 13, splash: 3, unguided: true },
+    },
+    desc: "Self-propelled howitzer with a short gun, and can't fire on the move. Deployed, it shells anything your side can see at long range; the shells are slow and fall where the target was. Brutal on buildings and defenses. Weak vs tanks.",
   },
 };
