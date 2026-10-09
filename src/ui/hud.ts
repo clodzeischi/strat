@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { RTSCamera } from '../render/camera';
 import { CAMP_FULL, CAMP_UPGRADE, HARVEST_UPGRADE, HARVESTER, TEAM_CSS, TILE } from '../config';
 import { Building, Unit, type Entity } from '../entities';
-import type { Game } from '../game/game';
+import type { Game, PingKind } from '../game/game';
 import { hypot } from '../game/hypot';
 import { SPICE } from '../map';
 import { tileColor } from '../materials/ground';
@@ -10,6 +10,12 @@ import { tileColor } from '../materials/ground';
 /** Screen sizes the HUD is laid out for at 1x; bigger screens scale it up (to at most MAX_SCALE). */
 const BASE = { w: 1440, h: 860 };
 const MAX_SCALE = 2;
+
+/** Minimap pings: how long one shows (seconds), and its color by kind. */
+const PING_TIME = 4;
+const PING_COLOR: Record<PingKind, string> = { attack: '#ff3b30', army: '#ff3b30', worm: '#ff9a1a', info: '#ffe040' };
+/** Space jumps to the latest alert for this long after it (seconds); after that, to the base. */
+const ALERT_JUMP = 15;
 
 /** The HUD around the view: credits along the top, the minimap bottom right, and messages. */
 export class Hud {
@@ -37,6 +43,10 @@ export class Hud {
   private fogImg: HTMLCanvasElement;
   private minimapTimer = 0;
   private messages: HTMLElement;
+  /** Alerts pinged on the minimap, with when (performance.now(), in ms). */
+  private pings: { x: number; z: number; kind: PingKind; at: number }[] = [];
+  /** The latest alert Space hasn't jumped to yet. */
+  private lastAlert: { x: number; z: number; at: number } | null = null;
   /**
    * A click on the minimap at world (x, z) with a mouse button, offered to the controls first (orders, rally points,
    * armed attack-moves). Returning false means it wasn't one, and a left click moves the camera.
@@ -86,6 +96,56 @@ export class Hud {
     setTimeout(() => el.remove(), 4200);
   }
 
+  /**
+   * An alert with a place: the message, and a ping on the minimap. A fight the army is in only counts when it's off
+   * screen (the player is already looking at one on it).
+   */
+  alert(text: string, x: number, z: number, kind: PingKind): void {
+    if (kind === 'army' && this.onScreen(x, z)) return;
+    this.showMessage(text);
+    const at = performance.now();
+    this.pings.push({ x, z, kind, at });
+    if (kind !== 'info') this.lastAlert = { x, z, at };
+    this.minimapTimer = 0;
+  }
+
+  /** Where Space should take the camera: the latest alert from the last few seconds (once), else nowhere. */
+  takeAlert(): { x: number; z: number } | null {
+    const a = this.lastAlert;
+    this.lastAlert = null;
+    return a && performance.now() - a.at < ALERT_JUMP * 1000 ? a : null;
+  }
+
+  /** The ground the camera sees: where the four screen corners hit y = 0 (null if it can't be worked out). */
+  private footprint(): THREE.Vector3[] | null {
+    const ray = new THREE.Raycaster();
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const pts: THREE.Vector3[] = [];
+    for (const [x, y] of [[-1, 1], [1, 1], [1, -1], [-1, -1]]) {
+      ray.setFromCamera(new THREE.Vector2(x, y), this.cam.camera);
+      const p = ray.ray.intersectPlane(plane, new THREE.Vector3());
+      if (p) pts.push(p);
+    }
+    return pts.length === 4 ? pts : null;
+  }
+
+  /** Whether a ground point is in view. */
+  private onScreen(x: number, z: number): boolean {
+    const pts = this.footprint();
+    if (!pts) return false;
+    // Inside the (convex) footprint: on the same side of all four edges.
+    let sign = 0;
+    for (let i = 0; i < 4; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % 4];
+      const c = Math.sign((b.x - a.x) * (z - a.z) - (b.z - a.z) * (x - a.x));
+      if (c === 0) continue;
+      if (sign === 0) sign = c;
+      else if (c !== sign) return false;
+    }
+    return true;
+  }
+
   update(dt: number): void {
     const credits = Math.floor(this.game.teams[this.game.localTeam].credits);
     if (credits !== this.shownCredits) {
@@ -105,7 +165,9 @@ export class Hud {
     }
     this.minimapTimer -= dt;
     if (this.minimapTimer <= 0) {
-      this.minimapTimer = 0.1;
+      // Smoothly while pings ripple, else ten times a second.
+      this.pings = this.pings.filter((p) => performance.now() - p.at < PING_TIME * 1000);
+      this.minimapTimer = this.pings.length ? 1 / 30 : 0.1;
       this.drawMinimap();
     }
   }
@@ -299,16 +361,37 @@ export class Hud {
       ctx.fillRect(px - r, pz - r, 2 * r, 2 * r);
     }
 
-    // Camera footprint: where the four screen corners hit the ground.
-    const ray = new THREE.Raycaster();
-    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-    const pts: THREE.Vector3[] = [];
-    for (const [x, y] of [[-1, 1], [1, 1], [1, -1], [-1, -1]]) {
-      ray.setFromCamera(new THREE.Vector2(x, y), this.cam.camera);
-      const p = ray.ray.intersectPlane(plane, new THREE.Vector3());
-      if (p) pts.push(p);
+    // Pings: rings rippling out from the spot, three of them, and a marker that fades at the end.
+    const now = performance.now();
+    for (const p of this.pings) {
+      const age = (now - p.at) / 1000;
+      const cx = (p.x / TILE) * s;
+      const cz = (p.z / TILE) * s;
+      ctx.strokeStyle = ctx.fillStyle = PING_COLOR[p.kind];
+      ctx.lineWidth = 2 * px1;
+      for (let k = 0; k < 3; k++) {
+        const t = (age - k * 0.45) / 1.2;
+        if (t < 0 || t > 1) continue;
+        ctx.globalAlpha = 1 - t;
+        ctx.beginPath();
+        ctx.arc(cx, cz, (4 + 22 * t) * px1, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = Math.min(1, PING_TIME - age);
+      const r = 3 * px1;
+      ctx.beginPath();
+      ctx.moveTo(cx, cz - r * 1.4);
+      ctx.lineTo(cx + r, cz);
+      ctx.lineTo(cx, cz + r * 1.4);
+      ctx.lineTo(cx - r, cz);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
     }
-    if (pts.length === 4) {
+
+    // Camera footprint: where the four screen corners hit the ground.
+    const pts = this.footprint();
+    if (pts) {
       ctx.strokeStyle = 'rgba(255,255,255,0.85)';
       ctx.lineWidth = px1;
       ctx.beginPath();

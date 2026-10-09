@@ -102,6 +102,8 @@ hud.onClick = (x, z, button) => input.minimapClick(x, z, button);
 hud.onIdle = (list, all) => input.selectIdle(list, all);
 input.idleWorkers = () => hud.idleWorkers();
 game.onMessage = (t) => hud.showMessage(t);
+game.onAlert = (t, x, z, kind) => hud.alert(t, x, z, kind);
+input.takeAlert = () => hud.takeAlert();
 // Created when the game starts: the computer opponent (offline) and the lockstep that runs the simulation.
 let ai: AI | null = null;
 let lockstep: Lockstep | null = null;

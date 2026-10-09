@@ -182,6 +182,10 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   console.log(`      ${spots.length} separate spots on the sand around the Thumper`);
   check(spots.length >= 3, "test setup: room on the sand for the worm's prey");
   const [p1, p2, p3, p4] = spots;
+  // The Atreides side plays on this screen: what alerts does it get?
+  t.localTeam = A;
+  const alerts: { text: string; x: number; z: number; kind: string }[] = [];
+  t.onAlert = (text, x, z, kind) => alerts.push({ text, x, z, kind });
   const planter = t.spawnUnit('warrior', F, sx + 3, sz);
   const credits = t.teams[F].credits;
   applyCommand(t, F, { c: 'thump', units: [planter.id], x: sx, z: sz });
@@ -190,6 +194,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   const thumper = t.buildings.find((b) => b.type === 'thumper' && !b.dead);
   check(!!thumper && hypot(thumper.x - sx, thumper.z - sz) < 2 * TILE && t.teams[F].credits === credits - THUMPER.cost, 'and plants a Thumper there, for its price');
   check(t.thumpBlocked(F) !== null, 'one Thumper at a time');
+  const heard = () => alerts.find((a) => a.text.startsWith('Thumper detected'));
   // Prey: an enemy tank driving to and fro, one parked, a harvester parked, our own warrior walking about, all on the
   // sand within reach; the planter goes back to the rock by the yard and holds position there.
   const mover = t.spawnUnit('tank', A, p1.x, p1.z);
@@ -209,6 +214,8 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   };
   for (let k = 0; k < THUMPER.delay - 3 - 0.5; k += 1) { shuttle(); tick(1); }
   check(t.worms.length === 0 && !thumper!.dead, 'nothing comes until the Thumper has drummed its time');
+  const h = heard();
+  check(!!h && h.kind === 'worm' && hypot(h.x - thumper!.x, h.z - thumper!.z) < 1, 'the enemy nearby gets "Thumper detected!", pinged where it drums');
   tick(1);
   check(t.worms.length === 1 && thumper!.dead, 'then a Sandworm comes up where the Thumper stood');
   for (let k = 0; k < WORM.hunt + 2; k++) { shuttle(); tick(1); }

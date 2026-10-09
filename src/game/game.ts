@@ -32,6 +32,12 @@ export interface TeamStats {
 
 export type Difficulty = 'normal' | 'hard' | 'brutal';
 
+/**
+ * What an alert with a place on the map is about, for its minimap ping: an attack (red), the army in a fight
+ * (red, only when it's off screen), a worm or Thumper (orange), or news (yellow).
+ */
+export type PingKind = 'attack' | 'army' | 'worm' | 'info';
+
 /** Anything that fires: units, and structures with a gun (Corrino's turret). */
 export type Shooter = Unit | Building;
 
@@ -168,6 +174,8 @@ export class Game {
   difficulty: Difficulty = 'normal';
   /** Called with notifications for the local player. */
   onMessage: (text: string) => void = () => {};
+  /** Called with notifications for the local player that have a place on the map (the HUD pings the minimap). */
+  onAlert: (text: string, x: number, z: number, kind: PingKind) => void = (text) => this.onMessage(text);
   /** The team this screen plays (presentation only: whose messages and alerts show). */
   localTeam: Team = PLAYER;
   /** Drawing only: show the whole map, fog or not (single player with ?reveal, and after the game). */
@@ -189,8 +197,11 @@ export class Game {
   worms: Sandworm[] = [];
   /** Worms that have gone back down, with what they ate (for the sims). */
   wormLog: { team: Team; eatenOwn: number; eatenEnemy: number }[] = [];
-  private lastAlert = -100;
+  /** Attack alerts for the local player, per kind of target: when and where the last one was (to keep them few). */
+  private lastAlerts = new Map<string, { t: number; x: number; z: number }>();
   private lastDropAlert = -100;
+  /** Set while a worm's bite is dealt out. */
+  private wormBiting = false;
   private victoryTimer = 0;
 
   constructor(
@@ -686,14 +697,40 @@ export class Game {
       if (ts.team === carrier.team || this.time - this.lastDropAlert < 12) continue;
       if (this.buildings.some((b) => b.team === ts.team && !b.dead && hypot(b.x - u.x, b.z - u.z) < 22 * TILE)) {
         if (ts.team === this.localTeam) this.lastDropAlert = this.time;
-        this.notifyTeam(ts.team, 'Enemy airdrop detected!');
+        this.notifyTeam(ts.team, 'Enemy airdrop detected!', u);
       }
     }
   }
 
-  /** Shows a message, if the team is the one playing on this screen. */
-  notifyTeam(team: Team, text: string): void {
-    if (team === this.localTeam) this.onMessage(text);
+  /** Shows a message, if the team is the one playing on this screen; with a place, the minimap pings it too. */
+  notifyTeam(team: Team, text: string, at?: { x: number; z: number }, kind: PingKind = 'attack'): void {
+    if (team !== this.localTeam) return;
+    if (at) this.onAlert(text, at.x, at.z, kind);
+    else this.onMessage(text);
+  }
+
+  /**
+   * The local player's things under fire: an alert and a ping, at most one every 15 s per kind of target (base,
+   * camp, harvester, army) unless the new one is somewhere else entirely.
+   */
+  private attackAlert(target: Entity): void {
+    if (target.team !== this.localTeam) return;
+    let key: string;
+    let text: string;
+    let kind: PingKind = 'attack';
+    if (target instanceof Building) {
+      if (target.type === 'thumper') return;
+      [key, text] = target.def.extract ? ['camp', 'Spice Camp under attack!'] : ['base', 'Our base is under attack!'];
+    } else {
+      const u = target as Unit;
+      if (u.type === 'harvester') [key, text] = ['harvester', 'Harvester under attack!'];
+      else if (u.def.camp) [key, text] = ['harvester', 'Spice Crew under attack!'];
+      else [key, text, kind] = ['army', 'Our forces are under attack!', 'army'];
+    }
+    const last = this.lastAlerts.get(key);
+    if (last && this.time - last.t < 15 && hypot(last.x - target.x, last.z - target.z) < 20 * TILE) return;
+    this.lastAlerts.set(key, { t: this.time, x: target.x, z: target.z });
+    this.onAlert(text, target.x, target.z, kind);
   }
 
   startBuilding(team: Team, type: BuildingType): boolean {
@@ -991,11 +1028,8 @@ export class Game {
       // A harvester under fire calls its Carryall to fly it home.
       if (target.type === 'harvester') this.ferryFor(target)?.rescue(this, target);
     }
-    const important = (target instanceof Building && target.type !== 'thumper') || (target as Unit).type === 'harvester';
-    if (target.team === this.localTeam && important && this.time - this.lastAlert > 15) {
-      this.lastAlert = this.time;
-      this.onMessage(target instanceof Building ? 'Our base is under attack!' : 'Harvester under attack!');
-    }
+    // Something hitting us (not a worm's bite, which has its own warnings).
+    if (!this.wormBiting) this.attackAlert(target);
     if (target.hp <= 0) this.kill(target, attacker);
   }
 
@@ -1072,7 +1106,7 @@ export class Game {
         const p = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, e.y + 1 + Math.random(), e.z + (Math.random() - 0.5) * 4);
         this.effects.explosion(p, 1.5 + Math.random() * 1.5);
       }
-      this.notifyTeam(e.team, `${e.name} destroyed.`);
+      this.notifyTeam(e.team, `${e.name} destroyed.`, e);
     } else {
       this.effects.explosion(e.aimPoint(), (e as Unit).def.infantry ? 0.5 : 1.3);
     }
@@ -1176,7 +1210,7 @@ export class Game {
     const d = u.def.detonate;
     if (!d || u.dead || u.detonateAt !== null || u.carrier) return;
     u.detonateAt = this.time + d.delay;
-    for (const ts of this.teams) if (ts.team !== u.team && this.vision.sees(ts.team, u)) this.notifyTeam(ts.team, `Enemy ${u.name} is about to self-destruct!`);
+    for (const ts of this.teams) if (ts.team !== u.team && this.vision.sees(ts.team, u)) this.notifyTeam(ts.team, `Enemy ${u.name} is about to self-destruct!`, u);
   }
 
   private updateDetonations(): void {
@@ -1547,12 +1581,12 @@ export class Game {
       const spot = this.campSpotNear(b.x, b.z, b.type, b.team);
       const u = spot ? this.packCamp(b) : null;
       if (!u || !spot) {
-        this.notifyTeam(b.team, 'A Spice Camp has run dry. Pack it up (D) and move on.');
+        this.notifyTeam(b.team, 'A Spice Camp has run dry. Pack it up (D) and move on.', b, 'info');
         continue;
       }
       u.command(this, { kind: 'move', x: spot.x, z: spot.z });
       u.queue.push({ kind: 'deploy', walked: true });
-      this.notifyTeam(b.team, 'A Spice Camp ran dry. Its crew is moving to fresh spice nearby.');
+      this.notifyTeam(b.team, 'A Spice Camp ran dry. Its crew is moving to fresh spice nearby.', b, 'info');
     }
   }
 
@@ -1607,7 +1641,7 @@ export class Game {
     ts.nextThumper = this.time + THUMPER.cooldown;
     const b = this.placeBuilding('thumper', u.team, spot.cx, spot.cz);
     this.drums.push({ b, due: this.time + THUMPER.delay, nextReveal: this.time, heard: 0 });
-    this.notifyTeam(u.team, `Thumper planted. The worm comes in ${THUMPER.delay} s: get off the sand, or stand still.`);
+    this.notifyTeam(u.team, `Thumper planted. The worm comes in ${THUMPER.delay} s: get off the sand, or stand still.`, b, 'worm');
     return true;
   }
 
@@ -1626,7 +1660,7 @@ export class Game {
       const b = d.b;
       if (b.dead) {
         this.drums.splice(this.drums.indexOf(d), 1);
-        this.notifyTeam(b.team, 'Our Thumper was destroyed. No worm will come.');
+        this.notifyTeam(b.team, 'Our Thumper was destroyed. No worm will come.', b, 'worm');
         continue;
       }
       if (this.time >= d.nextReveal) {
@@ -1638,7 +1672,7 @@ export class Game {
           this.vision.reveal(ts.team, b.x, b.z, this.ticks);
           if (!(d.heard & (1 << ts.team))) {
             d.heard |= 1 << ts.team;
-            this.notifyTeam(ts.team, 'A Thumper is drumming nearby: a Sandworm is coming. Destroy it, or get off the sand!');
+            this.notifyTeam(ts.team, 'Thumper detected! A Sandworm is coming: destroy it, or get off the sand.', b, 'worm');
           }
         }
       }
@@ -1662,8 +1696,8 @@ export class Game {
     this.remove(b);
     for (const ts of this.teams) {
       const near = (e: Entity) => e.team === ts.team && !e.dead && hypot(e.x - b.x, e.z - b.z) <= WORM.range + 10 * TILE;
-      if (ts.team === b.team) this.notifyTeam(ts.team, 'Shai-Hulud has come.');
-      else if (this.units.some(near) || this.buildings.some(near)) this.notifyTeam(ts.team, 'Wormsign! Get off the sand!');
+      if (ts.team === b.team) this.notifyTeam(ts.team, 'Shai-Hulud has come.', b, 'worm');
+      else if (this.units.some(near) || this.buildings.some(near)) this.notifyTeam(ts.team, 'Wormsign! Get off the sand!', b, 'worm');
     }
     this.wormBite(w, b.x, b.z);
   }
@@ -1793,7 +1827,9 @@ export class Game {
       ...this.buildings.filter((b) => !b.dead && this.onSandFootprint(b) && distTo(b, x, z) <= WORM.bite),
     ];
     for (const v of victims) {
+      this.wormBiting = true;
       this.damage(v, WORM.weapon, 1, null);
+      this.wormBiting = false;
       if (!v.dead) continue;
       const value = v instanceof Unit ? v.def.cost : BUILDINGS[(v as Building).type].cost;
       if (v.team === w.team) w.eatenOwn += value;

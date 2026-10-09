@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { RTSCamera } from '../render/camera';
-import { BUILDINGS, FACTIONS, PRODUCERS, TILE, type BuildingType, type Producer, type Team, type UnitType } from '../config';
+import { BUILDINGS, FACTIONS, PRODUCERS, THUMPER, TILE, type BuildingType, type Producer, type Team, type UnitType } from '../config';
 import { Building, BUILDING_TURN, Carryall, diamondScale, repairable, Unit, type Entity } from '../entities';
 import type { Command } from '../game/commands';
 import type { Game } from '../game/game';
@@ -57,6 +57,8 @@ export class Input {
   paused = false;
   /** Clicks and hotkeys issued, for APM on the end screen. */
   actions = 0;
+  /** The latest alert to jump to with Space, if there's a recent one (the HUD keeps them). */
+  takeAlert: () => { x: number; z: number } | null = () => null;
   /** Called when Esc has nothing else to cancel (opens the in-game menu). */
   onMenu: () => void = () => {};
   /** Sends a command for this player to the game (through the lockstep, which applies it on the next tick it can). */
@@ -798,12 +800,15 @@ export class Input {
         e.preventDefault();
         if (!e.repeat) this.cycleSubgroup();
         break;
-      // Hotkeys stay on the left hand (as in Stormgate): the command card's grid (ui/command-card.ts), Space base,
-      // ` army, ~ idle gatherers, P pause. The right hand is on the mouse; the camera pans with the arrows, screen edges or middle-drag.
+      // Hotkeys stay on the left hand (as in Stormgate): the command card's grid (ui/command-card.ts), Space the
+      // latest alert (else the base), ` army, ~ idle gatherers, P pause. The right hand is on the mouse; the camera
+      // pans with the arrows, screen edges or middle-drag.
       case ' ': {
         e.preventDefault();
+        const alert = this.takeAlert();
         const home = g.buildings.find((b) => b.team === this.team && b.type === 'conyard') ?? g.buildings.find((b) => b.team === this.team);
-        if (home) this.cam.lookAt(home.x, home.z);
+        const to = alert ?? home;
+        if (to) this.cam.lookAt(to.x, to.z);
         break;
       }
     }
@@ -886,7 +891,7 @@ export class Input {
     else if (this.attackMode) text = 'Attack-move: left-click a target or location.';
     else if (this.dropMode) text = 'Drop: left-click where to drop. Vehicles are set down; infantry jump on a fly-by.';
     else if (this.lockMode) text = 'Lock On: left-click an enemy. Rockets home in on it for a while.';
-    else if (this.thumpMode) text = 'Plant Thumper: left-click open sand or spice. The worm comes 10 s after it is planted.';
+    else if (this.thumpMode) text = `Plant Thumper: left-click open sand or spice. The worm comes ${THUMPER.delay} s after it is planted.`;
     else if (this.rallyMode) text = 'Rally point: left-click a spot, on the map or the minimap.';
     else if (this.rallyAllMode) text = 'Rally All: left-click a spot (or the minimap). New units from every production building go there.';
     else if (sel.length === 1) {
