@@ -261,6 +261,37 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   check(holder.order.kind === 'move', 'a new order ends it');
 }
 
+// ---- Wind Glider ----
+{
+  const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
+  const tick = (seconds: number) => {
+    for (let k = 0; k < seconds * 20; k++) t.update(0.05);
+  };
+  check(!t.canTrain(F, 'glider'), 'no gliders before the Sietch');
+  const gl = t.spawnUnit('glider', F, sx, sz);
+  const goal = { x: sx + 30, z: sz };
+  applyCommand(t, F, { c: 'go', units: [gl.id], x: goal.x, z: goal.z, target: null, attack: false });
+  tick(4);
+  check(hypot(gl.x - goal.x, gl.z - goal.z) < 12 && gl.order.kind === 'idle', 'a glider flies to where it is sent');
+  let still = 0;
+  let far = 0;
+  let lx = gl.x;
+  let lz = gl.z;
+  for (let k = 0; k < 200; k++) {
+    t.update(0.05);
+    if (hypot(gl.x - lx, gl.z - lz) < 0.05 * gl.def.speed * 0.9) still++;
+    if (hypot(gl.x - goal.x, gl.z - goal.z) > gl.def.glides!.orbit * 1.6) far++;
+    lx = gl.x;
+    lz = gl.z;
+  }
+  check(still === 0, 'it never stops');
+  check(far === 0, 'it circles the spot');
+  applyCommand(t, F, { c: 'go', units: [gl.id], x: 0, z: 0, target: null, attack: false });
+  tick(12);
+  check(gl.x >= TILE && gl.z >= TILE && gl.x <= t.map.worldSize() - TILE && hypot(gl.x, gl.z) < 25, 'sent to a corner, it circles there, over the map');
+  check(!gl.def.weapon && gl.def.speed > UNITS.raider.speed && gl.def.sight > UNITS.raider.sight, 'unarmed, but faster and sharper-eyed than a Sky Raider');
+}
+
 // ---- Healing ----
 {
   const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);

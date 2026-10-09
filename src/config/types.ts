@@ -11,7 +11,7 @@ export type Faction = 'atreides' | 'corrino' | 'fremen';
 export type UnitType =
   | 'harvester' | 'infantry' | 'trike' | 'tank' | 'rocket' | 'repair' | 'carryall'
   | 'trooper' | 'sardaukar' | 'razor' | 'devastator' | 'raider' | 'artillery'
-  | 'warrior' | 'fedaykin' | 'crew';
+  | 'warrior' | 'fedaykin' | 'crew' | 'glider';
 export type BuildingType =
   | 'conyard' | 'refinery' | 'barracks' | 'bunker' | 'factory' | 'hitech' | 'fab' | 'tleilaxu' | 'pad' | 'turret'
   | 'sietch' | 'thumper' | 'camp';
@@ -90,6 +90,8 @@ export interface UnitDef {
   mines?: { cooldown: number; trigger: number; max: number; weapon: WeaponDef };
   /** Fremen: digs into the sand when standing still on it, out of the enemy's sight (see HIDE in rules.ts). */
   hides?: boolean;
+  /** A glider: always on the move, it can't hover; with nowhere to go it circles this far (world units) around its spot. */
+  glides?: { orbit: number };
   /** Can plant a Thumper on the sand to call a wild Sandworm (see THUMPER and WORM in rules.ts). */
   thumper?: boolean;
   /** Deploys into this structure where it stands (a Spice Crew into a Spice Camp), and the structure packs back into it. */

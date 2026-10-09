@@ -2,7 +2,7 @@ import type { UnitDef, UnitType } from './types';
 
 export const UNIT_ORDER: UnitType[] = [
   'harvester', 'infantry', 'trike', 'tank', 'rocket', 'repair', 'carryall', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery',
-  'warrior', 'fedaykin', 'crew',
+  'warrior', 'fedaykin', 'crew', 'glider',
 ];
 
 export const UNITS: Record<UnitType, UnitDef> = {
@@ -119,5 +119,10 @@ export const UNITS: Record<UnitType, UnitDef> = {
     name: 'Spice Crew', producer: 'barracks', cost: 450, buildTime: 12, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
     turret: false, infantry: true, tags: ['biological', 'light'], weapon: null, requires: ['barracks'], hides: true, camp: 'camp',
     desc: 'Unarmed spice hunters. Walk them onto a spice field and Set Up Camp (D): the Spice Camp turns the spice around it into credits. Pack it up again when the spice runs out.',
+  },
+  glider: {
+    name: 'Wind Glider', producer: 'barracks', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,
+    turret: false, infantry: false, tags: ['light', 'air'], weapon: null, requires: ['sietch'], air: true, glides: { orbit: 8 },
+    desc: 'A Fremen rider on a cloth wing, riding the desert winds. The fastest thing in the sky and sees far, but unarmed and frail. It can\'t hover: with nowhere to go, it circles.',
   },
 };

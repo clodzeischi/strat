@@ -126,6 +126,12 @@ export class Unit extends Entity {
   moveZ = 0;
   /** Ambush: game time until which it deals the bonus damage of having struck out of hiding. */
   ambushUntil = 0;
+  /** Gliders: the spot they circle while they have nowhere to go (null: wherever they are when they next need one). */
+  orbitX: number | null = null;
+  orbitZ = 0;
+  /** Drawing only: gliders bank into their turns. */
+  private glideBank = 0;
+  private drawnHeading = 0;
   /** Seconds until the second gun (Devastator machine gun) can fire again. */
   private cooldown2 = 0;
   protected body: THREE.Group;
@@ -434,6 +440,10 @@ export class Unit extends Entity {
       this.updateDeployed(game, dt);
       return;
     }
+    if (this.def.glides) {
+      this.updateGlide(game, dt);
+      return;
+    }
 
     // Pick or drop the current target.
     if (this.order.kind === 'attack') {
@@ -531,6 +541,45 @@ export class Unit extends Entity {
     if (this.turret && !aiming) this.turretHeading = this.rotateToward(this.turretHeading, this.heading, 3 * dt);
     if (this.def.secondary) this.fireSecondary(game, dt);
     this.checkStuck(game, dt);
+  }
+
+  /**
+   * Gliders never stop: they fly at full speed, turning at their turn rate, toward where they've been sent; there (or
+   * with nowhere to go) they circle the spot, staying over the map.
+   */
+  private updateGlide(game: Game, dt: number): void {
+    const R = this.def.glides!.orbit;
+    const edge = game.map.worldSize();
+    const o = this.order;
+    let gx: number;
+    let gz: number;
+    if ((o.kind === 'move' || o.kind === 'amove') && hypot(o.x - this.x, o.z - this.z) > R * 0.5) {
+      gx = o.x;
+      gz = o.z;
+    } else {
+      if (o.kind !== 'idle') {
+        // Arrived (or an order it can't follow, like an attack): circle here.
+        this.order = { kind: 'idle' };
+        this.orbitX = o.kind === 'move' || o.kind === 'amove' ? o.x : this.x;
+        this.orbitZ = o.kind === 'move' || o.kind === 'amove' ? o.z : this.z;
+      }
+      if (this.orbitX === null) {
+        this.orbitX = this.x + Math.cos(this.heading) * R;
+        this.orbitZ = this.z + Math.sin(this.heading) * R;
+      }
+      // The circle stays over the map.
+      this.orbitX = THREE.MathUtils.clamp(this.orbitX, R + TILE, edge - R - TILE);
+      this.orbitZ = THREE.MathUtils.clamp(this.orbitZ, R + TILE, edge - R - TILE);
+      // Chase a point a little ahead on the circle (counterclockwise): from anywhere, that brings it onto the circle.
+      const a = Math.atan2(this.z - this.orbitZ, this.x - this.orbitX) + 0.7;
+      gx = this.orbitX + Math.cos(a) * R;
+      gz = this.orbitZ + Math.sin(a) * R;
+    }
+    this.path = [];
+    this.heading = this.rotateToward(this.heading, Math.atan2(gz - this.z, gx - this.x), this.def.turnRate * dt);
+    const v = this.speed(game) * dt;
+    this.x = THREE.MathUtils.clamp(this.x + Math.cos(this.heading) * v, TILE, edge - TILE);
+    this.z = THREE.MathUtils.clamp(this.z + Math.sin(this.heading) * v, TILE, edge - TILE);
   }
 
   /** Whether a target is within its weapon's reach from where it stands (not too close, not too far). */
@@ -1045,7 +1094,14 @@ export class Unit extends Entity {
       this.y += (groundY - this.y) * Math.min(1, dt * (this.def.air ? 3 : 10));
     }
     this.root.position.set(this.x, this.y, this.z);
-    if (this.falling || this.def.air) {
+    if (this.def.glides && !this.falling) {
+      // Banks into its turns, rocking a little on the wind.
+      const turn = dt > 0 ? wrapAngle(this.heading - this.drawnHeading) / dt : 0;
+      this.drawnHeading = this.heading;
+      this.glideBank += (THREE.MathUtils.clamp(-turn * 0.45, -0.6, 0.6) - this.glideBank) * Math.min(1, dt * 4);
+      // Roll about its own nose (+X) first, then turn to its heading.
+      this.body.rotation.set(this.glideBank + Math.sin(game.time * 1.7 + this.id) * 0.05, -this.heading, 0, 'YXZ');
+    } else if (this.falling || this.def.air) {
       this.body.rotation.set(0, -this.heading, Math.sin(game.time * 2.3 + this.id) * 0.08);
     } else if (this.def.infantry) {
       this.body.rotation.set(0, -this.heading, 0);

@@ -55,7 +55,7 @@ export const FACTIONS: Record<Faction, FactionDef> = {
   fremen: {
     name: 'Fremen',
     build: ['barracks', 'sietch', null, null, 'bunker', 'conyard', null, null],
-    train: ['warrior', 'fedaykin', null, null, 'crew', null, null, null],
+    train: ['warrior', 'fedaykin', null, null, 'crew', 'glider', null, null],
     research: [
       { levelUp: 'sietch' }, { upgrades: ['fWeapons'] }, { upgrades: ['fArmor'] }, { upgrades: ['ambush'] },
       { upgrades: ['stillsuit'] }, { upgrades: ['sandwalk'] }, { upgrades: ['fHarvest'] }, null,
