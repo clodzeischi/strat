@@ -23,7 +23,7 @@ interface FactionKit {
   scouts: UnitType[];
   /** Atreides: Repair Vehicles at home. Corrino: a Repair Pad. Fremen heal on their own. */
   mender: { unit: UnitType } | { building: BuildingType } | null;
-  /** Structures to put up once there's an army (Corrino's Tleilaxu Research; the Fremen Thumper once it's unlocked). */
+  /** Structures to put up once there's an army (Corrino's Tleilaxu Research). */
   tech: BuildingType[];
   levels: LevelUpType[];
   research: UpgradeType[];
@@ -43,9 +43,9 @@ const KITS: Record<Faction, FactionKit> = {
     levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'], fallback: 'trooper',
     worker: 'harvester',
   },
-  // The Sietch stands in for the factory (the second step of the opening); the Thumper is the late tech structure.
+  // The Sietch stands in for the factory (the second step of the opening).
   fremen: {
-    factory: 'sietch', defense: 'bunker', raider: 'warrior', scouts: ['warrior'], mender: null, tech: ['thumper'],
+    factory: 'sietch', defense: 'bunker', raider: 'warrior', scouts: ['warrior'], mender: null, tech: [],
     levels: ['sietch'], research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush'], fallback: 'warrior',
     worker: 'crew',
   },
@@ -119,7 +119,7 @@ export interface AIProfile {
 const BASE_MIX: Record<Matchup, number> = {
   infantry: 0.7, trike: 0.4, tank: 1, rocket: 1,
   trooper: 0.8, sardaukar: 0.7, razor: 0.5, devastator: 1, raider: 0.5, artillery: 0.4,
-  warrior: 1, fedaykin: 1, commando: 0.35, worm: 0.8,
+  warrior: 1, fedaykin: 1,
 };
 
 export const NORMAL_PROFILE: AIProfile = {
@@ -163,8 +163,7 @@ const DEFENSE_TIMEOUT = 4;
 
 /** 'garrison': on its way into one of our bunkers, or in it. */
 /** 'mend': pulled out of a fight to heal or be repaired; 'drop': on a Carryall operation (Brutal). */
-/** 'hunt': a Sandworm prowling the open desert on its own. */
-export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop' | 'hunt';
+export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -426,7 +425,7 @@ export class AI {
     else if (g.count(this.team, this.kit.defense) < this.profile.bunkers && barracks > 0 && (ts.credits > 900 || this.behindFor > 0)) want = this.kit.defense;
     else if (techBuilding && army >= this.profile.techArmy) want = techBuilding;
     else if (mender && !g.has(this.team, mender) && g.canBuild(this.team, mender) && army >= this.profile.techArmy) want = mender;
-    // Fremen train everything but worms at the Barracks: they want more of them, and only one Sietch.
+    // Fremen train everything at the Barracks: they want more of them, and only one Sietch.
     else if (barracks < (this.camps ? 3 : 2) && ts.credits > this.profile.more.barracks) want = 'barracks';
     else if (!this.camps && factories < 2 && ts.credits > this.profile.more.factory) want = this.kit.factory;
     else if (g.count(this.team, 'conyard') < 2 && ts.credits > 4000) want = 'conyard';
@@ -587,7 +586,7 @@ export class AI {
   private counterWeights(): [UnitType, number][] {
     const g = this.game;
     const roster = FACTIONS[this.ts.faction].train;
-    const options = (MATCHUP_TYPES as Matchup[]).filter((t) => roster.includes(t) && g.requirementsMet(this.team, g.unitDef(this.team, t).requires) && !g.atLimit(this.team, t));
+    const options = (MATCHUP_TYPES as Matchup[]).filter((t) => roster.includes(t) && g.requirementsMet(this.team, g.unitDef(this.team, t).requires));
     // The enemy army as we've seen it.
     const enemy = new Map<Matchup, number>();
     let total = 0;
@@ -659,7 +658,6 @@ export class AI {
     this.updateRally();
 
     this.manageCrews();
-    this.manageWorms(army);
     this.manageRepairs(army);
     this.managePads(army);
     this.manageAbilities(army);
@@ -692,7 +690,7 @@ export class AI {
     }
   }
 
-  // ---- Fremen economy and Sandworms ---------------------------------------------------------
+  // ---- Fremen economy ---------------------------------------------------------
 
   /** Where each Spice Crew on its way is going to set up camp. */
   private crewJobs = new Map<Unit, { x: number; z: number; since: number }>();
@@ -771,44 +769,6 @@ export class AI {
       }
     }
     return best;
-  }
-
-  /**
-   * Sandworms hunt on their own in the open desert: the nearest enemy unit we know of standing on sand or spice
-   * (harvesters first), else they travel with the wave that's out, else they wait on the sand near home. They join a
-   * defense when it's at home.
-   */
-  private manageWorms(army: Unit[]): void {
-    const g = this.game;
-    const m = g.map;
-    const onSand = (x: number, z: number) => m.canEnter(m.cellOf(x), m.cellOf(z), 'worm');
-    for (const u of army) {
-      if (!u.def.sandOnly || this.roles.get(u) === 'defend') continue;
-      this.roles.set(u, 'hunt');
-      if (u.target && !u.target.dead) continue;
-      let best: { x: number; z: number } | null = null;
-      let bestD = 45 * TILE;
-      for (const s of this.intel.placedUnits()) {
-        if (!onSand(s.x, s.z) || UNITS[s.type as UnitType]?.air) continue;
-        const d = hypot(s.x - u.x, s.z - u.z) - (s.harvester ? 15 * TILE : 0);
-        if (d < bestD) {
-          bestD = d;
-          best = s;
-        }
-      }
-      if (!best) {
-        const wave = this.waves.find((w) => w.units.size >= 3);
-        if (wave) {
-          const c = this.centroid(wave.units);
-          if (onSand(c.x, c.z)) best = c;
-        }
-      }
-      if (best) {
-        if (u.order.kind !== 'amove' || hypot(u.order.x - best.x, u.order.z - best.z) > 4 * TILE) u.command(g, { kind: 'amove', x: best.x, z: best.z });
-      } else if (u.order.kind === 'idle' && this.rally && hypot(u.x - this.rally.x, u.z - this.rally.z) > 12 * TILE) {
-        u.command(g, { kind: 'amove', x: this.rally.x, z: this.rally.z });
-      }
-    }
   }
 
   protected home(): Building | null {

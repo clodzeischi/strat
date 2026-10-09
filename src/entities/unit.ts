@@ -5,7 +5,7 @@ import {
 } from '../config';
 import type { Game } from '../game/game';
 import { findPath, type Point } from '../game/pathfinding';
-import { SAND, SPICE, type Cell, type MoveClass } from '../map';
+import { SAND, SPICE, type Cell } from '../map';
 import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit } from '../models';
 import { Building } from './building';
 import { distTo } from './distance';
@@ -37,7 +37,11 @@ export type Order =
    * what comes within reach, instead of driving into the fight. (x, z) is where the group is headed.
    */
   | { kind: 'escort'; group: Unit[]; x: number; z: number }
-  | { kind: 'enter'; target: Building };
+  | { kind: 'enter'; target: Building }
+  /** Hold Position: stay put, shooting only what comes within reach (no chasing, no backing off). */
+  | { kind: 'hold' }
+  /** Walk to (x, z) and plant a Thumper there (Fremen Warriors and Fedaykin). */
+  | { kind: 'plant'; x: number; z: number };
 
 /** An order waiting its turn (Shift+click): taken up once the unit has nothing else to do. */
 export type QueuedOrder =
@@ -51,13 +55,13 @@ export type QueuedOrder =
 const AIR_HEIGHT = CARRYALL.altitude - 2;
 
 /** Paratroopers come down at this speed; vehicles on their bigger canopies a little slower. */
-const FALL_SPEED = { foot: 2.2, vehicle: 1.7, worm: 1.7 };
+const FALL_SPEED = { foot: 2.2, vehicle: 1.7 };
 /** How far a hidden Fremen sinks into the sand (drawing). */
 const HIDDEN_SINK = 0.45;
 
-/** How a unit of this kind gets about: on foot, on wheels and tracks, or through the sand (Sandworms). */
-export function moveClassOf(def: UnitDef): MoveClass {
-  return def.sandOnly ? 'worm' : def.infantry ? 'foot' : 'vehicle';
+/** How a unit of this kind gets about: on foot, or on wheels and tracks. */
+export function moveClassOf(def: UnitDef): 'foot' | 'vehicle' {
+  return def.infantry ? 'foot' : 'vehicle';
 }
 /** Corrino drop pods come in fast from this high, braking at the last moment. */
 const POD = { height: 30, speed: 12 };
@@ -83,7 +87,7 @@ export class Unit extends Entity {
   readonly kind = 'unit';
   readonly def: UnitDef;
   readonly radius: number;
-  readonly moveClass: MoveClass;
+  readonly moveClass: 'foot' | 'vehicle';
   heading: number;
   turretHeading: number;
   order: Order = { kind: 'idle' };
@@ -116,6 +120,10 @@ export class Unit extends Entity {
   hidden = false;
   /** Teams (bit per team) with something close enough to see it even while it's hidden. */
   detected = 0;
+  /** When it last moved (more than a nudge), and from where: Sandworms only go after what moves. */
+  movedAt = 0;
+  moveX = 0;
+  moveZ = 0;
   /** Ambush: game time until which it deals the bonus damage of having struck out of hiding. */
   ambushUntil = 0;
   /** Seconds until the second gun (Devastator machine gun) can fire again. */
@@ -172,6 +180,8 @@ export class Unit extends Entity {
     this.z = z;
     this.hideX = x;
     this.hideZ = z;
+    this.moveX = x;
+    this.moveZ = z;
     this.lastX = x;
     this.lastZ = z;
     this.heading = heading;
@@ -260,7 +270,7 @@ export class Unit extends Entity {
     this.target = null;
     this.chasing = false;
     this.path = [];
-    if (order.kind === 'move' || order.kind === 'amove') this.setPath(game, order.x, order.z);
+    if (order.kind === 'move' || order.kind === 'amove' || order.kind === 'plant') this.setPath(game, order.x, order.z);
     if (order.kind === 'enter') this.setPath(game, order.target.x, order.target.z);
   }
 
@@ -438,17 +448,21 @@ export class Unit extends Entity {
       } else {
         this.target = this.order.target;
       }
-    } else if (weapon && (this.order.kind === 'idle' || this.order.kind === 'amove')) {
-      // Also dropped if it can't be hit at all (an aircraft that shot at a unit without anti-air).
+    } else if (weapon && (this.order.kind === 'idle' || this.order.kind === 'amove' || this.order.kind === 'hold')) {
+      const hold = this.order.kind === 'hold';
+      // Also dropped if it can't be hit at all (an aircraft that shot at a unit without anti-air), and on Hold
+      // Position once it's out of reach.
       const t = this.target;
-      if (t && (t.dead || !game.sees(this.team, t) || distTo(t, this.x, this.z) > this.def.sight * 1.3 || !game.weaponFor(this, t))) {
+      if (t && (t.dead || !game.sees(this.team, t) || distTo(t, this.x, this.z) > this.def.sight * 1.3 || !game.weaponFor(this, t) || (hold && !this.inReach(game, t)))) {
         this.target = null;
-        if (this.order.kind === 'idle') this.path = [];
+        if (this.order.kind !== 'amove') this.path = [];
       }
       if (!this.target && this.scanTimer <= 0) {
         this.scanTimer = 0.4 + game.random() * 0.2;
-        // Dug in, Fremen lie in wait: they only take on what walks into range, rather than give themselves away.
-        this.target = game.nearestEnemy(this.team, this.x, this.z, this.hidden ? weapon.range : this.def.sight, this);
+        // Dug in, Fremen lie in wait: they only take on what walks into range, rather than give themselves away;
+        // on Hold Position, anyone does.
+        const found = game.nearestEnemy(this.team, this.x, this.z, this.hidden || hold ? weapon.range : this.def.sight, this);
+        this.target = found && (!hold || this.inReach(game, found)) ? found : null;
       }
     } else {
       this.target = null;
@@ -480,6 +494,14 @@ export class Unit extends Entity {
         case 'escort':
           this.updateEscort(game, dt);
           break;
+        case 'plant':
+          // Close enough to the spot (or as close as it gets): plant the Thumper, and wait for orders.
+          if (this.followPath(game, dt) || hypot(this.order.x - this.x, this.order.z - this.z) < TILE) {
+            game.plantThumper(this, this.order.x, this.order.z);
+            this.order = { kind: 'idle' };
+            this.path = [];
+          }
+          break;
         case 'enter': {
           // Walk to the bunker and get in, if there's still room when we arrive.
           const b = this.order.target;
@@ -498,6 +520,7 @@ export class Unit extends Entity {
           }
           break;
         case 'attack':
+        case 'hold':
           break;
       }
     }
@@ -508,6 +531,14 @@ export class Unit extends Entity {
     if (this.turret && !aiming) this.turretHeading = this.rotateToward(this.turretHeading, this.heading, 3 * dt);
     if (this.def.secondary) this.fireSecondary(game, dt);
     this.checkStuck(game, dt);
+  }
+
+  /** Whether a target is within its weapon's reach from where it stands (not too close, not too far). */
+  private inReach(game: Game, t: Entity): boolean {
+    const w = game.weaponFor(this, t);
+    if (!w) return false;
+    const d = distTo(t, this.x, this.z);
+    return d >= w.minRange && d <= game.rangeFor(this, w, t);
   }
 
   /** The second gun shoots whatever ground enemy is in its short reach, whatever the hull or main gun is doing. */

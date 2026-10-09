@@ -14,7 +14,7 @@ import { Game } from '../src/game/game';
 import { FACTIONS, unitDef, type Faction, type Team, type UnitType } from '../src/config';
 
 const TYPES: UnitType[] = [
-  'infantry', 'trike', 'tank', 'rocket', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery', 'warrior', 'fedaykin', 'commando', 'worm',
+  'infantry', 'trike', 'tank', 'rocket', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery', 'warrior', 'fedaykin',
 ];
 const BUDGET = 4000;
 const SEEDS = [1003, 1007, 1012];

@@ -29,20 +29,19 @@ import { raider } from './units/raider';
 import { razor } from './units/razor';
 import { sardaukar } from './units/sardaukar';
 import { trooper } from './units/trooper';
-import { commando } from './units/commando';
 import { crew } from './units/crew';
 import { fedaykin } from './units/fedaykin';
 import { warrior } from './units/warrior';
-import { worm } from './units/worm';
 
 export type { BuildingModel, UnitModel, UpgradeKit, UpgradeLook } from './types';
 export { makeParachute } from './parachute';
 export { makePod } from './pod';
+export { makeSandworm, WORM_DEPTH, type SandwormModel } from './sandworm';
 export { CARRYALL_HOOK_Y, NACELLES, SEATS, SEAT_OFF, SEAT_ON } from './units/carryall';
 
 const UNIT_MODELS: Record<UnitType, UnitBlueprint> = {
   harvester, infantry, trike, tank, rocket, repair, carryall, trooper, sardaukar, razor, devastator, raider, artillery,
-  warrior, fedaykin, commando, crew, worm,
+  warrior, fedaykin, crew,
 };
 const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = {
   conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret, sietch, thumper, camp,

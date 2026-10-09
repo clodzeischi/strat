@@ -2,7 +2,7 @@ import type { UnitDef, UnitType } from './types';
 
 export const UNIT_ORDER: UnitType[] = [
   'harvester', 'infantry', 'trike', 'tank', 'rocket', 'repair', 'carryall', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery',
-  'warrior', 'fedaykin', 'commando', 'crew', 'worm',
+  'warrior', 'fedaykin', 'crew',
 ];
 
 export const UNITS: Record<UnitType, UnitDef> = {
@@ -102,34 +102,22 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: "Self-propelled howitzer with a short gun, and can't fire on the move. Deployed, it shells anything your side can see at long range; the shells are slow and fall where the target was. Brutal on buildings and defenses. Weak vs tanks.",
   },
 
-  // ---- Fremen: cheap, fast infantry that dig into the sand (`hides`); the Sandworm is the one big thing ----
+  // ---- Fremen: cheap, fast infantry that dig into the sand (`hides`), and call wild Sandworms with Thumpers ----
   warrior: {
     name: 'Fremen Warrior', producer: 'barracks', cost: 80, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
-    turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
+    turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true, thumper: true,
     weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -2 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true },
-    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers.',
+    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers. With a Sietch, plants Thumpers that call a Sandworm.',
   },
   fedaykin: {
     name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 230, speed: 3, turnRate: 12, radius: 0.5, sight: 11,
-    turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch'], hides: true,
+    turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch'], hides: true, thumper: true,
     weapon: { range: 7, minRange: 0, damage: 10, bonus: { mechanical: 20, armored: 4, structure: 6, biological: -3 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, air: true, pierce: true },
-    desc: 'Elite fighters with weirding modules: sonic weapons that tear vehicles apart and pass straight through shields. Strong vs vehicles and structures, can shoot at aircraft. Weak vs infantry.',
-  },
-  commando: {
-    name: 'Death Commando', producer: 'barracks', cost: 125, buildTime: 5, hp: 120, speed: 4, turnRate: 12, radius: 0.45, sight: 10,
-    turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch'], hides: true,
-    weapon: { range: 2.5, minRange: 0, damage: 60, bonus: { structure: 200, mechanical: 40 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 4, suicide: true },
-    desc: 'Runs up to its target and blows itself up, wrecking everything around it. Devastating vs structures, defenses and packed armies. Has to get there first.',
+    desc: 'Elite fighters with weirding modules: sonic weapons that tear vehicles apart and pass straight through shields. Strong vs vehicles and structures, can shoot at aircraft. Weak vs infantry. Plants Thumpers that call a Sandworm.',
   },
   crew: {
     name: 'Spice Crew', producer: 'barracks', cost: 450, buildTime: 12, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
     turret: false, infantry: true, tags: ['biological', 'light'], weapon: null, requires: ['barracks'], hides: true, camp: 'camp',
     desc: 'Unarmed spice hunters. Walk them onto a spice field and Set Up Camp (D): the Spice Camp turns the spice around it into credits. Pack it up again when the spice runs out.',
-  },
-  worm: {
-    name: 'Sandworm', producer: 'thumper', cost: 1500, buildTime: 30, hp: 2400, speed: 5, turnRate: 1.6, radius: 1.6, sight: 12,
-    turret: false, infantry: false, tags: ['biological', 'armored'], requires: ['thumper'], sandOnly: true, limit: 2,
-    weapon: { range: 3.4, minRange: 0, damage: 120, bonus: { mechanical: 120, structure: -80 }, cooldown: 2.2, projectile: 'bullet', speed: 0, splash: 2.5 },
-    desc: 'Shai-Hulud, ridden by Fremen. Huge and fast, swallows whatever is in front of it, vehicles above all. Only travels on sand and spice: it can\'t follow anyone onto rock. At most two.',
   },
 };

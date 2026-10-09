@@ -35,7 +35,7 @@ for (let k = 0; k < games; k++) {
   const ais = ([0, 1] as Team[]).map((t) => make(t, t === corrino ? cLevel : aLevel));
   const built: Partial<Record<UnitType, number>> = {};
   const seen = new Set<number>();
-  let deploys = 0, detonations = 0, mines = 0, pods = 0, padHeal = 0, mends = 0, camps = 0, hiddenSeconds = 0, commandos = 0;
+  let deploys = 0, detonations = 0, mines = 0, pods = 0, padHeal = 0, mends = 0, camps = 0, hiddenSeconds = 0;
   const campIds = new Set<number>();
   const wasDeployed = new Set<number>();
   const startDet = g.startDetonation.bind(g);
@@ -63,10 +63,13 @@ for (let k = 0; k < games; k++) {
     void before;
   }
   const s = g.teams[corrino].stats;
+  // Sandworms this side called, and the value of what they ate: the enemy's, and its own.
+  const worms = [...g.wormLog, ...g.worms].filter((w) => w.team === corrino);
   console.log(JSON.stringify({
     corrino: cLevel, atreides: aLevel, side: corrino, seed, result: g.winner === null ? 'timeout' : g.winner === corrino ? 'win' : 'loss', time: Math.round(g.time),
     killed: s.unitsKilled, lost: s.unitsLost, spice: Math.round(s.spiceHarvested), oppSpice: Math.round(g.teams[1 - corrino].stats.spiceHarvested),
     built, deploys, detonations, mines, pods, padSeconds: Math.round(padHeal), selfRepairSeconds: Math.round(mends),
-    camps, hiddenSeconds: Math.round(hiddenSeconds), factions: `${mine}-${theirs}`, variant: process.env.FREMEN_VARIANT ?? 'swarm',
+    camps, hiddenSeconds: Math.round(hiddenSeconds), worms: worms.length, wormEnemy: worms.reduce((a, w) => a + w.eatenEnemy, 0),
+    wormOwn: worms.reduce((a, w) => a + w.eatenOwn, 0), factions: `${mine}-${theirs}`, variant: process.env.FREMEN_VARIANT ?? 'swarm',
   }));
 }

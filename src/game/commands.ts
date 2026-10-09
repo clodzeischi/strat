@@ -18,6 +18,10 @@ export type Command =
   | { c: 'go'; units: number[]; x: number; z: number; target: number | null; attack: boolean; queue?: boolean }
   | { c: 'drop'; units: number[]; x: number; z: number }
   | { c: 'stop'; units: number[] }
+  /** Hold Position: stay put and shoot only what comes within reach. */
+  | { c: 'hold'; units: number[] }
+  /** Fremen: the nearest of these that can goes to (x, z) and plants a Thumper there. */
+  | { c: 'thump'; units: number[]; x: number; z: number }
   | { c: 'unload'; buildings: number[] }
   | { c: 'rally'; buildings: number[]; x: number; z: number }
   | { c: 'salvage'; buildings: number[] }
@@ -88,6 +92,16 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
         u.queue = [];
         u.command(game, { kind: 'idle' });
       }
+      return;
+    case 'hold':
+      for (const u of own(game, team, cmd.units)) {
+        u.queue = [];
+        if (u.def.weapon && !(u instanceof Carryall) && !u.def.air) u.command(game, { kind: 'hold' });
+        else u.command(game, { kind: 'idle' });
+      }
+      return;
+    case 'thump':
+      game.orderThumper(team, own(game, team, cmd.units), cmd.x, cmd.z);
       return;
     case 'unload':
       for (const id of cmd.buildings) {
@@ -160,9 +174,12 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
   }
 }
 
-/** Whether a unit has something to do first, so a queued order waits (Carryalls run their own errands: never). */
+/**
+ * Whether a unit has something to do first, so a queued order waits (Carryalls run their own errands: never; units
+ * holding position take a queued order straight away, as they would after Stop).
+ */
 function busy(u: Unit): boolean {
-  return !(u instanceof Carryall) && (u.order.kind !== 'idle' || u.queue.length > 0);
+  return !(u instanceof Carryall) && ((u.order.kind !== 'idle' && u.order.kind !== 'hold') || u.queue.length > 0);
 }
 
 /**

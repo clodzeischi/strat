@@ -19,7 +19,7 @@ const PAN_SPEED = 45;
 const TIER: Record<UnitType, number> = {
   carryall: 6, rocket: 5, repair: 4, tank: 3, trike: 2, infantry: 1, harvester: 0,
   devastator: 6, artillery: 5, raider: 4, sardaukar: 3, razor: 2, trooper: 1,
-  worm: 6, fedaykin: 4, commando: 3, warrior: 2, crew: 1,
+  fedaykin: 4, warrior: 2, crew: 1,
 };
 
 /** One kind of thing in the selection: a unit type or a building type. */
@@ -46,6 +46,8 @@ export class Input {
   dropMode = false;
   /** Lock On armed (MLRS): the next left click on an enemy locks the selected MLRS on to it. */
   lockMode = false;
+  /** Plant Thumper armed (Fremen): the next left click is where one of the selected Warriors or Fedaykin plants it. */
+  thumpMode = false;
   /** Waiting for a click on the selected production buildings' new rally point. */
   rallyMode = false;
   /** Rally All (Train tab): the next click sets the rally point of every production building, whatever is selected. */
@@ -147,10 +149,11 @@ export class Input {
     this.rallyMode = false;
     this.rallyAllMode = false;
     this.lockMode = false;
+    this.thumpMode = false;
   }
 
   private get armed(): boolean {
-    return !!this.placing || this.attackMode || this.dropMode || this.rallyMode || this.rallyAllMode || this.lockMode;
+    return !!this.placing || this.attackMode || this.dropMode || this.rallyMode || this.rallyAllMode || this.lockMode || this.thumpMode;
   }
 
   /** Shift held: orders join the end of the units' queues instead of replacing what they're doing. */
@@ -335,6 +338,32 @@ export class Input {
 
   stop(): void {
     if (this.canStop()) this.issue({ c: 'stop', units: this.ownUnits().map((u) => u.id) });
+  }
+
+  /** Hold Position for the selected armed ground units. */
+  canHold(): boolean {
+    return this.ownUnits().some((u) => u.def.weapon && !u.def.air);
+  }
+
+  hold(): void {
+    if (this.canHold()) this.issue({ c: 'hold', units: this.ownUnits().map((u) => u.id) });
+  }
+
+  /** Whether the selection has units that plant Thumpers. */
+  hasThumpers(): boolean {
+    return this.ownUnits().some((u) => !!u.def.thumper);
+  }
+
+  /** Arms Plant Thumper: the next left click is the spot (says why not, if the side can't plant one now). */
+  armThump(): void {
+    if (!this.hasThumpers()) return;
+    const why = this.game.thumpBlocked(this.team);
+    if (why) {
+      this.game.onMessage(why);
+      return;
+    }
+    this.disarm();
+    this.thumpMode = true;
   }
 
   canDrop(): boolean {
@@ -568,8 +597,7 @@ export class Input {
       } else {
         const g = this.game;
         const sand = FACTIONS[g.teams[this.team].faction].buildOnSand;
-        g.onMessage(BUILDINGS[this.placing].onSand ? 'A Thumper must stand on open sand, near your other structures.'
-          : sand ? 'Cannot build there. Structures go on level rock or sand (not spice), near your other structures.'
+        g.onMessage(sand ? 'Cannot build there. Structures go on level rock or sand (not spice), near your other structures.'
             : 'Cannot build there. Structures go on rock, near your base.');
       }
       return;
@@ -583,6 +611,13 @@ export class Input {
     if (this.dropMode) {
       this.dropMode = false;
       this.dropAt(p.x, p.y);
+      return;
+    }
+    if (this.thumpMode) {
+      this.thumpMode = false;
+      const g = this.groundPoint(p.x, p.y);
+      const planters = this.ownUnits().filter((u) => u.def.thumper);
+      if (g && planters.length) this.issue({ c: 'thump', units: planters.map((u) => u.id), x: g.x, z: g.z });
       return;
     }
     if (this.lockMode) {
@@ -699,6 +734,7 @@ export class Input {
     if (this.attackMode) this.orderAt(point, null, true);
     else if (this.dropMode) this.dropAtPoint(point);
     else if (this.rallyMode || this.rallyAllMode) this.setRally(x, z, this.rallyAllMode);
+    else if (this.thumpMode && this.hasThumpers()) this.issue({ c: 'thump', units: this.ownUnits().filter((u) => u.def.thumper).map((u) => u.id), x, z });
     else return false;
     this.actions++;
     this.disarm();
@@ -834,7 +870,7 @@ export class Input {
     let cursor = 'default';
     if (this.grab) cursor = 'grabbing';
     else if (this.placing) cursor = 'cell';
-    else if (this.attackMode || this.dropMode || this.rallyMode || this.rallyAllMode || this.lockMode) cursor = 'crosshair';
+    else if (this.attackMode || this.dropMode || this.rallyMode || this.rallyAllMode || this.lockMode || this.thumpMode) cursor = 'crosshair';
     else if (this.mouse.inside && this.ownUnits().length) {
       const t = this.pick(this.mouse.x, this.mouse.y);
       if (t && t.team !== this.team) cursor = 'crosshair';
@@ -850,6 +886,7 @@ export class Input {
     else if (this.attackMode) text = 'Attack-move: left-click a target or location.';
     else if (this.dropMode) text = 'Drop: left-click where to drop. Vehicles are set down; infantry jump on a fly-by.';
     else if (this.lockMode) text = 'Lock On: left-click an enemy. Rockets home in on it for a while.';
+    else if (this.thumpMode) text = 'Plant Thumper: left-click open sand or spice. The worm comes 10 s after it is planted.';
     else if (this.rallyMode) text = 'Rally point: left-click a spot, on the map or the minimap.';
     else if (this.rallyAllMode) text = 'Rally All: left-click a spot (or the minimap). New units from every production building go there.';
     else if (sel.length === 1) {

@@ -11,12 +11,12 @@ export type Faction = 'atreides' | 'corrino' | 'fremen';
 export type UnitType =
   | 'harvester' | 'infantry' | 'trike' | 'tank' | 'rocket' | 'repair' | 'carryall'
   | 'trooper' | 'sardaukar' | 'razor' | 'devastator' | 'raider' | 'artillery'
-  | 'warrior' | 'fedaykin' | 'commando' | 'crew' | 'worm';
+  | 'warrior' | 'fedaykin' | 'crew';
 export type BuildingType =
   | 'conyard' | 'refinery' | 'barracks' | 'bunker' | 'factory' | 'hitech' | 'fab' | 'tleilaxu' | 'pad' | 'turret'
   | 'sietch' | 'thumper' | 'camp';
 /** Buildings that train units. Each one of a type adds a parallel production line for that type. */
-export type Producer = 'barracks' | 'factory' | 'hitech' | 'fab' | 'thumper';
+export type Producer = 'barracks' | 'factory' | 'hitech' | 'fab';
 /** Buildings that can be upgraded to level 2 to unlock more tech. */
 export type LevelUpType = 'conyard' | 'factory' | 'barracks' | 'fab' | 'sietch';
 /** A tech requirement: a building, or a level-2 one. */
@@ -46,8 +46,6 @@ export interface WeaponDef {
   unguided?: boolean;
   /** Flamethrower: hits every enemy within range inside this half-angle (radians) around the aim. */
   cone?: number;
-  /** Firing it blows the shooter up (Death Commandos): a blast of `splash` around itself, and it's gone. */
-  suicide?: boolean;
   /** Passes straight through shields to health (sound: the Fedaykin's weirding modules). */
   pierce?: boolean;
 }
@@ -92,10 +90,8 @@ export interface UnitDef {
   mines?: { cooldown: number; trigger: number; max: number; weapon: WeaponDef };
   /** Fremen: digs into the sand when standing still on it, out of the enemy's sight (see HIDE in rules.ts). */
   hides?: boolean;
-  /** Only travels on sand and spice (the Sandworm). */
-  sandOnly?: boolean;
-  /** At most this many per side, alive or in production. */
-  limit?: number;
+  /** Can plant a Thumper on the sand to call a wild Sandworm (see THUMPER and WORM in rules.ts). */
+  thumper?: boolean;
   /** Deploys into this structure where it stands (a Spice Crew into a Spice Camp), and the structure packs back into it. */
   camp?: BuildingType;
 }
@@ -118,7 +114,7 @@ export interface BuildingDef {
   pad?: { slots: number; rate: number; range: number };
   /** Turns the spice within `radius` (world units) into credits, `rate` per second while there's enough of it (Spice Camp). */
   extract?: { rate: number; radius: number };
-  /** Has to stand on open sand (the Thumper). */
+  /** Has to stand on open sand or spice (the Thumper). */
   onSand?: boolean;
   /** Only comes from a unit deploying (not built at the Construction Yard). */
   deployed?: boolean;

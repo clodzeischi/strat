@@ -60,12 +60,12 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   // ---- Fremen (who also build on open sand) ----
   sietch: {
     name: 'Sietch', short: 'Sietch', cost: 1000, buildTime: 15, hp: 1400, size: 3, requires: ['barracks'],
-    desc: 'A Fremen stronghold. Unlocks Fedaykin, Death Commandos and research.',
-    levelUp: { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades the Sietch. Unlocks the Thumper, which calls Sandworms, and Ambush.' },
+    desc: 'A Fremen stronghold. Unlocks Fedaykin, Thumpers and research.',
+    levelUp: { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades the Sietch. Unlocks Ambush.' },
   },
   thumper: {
-    name: 'Thumper', short: 'Thumper', cost: 600, buildTime: 12, hp: 500, size: 1, requires: ['sietch2'], onSand: true,
-    desc: 'Drums on the sand to call a Sandworm. Must stand on open sand. Each Thumper adds a production line.',
+    name: 'Thumper', short: 'Thumper', cost: 200, buildTime: 0, hp: 150, size: 1, requires: ['sietch'], onSand: true, deployed: true,
+    desc: 'Planted in the sand by a Warrior or Fedaykin, it drums until a wild Sandworm comes. The worm swallows whatever moves on the sand around it, whoever it belongs to, and harvesters even standing still. Destroy it before then and no worm comes.',
   },
   camp: {
     name: 'Spice Camp', short: 'Spice Camp', cost: 450, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 10, radius: 7 },

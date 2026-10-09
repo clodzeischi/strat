@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, TILE, UPGRADES, reqName, shieldsFor,
+  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, THUMPER, TILE, UPGRADES, WORM, reqName, shieldsFor,
   type BuildingType, type LevelUpType, type Req, type ResearchSlot, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
 import { Building, SALVAGE, Unit } from '../entities';
@@ -87,7 +87,7 @@ export class CommandCard {
   /** The selection's lead kind last frame, to follow Tab. */
   private lead: string | null = null;
   /** Command tab buttons by name, laid out per selection in `commandLayout`. */
-  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine' | 'lock' | 'setup' | 'pack', Slot>;
+  private commands: Record<'attack' | 'stop' | 'hold' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine' | 'lock' | 'setup' | 'pack' | 'thump', Slot>;
   private tabEls: { el: HTMLElement; key: HTMLElement; bar: HTMLElement; badge: HTMLElement; state: string }[] = [];
   private cells: CardEl[] = [];
   private slots: Record<Tab, (Slot | null)[]>;
@@ -213,9 +213,12 @@ export class CommandCard {
     }
     if (!this.input.ownUnits().length) return [];
     const u = lead instanceof Unit ? lead : null;
-    // D: the kind's ability (Carryall drop, Artillery deploy, Sky Raider mine). V, out of the way: self-destruct.
-    const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : u?.def.lockOn ? c.lock : u?.def.camp ? c.setup : null;
-    return [c.attack, c.stop, ability, null, null, null, null, u?.def.detonate ? c.detonate : null];
+    // D: the kind's ability (Carryall drop, Artillery deploy, Sky Raider mine, Plant Thumper). F: Hold Position. V,
+    // out of the way: self-destruct.
+    const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : u?.def.lockOn ? c.lock : u?.def.camp ? c.setup
+      : u?.def.thumper ? c.thump : null;
+    const hold = this.input.canHold() ? c.hold : null;
+    return [c.attack, c.stop, ability, hold, null, null, null, u?.def.detonate ? c.detonate : null];
   }
 
   private use(i: number): void {
@@ -304,7 +307,7 @@ export class CommandCard {
           const building = queue.slice(0, lines).filter((q) => q.type === t);
           return {
             locked: !queued && !g.requirementsMet(g.localTeam, d.requires),
-            disabled: !g.canTrain(g.localTeam, t) || g.atLimit(g.localTeam, t),
+            disabled: !g.canTrain(g.localTeam, t),
             progress: queued ? Math.max(0, ...building.map((q) => q.progress)) : null,
             badge: queued > 1 ? `${queued}` : '',
           };
@@ -407,6 +410,27 @@ export class CommandCard {
         'Then click a spot (or the minimap): units move there, fighting anything they meet on the way. Click an enemy to attack it.',
         () => input.canAttackMove(), () => input.attackMode, () => input.attackMove()),
       stop: command('stop', 'Stop', 'Selected units stop what they are doing.', () => input.canStop(), () => false, () => input.stop()),
+      hold: command('hold', 'Hold Position',
+        "Selected units stay where they are and shoot only what comes within reach: they don't chase or back off. Standing still, they don't draw Sandworms either.",
+        () => input.canHold(), () => input.ownUnits().some((u) => u.order.kind === 'hold'), () => input.hold()),
+      thump: {
+        icon: () => 'thump',
+        name: () => 'Plant Thumper',
+        cost: () => THUMPER.cost,
+        tip: () => `Then click open sand or spice: the nearest selected Warrior or Fedaykin goes there and plants a Thumper. ${THUMPER.delay} s later a wild Sandworm comes up there and for ${WORM.hunt} s swallows whatever moves on the sand within ${WORM.range} of it, harvesters even standing still, and structures on the sand. It eats your units too: get off the sand, or stand still (Hold Position). Enemies nearby hear it drumming; destroy it in time and no worm comes. One at a time, every ${THUMPER.cooldown} s. Needs a Sietch.`,
+        view: () => {
+          const g = this.game;
+          const due = g.drumDue(g.localTeam);
+          const wait = Math.max(0, this.ts.nextThumper - g.time);
+          return {
+            disabled: !g.has(g.localTeam, 'sietch'),
+            locked: !g.has(g.localTeam, 'sietch'),
+            active: input.thumpMode || due !== null,
+            status: due !== null ? `${Math.ceil(due)}` : wait > 0 ? `${Math.ceil(wait)}` : '',
+          };
+        },
+        use: () => input.armThump(),
+      },
       drop: command('drop', 'Drop', 'Selected Carryalls: then click where to set down their load (or the minimap). Infantry jump on a fly-by.',
         () => input.canDrop(), () => input.dropMode, () => input.drop()),
       unload: command('unload', 'Unload', 'Selected bunkers let their infantry out.', () => input.canUnload(), () => false, () => input.unload()),

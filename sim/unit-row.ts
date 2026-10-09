@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
 import { FACTIONS, unitDef, type Faction, type Team, type UnitType } from '../src/config';
-const OPP: UnitType[] = ['infantry', 'trike', 'tank', 'rocket', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery', 'warrior', 'fedaykin', 'commando', 'worm'];
+const OPP: UnitType[] = ['infantry', 'trike', 'tank', 'rocket', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery', 'warrior', 'fedaykin'];
 const factionOf = (t: UnitType): Faction => (FACTIONS.corrino.train.includes(t) ? 'corrino' : FACTIONS.fremen.train.includes(t) ? 'fremen' : 'atreides');
 function duel(a: UnitType, b: UnitType, seed: number, swap: boolean): number {
   const [ta, tb]: Team[] = swap ? [1, 0] : [0, 1];

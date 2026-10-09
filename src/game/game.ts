@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   AMBUSH, ARMOR_BONUS, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS,
-  TEAM_COLORS, TILE, UNITS, UPGRADES, WEAPONS_BONUS, factionLevelUps, factionUpgrades, unitDef,
+  TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
   type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
@@ -11,7 +11,8 @@ import { Effects } from '../render/effects/effects';
 import { Building, Carryall, distTo, facingToward, moveClassOf, repairable, SALVAGE, Unit, type Entity } from '../entities';
 import { CLIFF, GameMap, ROCK, SAND, SPICE, type Cell, type MoveClass } from '../map';
 import { mat } from '../materials/lambert';
-import { cellsAround } from './pathfinding';
+import { makeSandworm, WORM_DEPTH, type SandwormModel } from '../models';
+import { cellsAround, findPath, type Point } from './pathfinding';
 import { Terrain } from '../render/terrain';
 import { Hasher, mulberry32 } from './rng';
 import { Vision, VISION_EVERY } from './vision';
@@ -51,6 +52,8 @@ export interface TeamState {
   levelUps: Partial<Record<LevelUpType, { building: Building; progress: number }>>;
   /** Round-robin counter so units leave from each building of a type in turn. */
   spawnTurn: Record<Producer, number>;
+  /** Fremen: game time the next Thumper can be planted. */
+  nextThumper: number;
 }
 
 /**
@@ -89,6 +92,49 @@ interface Mine {
   trigger: number;
   weapon: WeaponDef;
   mesh: THREE.Mesh;
+}
+
+/** A planted Thumper drumming for a worm. */
+interface Drum {
+  b: Building;
+  /** Game time the worm comes. */
+  due: number;
+  /** When its drumming next gives it away, and to which sides it already has (bit per team). */
+  nextReveal: number;
+  heard: number;
+}
+
+/**
+ * A wild Sandworm called by a Thumper (see WORM in rules.ts): nobody's, it can't be hurt, and it eats anyone on the
+ * sand. It travels under the sand toward its prey and bites when it's right under it.
+ */
+export interface Sandworm {
+  /** The side whose Thumper called it (it eats them too). */
+  team: Team;
+  x: number;
+  z: number;
+  heading: number;
+  /** Where the Thumper stood: it only hunts within WORM.range of here. */
+  lairX: number;
+  lairZ: number;
+  /** Game time the hunt ends and it goes back down. */
+  until: number;
+  /** Game time of its last bite, and when it can bite again. */
+  bitAt: number;
+  nextBite: number;
+  target: Entity | null;
+  path: Point[];
+  repath: number;
+  /** Prey it couldn't reach (cut off by rock), by id. */
+  unreachable: Set<number>;
+  /** Value of what it swallowed: the caller's own, and everyone else's. */
+  eatenOwn: number;
+  eatenEnemy: number;
+  /** Drawing only. */
+  model: SandwormModel;
+  from: THREE.Vector3;
+  to: THREE.Vector3;
+  dustTimer: number;
 }
 
 const MINE_ARM = 1;
@@ -138,6 +184,11 @@ export class Game {
   private projectiles: Projectile[] = [];
   /** Mines on the ground, oldest first. Nobody's are hidden: they're area denial, not traps. */
   mines: Mine[] = [];
+  /** Thumpers drumming for a worm, and the wild Sandworms they called. */
+  private drums: Drum[] = [];
+  worms: Sandworm[] = [];
+  /** Worms that have gone back down, with what they ate (for the sims). */
+  wormLog: { team: Team; eatenOwn: number; eatenEnemy: number }[] = [];
   private lastAlert = -100;
   private lastDropAlert = -100;
   private victoryTimer = 0;
@@ -157,8 +208,8 @@ export class Game {
         unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
         spiceHarvested: 0, creditsSpent: 0,
       },
-      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [], thumper: [] }, research: null,
-      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0, thumper: 0 }, levelUps: {},
+      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [] }, research: null,
+      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0 }, levelUps: {}, nextThumper: 0,
     }));
     this.vision = new Vision(this.map, this.teams.length);
     this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
@@ -237,13 +288,6 @@ export class Game {
     return FACTIONS[this.teams[team].faction].train.includes(type) && this.has(team, d.producer) && this.requirementsMet(team, d.requires);
   }
 
-  /** Whether the team already has as many of a limited unit (Sandworms) as it may, counting ones in production. */
-  atLimit(team: Team, type: UnitType): boolean {
-    const d = this.unitDef(team, type);
-    if (!d.limit) return false;
-    return this.count(team, type) + this.teams[team].queues[d.producer].filter((q) => q.type === type).length >= d.limit;
-  }
-
   canResearch(team: Team, type: UpgradeType): boolean {
     const d = UPGRADES[type];
     const ups = this.teams[team].upgrades;
@@ -278,9 +322,6 @@ export class Game {
       let score = d + penalty;
       const w = seeker && this.weaponFor(seeker, e);
       if (seeker && !w) return; // e.g. an aircraft and no anti-air weapon
-      // A Death Commando doesn't go after what it can't catch (trikes and the like would just lead it about), unless
-      // it's right there.
-      if (w?.suicide && e instanceof Unit && seeker instanceof Unit && e.def.speed > seeker.def.speed && d > w.range + 2) return;
       if (w) {
         const ratio = THREE.MathUtils.clamp(weaponDamage(w, e) / w.damage - 1, -1, 2);
         score -= ratio * 4;
@@ -422,9 +463,9 @@ export class Game {
     return this.inBuildRange(type, team, cx, cz);
   }
 
-  /** The ground a team may build this on: rock, and for Fremen open sand too; a Thumper only on sand; a camp on spice too. */
+  /** The ground a team may build this on: rock, and for Fremen open sand too; a Thumper only on sand or spice; a camp on spice too. */
   private groundFor(team: Team, type?: BuildingType): (t: number) => boolean {
-    if (type && BUILDINGS[type].onSand) return (t) => t === SAND;
+    if (type && BUILDINGS[type].onSand) return (t) => t === SAND || t === SPICE;
     if (type && BUILDINGS[type].deployed) return (t) => t !== CLIFF;
     return FACTIONS[this.teams[team].faction].buildOnSand ? (t) => t === ROCK || t === SAND : (t) => t === ROCK;
   }
@@ -467,6 +508,7 @@ export class Game {
     const u = type === 'carryall' ? new Carryall(this.nextId++, team, x, z, heading) : new Unit(this.nextId++, team, type, x, z, heading, faction);
     u.y = this.map.surfaceAt(x, z);
     u.stillSince = this.time;
+    u.movedAt = this.time;
     u.stagger(this.random);
     u.syncVisual(this, 0);
     this.scene.add(u.root);
@@ -688,10 +730,6 @@ export class Game {
     const ts = this.teams[team];
     const queue = ts.queues[this.unitDef(team, type).producer];
     if (!this.canTrain(team, type)) return false;
-    if (this.atLimit(team, type)) {
-      this.notifyTeam(team, `You can have at most ${this.unitDef(team, type).limit} of those.`);
-      return false;
-    }
     if (queue.length >= QUEUE_MAX) {
       this.notifyTeam(team, 'Production queue full.');
       return false;
@@ -829,15 +867,6 @@ export class Game {
     }
     const from = u.muzzleWorld();
     const to = target.aimPoint();
-    if (w.suicide && u instanceof Unit) {
-      // Death Commando: the charge goes off where it stands, and so does it. What it ran at takes the whole charge.
-      this.blast(u.x, u.z, w, mult, u, u.team, w.range + target.radius + 1);
-      this.effects.explosion(u.aimPoint(), 2.2);
-      this.effects.dust(new THREE.Vector3(u.x, this.map.surfaceAt(u.x, u.z) + 0.2, u.z), 0xd8c49a, 1.6);
-      u.hp = 0;
-      this.kill(u, null);
-      return;
-    }
     if (w.cone) {
       this.flame(u, target, w, mult, from);
       return;
@@ -847,11 +876,7 @@ export class Game {
       to.x += (Math.random() - 0.5) * 0.5;
       to.z += (Math.random() - 0.5) * 0.5;
       this.effects.tracer(from, to);
-      if (w.splash > 0) {
-        // A Sandworm's bite: the target takes it whole, whatever is next to it some of it.
-        this.blast(target.x, target.z, w, mult, u, u.team, Infinity);
-        this.effects.dust(new THREE.Vector3(target.x, this.map.surfaceAt(target.x, target.z) + 0.3, target.z), 0xd8b080, 1.4);
-      } else this.damage(target, w, mult, u);
+      this.damage(target, w, mult, u);
       return;
     }
     const mesh = new THREE.Mesh(w.projectile === 'shell' ? shellGeo : rocketGeo, mat(w.projectile === 'shell' ? 0x403020 : 0xeeeeee));
@@ -966,7 +991,7 @@ export class Game {
       // A harvester under fire calls its Carryall to fly it home.
       if (target.type === 'harvester') this.ferryFor(target)?.rescue(this, target);
     }
-    const important = target instanceof Building || (target as Unit).type === 'harvester';
+    const important = (target instanceof Building && target.type !== 'thumper') || (target as Unit).type === 'harvester';
     if (target.team === this.localTeam && important && this.time - this.lastAlert > 15) {
       this.lastAlert = this.time;
       this.onMessage(target instanceof Building ? 'Our base is under attack!' : 'Harvester under attack!');
@@ -1069,7 +1094,7 @@ export class Game {
 
   /** Puts an infantry unit into its own team's bunker, if there's room. */
   enterBunker(u: Unit, b: Building): boolean {
-    if (!u.def.infantry || u.def.weapon?.suicide || u.team !== b.team || b.dead || b.room <= 0 || u.carrier) return false;
+    if (!u.def.infantry || u.team !== b.team || b.dead || b.room <= 0 || u.carrier) return false;
     u.carrier = b;
     u.path = [];
     u.target = null;
@@ -1278,6 +1303,12 @@ export class Game {
    */
   private updateHiding(visionTick: boolean): void {
     for (const u of this.units) {
+      // Anyone: when it last moved (Sandworms only go after what moves).
+      if (u.carrier || u.falling || hypot(u.x - u.moveX, u.z - u.moveZ) > 0.3) {
+        u.moveX = u.x;
+        u.moveZ = u.z;
+        u.movedAt = this.time;
+      }
       if (!u.def.hides) continue;
       if (u.carrier || u.falling || hypot(u.x - u.hideX, u.z - u.hideZ) > 0.3) {
         u.hideX = u.x;
@@ -1525,6 +1556,283 @@ export class Game {
     }
   }
 
+  // ---- Thumpers and wild Sandworms ---------------------------------------------------
+
+  /** Why a team can't plant a Thumper now (no Sietch, still recharging, one already out, no credits), or null if it can. */
+  thumpBlocked(team: Team): string | null {
+    const ts = this.teams[team];
+    if (!this.has(team, 'sietch')) return 'Thumpers need a Sietch.';
+    if (this.drums.some((d) => d.b.team === team) || this.worms.some((w) => w.team === team)) return 'The worm you called is still about.';
+    if (this.time < ts.nextThumper) return `Next Thumper in ${Math.ceil(ts.nextThumper - this.time)} s.`;
+    if (ts.credits < THUMPER.cost) return 'Insufficient funds.';
+    return null;
+  }
+
+  /** Tells the unit among these nearest to (x, z) that can plant a Thumper to go and plant one there. */
+  orderThumper(team: Team, units: Unit[], x: number, z: number): boolean {
+    const why = this.thumpBlocked(team);
+    if (why) {
+      this.notifyTeam(team, why);
+      return false;
+    }
+    let best: Unit | null = null;
+    for (const u of units) {
+      if (!u.def.thumper || u.dead || u.carrier || u.falling) continue;
+      if (!best || hypot(u.x - x, u.z - z) < hypot(best.x - x, best.z - z)) best = u;
+    }
+    if (!best) return false;
+    best.queue = [];
+    best.command(this, { kind: 'plant', x, z });
+    return true;
+  }
+
+  /** The open sand or spice cell nearest (x, z), within two cells, where a Thumper can go (the planter may stand on it). */
+  private thumperSpot(u: Unit, x: number, z: number): Cell | null {
+    const m = this.map;
+    const ok = (cx: number, cz: number) => this.tileBuildable(cx, cz, m.level[m.idx(cx, cz)], u.team, 'thumper', u);
+    return m.nearestCell(m.cellOf(x), m.cellOf(z), ok, 2);
+  }
+
+  /** A unit that can (Warrior, Fedaykin) plants a Thumper by (x, z), paying for it. Says why if it can't. */
+  plantThumper(u: Unit, x: number, z: number): boolean {
+    if (!u.def.thumper || u.dead) return false;
+    const why = this.thumpBlocked(u.team);
+    const spot = why ? null : this.thumperSpot(u, x, z);
+    if (why || !spot) {
+      this.notifyTeam(u.team, why ?? 'A Thumper needs open, level sand or spice.');
+      return false;
+    }
+    const ts = this.teams[u.team];
+    this.spend(ts, THUMPER.cost);
+    ts.nextThumper = this.time + THUMPER.cooldown;
+    const b = this.placeBuilding('thumper', u.team, spot.cx, spot.cz);
+    this.drums.push({ b, due: this.time + THUMPER.delay, nextReveal: this.time, heard: 0 });
+    this.notifyTeam(u.team, `Thumper planted. The worm comes in ${THUMPER.delay} s: get off the sand, or stand still.`);
+    return true;
+  }
+
+  /** Seconds until a team's Thumper brings its worm (null if none is drumming). */
+  drumDue(team: Team): number | null {
+    const d = this.drums.find((d) => d.b.team === team);
+    return d ? Math.max(0, d.due - this.time) : null;
+  }
+
+  /**
+   * Drumming Thumpers give themselves away to any side with something near enough to hear them, and call their worm
+   * when the time comes; one destroyed before then calls nothing.
+   */
+  private updateDrums(): void {
+    for (const d of [...this.drums]) {
+      const b = d.b;
+      if (b.dead) {
+        this.drums.splice(this.drums.indexOf(d), 1);
+        this.notifyTeam(b.team, 'Our Thumper was destroyed. No worm will come.');
+        continue;
+      }
+      if (this.time >= d.nextReveal) {
+        d.nextReveal += THUMPER.revealEvery;
+        for (const ts of this.teams) {
+          if (ts.team === b.team) continue;
+          const near = (e: Entity) => e.team === ts.team && !e.dead && hypot(e.x - b.x, e.z - b.z) <= THUMPER.hear;
+          if (!this.units.some((u) => near(u) && !u.carrier) && !this.buildings.some(near)) continue;
+          this.vision.reveal(ts.team, b.x, b.z, this.ticks);
+          if (!(d.heard & (1 << ts.team))) {
+            d.heard |= 1 << ts.team;
+            this.notifyTeam(ts.team, 'A Thumper is drumming nearby: a Sandworm is coming. Destroy it, or get off the sand!');
+          }
+        }
+      }
+      if (this.time < d.due) continue;
+      this.drums.splice(this.drums.indexOf(d), 1);
+      this.callWorm(b);
+    }
+  }
+
+  /** The worm comes up where the Thumper stands, swallowing it and whatever is around it, and starts its hunt. */
+  private callWorm(b: Building): void {
+    const model = makeSandworm();
+    model.root.position.set(b.x, this.map.surfaceAt(b.x, b.z), b.z);
+    this.scene.add(model.root);
+    const w: Sandworm = {
+      team: b.team, x: b.x, z: b.z, heading: 0, lairX: b.x, lairZ: b.z, until: this.time + WORM.hunt, bitAt: -Infinity, nextBite: 0,
+      target: null, path: [], repath: 0, unreachable: new Set(), eatenOwn: 0, eatenEnemy: 0,
+      model, from: model.root.position.clone(), to: model.root.position.clone(), dustTimer: 0,
+    };
+    this.worms.push(w);
+    this.remove(b);
+    for (const ts of this.teams) {
+      const near = (e: Entity) => e.team === ts.team && !e.dead && hypot(e.x - b.x, e.z - b.z) <= WORM.range + 10 * TILE;
+      if (ts.team === b.team) this.notifyTeam(ts.team, 'Shai-Hulud has come.');
+      else if (this.units.some(near) || this.buildings.some(near)) this.notifyTeam(ts.team, 'Wormsign! Get off the sand!');
+    }
+    this.wormBite(w, b.x, b.z);
+  }
+
+  /** Whether the worm can get at a unit: on open sand or spice (not rock, not a ramp), on the ground. */
+  private onWormGround(x: number, z: number): boolean {
+    const m = this.map;
+    const cx = m.cellOf(x);
+    const cz = m.cellOf(z);
+    if (!m.inBounds(cx, cz)) return false;
+    const i = m.idx(cx, cz);
+    return (m.tiles[i] === SAND || m.tiles[i] === SPICE) && m.ramp[i] === 0;
+  }
+
+  /** Whether any of a structure's footprint is on sand or spice (where the worm can come up under it). */
+  private onSandFootprint(b: Building): boolean {
+    const m = this.map;
+    for (let z = b.cz; z < b.cz + b.size; z++) {
+      for (let x = b.cx; x < b.cx + b.size; x++) {
+        const t = m.tile(x, z);
+        if (t === SAND || t === SPICE) return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Whether the worm goes after this: within its hunting ground, on the sand, and loud. Units are loud while they
+   * move (harvesters always: their machinery never stops); structures on the sand always are.
+   */
+  private wormPrey(w: Sandworm, e: Entity | null): e is Entity {
+    if (!e || e.dead || w.unreachable.has(e.id)) return false;
+    if (e instanceof Unit) {
+      if (e.def.air || e.carrier || e.falling) return false;
+      if (e.type !== 'harvester' && this.time - e.movedAt >= WORM.still) return false;
+      if (!this.onWormGround(e.x, e.z)) return false;
+      return hypot(e.x - w.lairX, e.z - w.lairZ) <= WORM.range;
+    }
+    return e instanceof Building && distTo(e, w.lairX, w.lairZ) <= WORM.range && this.onSandFootprint(e);
+  }
+
+  /** What the worm goes for next: the nearest prey, economy first (harvesters and camps), structures last. */
+  private wormTarget(w: Sandworm): Entity | null {
+    let best: Entity | null = null;
+    let bestScore = Infinity;
+    const consider = (e: Entity, bias: number) => {
+      if (!this.wormPrey(w, e)) return;
+      const score = distTo(e, w.x, w.z) + bias;
+      if (score < bestScore) {
+        bestScore = score;
+        best = e;
+      }
+    };
+    for (const u of this.units) consider(u, u.type === 'harvester' ? -12 : 0);
+    for (const b of this.buildings) consider(b, b.def.extract ? -12 : 8);
+    return best;
+  }
+
+  /** Worms hunt: under the sand toward their prey, biting when they're under it, until their time is up. */
+  private updateWorms(dt: number): void {
+    for (const w of [...this.worms]) {
+      w.from.copy(w.to);
+      const resting = this.time < w.bitAt + 1.2;
+      if (this.time >= w.until && !resting) {
+        // Back down into the deep desert.
+        this.worms.splice(this.worms.indexOf(w), 1);
+        this.wormLog.push({ team: w.team, eatenOwn: w.eatenOwn, eatenEnemy: w.eatenEnemy });
+        this.scene.remove(w.model.root);
+        this.effects.dust(new THREE.Vector3(w.x, this.map.surfaceAt(w.x, w.z) + 0.2, w.z), 0xd8c49a, 2);
+        continue;
+      }
+      if (resting || this.time >= w.until) continue;
+      if (!this.wormPrey(w, w.target) || this.ticks % 10 === 0) {
+        const t = this.wormTarget(w);
+        if (t !== w.target) w.path = [];
+        w.target = t;
+      }
+      const t = w.target;
+      if (!t) continue;
+      if (distTo(t, w.x, w.z) <= WORM.reach && this.time >= w.nextBite) {
+        this.wormBite(w, t.x, t.z);
+        continue;
+      }
+      w.repath -= dt;
+      if (w.repath <= 0 || !w.path.length) {
+        w.repath = 0.5;
+        w.path = findPath(this.map, w.x, w.z, t.x, t.z, 'worm');
+        // Cut off by rock: it can't get closer than this, so it leaves that one alone.
+        const end = w.path[w.path.length - 1];
+        if (!end || distTo(t, end.x, end.z) > WORM.reach + TILE) {
+          w.unreachable.add(t.id);
+          w.target = null;
+          w.path = [];
+          continue;
+        }
+      }
+      let step = WORM.speed * dt;
+      while (step > 0 && w.path.length) {
+        const p = w.path[0];
+        const d = hypot(p.x - w.x, p.z - w.z);
+        if (d <= step) {
+          w.x = p.x;
+          w.z = p.z;
+          step -= d;
+          w.path.shift();
+        } else {
+          w.heading = Math.atan2(p.z - w.z, p.x - w.x);
+          w.x += ((p.x - w.x) / d) * step;
+          w.z += ((p.z - w.z) / d) * step;
+          step = 0;
+        }
+      }
+    }
+    for (const w of this.worms) w.to.set(w.x, this.map.surfaceAt(w.x, w.z), w.z);
+  }
+
+  /** The worm surges up at (x, z): everything on the sand within WORM.bite of it takes the bite, whoever's it is. */
+  private wormBite(w: Sandworm, x: number, z: number): void {
+    w.x = x;
+    w.z = z;
+    w.bitAt = this.time;
+    w.nextBite = this.time + WORM.biteEvery;
+    w.target = null;
+    w.path = [];
+    const victims: Entity[] = [
+      ...this.units.filter((u) => !u.dead && !u.def.air && !u.carrier && !u.falling && this.onWormGround(u.x, u.z) && distTo(u, x, z) <= WORM.bite),
+      ...this.buildings.filter((b) => !b.dead && this.onSandFootprint(b) && distTo(b, x, z) <= WORM.bite),
+    ];
+    for (const v of victims) {
+      this.damage(v, WORM.weapon, 1, null);
+      if (!v.dead) continue;
+      const value = v instanceof Unit ? v.def.cost : BUILDINGS[(v as Building).type].cost;
+      if (v.team === w.team) w.eatenOwn += value;
+      else w.eatenEnemy += value;
+    }
+    const ground = this.map.surfaceAt(x, z);
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2;
+      this.effects.dust(new THREE.Vector3(x + Math.cos(a) * 2.5, ground + 0.3, z + Math.sin(a) * 2.5), 0xd8b080, 1.8);
+    }
+  }
+
+  /** Drawing: worms between ticks, rearing up out of the sand when they bite, a ridge of sand while they travel. */
+  private drawWorms(dt: number, alpha: number): void {
+    const now = this.time + alpha * 0.05;
+    for (const w of this.worms) {
+      const { root, body, ridge } = w.model;
+      root.position.lerpVectors(w.from, w.to, alpha);
+      root.rotation.y = -w.heading;
+      // Rears up fast, holds a moment with its maw open, then sinks back.
+      const since = now - w.bitAt;
+      const up = since < 0.3 ? since / 0.3 : since < 0.7 ? 1 : since < 1.5 ? 1 - (since - 0.7) / 0.8 : 0;
+      body.position.y = -WORM_DEPTH + (WORM_DEPTH + 1.2) * up * (2 - up);
+      body.visible = up > 0;
+      const travelling = w.path.length > 0 && up === 0;
+      ridge.visible = up === 0;
+      ridge.scale.y = travelling ? 0.6 + Math.sin(now * 9) * 0.08 : 0.35;
+      root.visible = this.revealAll || this.vision.seesAt(this.localTeam, root.position.x, root.position.z);
+      if (travelling && root.visible) {
+        w.dustTimer -= dt;
+        if (w.dustTimer <= 0) {
+          w.dustTimer = 0.12;
+          const back = new THREE.Vector3(root.position.x - Math.cos(w.heading) * 2.5, root.position.y + 0.2, root.position.z - Math.sin(w.heading) * 2.5);
+          this.effects.dust(back, 0xd8c49a, 0.8);
+        }
+      }
+    }
+  }
+
   offerSurrender(team: Team): void {
     if (this.winner === null) this.onSurrenderOffer(team);
   }
@@ -1572,6 +1880,8 @@ export class Game {
     this.updateCamps(dt);
     this.updateDetonations();
     this.updateMines();
+    this.updateDrums();
+    this.updateWorms(dt);
     this.updateBunkers(dt);
     this.updateTurrets(dt);
     this.updatePads(dt);
@@ -1608,6 +1918,7 @@ export class Game {
       p.mesh.visible = this.revealAll || this.vision.seesAt(this.localTeam, p.mesh.position.x, p.mesh.position.z);
     }
     this.drawFog(dt);
+    this.drawWorms(dt, alpha);
     for (const b of this.buildings) {
       if (b.def.weapon) b.aimGun();
       else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + Math.abs(Math.sin(this.time * 5 + b.id)) * 0.35;
@@ -1653,10 +1964,13 @@ export class Game {
   hash(): number {
     const h = new Hasher().int(this.ticks).int(this.nextId);
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
-    for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading);
+    for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading).num(u.movedAt);
     for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected).int(u.queue.length);
     for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
+    for (const d of this.drums) h.int(d.b.id).num(d.due);
+    for (const w of this.worms) h.num(w.x).num(w.z).num(w.nextBite).int(w.target?.id ?? -1);
+    for (const ts of this.teams) h.num(ts.nextThumper);
     for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);
     return h.value;
   }
@@ -1669,9 +1983,9 @@ export class Game {
       for (let j = i + 1; j < us.length; j++) {
         const b = us[j];
         if (a.team === b.team && (walksThrough(a, b) || walksThrough(b, a))) continue;
-        // Dug-in units (deployed Soulcrushers) don't budge: whoever bumps into them moves aside.
-        const aFixed = a.deployState !== 'mobile';
-        const bFixed = b.deployState !== 'mobile';
+        // Dug-in units (deployed Soulcrushers) and units holding position don't budge: whoever bumps into them moves aside.
+        const aFixed = a.deployState !== 'mobile' || a.order.kind === 'hold';
+        const bFixed = b.deployState !== 'mobile' || b.order.kind === 'hold';
         if (aFixed && bFixed) continue;
         const minD = a.radius + b.radius;
         let dx = b.x - a.x;

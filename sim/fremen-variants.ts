@@ -1,11 +1,11 @@
 // Alternative Fremen makeups, for comparing in AI-vs-AI games without touching the game's own numbers. Each variant
 // patches the config tables in place before any game is made (unit stats are cached per faction on first use).
 // Pick one with FREMEN_VARIANT=<name> for sim/faction-match.ts (and anything that imports this first).
-import { AMBUSH, BUILDINGS, FACTIONS, HIDE, SAND_SPEED, UNITS, UPGRADES } from '../src/config';
+import { AMBUSH, HIDE, SAND_SPEED, THUMPER, UNITS, UPGRADES, WORM } from '../src/config';
 
 export const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
-  /** As built: the swarm, with Sandworms late. */
-  swarm: { desc: 'As built: cheap Warriors, Fedaykin and Commandos; Sandworms after the Great Sietch.', apply: () => {} },
+  /** As built. */
+  swarm: { desc: 'As built: cheap Warriors and Fedaykin; Thumpers from the Sietch call wild Sandworms.', apply: () => {} },
 
   /** Stealth first: dig in fast, harder to find, and every ambush hits much harder. Warriors a little cheaper and frailer. */
   ghosts: {
@@ -19,25 +19,22 @@ export const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
     },
   },
 
-  /** Worms early and often: the Thumper needs only the Sietch, and worms are cheaper and smaller, three at a time. */
-  riders: {
-    desc: 'Worm riders: Thumper straight from the Sietch (no Great Sietch), Sandworms 900 credits / 1500 HP / smaller bite, up to 3; Fedaykin 240 credits.',
+  /** More worms: Thumpers cheaper and twice as often, the worm hunting a wider ground for longer. */
+  drums: {
+    desc: 'Drums: Thumpers 100 credits every 25 s (not 200 every 45), worms hunt within 20 for 25 s (not 15 for 20).',
     apply: () => {
-      BUILDINGS.thumper.requires = ['sietch'];
-      Object.assign(UNITS.worm, { cost: 900, hp: 1500, limit: 3, buildTime: 20 });
-      UNITS.worm.weapon = { ...UNITS.worm.weapon!, damage: 90, bonus: { mechanical: 90, structure: -60 } };
-      UNITS.fedaykin.cost = 240;
+      Object.assign(THUMPER, { cost: 100, cooldown: 25 });
+      Object.assign(WORM, { range: 20, hunt: 25 });
     },
   },
 
-  /** Fewer, better fighters: tougher Warriors, Fedaykin from the start, faster on sand; no Death Commandos. */
+  /** Fewer, better fighters: tougher Warriors, Fedaykin from the start, faster on sand. */
   host: {
-    desc: 'Fedaykin host: Warriors 110 credits / 100 HP (not 80 / 70), Fedaykin need only a Barracks, sand bonus +35% (not +20%); no Death Commandos.',
+    desc: 'Fedaykin host: Warriors 110 credits / 100 HP (not 80 / 70), Fedaykin need only a Barracks, sand bonus +35% (not +20%).',
     apply: () => {
       Object.assign(UNITS.warrior, { cost: 110, hp: 100 });
       UNITS.fedaykin.requires = ['barracks'];
       SAND_SPEED.base = 0.35;
-      FACTIONS.fremen.train = FACTIONS.fremen.train.map((t) => (t === 'commando' ? null : t));
     },
   },
 };

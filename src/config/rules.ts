@@ -1,5 +1,5 @@
 // Distances are in world units; one map tile is TILE world units.
-import type { LevelUpType, Producer, Team } from './types';
+import type { LevelUpType, Producer, Team, WeaponDef } from './types';
 
 export const TILE = 2;
 /** Map sizes in tiles per side, chosen before each game. */
@@ -14,7 +14,7 @@ export const TEAM_CSS = ['#3d7be0', '#d8402f'];
 
 export const START_CREDITS = 2500;
 
-export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab', 'thumper'];
+export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab'];
 export const QUEUE_MAX = 5; // per producer type
 export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab', 'sietch'];
 
@@ -58,6 +58,22 @@ export const SAND_SPEED = { base: 0.2, sandwalk: 0.25 };
 export const AMBUSH = { bonus: 0.5, time: 4 };
 /** Fremen healing: a share of health per second once unhurt for `delay` s (Stillsuits: x`stillsuit`, after `quick` s). */
 export const FREMEN_REGEN = { unit: 0.015, building: 0.006, delay: 6, stillsuit: 2, quick: 3 };
+/**
+ * Thumpers (Fremen Warriors and Fedaykin, once there's a Sietch): `cost` credits, one every `cooldown` s per side and
+ * one at a time. A planted Thumper drums for `delay` s; then a wild Sandworm comes, unless the Thumper was destroyed.
+ * Every `revealEvery` s its drumming gives it away to sides with anything within `hear` of it.
+ */
+export const THUMPER = { cost: 200, cooldown: 45, delay: 10, hear: 30, revealEvery: 1 };
+/**
+ * The wild Sandworm a Thumper calls: nobody's, and it can't be hurt. It surfaces where the Thumper stands (swallowing
+ * it), then for `hunt` s goes after whatever moves on sand or spice within `range` of that spot, harvesters even
+ * standing still, and structures there: a bite every `biteEvery` s, everything within `bite` of it. Units still for
+ * `still` s don't draw it. It travels under the sand at `speed` and can't cross rock. Distances in world units.
+ */
+export const WORM = {
+  range: 15, bite: 4, hunt: 20, biteEvery: 2.5, still: 1.5, speed: 9, reach: 2.5,
+  weapon: { range: 0, minRange: 0, damage: 400, bonus: { mechanical: 400, structure: -100 }, cooldown: 0, projectile: 'bullet', speed: 0, splash: 4, pierce: true } as WeaponDef,
+};
 /** A Spice Camp works at full rate with this many spice tiles in reach, proportionally less with fewer. */
 export const CAMP_FULL = 12;
 /** Spice Mining: Spice Camps' extra rate. */
