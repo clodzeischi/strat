@@ -1679,7 +1679,7 @@ export class Game {
   }
 
   /** Whether any of a structure's footprint is on sand or spice (where the worm can come up under it). */
-  private onSandFootprint(b: Building): boolean {
+  onSandFootprint(b: Building): boolean {
     const m = this.map;
     for (let z = b.cz; z < b.cz + b.size; z++) {
       for (let x = b.cx; x < b.cx + b.size; x++) {

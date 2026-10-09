@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, FACTIONS, TILE, UNITS, UPGRADES,
+  BUILDINGS, FACTIONS, THUMPER, TILE, UNITS, UPGRADES, WORM,
   type BuildingType, type Faction, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType,
 } from '../config';
 import { Building, type Entity, type Unit } from '../entities';
@@ -47,7 +47,7 @@ const KITS: Record<Faction, FactionKit> = {
   },
   // The Sietch stands in for the factory (the second step of the opening).
   fremen: {
-    factory: 'sietch', defense: 'bunker', raider: 'warrior', scouts: ['warrior'], mender: null, tech: [],
+    factory: 'sietch', defense: 'bunker', raider: 'warrior', scouts: ['glider', 'warrior'], mender: null, tech: [],
     levels: ['sietch'], research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush'], fallback: 'warrior',
     siege: { unit: 'mortar', per: 5, max: 5 }, worker: 'crew',
   },
@@ -165,7 +165,8 @@ const DEFENSE_TIMEOUT = 4;
 
 /** 'garrison': on its way into one of our bunkers, or in it. */
 /** 'mend': pulled out of a fight to heal or be repaired; 'drop': on a Carryall operation (Brutal). */
-export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop';
+/** 'thump': gone to plant a Thumper by the enemy's economy (and getting clear of the worm). */
+export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop' | 'thump';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -375,9 +376,13 @@ export class AI {
     return null;
   }
 
-  /** Credits kept back for replacing harvesters, once the base is up and while the economy is healthy. */
+  /**
+   * Credits kept back for replacing harvesters, once the base is up and while the economy is healthy. Fremen keep
+   * none: a lost camp comes back with a crew, which the economy goal puts first anyway, and with their income
+   * trickling in rather than arriving by the harvester load, a fund on top of the tech reserve was never reached.
+   */
   private fund(): number {
-    return this.openingDone && !this.econGoal() ? this.profile.fund : 0;
+    return this.openingDone && !this.econGoal() && !this.camps ? this.profile.fund : 0;
   }
 
   protected get ts() {
@@ -562,7 +567,16 @@ export class AI {
 
   /** The next unit to save up for and build. */
   protected chooseUnit(): UnitType {
-    return this.raidTrikeWanted() ? this.kit.raider : this.repairWanted() ? 'repair' : this.siegeWanted() ? this.kit.siege!.unit : this.pickCounter();
+    return this.raidTrikeWanted() ? this.kit.raider : this.repairWanted() ? 'repair' : this.scoutWanted() ? this.kit.scouts[0]
+      : this.siegeWanted() ? this.kit.siege!.unit : this.pickCounter();
+  }
+
+  /** An unarmed scout (a Fremen glider) we can build and don't have: one is kept for looking around. */
+  private scoutWanted(): boolean {
+    const g = this.game;
+    const t = this.kit.scouts[0];
+    if (g.unitDef(this.team, t).weapon || !g.canTrain(this.team, t)) return false;
+    return g.count(this.team, t) + this.ts.queues[g.unitDef(this.team, t).producer].filter((q) => q.type === t).length < 1;
   }
 
   /**
@@ -661,6 +675,8 @@ export class AI {
     this.updateRally();
 
     this.manageCrews();
+    this.manageWorms();
+    this.manageThumper();
     this.manageRepairs(army);
     this.managePads(army);
     this.manageAbilities(army);
@@ -769,6 +785,139 @@ export class AI {
       if (score > bestScore) {
         bestScore = score;
         best = s;
+      }
+    }
+    return best;
+  }
+
+  // ---- Sandworms and Thumpers -------------------------------------------------
+
+  /** Our units told to stand still while a worm is about (they go back to what they were doing once it's gone). */
+  private frozen = new Set<Unit>();
+  /** The Thumper we're planting: who, where, since when; `away` once it's planted and the planter is getting clear. */
+  private thumpJob: { u: Unit; x: number; z: number; since: number; away: boolean } | null = null;
+
+  /**
+   * Any worm about (or one about to come): our units on the sand around it stand still, which it doesn't hear, and
+   * harvesters (which it always hears) run for the refinery. Once it's gone, they carry on. Enemy Thumpers we can
+   * see near our things get a few units sent to destroy them before their worm comes.
+   */
+  private manageWorms(): void {
+    const g = this.game;
+    const m = g.map;
+    const danger: { x: number; z: number }[] = g.worms.map((w) => ({ x: w.lairX, z: w.lairZ }));
+    for (const b of g.buildings) {
+      if (b.type !== 'thumper' || b.dead) continue;
+      const due = g.drumDue(b.team);
+      // Ours we know about; the enemy's, once we hear or see them.
+      if (due !== null && due < 3 && (b.team === this.team || g.sees(this.team, b))) danger.push({ x: b.x, z: b.z });
+    }
+    const onSand = (u: Unit) => m.canEnter(m.cellOf(u.x), m.cellOf(u.z), 'worm');
+    const near = (u: Unit) => danger.some((d) => hypot(u.x - d.x, u.z - d.z) <= WORM.range + WORM.bite + 2 * TILE);
+    for (const u of g.units) {
+      if (u.team !== this.team || u.dead || u.carrier || u.falling || u.def.air || !onSand(u) || !near(u)) continue;
+      if (u.type === 'harvester') {
+        u.retreat(g);
+        continue;
+      }
+      // (Again, if something else has given it an order since.)
+      if (u.deployState !== 'mobile' || u.order.kind === 'hold') continue;
+      this.frozen.add(u);
+      u.queue = [];
+      u.command(g, { kind: 'hold' });
+    }
+    for (const u of [...this.frozen]) {
+      if (u.dead) this.frozen.delete(u);
+      else if (!near(u)) {
+        this.frozen.delete(u);
+        if (u.order.kind === 'hold') u.command(g, { kind: 'idle' });
+      }
+    }
+    // Enemy Thumpers in sight near our structures or units: kill them in time.
+    for (const b of g.buildings) {
+      if (b.type !== 'thumper' || b.team === this.team || b.dead || !g.sees(this.team, b)) continue;
+      const hunters = g.units.filter((u) => u.team === this.team && !u.dead && !u.carrier && u.def.weapon && !this.frozen.has(u)
+        && u.order.kind !== 'attack' && hypot(u.x - b.x, u.z - b.z) < 20 * TILE && ['home', 'defend', 'wave'].includes(this.roles.get(u) ?? '') && g.weaponFor(u, b));
+      hunters.sort((a, c) => hypot(a.x - b.x, a.z - b.z) - hypot(c.x - b.x, c.z - b.z));
+      const already = g.units.filter((u) => u.team === this.team && u.order.kind === 'attack' && u.order.target === b).length;
+      for (const u of hunters.slice(0, Math.max(0, 3 - already))) u.command(g, { kind: 'attack', target: b });
+    }
+  }
+
+  /**
+   * Fremen: a Warrior or Fedaykin goes to plant a Thumper where it will catch the most of the enemy's economy we
+   * know of (harvesters and camps out on the sand), away from our own; once it's planted, the planter gets clear
+   * and stands still until the worm is gone.
+   */
+  private manageThumper(): void {
+    const g = this.game;
+    const job = this.thumpJob;
+    if (job) {
+      const u = job.u;
+      const ours = g.drumDue(this.team) !== null || g.worms.some((w) => w.team === this.team);
+      if (u.dead || g.time - job.since > 120) {
+        this.thumpJob = null;
+        if (!u.dead) this.sendHome(u);
+        return;
+      }
+      if (!job.away) {
+        if (ours) {
+          // Planted: walk off a little way toward home and stand still there.
+          job.away = true;
+          const home = this.rally ?? u;
+          const len = hypot(home.x - job.x, home.z - job.z) || 1;
+          const out = WORM.bite + 3 * TILE;
+          u.command(g, { kind: 'move', x: job.x + ((home.x - job.x) / len) * out, z: job.z + ((home.z - job.z) / len) * out });
+        } else if (u.order.kind !== 'plant') {
+          // Couldn't plant (the spot was taken, or we're short of credits): give up for now.
+          this.thumpJob = null;
+          this.sendHome(u);
+        }
+        return;
+      }
+      if (u.order.kind === 'idle') u.command(g, { kind: 'hold' });
+      if (!ours) {
+        this.thumpJob = null;
+        this.sendHome(u);
+      }
+      return;
+    }
+    if (!this.camps || g.thumpBlocked(this.team) || this.rushed() || this.ts.credits < THUMPER.cost + 100) return;
+    const spot = this.thumperSpot();
+    if (!spot) return;
+    const planters = g.units.filter((u) => u.team === this.team && u.def.thumper && !u.dead && !u.carrier && !this.frozen.has(u)
+      && ['home', 'wave', 'raid'].includes(this.roles.get(u) ?? '') && u.hp > u.maxHp * 0.6);
+    planters.sort((a, b) => hypot(a.x - spot.x, a.z - spot.z) - hypot(b.x - spot.x, b.z - spot.z));
+    const u = planters[0];
+    if (!u || !g.orderThumper(this.team, [u], spot.x, spot.z)) return;
+    this.leaveGroups(u);
+    this.roles.set(u, 'thump');
+    this.thumpJob = { u, x: spot.x, z: spot.z, since: g.time, away: false };
+  }
+
+  /**
+   * Where a Thumper would catch the most: open sand by the enemy's harvesters (seen lately) and camps, scored by
+   * what's within the worm's reach of it, as long as none of our own camps or structures on the sand are.
+   */
+  private thumperSpot(): { x: number; z: number } | null {
+    const g = this.game;
+    const m = g.map;
+    const prey: { x: number; z: number; value: number }[] = [];
+    for (const s of this.intel.placedUnits()) if (s.harvester && g.time - s.seen < 20) prey.push({ x: s.x, z: s.z, value: UNITS.harvester.cost });
+    for (const s of this.intel.structures('camp')) prey.push({ x: s.x, z: s.z, value: BUILDINGS.camp.cost });
+    const ownSand = g.buildings.filter((b) => b.team === this.team && !b.dead && b.type !== 'thumper' && g.onSandFootprint(b));
+    let best: { x: number; z: number } | null = null;
+    let bestValue = BUILDINGS.camp.cost - 1;
+    for (const p of prey) {
+      const c = m.nearestCell(m.cellOf(p.x), m.cellOf(p.z), (x, z) => m.canEnter(x, z, 'worm'), 3);
+      if (!c) continue;
+      const x = m.center(c.cx);
+      const z = m.center(c.cz);
+      if (ownSand.some((b) => hypot(b.x - x, b.z - z) < WORM.range + WORM.bite + 2 * TILE)) continue;
+      const value = prey.filter((q) => hypot(q.x - x, q.z - z) <= WORM.range).reduce((a, q) => a + q.value, 0);
+      if (value > bestValue) {
+        bestValue = value;
+        best = { x, z };
       }
     }
     return best;
@@ -1221,8 +1370,10 @@ export class AI {
       return;
     }
     if (baseAttacked || this.rushed() || g.time < this.nextScoutTime) return;
-    const candidates = army
-      .filter((u) => this.roles.get(u) === 'home' && this.kit.scouts.includes(u.type) && u.hp > u.maxHp * 0.7)
+    // Any of our units of a scouting kind (Fremen gliders are unarmed, so not in the army), the fastest first.
+    void army;
+    const candidates = g.units
+      .filter((u) => u.team === this.team && !u.carrier && (this.roles.get(u) ?? 'home') === 'home' && this.kit.scouts.includes(u.type) && u.hp > u.maxHp * 0.7)
       .sort((a, b) => b.def.speed - a.def.speed);
     const scout = candidates[0];
     if (!scout) {
