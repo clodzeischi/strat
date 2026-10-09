@@ -1316,6 +1316,10 @@ export class Game {
       for (let j = i + 1; j < us.length; j++) {
         const b = us[j];
         if (a.team === b.team && (walksThrough(a, b) || walksThrough(b, a))) continue;
+        // Dug-in units (deployed Soulcrushers) don't budge: whoever bumps into them moves aside.
+        const aFixed = a.deployState !== 'mobile';
+        const bFixed = b.deployState !== 'mobile';
+        if (aFixed && bFixed) continue;
         const minD = a.radius + b.radius;
         let dx = b.x - a.x;
         let dz = b.z - a.z;
@@ -1333,7 +1337,7 @@ export class Game {
         const nz = dz / d;
         const aMoving = a.path.length > 0;
         const bMoving = b.path.length > 0;
-        const shareA = aMoving && !bMoving ? 0.2 : !aMoving && bMoving ? 0.8 : 0.5;
+        const shareA = aFixed ? 0 : bFixed ? 1 : aMoving && !bMoving ? 0.2 : !aMoving && bMoving ? 0.8 : 0.5;
         this.nudge(a, -nx * push * 2 * shareA, -nz * push * 2 * shareA);
         this.nudge(b, nx * push * 2 * (1 - shareA), nz * push * 2 * (1 - shareA));
       }

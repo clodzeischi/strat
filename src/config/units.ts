@@ -33,7 +33,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry.',
   },
   rocket: {
-    name: 'Rocket Launcher', producer: 'factory', cost: 500, buildTime: 11, hp: 200, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
+    name: 'MLRS', producer: 'factory', cost: 500, buildTime: 11, hp: 200, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory2'],
     weapon: { range: 17, minRange: 6, damage: 40, bonus: { biological: 35, structure: 35, air: 25 }, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 2.5, air: true },
     lift: 6,
@@ -56,13 +56,13 @@ export const UNITS: Record<UnitType, UnitDef> = {
     name: 'Harkonnen Trooper', producer: 'barracks', cost: 100, buildTime: 5, hp: 100, shields: 60, speed: 2.1, turnRate: 12, radius: 0.45, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'],
     weapon: { range: 7, minRange: 0, damage: 9, bonus: { armored: 14, structure: -3 }, cooldown: 0.7, projectile: 'rocket', speed: 20, splash: 0 },
-    desc: 'Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, and beats trikes by numbers. Weak vs Rocket Launchers.',
+    desc: 'Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, and beats trikes by numbers. Weak vs MLRS.',
   },
   sardaukar: {
     name: 'Sardaukar', producer: 'barracks', cost: 300, buildTime: 9, hp: 220, shields: 120, speed: 2.6, turnRate: 12, radius: 0.5, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks2'],
     weapon: { range: 4.5, minRange: 0, damage: 12, bonus: { biological: 24, air: 12, structure: -4 }, cooldown: 0.75, projectile: 'bullet', speed: 0, splash: 0, air: true },
-    desc: "The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and Rocket Launchers.",
+    desc: "The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and MLRS.",
   },
   razor: {
     name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 200, shields: 100, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
@@ -77,7 +77,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     holdFire: true,
     secondary: { range: 5, minRange: 0, damage: 4, bonus: { biological: 6, armored: -3, structure: -3 }, cooldown: 0.2, projectile: 'bullet', speed: 0, splash: 0 },
     detonate: { delay: 2.5, weapon: { range: 0, minRange: 0, damage: 500, bonus: { structure: 300 }, cooldown: 0, projectile: 'shell', speed: 0, splash: 9 } },
-    desc: "Slow heavy tank. Crushes armor; its machine gun cuts down infantry up close, even on the move, but the main gun only fires standing still. Can self-destruct in a huge blast. Weak vs aircraft and Rocket Launchers.",
+    desc: "Slow heavy tank. Crushes armor; its machine gun cuts down infantry up close, even on the move, but the main gun only fires standing still. Can self-destruct in a huge blast. Weak vs aircraft and MLRS.",
   },
   raider: {
     name: 'Sky Raider', producer: 'fab', cost: 500, buildTime: 11, hp: 260, shields: 120, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
@@ -91,7 +91,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   },
   artillery: {
     name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 260, shields: 140, speed: 2.8, turnRate: 2, radius: 1.1, sight: 12,
-    turret: false, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu'],
+    turret: true, holdFire: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu'],
     weapon: { range: 8, minRange: 0, damage: 14, bonus: { structure: 12 }, cooldown: 1.5, projectile: 'shell', speed: 26, splash: 0 },
     deploy: {
       time: 3,

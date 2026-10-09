@@ -5,6 +5,8 @@ export interface UnitModel {
   turret: THREE.Group | null;
   /** Local offset (in turret or body space) where projectiles spawn. */
   muzzle: THREE.Object3D;
+  /** Units that deploy: poses the model from 0 (mobile) to 1 (dug in). Drawing only. */
+  deploy?: (t: number) => void;
 }
 
 /** Extra parts showing upgrades; `turret` parts follow the turret's rotation. */

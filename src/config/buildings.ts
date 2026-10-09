@@ -28,7 +28,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   factory: {
     name: 'Factory', short: 'Factory', cost: 1000, buildTime: 14, hp: 1100, size: 3, requires: ['refinery', 'barracks'],
     desc: 'Builds vehicles. Each Factory adds a production line.',
-    levelUp: { name: 'Factory Level 2', short: 'Factory Lv 2', cost: 1200, time: 40, desc: 'Upgrades a Factory. Unlocks Rocket Launchers, Weapons II and Armor II.' },
+    levelUp: { name: 'Factory Level 2', short: 'Factory Lv 2', cost: 1200, time: 40, desc: 'Upgrades a Factory. Unlocks MLRS, Weapons II and Armor II.' },
   },
   hitech: {
     name: 'Hi-Tech Factory', short: 'Hi-Tech', cost: 1200, buildTime: 16, hp: 1000, size: 3, requires: ['factory'],

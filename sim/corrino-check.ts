@@ -158,6 +158,23 @@ function arena(): { g2: Game; at: (dx: number, dz: number) => { x: number; z: nu
   (sitter.def as { weapon: unknown }) === sitter.def; // keep the tank from wandering: it has no target in sight
   step(8);
   check(sitter.dead || sitter.hp < sitter.maxHp, 'deployed Artillery shells a target its side can see, out of its own sight');
+  // A target off to the side: the turret swings round, the hull doesn't.
+  const side = at(12, -6);
+  g2.spawnUnit('trooper', C, side.x - 3, side.z).hp = 1e6;
+  const flank = g2.spawnUnit('tank', A, side.x, side.z);
+  flank.hp = 1e6;
+  arty.target = flank;
+  const hull = arty.heading;
+  step(4);
+  const toFlank = Math.atan2(flank.z - arty.z, flank.x - arty.x);
+  check(arty.heading === hull && Math.abs(arty.turretHeading - toFlank) < 0.15, 'it aims by turning its turret, the hull stays put');
+  // Something driving straight through it doesn't shove it.
+  const ax = arty.x;
+  const az = arty.z;
+  const bully = g2.spawnUnit('tank', C, arty.x - 6, arty.z);
+  bully.command(g2, { kind: 'move', x: arty.x + 6, z: arty.z });
+  step(4);
+  check(arty.x === ax && arty.z === az, 'a deployed Soulcrusher is not pushed by other units');
   applyCommand(g2, C, { c: 'deploy', units: [arty.id], on: false });
   step(UNITS.artillery.deploy!.time + 0.2);
   check(arty.deployState === 'mobile', 'and packs up again');

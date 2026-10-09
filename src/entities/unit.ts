@@ -90,6 +90,10 @@ export class Unit extends Entity {
   /** Parts showing researched upgrades, rebuilt when the team's upgrades change. */
   private kit: { key: string; body: THREE.Group; turret: THREE.Group } | null = null;
   private muzzle: THREE.Object3D;
+  /** Deploying units: poses the model from mobile (0) to dug in (1). */
+  private deployPose: ((t: number) => void) | null;
+  /** Drawing only: the dig-in pose last drawn, to puff dust as the spades hit the ground. */
+  private drawnDeploy = 0;
   /** Seconds until the weapon can fire again (also counted down by a bunker the unit is in). */
   cooldown = 0;
   private scanTimer = 0;
@@ -135,6 +139,7 @@ export class Unit extends Entity {
     this.body = model.body;
     this.turret = model.turret;
     this.muzzle = model.muzzle;
+    this.deployPose = model.deploy ?? null;
     this.root.add(this.body);
   }
 
@@ -461,6 +466,18 @@ export class Unit extends Entity {
     this.cooldown2 = w.cooldown * (0.9 + game.random() * 0.2);
   }
 
+  /** How far dug in: 0 mobile, 1 deployed, in between while setting up or packing up. */
+  deployProgress(): number {
+    const d = this.def.deploy;
+    if (!d) return 0;
+    switch (this.deployState) {
+      case 'mobile': return 0;
+      case 'deployed': return 1;
+      case 'deploying': return 1 - Math.max(0, this.deployTimer) / d.time;
+      case 'packing': return Math.max(0, this.deployTimer) / d.time;
+    }
+  }
+
   /** Starts setting up (Artillery), or packing up to move again. */
   setDeployed(on: boolean): void {
     const d = this.def.deploy;
@@ -486,6 +503,8 @@ export class Unit extends Entity {
   private updateDeployed(game: Game, dt: number): void {
     this.path = [];
     if (this.deployState === 'deploying' || this.deployState === 'packing') {
+      // The turret swings back to the front before the gun comes down.
+      if (this.deployState === 'packing') this.turretHeading = this.rotateToward(this.turretHeading, this.heading, 1.5 * dt);
       this.deployTimer -= dt;
       if (this.deployTimer <= 0) {
         this.deployState = this.deployState === 'deploying' ? 'deployed' : 'mobile';
@@ -513,9 +532,10 @@ export class Unit extends Entity {
     }
     const t = this.target;
     if (!t) return;
+    // Dug in, the hull stays put and the turret turns (slowly: it's a heavy gun).
     const angle = Math.atan2(t.z - this.z, t.x - this.x);
-    this.heading = this.rotateToward(this.heading, angle, this.def.turnRate * dt);
-    if (Math.abs(wrapAngle(angle - this.heading)) < 0.1 && this.cooldown <= 0) {
+    this.turretHeading = this.rotateToward(this.turretHeading, angle, 1.5 * dt);
+    if (Math.abs(wrapAngle(angle - this.turretHeading)) < 0.08 && this.cooldown <= 0) {
       game.fire(this, t, w);
       this.cooldown = w.cooldown * (0.9 + game.random() * 0.2);
     }
@@ -887,5 +907,20 @@ export class Unit extends Entity {
       this.body.quaternion.multiplyQuaternions(tilt, yaw);
     }
     if (this.turret) this.turret.rotation.y = -(this.turretHeading - this.heading);
+    if (this.deployPose) {
+      const t = this.deployProgress();
+      if (t !== this.drawnDeploy) {
+        this.deployPose(t);
+        // The spades bite into the ground.
+        if (this.drawnDeploy < 0.42 && t >= 0.42) {
+          for (const [fx, fz] of [[0.75, 0.9], [-0.75, 0.9], [0.75, -0.9], [-0.75, -0.9]]) {
+            const c = Math.cos(this.heading);
+            const sn = Math.sin(this.heading);
+            game.effects.dust(new THREE.Vector3(this.x + fx * c - fz * sn, this.y + 0.1, this.z + fx * sn + fz * c), 0xc8b088, 0.6);
+          }
+        }
+        this.drawnDeploy = t;
+      }
+    }
   }
 }
