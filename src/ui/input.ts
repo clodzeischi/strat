@@ -15,7 +15,10 @@ const PAN_SPEED = 45;
  * Which kind of unit leads a mixed selection, highest first: its abilities are the ones the command card shows
  * (Tab moves on to the next kind). Roughly the tech tier, so the rarest, most specialised unit comes first.
  */
-const TIER: Record<UnitType, number> = { carryall: 6, rocket: 5, repair: 4, tank: 3, trike: 2, infantry: 1, harvester: 0 };
+const TIER: Record<UnitType, number> = {
+  carryall: 6, rocket: 5, repair: 4, tank: 3, trike: 2, infantry: 1, harvester: 0,
+  devastator: 6, artillery: 5, raider: 4, sardaukar: 3, razor: 2, trooper: 1,
+};
 
 /** One kind of thing in the selection: a unit type or a building type. */
 export interface Subgroup {
@@ -297,6 +300,12 @@ export class Input {
     if (!producers.length) return;
     this.issue({ c: 'rally', buildings: producers.map((b) => b.id), x, z });
     this.game.effects.marker(new THREE.Vector3(x, this.game.map.surfaceAt(x, z), z), 0x7cff7c);
+  }
+
+  /** Corrino: start (or stop) the selected damaged structures repairing themselves. */
+  mend(on: boolean): void {
+    const list = this.ownBuildings().filter((b) => (on ? this.game.canSelfRepair(b) && !b.repairing : b.repairing));
+    if (list.length) this.issue({ c: 'mend', buildings: list.map((b) => b.id), on });
   }
 
   canSalvage(): boolean {

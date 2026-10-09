@@ -1,5 +1,5 @@
-import { DARK, SANDSTONE } from '../../materials/palette';
-import { box } from '../parts';
+import { DARK, GOLD, SANDSTONE } from '../../materials/palette';
+import { box, cyl } from '../parts';
 import type { BuildingBlueprint } from '../types';
 
 /** Barracks: low hall with sandbag walls by the door and a team flag. */
@@ -15,5 +15,12 @@ export const barracks: BuildingBlueprint = {
     box(g, 0.08, 2.0, 0.08, DARK, 1.3, 2.7, -1.3);
     box(g, 0.7, 0.4, 0.04, color, 1.65, 3.45, -1.3);
     return null;
+  },
+
+  /** Imperial Barracks (Corrino): a drop-pod launch tube behind the hall. */
+  levelKit(g, color) {
+    cyl(g, 0.45, 2.2, SANDSTONE, -1.0, 1.5, -1.2, 10);
+    cyl(g, 0.5, 0.15, GOLD, -1.0, 2.65, -1.2, 10);
+    cyl(g, 0.35, 0.1, color, -1.0, 2.75, -1.2, 10);
   },
 };

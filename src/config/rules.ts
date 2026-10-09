@@ -14,13 +14,16 @@ export const TEAM_CSS = ['#3d7be0', '#d8402f'];
 
 export const START_CREDITS = 2500;
 
-export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech'];
+export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab'];
 export const QUEUE_MAX = 5; // per producer type
-export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory'];
+export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab'];
 
 /** Upgrade effects. */
 export const WEAPONS_BONUS = 0.2; // damage per Weapons tier
-export const ARMOR_BONUS = 0.15; // damage reduction per Armor tier
+export const ARMOR_BONUS = 0.15; // damage reduction per Armor tier (to health)
+export const SHIELDS_BONUS = 0.2; // damage reduction to shields per Shields level
+/** Razor Flame Range upgrade: extra reach, in world units. */
+export const FLAME_RANGE = 2;
 export const NITRO = { speed: 1.4, cooldown: 1 / 1.5 };
 export const HARVEST_UPGRADE = { capacity: 1.2, speed: 1.2 };
 
@@ -39,6 +42,10 @@ export const SPICE_MAX = 500;
 export const REPAIR_COST = 0.4;
 /** Infantry heal this share of their health per second once they haven't been hit for INFANTRY_REGEN.delay seconds. */
 export const INFANTRY_REGEN = { rate: 0.02, delay: 5 };
+/** Shields start recovering once a unit or structure hasn't been hit for `delay` seconds, refilling in `full` seconds. */
+export const SHIELD_REGEN = { delay: 7, full: 10 };
+/** Corrino structures repairing themselves: health per second, paid as repairs are (REPAIR_COST). */
+export const SELF_REPAIR_RATE = 12;
 
 export const CARRYALL = {
   capacity: 6, // lift space: infantry take 1, trikes 3, heavy vehicles 6

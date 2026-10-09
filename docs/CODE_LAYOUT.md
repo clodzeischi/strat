@@ -4,7 +4,7 @@
 
 | Folder | What lives there |
 |---|---|
-| `config/` | Game data. `types.ts` (shared types), `rules.ts` (tile size, teams, upgrade effects, economy), and one table each for `units.ts`, `buildings.ts`, `upgrades.ts`. |
+| `config/` | Game data. `types.ts` (shared types), `rules.ts` (tile size, teams, upgrade effects, economy), one table each for `units.ts`, `buildings.ts`, `upgrades.ts`, and `factions.ts` (what each faction builds, trains and researches, its command card layout, starting units, shields). |
 | `game/` | Game logic: `game.ts` (the match: entities, production, combat, projectiles), `commands.ts` (everything a player can order, as data, and how the game applies it), `ai.ts` (the AI, tuned per difficulty by a profile), `brutal.ts` (Brutal: a subclass of the AI with Carryall operations, retreats and wave marching) with `micro.ts` (kiting and focus fire), `pathfinding.ts`, `heroes.ts`, `rng.ts` (seeded random numbers and state checksums), `hypot.ts`, `vision.ts` (fog of war on the tile grid), `intel.ts` (what an AI knows of the enemy: only what its side has seen). |
 | `net/` | Running the simulation and online play: `lockstep.ts` (fixed-rate ticks, command scheduling, replays, desync checks), `protocol.ts` (messages between browser and server), `client.ts` (the WebSocket). The server itself is `server/server.ts`, outside `src/`. |
 | `entities/` | Things on the map: `entity.ts` (base class, health bar, selection ring), `building.ts`, `unit.ts` (movement, combat, harvesting, repair, parachute falls, vehicle tilt), `carryall.ts` (the aircraft: flight, pickups, drops, harvester ferrying), `distance.ts`. |

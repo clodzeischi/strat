@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDING_TAGS, BUILDINGS, TEAM_COLORS, TILE, type BuildingDef, type BuildingType, type Team } from '../config';
+import { BUILDING_TAGS, BUILDINGS, TEAM_COLORS, TILE, shieldsFor, type BuildingDef, type BuildingType, type Faction, type Team } from '../config';
 import type { Cell } from '../map';
 import type { Point } from '../game/pathfinding';
 import { makeBuildingModel, makeLevelKit } from '../models';
@@ -55,12 +55,23 @@ export class Building extends Entity {
   rallyDefault = true;
   /** Being salvaged: 0 to 1, after which it's removed and part of its price refunded. */
   salvage: number | null = null;
+  /** Corrino: mending itself (paid as it goes) until back at full health. */
+  repairing = false;
+  /** Gun emplacements: seconds until the next shot, what it shoots at, and where the gun points. */
+  cooldown = 0;
+  target: Entity | null = null;
+  aim = 0;
+  /** Repair Pads: the units being mended now. */
+  patients: Unit[] = [];
   /** Turned and scaled holder of the model, so level-2 parts line up with it. */
   private model = new THREE.Group();
 
-  constructor(id: number, team: Team, readonly type: BuildingType, readonly cx: number, readonly cz: number, groundY: number, readonly facing: Facing = 'south') {
+  constructor(
+    id: number, team: Team, readonly type: BuildingType, readonly cx: number, readonly cz: number, groundY: number,
+    readonly facing: Facing = 'south', readonly faction: Faction = 'atreides',
+  ) {
     const def = BUILDINGS[type];
-    super(id, team, def.hp, def.size * TILE * 0.8, 4.8, (def.size * TILE) / 2 + 0.1);
+    super(id, team, def.hp, shieldsFor(faction, def), def.size * TILE * 0.8, def.size === 1 ? 3.2 : 4.8, (def.size * TILE) / 2 + 0.1);
     this.def = def;
     this.size = def.size;
     this.radius = (def.size * TILE) / 2;
@@ -75,6 +86,16 @@ export class Building extends Entity {
     this.model.add(model.group);
     this.root.add(this.model);
     this.root.position.set(this.x, this.y, this.z);
+  }
+
+  /** Turns a gun emplacement's head (its spinner, built facing +X) toward its aim. */
+  aimGun(): void {
+    if (this.spinner) this.spinner.rotation.y = -this.aim - this.model.rotation.y;
+  }
+
+  /** Where a gun emplacement's shots start: the top of the gun, a little toward its aim. */
+  muzzleWorld(): THREE.Vector3 {
+    return new THREE.Vector3(this.x + Math.cos(this.aim) * 0.6, this.y + 1.3, this.z + Math.sin(this.aim) * 0.6);
   }
 
   /** Free places for infantry, 0 for buildings that don't hold any (or are being salvaged). */

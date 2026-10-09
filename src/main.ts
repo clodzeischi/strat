@@ -2,10 +2,10 @@ import * as THREE from 'three';
 import type { AI } from './game/ai';
 import { createAI } from './game/brutal';
 import { RTSCamera } from './render/camera';
-import { MAP_SIZES, TILE, type MapSize, type Team } from './config';
+import { FACTION_LIST, MAP_SIZES, TILE, type Faction, type MapSize, type Team } from './config';
 import { Game, type Difficulty } from './game/game';
 import { Input } from './ui/input';
-import { loadMapSize, Menus } from './ui/menu';
+import { loadFaction, loadMapSize, Menus } from './ui/menu';
 import { ViewShadows } from './render/shadows';
 import { CommandCard } from './ui/command-card';
 import { Hud } from './ui/hud';
@@ -40,16 +40,19 @@ scene.add(sun, sun.target);
 // an online match: the page reloads into it once the server has paired two players.
 const AUTOSTART_KEY = 'strat.autostart';
 const MATCH_KEY = 'strat.match';
-interface Autostart { difficulty: Difficulty; size: MapSize; seed: number }
+interface Autostart { difficulty: Difficulty; size: MapSize; seed: number; faction: Faction }
 function readAutostart(): Autostart | null {
   try {
     const raw = sessionStorage.getItem(AUTOSTART_KEY);
     sessionStorage.removeItem(AUTOSTART_KEY);
-    const [difficulty, size, seed] = (raw ?? '').split(':');
+    const [difficulty, size, seed, faction] = (raw ?? '').split(':');
     const okDifficulty = difficulty === 'normal' || difficulty === 'hard' || difficulty === 'brutal';
     const okSize = (MAP_SIZES as readonly number[]).includes(Number(size));
     const okSeed = seed !== '' && Number.isInteger(Number(seed));
-    return okDifficulty && okSize && okSeed ? { difficulty, size: Number(size) as MapSize, seed: Number(seed) } : null;
+    const okFaction = FACTION_LIST.includes(faction as Faction);
+    return okDifficulty && okSize && okSeed && okFaction
+      ? { difficulty, size: Number(size) as MapSize, seed: Number(seed), faction: faction as Faction }
+      : null;
   } catch {
     return null;
   }
@@ -75,8 +78,12 @@ const mapSize = match?.size ?? autostart?.size ?? loadMapSize();
 // Every visit gets a new map; Restart keeps the seed so the same map comes back.
 const mapSeed = match?.seed ?? autostart?.seed ?? urlSeed() ?? randomSeed();
 
+// The player's faction; the computer opponent plays Atreides (the only side its AI knows so far).
+const playerFaction = autostart?.faction ?? loadFaction();
+const factions: Faction[] = match?.factions ?? [playerFaction, 'atreides'];
+
 const rts = new RTSCamera(mapSize * TILE);
-const game = new Game(scene, rts.camera, mapSize, mapSeed);
+const game = new Game(scene, rts.camera, mapSize, mapSeed, factions);
 game.localTeam = match?.team ?? 0;
 // `?reveal` lifts the fog of war on screen, offline only (for testing). The title fly-over shows the whole map.
 const revealParam = !match && new URLSearchParams(location.search).has('reveal');
@@ -146,6 +153,11 @@ let net: NetClient | null = null;
 const online = match !== null;
 const opponentName = match ? match.names[ENEMY] : null;
 
+/** The opening build hint for the local player's faction. */
+function firstSteps(): string {
+  return `Build a Refinery and a Barracks, then a ${game.teams[game.localTeam].faction === 'corrino' ? 'Fab' : 'Factory'}.`;
+}
+
 function beginPlay(): void {
   mode = 'playing';
   game.revealAll = revealParam;
@@ -163,7 +175,7 @@ function startGame(difficulty: Difficulty): void {
   const opponent = ai;
   lockstep.onTick = () => opponent.update(TICK);
   beginPlay();
-  hud.showMessage('Build a Refinery and a Barracks, then a Factory. Destroy the red base.');
+  hud.showMessage(`${firstSteps()} Destroy the red base.`);
 }
 
 /** Online: the page has reloaded into a match; reconnect, and start when both players are back. */
@@ -201,7 +213,7 @@ function onMatchMessage(msg: ServerMsg): void {
       };
       showNetWait('');
       beginPlay();
-      hud.showMessage(`Online against ${opponentName}. Build a Refinery and a Barracks, then a Factory.`);
+      hud.showMessage(`Online against ${opponentName}. ${firstSteps()}`);
       break;
     }
     case 'cmds':
@@ -238,7 +250,7 @@ function endGame(note: string): void {
 /** Restart, Quit and a new map size reload the page for a clean match; with `next` set, the title is skipped. */
 function reload(next: Autostart | null): void {
   try {
-    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}:${next.seed}`);
+    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}:${next.seed}:${next.faction}`);
   } catch {
     // Without session storage, Restart falls back to the title screen.
   }
@@ -289,9 +301,11 @@ function openLobby(): void {
 }
 
 const menus = new Menus({
-  onPlay: (difficulty, size) => (size === game.map.size ? startGame(difficulty) : reload({ difficulty, size, seed: urlSeed() ?? randomSeed() })),
+  // A different map size or faction needs a fresh page (the map and starting units are built at load).
+  onPlay: (difficulty, size, faction) =>
+    size === game.map.size && faction === playerFaction ? startGame(difficulty) : reload({ difficulty, size, seed: urlSeed() ?? randomSeed(), faction }),
   onResume: () => setPaused(false),
-  onRestart: () => reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed }),
+  onRestart: () => reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed, faction: playerFaction }),
   onQuit: () => {
     net?.send({ t: 'leave' });
     reload(null);
@@ -311,8 +325,8 @@ const menus = new Menus({
       net = null;
     }
   },
-  onHost: (name, size) => net?.send({ t: 'host', name, size, version: PROTOCOL_VERSION }),
-  onJoin: (code, name) => net?.send({ t: 'join', code, name, version: PROTOCOL_VERSION }),
+  onHost: (name, size, faction) => net?.send({ t: 'host', name, size, faction, version: PROTOCOL_VERSION }),
+  onJoin: (code, name, faction) => net?.send({ t: 'join', code, name, faction, version: PROTOCOL_VERSION }),
   onCancelHost: () => {
     net?.send({ t: 'cancel' });
     menus.page('multiplayer');

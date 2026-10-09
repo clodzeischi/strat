@@ -11,6 +11,7 @@ Living plan for upcoming features and the AI difficulty work. Decisions are mark
 5. Hard AI (economy, recovery, harassment, chokepoint awareness), tuned across many generated maps
 6. Brutal AI, once units and numbers have settled. **Status: first version done** (micro, harassment and Carryall drops; see [AI difficulty plan](#ai-difficulty-plan))
 7. Online multiplayer, so balance can be tested by people instead of only sims. **Status: 1v1 lockstep done** (self-hosted server, LAN or Raspberry Pi); see [MULTIPLAYER.md](MULTIPLAYER.md) for the design, the rules game code must now follow, and next steps (reconnect, replays, VPS).
+8. Factions: Atreides (today's roster) and Corrino. See [Factions](#6-factions).
 
 Brutal waits because timing builds and micro depend on exact numbers (speeds, ranges, build times), so every balance change would break them. Hard's general systems (rebuilding, value-based spending) read costs and stats from `src/config/`, so they survive changes.
 
@@ -127,6 +128,73 @@ Suggestion: rather than making harvesters slower overall, make home fields run o
   - **Anti-air:** infantry (rifles and rockets) and rocket launchers can shoot aircraft (rockets get +25 against them); nothing else can. A Carryall that's shot down loses vehicles aboard (hanging trikes included), while infantry bail out by parachute. Drops landing within 22 tiles of the other side's buildings warn its owner.
 
 Follow-ups: the AI doesn't build Repair Vehicles, the Hi-Tech Factory or Carryalls yet (its units do shoot at enemy aircraft). Carryalls ignore threats when choosing a path.
+
+## 6. Factions
+
+Setting: after *Dune Messiah*. House Harkonnen is broken; House Corrino is still plotting. There is no Harkonnen faction.
+
+### Atreides (today's roster) **Decided**
+
+The Terran of the game: mid cost, fast, moderate APM. Relies on scouting, conventional weapons and mobility (Carryalls). The introductory faction.
+
+### Corrino **Decided** (numbers are proposals until the sims settle them)
+
+The Protoss of the game: slower, more expensive, stronger, and every loss hurts.
+
+- **Health and shields like Protoss.** A unit's health alone exceeds its Atreides counterpart's; shields come on top. Damage hits shields first, then health. Shields recover on their own after a few seconds without taking damage; health never does. Health is only restored at a **Repair Pad**. The Atreides Repair Vehicle and infantry regeneration don't apply to Corrino.
+- **No hidden units.** Mines are visible area denial.
+- **No Carryalls and no fast transport.** Mobility is the Atreides advantage. Corrino's answer is **drop pods**: after the Barracks upgrade, infantry can be dropped anywhere in the visible area.
+
+**Units**
+
+| Unit | Built at | Requires | Role | Counters | Countered by |
+|---|---|---|---|---|---|
+| Harkonnen Trooper | Barracks | Barracks | Imperial levy (Harkonnen remnants) with anti-vehicle weapons | Vehicles. Beats trikes by numbers, about 1.3:1 (like Zealots against Roaches) | Trikes in small numbers, Rocket Launchers |
+| Sardaukar | Barracks | Barracks upgrade (late game) | Close-quarters specialist, well rounded | Infantry, aircraft | Trikes, Rocket Launchers |
+| Razor | Fab | Fab | Dune buggy with a flamethrower | Infantry | Tanks |
+| Devastator | Fab | Tleilaxu Research, Fab upgrade | Slow heavy tank. Its machine gun fires while moving; the main gun doesn't. Can self-destruct in a big explosion | Armor; infantry up close | Aircraft, Rocket Launchers |
+| Sky Raider | Fab | Tleilaxu Research | Light ornithopter for scouting and disruption. Lays visible mines that wreck infantry and wear down harvesters | Armor | Anti-air |
+| Artillery | Fab | Tleilaxu Research | Self-propelled howitzer. Can't fire while moving; a short-range gun with modest damage. Deployed (static), it fires long-range, high-damage shells at a spot on the ground. Shells aren't guided, so a trike can drive out of the impact zone | Buildings, static defenses | Tanks |
+
+Corrino builds the same **Harvester** (with shields) at the Fab.
+
+**Buildings:** Construction Yard, Refinery, Barracks (Harkonnen Troopers), Fab (Razors), Tleilaxu Research (needed for Devastators, Sky Raiders and Artillery), Repair Pad, and a small **auto turret** for defense (Corrino has no Bunker).
+
+- Buildings have shields too. A damaged building gets a **Repair** action on its command card while its owner has a Construction Yard; health comes back slowly and costs credits.
+- The **Repair Pad** restores units' health two at a time, as long as there are credits to pay for it (the same 40% share of the price as Atreides repairs).
+
+**Upgrades**
+
+| Upgrade | Requires | Effect |
+|---|---|---|
+| Armor +1 (Fab) | | Less damage to health |
+| Shields +1 (Tleilaxu Research) | | Less damage to shields |
+| Weapons +1 (Fab) | | More damage |
+| Barracks upgrade | Tleilaxu Research | Sardaukar, drop pods: newly trained infantry land by pod at the Barracks' rally point, anywhere the player can see |
+| Fab upgrade | Tleilaxu Research | Devastators |
+| Harvester speed | | Faster harvesters |
+| Razor flame range | | Longer flamethrower |
+
+### Order of work
+
+**Status: stage 1 done.** Check with `npx tsx sim/corrino-check.ts` (tech tree, shields, Repair Pad, self-repair, turret, Sky Raider flight, determinism) and `npx tsx sim/faction-duels.ts` (balance). The computer opponent still always plays Atreides.
+
+Equal-cost duels after the first balance pass ($4500 a side; +1 Corrino wins untouched, -1 Atreides does):
+
+| Corrino \ Atreides | Infantry | Trike | Tank | Rocket Launcher |
+|---|---|---|---|---|
+| Harkonnen Trooper | 0.18 | 0.10 | 0.79 | -0.17 |
+| Sardaukar | 0.31 | -0.56 | 0.66 | -0.90 |
+| Razor | 0.53 | 0.13 | -0.58 | -0.11 |
+| Devastator | 0.31 | 0.43 | 0.25 | 0.46 |
+| Sky Raider | -0.78 | 1.00 | 0.96 | -0.23 |
+| Artillery | -0.15 | -0.43 | -0.60 | -0.51 |
+
+Open points: the Devastator beats Rocket Launchers in a straight fight (they only win by kiting with their longer range), and Artillery loses everywhere until it can deploy (stage 2). The Razor's flamethrower is still a plain short-range gun.
+
+1. **Plumbing:** a faction per player (menu, lobby, AI), a roster per faction (units, buildings, upgrades, tech tree), shields and their regeneration, the Repair Pad. The six units go in using today's mechanics. Run the matchup sims for a first balance pass.
+2. **Special mechanics,** one at a time, re-running the matchup sims after each: drop pods, deployed Artillery firing at the ground, the flamethrower, the Devastator firing while moving and self-destructing, Sky Raider mines.
+3. **AI that can play Corrino** (Brutal is tuned for Atreides).
 
 ## AI difficulty plan
 

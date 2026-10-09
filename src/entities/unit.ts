@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
-  BUILDINGS, HARVEST_UPGRADE, HARVESTER, NITRO, REPAIR_COST, TEAM_COLORS, TILE, UNITS, type Tag, type Team, type UnitDef, type UnitType,
+  BUILDINGS, CARRYALL, HARVEST_UPGRADE, HARVESTER, NITRO, REPAIR_COST, TEAM_COLORS, TILE, shieldsFor, unitDef,
+  type Faction, type Tag, type Team, type UnitDef, type UnitType,
 } from '../config';
 import type { Game } from '../game/game';
 import { findPath, type Point } from '../game/pathfinding';
@@ -32,6 +33,9 @@ export type Order =
   | { kind: 'harvest' }
   | { kind: 'repair'; target: Entity }
   | { kind: 'enter'; target: Building };
+
+/** Combat aircraft (the Sky Raider) fly this high over the ground. */
+const AIR_HEIGHT = CARRYALL.altitude - 2;
 
 /** Paratroopers come down at this speed; vehicles on their bigger canopies a little slower. */
 const FALL_SPEED = { foot: 2.2, vehicle: 1.7 };
@@ -101,9 +105,9 @@ export class Unit extends Entity {
   private lastSpice: Cell | null = null;
   private puffTimer = 0;
 
-  constructor(id: number, team: Team, readonly type: UnitType, x: number, z: number, heading = 0) {
-    const def = UNITS[type];
-    super(id, team, def.hp, Math.max(1.2, def.radius * 1.8), def.infantry ? 1.6 : 2.0, def.radius + 0.25);
+  constructor(id: number, team: Team, readonly type: UnitType, x: number, z: number, heading = 0, readonly faction: Faction = 'atreides') {
+    const def = unitDef(faction, type);
+    super(id, team, def.hp, shieldsFor(faction, def), Math.max(1.2, def.radius * 1.8), def.infantry ? 1.6 : 2.0, def.radius + 0.25);
     this.def = def;
     this.radius = def.radius;
     this.moveClass = def.infantry ? 'foot' : 'vehicle';
@@ -165,7 +169,7 @@ export class Unit extends Entity {
 
   speed(game: Game): number {
     const ups = game.teams[this.team].upgrades;
-    if (this.type === 'harvester' && ups.has('harvest')) return this.def.speed * HARVEST_UPGRADE.speed;
+    if (this.type === 'harvester' && game.tier(this.team, 'harvest')) return this.def.speed * HARVEST_UPGRADE.speed;
     if (this.type === 'trike' && ups.has('nitro')) return this.def.speed * NITRO.speed;
     return this.def.speed;
   }
@@ -294,13 +298,17 @@ export class Unit extends Entity {
     if (this.turret) this.turret.rotation.y = 0;
   }
 
-  onDamaged(attacker: Unit | null): void {
+  onDamaged(attacker: Entity | null): void {
     if (!attacker || attacker.dead || !this.def.weapon) return;
     if (this.order.kind === 'idle' && !this.target) this.target = attacker;
   }
 
   setPath(game: Game, x: number, z: number): void {
-    this.path = findPath(game.map, this.x, this.z, x, z, this.moveClass);
+    // Aircraft fly straight over everything, staying over the map.
+    const edge = game.map.worldSize() - TILE;
+    this.path = this.def.air
+      ? [{ x: THREE.MathUtils.clamp(x, TILE, edge), z: THREE.MathUtils.clamp(z, TILE, edge) }]
+      : findPath(game.map, this.x, this.z, x, z, this.moveClass);
     this.progressTimer = 0;
     this.lastX = this.x;
     this.lastZ = this.z;
@@ -328,7 +336,9 @@ export class Unit extends Entity {
         this.target = this.order.target;
       }
     } else if (weapon && (this.order.kind === 'idle' || this.order.kind === 'amove')) {
-      if (this.target && (this.target.dead || !game.sees(this.team, this.target) || distTo(this.target, this.x, this.z) > this.def.sight * 1.3)) {
+      // Also dropped if it can't be hit at all (an aircraft that shot at a unit without anti-air).
+      const t = this.target;
+      if (t && (t.dead || !game.sees(this.team, t) || distTo(t, this.x, this.z) > this.def.sight * 1.3 || !game.weaponFor(this, t))) {
         this.target = null;
         if (this.order.kind === 'idle') this.path = [];
       }
@@ -522,7 +532,7 @@ export class Unit extends Entity {
       const step = Math.min(d, this.speed(game) * dt * align);
       const nx = this.x + (dx / d) * step;
       const nz = this.z + (dz / d) * step;
-      if (!game.canMove(this, nx, nz)) {
+      if (!this.def.air && !game.canMove(this, nx, nz)) {
         // Pushed off the planned line and now facing a level edge: plan again from here.
         const goal = this.path[this.path.length - 1];
         this.setPath(game, goal.x, goal.z);
@@ -578,7 +588,7 @@ export class Unit extends Entity {
   private updateHarvester(game: Game, dt: number): void {
     const map = game.map;
     const team = game.teams[this.team];
-    const capacity = HARVESTER.capacity * (team.upgrades.has('harvest') ? HARVEST_UPGRADE.capacity : 1);
+    const capacity = HARVESTER.capacity * (game.tier(this.team, 'harvest') ? HARVEST_UPGRADE.capacity : 1);
 
     switch (this.hstate) {
       case 'seek': {
@@ -706,7 +716,7 @@ export class Unit extends Entity {
       armor: game.tier(this.team, 'armor'),
       rockets: ts.upgrades.has('rockets'),
       nitro: ts.upgrades.has('nitro'),
-      harvest: ts.upgrades.has('harvest'),
+      harvest: game.tier(this.team, 'harvest') > 0,
     };
     const key = `${look.weapons}${look.armor}${+look.rockets}${+look.nitro}${+look.harvest}`;
     if (this.kit?.key === key) return;
@@ -725,11 +735,11 @@ export class Unit extends Entity {
   syncVisual(game: Game, dt: number): void {
     this.refreshKit(game);
     if (!this.falling) {
-      const groundY = game.map.surfaceAt(this.x, this.z);
-      this.y += (groundY - this.y) * Math.min(1, dt * 10);
+      const groundY = game.map.surfaceAt(this.x, this.z) + (this.def.air ? AIR_HEIGHT : 0);
+      this.y += (groundY - this.y) * Math.min(1, dt * (this.def.air ? 3 : 10));
     }
     this.root.position.set(this.x, this.y, this.z);
-    if (this.falling) {
+    if (this.falling || this.def.air) {
       this.body.rotation.set(0, -this.heading, Math.sin(game.time * 2.3 + this.id) * 0.08);
     } else if (this.def.infantry) {
       this.body.rotation.set(0, -this.heading, 0);

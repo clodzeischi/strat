@@ -19,6 +19,8 @@ export type Command =
   | { c: 'rally'; buildings: number[]; x: number; z: number }
   | { c: 'salvage'; buildings: number[] }
   | { c: 'cancelSalvage'; buildings: number[] }
+  /** Corrino: structures start (or stop) repairing themselves. */
+  | { c: 'mend'; buildings: number[]; on: boolean }
   | { c: 'build'; type: BuildingType }
   | { c: 'cancelBuild' }
   | { c: 'place'; cx: number; cz: number }
@@ -78,6 +80,9 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       return;
     case 'cancelSalvage':
       for (const b of ownBuildings(game, team, cmd.buildings)) game.cancelSalvage(b);
+      return;
+    case 'mend':
+      for (const b of ownBuildings(game, team, cmd.buildings)) b.repairing = cmd.on && game.canSelfRepair(b);
       return;
     case 'build':
       if (!game.teams[team].building && game.canBuild(team, cmd.type)) game.startBuilding(team, cmd.type);

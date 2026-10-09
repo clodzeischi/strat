@@ -4,3 +4,4 @@ export * from './rules';
 export * from './units';
 export * from './buildings';
 export * from './upgrades';
+export * from './factions';

@@ -12,7 +12,7 @@ import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomInt } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
-import type { MapSize, Team } from '../src/config';
+import { FACTION_LIST, type Faction, type MapSize, type Team } from '../src/config';
 import { PROTOCOL_VERSION, type ClientMsg, type MatchInfo, type RoomInfo, type ServerMsg } from '../src/net/protocol';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -34,6 +34,7 @@ interface Room {
   code: string;
   size: MapSize;
   names: [string, string];
+  factions: [Faction, Faction];
   state: 'open' | 'matched' | 'playing';
   seed: number;
   tokens: [string, string];
@@ -50,7 +51,7 @@ function send(c: Client | null, msg: ServerMsg): void {
 }
 
 function roomList(): RoomInfo[] {
-  return [...rooms.values()].filter((r) => r.state === 'open').map((r) => ({ code: r.code, host: r.names[0], size: r.size }));
+  return [...rooms.values()].filter((r) => r.state === 'open').map((r) => ({ code: r.code, host: r.names[0], size: r.size, faction: r.factions[0] }));
 }
 
 function broadcastRooms(): void {
@@ -70,6 +71,10 @@ function newCode(): string {
 function cleanName(v: unknown): string {
   const s = typeof v === 'string' ? v.replace(/[^\p{L}\p{N} _.-]/gu, '').trim().slice(0, 16) : '';
   return s || 'Player';
+}
+
+function cleanFaction(v: unknown): Faction {
+  return FACTION_LIST.includes(v as Faction) ? (v as Faction) : 'atreides';
 }
 
 function closeRoom(room: Room): void {
@@ -100,7 +105,8 @@ function onMessage(c: Client, msg: ClientMsg): void {
       if (msg.version !== PROTOCOL_VERSION) return send(c, { t: 'error', text: 'This page is out of date. Reload it to get the server\'s version of the game.' });
       if (c.room) leave(c);
       const room: Room = {
-        code: newCode(), size: MAP_SIZES.includes(msg.size) ? msg.size : 64, names: [cleanName(msg.name), ''], state: 'open',
+        code: newCode(), size: MAP_SIZES.includes(msg.size) ? msg.size : 64, names: [cleanName(msg.name), ''],
+        factions: [cleanFaction(msg.faction), 'atreides'], state: 'open',
         seed: 0, tokens: ['', ''], players: [c, null], timer: null,
       };
       rooms.set(room.code, room);
@@ -120,6 +126,7 @@ function onMessage(c: Client, msg: ClientMsg): void {
       if (room.players[0] === c) return send(c, { t: 'error', text: 'That\'s your own game. Wait for someone else to join it.' });
       if (c.room) leave(c);
       room.names[1] = cleanName(msg.name);
+      room.factions[1] = cleanFaction(msg.faction);
       room.state = 'matched';
       room.seed = randomInt(1_000_000);
       room.tokens = [randomBytes(12).toString('hex'), randomBytes(12).toString('hex')];
@@ -129,7 +136,7 @@ function onMessage(c: Client, msg: ClientMsg): void {
       for (const [p, team] of [[host, 0], [c, 1]] as [Client, Team][]) {
         p.room = null;
         p.team = null;
-        const match: MatchInfo = { code: room.code, token: room.tokens[team], team, seed: room.seed, size: room.size, names: room.names };
+        const match: MatchInfo = { code: room.code, token: room.tokens[team], team, seed: room.seed, size: room.size, names: room.names, factions: room.factions };
         send(p, { t: 'match', match });
       }
       room.timer = setTimeout(() => {

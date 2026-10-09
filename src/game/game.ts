@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import {
-  ARMOR_BONUS, BUILDINGS, HIGH_GROUND_RANGE, INFANTRY_REGEN, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
-  type LevelUpType, type MapSize, type Producer, type Req,
+  ARMOR_BONUS, BUILDINGS, FACTIONS, FLAME_RANGE, HIGH_GROUND_RANGE, INFANTRY_REGEN, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX,
+  REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
+  factionLevelUps, factionUpgrades, unitDef,
+  type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
-  type WeaponDef, type UnitType, type UpgradeType,
+  type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
 import { Effects } from '../render/effects/effects';
 import { Building, Carryall, distTo, facingToward, repairable, SALVAGE, Unit, type Entity } from '../entities';
@@ -29,8 +31,12 @@ export interface TeamStats {
 
 export type Difficulty = 'normal' | 'hard' | 'brutal';
 
+/** Anything that fires: units, and structures with a gun (Corrino's turret). */
+export type Shooter = Unit | Building;
+
 export interface TeamState {
   team: Team;
+  faction: Faction;
   stats: TeamStats;
   /** This team's unit with the most kills so far (may be dead). */
   hero: Unit | null;
@@ -60,7 +66,7 @@ interface Projectile {
   start: THREE.Vector3;
   end: THREE.Vector3;
   target: Entity;
-  owner: Unit;
+  owner: Shooter;
   t: number;
   duration: number;
   weapon: WeaponDef;
@@ -115,20 +121,23 @@ export class Game {
   private lastDropAlert = -100;
   private victoryTimer = 0;
 
-  constructor(readonly scene: THREE.Scene, private camera: THREE.Camera, size: MapSize = 64, seed = 7) {
+  constructor(
+    readonly scene: THREE.Scene, private camera: THREE.Camera, size: MapSize = 64, seed = 7,
+    factions: Faction[] = ['atreides', 'atreides'],
+  ) {
     this.map = new GameMap(size, seed);
     this.random = mulberry32(seed * 2654435761 + 12345);
     this.terrain = new Terrain(this.map);
     scene.add(this.terrain.mesh);
     this.effects = new Effects(scene);
     this.teams = ([0, 1] as Team[]).map((team) => ({
-      team, credits: START_CREDITS, upgrades: new Set<UpgradeType>(), hero: null,
+      team, faction: factions[team] ?? 'atreides', credits: START_CREDITS, upgrades: new Set<UpgradeType>(), hero: null,
       stats: {
         unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
         spiceHarvested: 0, creditsSpent: 0,
       },
-      building: null, queues: { barracks: [], factory: [], hitech: [] }, research: null,
-      spawnTurn: { barracks: 0, factory: 0, hitech: 0 }, levelUps: {},
+      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [] }, research: null,
+      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0 }, levelUps: {},
     }));
     this.vision = new Vision(this.map, this.teams.length);
     this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
@@ -148,8 +157,7 @@ export class Game {
       const uz = (mid - b.cz) / len;
       const towardCenter = { cx: front.cx + Math.round(ux * 3), cz: front.cz + Math.round(uz * 3) };
       const cells = cellsAround(this.map, towardCenter.cx, towardCenter.cz, 12);
-      const start: UnitType[] = ['trike', 'infantry', 'infantry', 'infantry'];
-      start.forEach((type, k) => {
+      FACTIONS[this.teams[team].faction].start.forEach((type, k) => {
         const c = cells[k * 2] ?? cells[0];
         this.spawnUnit(type, team, this.map.center(c.cx), this.map.center(c.cz), Math.atan2(uz, ux));
       });
@@ -174,13 +182,18 @@ export class Game {
     return n;
   }
 
-  /** Whether a requirement is satisfied: the building exists (at level 2 for 'conyard2' / 'factory2'). */
+  /** Whether a requirement is satisfied: the building exists (at level 2 for 'conyard2', 'factory2' and so on). */
   meets(team: Team, r: Req): boolean {
-    if (r === 'conyard2' || r === 'factory2') {
-      const type = r === 'conyard2' ? 'conyard' : 'factory';
+    if (r.endsWith('2')) {
+      const type = r.slice(0, -1);
       return this.buildings.some((b) => b.team === team && b.type === type && b.level >= 2 && !b.dead);
     }
-    return this.has(team, r);
+    return this.has(team, r as BuildingType);
+  }
+
+  /** A unit's stats as this team's faction fields it. */
+  unitDef(team: Team, type: UnitType): UnitDef {
+    return unitDef(this.teams[team].faction, type);
   }
 
   requirementsMet(team: Team, reqs: Req[]): boolean {
@@ -189,39 +202,44 @@ export class Game {
 
   /** A level-1 building of this type exists, nobody of that type is level 2, and none is mid-upgrade. */
   canLevelUp(team: Team, type: LevelUpType): boolean {
-    return !this.teams[team].levelUps[type] && !this.meets(team, `${type}2`) && this.has(team, type);
+    const reqs = BUILDINGS[type].levelUp?.requires ?? [];
+    return factionLevelUps(this.teams[team].faction).has(type) && !this.teams[team].levelUps[type] && !this.meets(team, `${type}2`) &&
+      this.has(team, type) && this.requirementsMet(team, reqs);
   }
 
   canBuild(team: Team, type: BuildingType): boolean {
-    return this.has(team, 'conyard') && this.requirementsMet(team, BUILDINGS[type].requires);
+    return FACTIONS[this.teams[team].faction].build.includes(type) && this.has(team, 'conyard') && this.requirementsMet(team, BUILDINGS[type].requires);
   }
 
   canTrain(team: Team, type: UnitType): boolean {
-    return this.has(team, UNITS[type].producer) && this.requirementsMet(team, UNITS[type].requires);
+    const d = this.unitDef(team, type);
+    return FACTIONS[this.teams[team].faction].train.includes(type) && this.has(team, d.producer) && this.requirementsMet(team, d.requires);
   }
 
   canResearch(team: Team, type: UpgradeType): boolean {
     const d = UPGRADES[type];
     const ups = this.teams[team].upgrades;
-    return !ups.has(type) && (!d.after || ups.has(d.after)) && this.requirementsMet(team, d.requires);
+    return factionUpgrades(this.teams[team].faction).has(type) && !ups.has(type) && (!d.after || ups.has(d.after)) &&
+      this.requirementsMet(team, d.requires);
   }
 
-  /** Researched tier (0-2) of a two-tier upgrade line. */
-  tier(team: Team, line: 'weapons' | 'armor'): number {
-    const ups = this.teams[team].upgrades;
-    return ups.has(`${line}2`) ? 2 : ups.has(`${line}1`) ? 1 : 0;
+  /** Researched level of an upgrade line: 0-2 for Atreides Weapons and Armor, 0-1 for the rest. */
+  tier(team: Team, line: UpgradeLine): number {
+    let n = 0;
+    for (const t of this.teams[team].upgrades) if (UPGRADES[t].line === line) n++;
+    return n;
   }
 
-  /** Seconds between shots for this unit's weapon, after upgrades. */
-  cooldownFor(u: Unit, w: WeaponDef): number {
-    return w.cooldown * (u.type === 'trike' && this.teams[u.team].upgrades.has('nitro') ? NITRO.cooldown : 1);
+  /** Seconds between shots for this weapon, after upgrades. */
+  cooldownFor(u: Shooter, w: WeaponDef): number {
+    return w.cooldown * (u instanceof Unit && u.type === 'trike' && this.teams[u.team].upgrades.has('nitro') ? NITRO.cooldown : 1);
   }
 
   /**
    * Best enemy within range of a point. When `seeker` is given, targets it counters are preferred
    * and ones inside its minimum range are avoided.
    */
-  nearestEnemy(team: Team, x: number, z: number, range: number, seeker?: Unit): Entity | null {
+  nearestEnemy(team: Team, x: number, z: number, range: number, seeker?: Shooter): Entity | null {
     let best: Entity | null = null;
     let bestScore = Infinity;
     const consider = (e: Entity, penalty: number) => {
@@ -340,10 +358,11 @@ export class Game {
     return e instanceof Building ? this.map.level[this.map.idx(e.cx, e.cz)] : this.map.levelAt(e.x, e.z);
   }
 
-  /** Weapon range after the high-ground modifier: longer shooting down, shorter shooting up. */
-  rangeFor(u: Unit, w: WeaponDef, target: Entity): number {
+  /** Weapon range after upgrades and the high-ground modifier: longer shooting down, shorter shooting up. */
+  rangeFor(u: Shooter, w: WeaponDef, target: Entity): number {
     const diff = this.levelOf(u) - this.levelOf(target);
-    return w.range * (diff >= 1 ? 1 + HIGH_GROUND_RANGE : diff <= -1 ? 1 - HIGH_GROUND_RANGE : 1);
+    const range = w.range + (u instanceof Unit && u.type === 'razor' && this.teams[u.team].upgrades.has('flame') ? FLAME_RANGE : 0);
+    return range * (diff >= 1 ? 1 + HIGH_GROUND_RANGE : diff <= -1 ? 1 - HIGH_GROUND_RANGE : 1);
   }
 
   findSpice(cx: number, cz: number, self: Unit): Cell | null {
@@ -404,7 +423,8 @@ export class Game {
   // ---- Spawning -------------------------------------------------------------
 
   spawnUnit(type: UnitType, team: Team, x: number, z: number, heading = 0): Unit {
-    const u = type === 'carryall' ? new Carryall(this.nextId++, team, x, z, heading) : new Unit(this.nextId++, team, type, x, z, heading);
+    const faction = this.teams[team].faction;
+    const u = type === 'carryall' ? new Carryall(this.nextId++, team, x, z, heading) : new Unit(this.nextId++, team, type, x, z, heading, faction);
     u.y = this.map.surfaceAt(x, z);
     u.stagger(this.random);
     u.syncVisual(this, 0);
@@ -419,7 +439,7 @@ export class Game {
     const bz = (cz + size / 2) * TILE;
     // Doors face the middle of the map, so mirrored bases get mirrored exits and docks.
     const mid = this.map.worldSize() / 2;
-    const b = new Building(this.nextId++, team, type, cx, cz, this.map.surfaceAt(bx, bz), facingToward(bx, bz, mid, mid));
+    const b = new Building(this.nextId++, team, type, cx, cz, this.map.surfaceAt(bx, bz), facingToward(bx, bz, mid, mid), this.teams[team].faction);
     for (let z = cz; z < cz + b.size; z++) {
       for (let x = cx; x < cx + b.size; x++) this.map.occupied[this.map.idx(x, z)] = b.id;
     }
@@ -440,7 +460,7 @@ export class Game {
   }
 
   private spawnFromProducer(team: Team, type: UnitType): void {
-    const producer = UNITS[type].producer;
+    const producer = this.unitDef(team, type).producer;
     const sites = this.buildings.filter((b) => b.team === team && b.type === producer && !b.dead);
     if (sites.length === 0) return;
     const ts = this.teams[team];
@@ -614,7 +634,7 @@ export class Game {
 
   queueUnit(team: Team, type: UnitType): boolean {
     const ts = this.teams[team];
-    const queue = ts.queues[UNITS[type].producer];
+    const queue = ts.queues[this.unitDef(team, type).producer];
     if (!this.canTrain(team, type)) return false;
     if (queue.length >= QUEUE_MAX) {
       this.notifyTeam(team, 'Production queue full.');
@@ -631,7 +651,7 @@ export class Game {
   }
 
   dequeueUnit(team: Team, type: UnitType): void {
-    const q = this.teams[team].queues[UNITS[type].producer];
+    const q = this.teams[team].queues[this.unitDef(team, type).producer];
     for (let i = q.length - 1; i >= 0; i--) {
       if (q[i].type === type) {
         q.splice(i, 1);
@@ -734,15 +754,15 @@ export class Game {
 
   // ---- Combat ---------------------------------------------------------------
 
-  /** The weapon a unit uses against this target: Infantry Rockets swap in against Armored. */
-  weaponFor(u: Unit, target: Entity): WeaponDef | null {
-    const anti = u.def.antiArmor;
-    const w = anti && target.tags.includes('armored') && this.teams[u.team].upgrades.has('rockets') ? anti : u.def.weapon;
+  /** The weapon a unit or turret uses against this target: Infantry Rockets swap in against Armored. */
+  weaponFor(u: Shooter, target: Entity): WeaponDef | null {
+    const anti = u instanceof Unit ? u.def.antiArmor : undefined;
+    const w = anti && target.tags.includes('armored') && this.teams[u.team].upgrades.has('rockets') ? anti : u.def.weapon ?? null;
     if (w && target.tags.includes('air') && !w.air) return null;
     return w;
   }
 
-  fire(u: Unit, target: Entity, w: WeaponDef): void {
+  fire(u: Shooter, target: Entity, w: WeaponDef): void {
     const mult = 1 + WEAPONS_BONUS * this.tier(u.team, 'weapons');
     const from = u.muzzleWorld();
     const to = target.aimPoint();
@@ -807,12 +827,19 @@ export class Game {
     }
   }
 
-  damage(target: Entity, w: WeaponDef, mult: number, attacker: Unit | null): void {
+  damage(target: Entity, w: WeaponDef, mult: number, attacker: Shooter | null): void {
     if (target.dead || (target instanceof Unit && target.carrier)) return;
     target.lastHurt = this.time;
     // Whoever fires is seen by the side it hits for a moment, so units below a cliff can shoot back.
     if (attacker && attacker.team !== target.team) this.vision.reveal(target.team, attacker.x, attacker.z, this.ticks);
     let dmg = weaponDamage(w, target) * mult;
+    if (target.shields > 0) {
+      // Shields take the hit first (less with Shields upgrades); whatever gets through goes on to health.
+      const onShields = dmg * (1 - SHIELDS_BONUS * this.tier(target.team, 'shields'));
+      const absorbed = Math.min(target.shields, onShields);
+      target.shields -= absorbed;
+      dmg *= 1 - absorbed / onShields;
+    }
     dmg *= 1 - ARMOR_BONUS * this.tier(target.team, 'armor');
     target.hp -= dmg;
     if (target instanceof Unit) {
@@ -833,7 +860,7 @@ export class Game {
     return this.witnessed[team].has(id);
   }
 
-  private kill(e: Entity, attacker: Unit | null): void {
+  private kill(e: Entity, attacker: Shooter | null): void {
     // Whoever saw it go, or made the kill, knows it's gone.
     for (const ts of this.teams) if (ts.team !== e.team && (this.vision.sees(ts.team, e) || attacker?.team === ts.team)) this.witnessed[ts.team].add(e.id);
     e.dead = true;
@@ -846,7 +873,7 @@ export class Game {
       victim.unitsLost++;
       if (killer) killer.stats.unitsKilled++;
     }
-    if (killer && attacker) {
+    if (killer && attacker instanceof Unit) {
       attacker.kills++;
       if (!killer.hero || attacker.kills > killer.hero.kills) killer.hero = attacker;
     }
@@ -948,6 +975,73 @@ export class Game {
     }
   }
 
+  // ---- Shields, turrets and repairs (Corrino) ---------------------------------------
+
+  /** Shields recover once nothing has hit their owner for a while. */
+  private regenShields(dt: number): void {
+    const regen = (e: Entity) => {
+      if (e.shields >= e.maxShields || this.time - e.lastHurt < SHIELD_REGEN.delay) return;
+      e.shields = Math.min(e.maxShields, e.shields + (e.maxShields / SHIELD_REGEN.full) * dt);
+    };
+    for (const u of this.units) if (u.maxShields) regen(u);
+    for (const b of this.buildings) if (b.maxShields) regen(b);
+  }
+
+  /** Gun emplacements pick the best enemy in range and shoot it. */
+  private updateTurrets(dt: number): void {
+    for (const b of this.buildings) {
+      const w = b.def.weapon;
+      if (!w || b.dead) continue;
+      b.cooldown -= dt;
+      const t = b.target;
+      if (!t || t.dead || !this.vision.sees(b.team, t) || distTo(t, b.x, b.z) > this.rangeFor(b, w, t) || !this.weaponFor(b, t)) {
+        b.target = this.nearestEnemy(b.team, b.x, b.z, w.range, b);
+      }
+      if (!b.target) continue;
+      b.aim = Math.atan2(b.target.z - b.z, b.target.x - b.x);
+      if (b.cooldown > 0) continue;
+      this.fire(b, b.target, w);
+      b.cooldown = w.cooldown * (0.9 + this.random() * 0.2);
+    }
+  }
+
+  /** A Repair Pad mends its own side's damaged units parked next to it, a few at a time, paying as it goes. */
+  private updatePads(dt: number): void {
+    for (const b of this.buildings) {
+      const pad = b.def.pad;
+      if (!pad || b.dead) continue;
+      const near = (u: Unit) => !u.dead && !u.carrier && !u.falling && u.team === b.team && u.hp < u.maxHp && distTo(b, u.x, u.z) - u.radius <= pad.range;
+      b.patients = b.patients.filter(near);
+      if (b.patients.length < pad.slots) {
+        const waiting = this.units.filter((u) => near(u) && !b.patients.includes(u)).sort((a, c) => a.hp / a.maxHp - c.hp / c.maxHp || a.id - c.id);
+        b.patients.push(...waiting.slice(0, pad.slots - b.patients.length));
+      }
+      for (const u of b.patients) {
+        const hp = Math.min(pad.rate * dt, u.maxHp - u.hp);
+        if (!this.pay(b.team, (hp / u.maxHp) * u.def.cost * REPAIR_COST)) break;
+        u.hp += hp;
+      }
+    }
+  }
+
+  /** Corrino structures told to repair mend themselves while a Construction Yard stands, paying as they go. */
+  private updateSelfRepair(dt: number): void {
+    for (const b of this.buildings) {
+      if (!b.repairing || b.dead) continue;
+      if (b.hp >= b.maxHp || !this.has(b.team, 'conyard')) {
+        b.repairing = false;
+        continue;
+      }
+      const hp = Math.min(SELF_REPAIR_RATE * dt, b.maxHp - b.hp);
+      if (this.pay(b.team, (hp / b.maxHp) * BUILDINGS[b.type].cost * REPAIR_COST)) b.hp += hp;
+    }
+  }
+
+  /** Whether a structure can be told to repair itself now (Corrino, damaged, a Construction Yard standing). */
+  canSelfRepair(b: Building): boolean {
+    return FACTIONS[this.teams[b.team].faction].selfRepair && !b.dead && b.hp < b.maxHp && this.has(b.team, 'conyard');
+  }
+
   offerSurrender(team: Team): void {
     if (this.winner === null) this.onSurrenderOffer(team);
   }
@@ -977,11 +1071,16 @@ export class Game {
       if (u.dead || u.carrier) continue;
       if (u.falling) u.updateFall(this, dt);
       else u.update(this, dt);
-      if (u.def.infantry && u.hp < u.maxHp && this.time - u.lastHurt > INFANTRY_REGEN.delay) {
+      // Atreides infantry patch themselves up; Corrino health only comes back at a Repair Pad.
+      if (u.def.infantry && !u.maxShields && u.hp < u.maxHp && this.time - u.lastHurt > INFANTRY_REGEN.delay) {
         u.hp = Math.min(u.maxHp, u.hp + u.maxHp * INFANTRY_REGEN.rate * dt);
       }
     }
+    this.regenShields(dt);
     this.updateBunkers(dt);
+    this.updateTurrets(dt);
+    this.updatePads(dt);
+    this.updateSelfRepair(dt);
     this.updateSalvage(dt);
     this.separate();
     for (const u of this.units) if (!u.carrier) u.syncVisual(this, dt);
@@ -1014,7 +1113,10 @@ export class Game {
       p.mesh.visible = this.revealAll || this.vision.seesAt(this.localTeam, p.mesh.position.x, p.mesh.position.z);
     }
     this.drawFog(dt);
-    for (const b of this.buildings) if (b.spinner) b.spinner.rotation.y += dt * (b.type === 'factory' ? 1.5 : 0.25);
+    for (const b of this.buildings) {
+      if (b.def.weapon) b.aimGun();
+      else if (b.spinner) b.spinner.rotation.y += dt * (b.type === 'factory' ? 1.5 : 0.25);
+    }
     this.effects.update(dt);
     this.terrain.flush();
     for (const u of this.units) if (u.root.visible) u.updateBar(this.camera);
@@ -1054,8 +1156,8 @@ export class Game {
   hash(): number {
     const h = new Hasher().int(this.ticks).int(this.nextId);
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
-    for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.heading);
-    for (const b of this.buildings) h.int(b.id).num(b.hp);
+    for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading);
+    for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
     for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);
     return h.value;
   }

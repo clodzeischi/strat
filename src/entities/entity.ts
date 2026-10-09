@@ -9,6 +9,8 @@ export abstract class Entity {
   abstract readonly name: string;
   abstract readonly tags: readonly Tag[];
   hp: number;
+  /** Shields (Corrino): soak up damage before health and recover on their own. */
+  shields: number;
   dead = false;
   /** Game time this last took damage. */
   lastHurt = -Infinity;
@@ -20,10 +22,16 @@ export abstract class Entity {
   /** Health bar (hidden by the fog of war along with the rest when out of sight). */
   readonly bar = new THREE.Group();
   private barFg: THREE.Mesh;
+  /** Shield bar, a thin blue strip above the health bar (only with shields). */
+  private shieldFg: THREE.Mesh | null = null;
   private ring: THREE.Mesh;
 
-  constructor(readonly id: number, readonly team: Team, readonly maxHp: number, barWidth: number, barHeight: number, ringRadius: number) {
+  constructor(
+    readonly id: number, readonly team: Team, readonly maxHp: number, readonly maxShields: number,
+    barWidth: number, barHeight: number, ringRadius: number,
+  ) {
     this.hp = maxHp;
+    this.shields = maxShields;
     const bg = new THREE.Mesh(barGeo, barBgMat);
     bg.scale.set(barWidth + 0.12, 0.3, 1);
     bg.position.set(-barWidth / 2 - 0.06, 0, 0);
@@ -33,6 +41,17 @@ export abstract class Entity {
     this.barFg.position.set(-barWidth / 2, 0, 0.001);
     this.barFg.renderOrder = 999;
     this.bar.add(bg, this.barFg);
+    if (maxShields > 0) {
+      const sbg = new THREE.Mesh(barGeo, barBgMat);
+      sbg.scale.set(barWidth + 0.12, 0.2, 1);
+      sbg.position.set(-barWidth / 2 - 0.06, 0.25, 0);
+      sbg.renderOrder = 998;
+      this.shieldFg = new THREE.Mesh(barGeo, barMats.shield);
+      this.shieldFg.scale.set(barWidth, 0.1, 1);
+      this.shieldFg.position.set(-barWidth / 2, 0.25, 0.001);
+      this.shieldFg.renderOrder = 999;
+      this.bar.add(sbg, this.shieldFg);
+    }
     this.bar.position.y = barHeight;
     this.bar.visible = false; // shown by updateBar once the game runs
     this.bar.userData.width = barWidth;
@@ -54,10 +73,15 @@ export abstract class Entity {
 
   updateBar(camera: THREE.Camera): void {
     const frac = Math.max(0, this.hp / this.maxHp);
-    this.bar.visible = this.selected || frac < 0.999;
+    const sfrac = this.maxShields > 0 ? Math.max(0, this.shields / this.maxShields) : 1;
+    this.bar.visible = this.selected || frac < 0.999 || sfrac < 0.999;
     if (!this.bar.visible) return;
     this.bar.quaternion.copy(camera.quaternion);
     this.barFg.scale.x = this.bar.userData.width * frac;
+    if (this.shieldFg) {
+      this.shieldFg.visible = sfrac > 0;
+      this.shieldFg.scale.x = Math.max(1e-3, this.bar.userData.width * sfrac);
+    }
     this.barFg.material = frac > 0.6 ? barMats.good : frac > 0.3 ? barMats.mid : barMats.bad;
   }
 

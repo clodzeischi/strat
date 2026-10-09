@@ -1,14 +1,16 @@
-import type { MapSize, Team } from '../config';
+import type { Faction, MapSize, Team } from '../config';
 import type { Command } from '../game/commands';
 
 /** Bumped whenever the messages or the simulation change in a way that would split two different builds apart. */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 /** An open game waiting for a second player. */
 export interface RoomInfo {
   code: string;
   host: string;
   size: MapSize;
+  /** The host's faction. */
+  faction: Faction;
 }
 
 /** What each player gets when a match is made; the page reloads into the match with it. */
@@ -20,12 +22,13 @@ export interface MatchInfo {
   seed: number;
   size: MapSize;
   names: [string, string];
+  factions: [Faction, Faction];
 }
 
 export type ClientMsg =
   | { t: 'list' }
-  | { t: 'host'; name: string; size: MapSize; version: number }
-  | { t: 'join'; code: string; name: string; version: number }
+  | { t: 'host'; name: string; size: MapSize; faction: Faction; version: number }
+  | { t: 'join'; code: string; name: string; faction: Faction; version: number }
   | { t: 'cancel' }
   | { t: 'resume'; code: string; token: string }
   /** This player's commands for one tick (sent every tick, empty or not, so the others know they can go on). */

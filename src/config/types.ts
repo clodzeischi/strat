@@ -2,15 +2,24 @@
 
 export type Team = 0 | 1;
 
-export type UnitType = 'harvester' | 'infantry' | 'trike' | 'tank' | 'rocket' | 'repair' | 'carryall';
-export type BuildingType = 'conyard' | 'refinery' | 'barracks' | 'bunker' | 'factory' | 'hitech';
+/** Atreides: today's roster (the Terran of the game). Corrino: slower, dearer, tougher, with shields. */
+export type Faction = 'atreides' | 'corrino';
+
+export type UnitType =
+  | 'harvester' | 'infantry' | 'trike' | 'tank' | 'rocket' | 'repair' | 'carryall'
+  | 'trooper' | 'sardaukar' | 'razor' | 'devastator' | 'raider' | 'artillery';
+export type BuildingType = 'conyard' | 'refinery' | 'barracks' | 'bunker' | 'factory' | 'hitech' | 'fab' | 'tleilaxu' | 'pad' | 'turret';
 /** Buildings that train units. Each one of a type adds a parallel production line for that type. */
-export type Producer = 'barracks' | 'factory' | 'hitech';
+export type Producer = 'barracks' | 'factory' | 'hitech' | 'fab';
 /** Buildings that can be upgraded to level 2 to unlock more tech. */
-export type LevelUpType = 'conyard' | 'factory';
-/** A tech requirement: a building, or a level-2 Construction Yard / Factory. */
-export type Req = BuildingType | 'conyard2' | 'factory2';
-export type UpgradeType = 'weapons1' | 'weapons2' | 'armor1' | 'armor2' | 'rockets' | 'nitro' | 'harvest';
+export type LevelUpType = 'conyard' | 'factory' | 'barracks' | 'fab';
+/** A tech requirement: a building, or a level-2 one. */
+export type Req = BuildingType | `${LevelUpType}2`;
+export type UpgradeType =
+  | 'weapons1' | 'weapons2' | 'armor1' | 'armor2' | 'rockets' | 'nitro' | 'harvest'
+  | 'cWeapons' | 'cArmor' | 'cShields' | 'cHarvest' | 'flame';
+/** Upgrades that stack into a level: Weapons I and II, or Corrino's single Weapons +1. */
+export type UpgradeLine = 'weapons' | 'armor' | 'shields' | 'harvest';
 /** StarCraft-style attributes. Weapons deal bonus (or reduced) damage against specific tags. */
 export type Tag = 'biological' | 'mechanical' | 'light' | 'armored' | 'structure' | 'air';
 export type ProjectileKind = 'bullet' | 'shell' | 'rocket';
@@ -52,6 +61,8 @@ export interface UnitDef {
   lift?: number;
   /** Mends mechanical units and structures. */
   repair?: { rate: number; range: number };
+  /** Corrino: shield points on top of health. They absorb damage first and recover on their own. */
+  shields?: number;
 }
 
 export interface BuildingDef {
@@ -63,9 +74,13 @@ export interface BuildingDef {
   size: number; // footprint in tiles (square)
   requires: Req[];
   desc: string;
-  levelUp?: { name: string; short: string; cost: number; time: number; desc: string };
+  levelUp?: { name: string; short: string; cost: number; time: number; desc: string; requires?: Req[] };
   /** Infantry it can hold (a bunker); they shoot from it and can't be hit while inside. */
   garrison?: number;
+  /** A gun of its own (Corrino's turret). */
+  weapon?: WeaponDef;
+  /** Mends its own side's units parked next to it (Corrino's Repair Pad): this many at a time, at `rate` HP/s each. */
+  pad?: { slots: number; rate: number; range: number };
 }
 
 export interface UpgradeDef {
@@ -75,5 +90,7 @@ export interface UpgradeDef {
   time: number;
   requires: Req[];
   after?: UpgradeType; // previous tier that must be researched first
+  /** The level it adds to (weapons, armor, shields, harvesting). */
+  line?: UpgradeLine;
   desc: string;
 }

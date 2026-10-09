@@ -6,6 +6,8 @@ const C = 'currentColor';
 const SAND = '#c9b48a';
 const DARK = '#3a3a3e';
 const METAL = '#8a8a86';
+const GOLD = '#c8a040';
+const LACQ = '#2e2a30';
 
 const STAR = `<polygon points="20,4 24,16 36,16 26,23 30,35 20,27 10,35 14,23 4,16 16,16" fill="#e0902a"/>`;
 const SHIELD = `<path d="M20 4 L34 9 L32 24 Q28 32 20 36 Q12 32 8 24 L6 9 Z" fill="${METAL}"/><path d="M20 9 L29 12 L28 23 Q25 29 20 31 Z" fill="${C}"/>`;
@@ -33,6 +35,23 @@ const ICONS: Record<BuildingType | UnitType | UpgradeType, string> = {
   armor2: SHIELD + tierMark(2),
   nitro: `<circle cx="9" cy="29" r="5" fill="${DARK}"/><circle cx="29" cy="29" r="5" fill="${DARK}"/><rect x="8" y="20" width="22" height="6" fill="${C}"/><polygon points="2,12 14,12 10,16 22,16 8,22 11,17 2,17" fill="#e0b030"/><rect x="24" y="16" width="12" height="2" fill="${DARK}"/>`,
   harvest: `<rect x="6" y="18" width="28" height="14" fill="#d08a3a"/><polygon points="20,4 30,16 24,16 24,22 16,22 16,16 10,16" fill="#7cff7c"/>`,
+
+  // ---- Corrino ----
+  fab: `<rect x="2" y="26" width="36" height="8" fill="#9c968a"/><rect x="4" y="17" width="32" height="10" fill="${SAND}"/><path d="M6 17 Q14 5 22 17 Z" fill="${C}"/><rect x="24" y="14" width="11" height="3" fill="${LACQ}"/><rect x="14" y="20" width="12" height="7" fill="${DARK}"/><rect x="13" y="18.5" width="14" height="1.5" fill="${GOLD}"/>`,
+  tleilaxu: `<rect x="3" y="28" width="34" height="6" fill="${SAND}"/><rect x="8" y="20" width="24" height="8" fill="${LACQ}"/><rect x="13" y="12" width="14" height="8" fill="${C}"/><rect x="13" y="11" width="14" height="1.5" fill="${GOLD}"/><polygon points="20,2 24,7 20,11 16,7" fill="#6cff9a"/><rect x="3" y="18" width="4" height="10" rx="2" fill="#6cff9a"/><rect x="33" y="18" width="4" height="10" rx="2" fill="#6cff9a"/>`,
+  pad: `<rect x="3" y="27" width="34" height="6" fill="${LACQ}"/><rect x="8" y="29" width="24" height="1.5" fill="${GOLD}"/><rect x="4" y="25" width="4" height="3" fill="${C}"/><rect x="32" y="25" width="4" height="3" fill="${C}"/><rect x="5" y="6" width="2.5" height="20" fill="${METAL}"/><rect x="5" y="6" width="20" height="2.5" fill="${METAL}"/><rect x="22" y="8" width="1.5" height="8" fill="${DARK}"/><path d="M18 18 l5 -2 l5 2 l-1 4 l-8 0 Z" fill="#7cff7c"/>`,
+  turret: `<rect x="9" y="27" width="22" height="8" fill="${SAND}"/><rect x="14" y="22" width="12" height="5" fill="${LACQ}"/><rect x="11" y="13" width="15" height="9" fill="${C}"/><rect x="11" y="12" width="15" height="1.5" fill="${GOLD}"/><rect x="25" y="15" width="12" height="2" fill="${METAL}"/><rect x="25" y="18.5" width="12" height="2" fill="${METAL}"/>`,
+  trooper: `<circle cx="18" cy="10" r="4" fill="#d8b38a"/><rect x="14" y="5" width="8" height="3" fill="${DARK}"/><rect x="13" y="14" width="11" height="13" fill="${C}" opacity="0.75"/><rect x="14" y="27" width="4" height="9" fill="${DARK}"/><rect x="20" y="27" width="4" height="9" fill="${DARK}"/><rect x="8" y="14" width="26" height="4" rx="1.5" fill="#5d6234"/><rect x="33" y="14.5" width="3" height="3" fill="#e0902a"/>`,
+  sardaukar: `<circle cx="20" cy="9" r="5" fill="${LACQ}"/><rect x="21" y="8" width="4" height="2" fill="${GOLD}"/><rect x="14" y="14" width="12" height="13" fill="${LACQ}"/><rect x="14" y="18" width="12" height="3" fill="${C}"/><rect x="15" y="27" width="4" height="9" fill="${DARK}"/><rect x="21" y="27" width="4" height="9" fill="${DARK}"/><rect x="24" y="17" width="10" height="2" fill="${DARK}"/><rect x="4" y="22" width="12" height="1.5" fill="${METAL}"/>`,
+  razor: `<circle cx="9" cy="29" r="4.5" fill="${DARK}"/><circle cx="30" cy="29" r="4.5" fill="${DARK}"/><rect x="5" y="20" width="30" height="6" fill="${C}"/><rect x="13" y="11" width="2" height="9" fill="${METAL}"/><rect x="13" y="11" width="10" height="2" fill="${METAL}"/><rect x="4" y="16" width="8" height="4" rx="2" fill="${GOLD}"/><rect x="28" y="17" width="7" height="2" fill="${DARK}"/><polygon points="35,15 40,18 35,21" fill="#ff8a2a"/>`,
+  devastator: `<rect x="2" y="26" width="36" height="9" rx="3" fill="${DARK}"/><rect x="3" y="18" width="34" height="9" fill="${C}" opacity="0.6"/><rect x="2" y="16" width="6" height="5" fill="#7cf0ff"/><rect x="11" y="10" width="16" height="9" fill="${C}"/><rect x="11" y="9" width="16" height="1.5" fill="${GOLD}"/><rect x="26" y="11.5" width="13" height="2" fill="${METAL}"/><rect x="26" y="15" width="13" height="2" fill="${METAL}"/>`,
+  raider: `<rect x="5" y="18" width="30" height="5" fill="${C}"/><rect x="28" y="16" width="7" height="5" fill="#223344"/><polygon points="12,18 22,18 14,5 10,5" fill="${METAL}"/><polygon points="12,23 22,23 14,36 10,36" fill="${METAL}"/><rect x="2" y="15" width="5" height="4" fill="${LACQ}"/><rect x="22" y="24" width="10" height="3" fill="${DARK}"/>`,
+  artillery: `<rect x="3" y="27" width="34" height="7" rx="3" fill="${DARK}"/><rect x="5" y="21" width="30" height="7" fill="${C}" opacity="0.6"/><rect x="7" y="13" width="15" height="9" fill="${C}"/><rect x="7" y="12" width="15" height="1.5" fill="${GOLD}"/><g transform="rotate(-20 20 15)"><rect x="20" y="14" width="18" height="2.5" fill="${METAL}"/></g>`,
+  cWeapons: STAR + tierMark(1),
+  cArmor: SHIELD + tierMark(1),
+  cShields: `<circle cx="20" cy="20" r="15" fill="#5ab8ff" opacity="0.35"/><circle cx="20" cy="20" r="15" fill="none" stroke="#5ab8ff" stroke-width="2.5"/><rect x="13" y="16" width="14" height="10" fill="${C}"/>` + tierMark(1),
+  cHarvest: `<rect x="6" y="18" width="28" height="14" fill="#d08a3a"/><polygon points="20,4 30,16 24,16 24,22 16,22 16,16 10,16" fill="#7cff7c"/>`,
+  flame: `<circle cx="9" cy="30" r="4" fill="${DARK}"/><rect x="5" y="22" width="16" height="5" fill="${C}"/><rect x="19" y="21" width="5" height="2" fill="${DARK}"/><path d="M24 22 Q30 12 38 16 Q32 18 36 24 Q30 22 24 22 Z" fill="#ff8a2a"/><path d="M24 22 Q29 17 33 19 Q29 20 24 22 Z" fill="#ffe080"/>`,
 };
 
 /** Green chevrons over the building icon mark a level-2 upgrade. */
@@ -44,10 +63,14 @@ const COMMANDS = {
   drop: `<rect x="6" y="6" width="28" height="5" fill="${METAL}"/><rect x="8" y="5" width="20" height="2" fill="${C}"/><rect x="17" y="13" width="6" height="10" fill="#e0b030"/><polygon points="11,22 29,22 20,32" fill="#e0b030"/><rect x="5" y="34" width="30" height="3" fill="#9c968a"/>`,
   rally: `<rect x="6" y="30" width="28" height="4" fill="#9c968a"/><path d="M8 31 Q14 22 22 26" stroke="#7cff7c" stroke-width="2" stroke-dasharray="3 2" fill="none"/><rect x="23" y="6" width="2.5" height="26" fill="${DARK}"/><polygon points="25.5,6 36,10.5 25.5,15" fill="#7cff7c"/>`,
   salvage: `<rect x="3" y="28" width="34" height="6" fill="#9c968a"/><rect x="6" y="15" width="20" height="14" fill="${SAND}"/><rect x="5" y="12" width="22" height="4" fill="${C}"/><circle cx="29" cy="14" r="8" fill="#e0b030" stroke="${DARK}" stroke-width="1.5"/><text x="29" y="18.5" font-size="12" font-weight="bold" text-anchor="middle" fill="${DARK}" font-family="sans-serif">$</text>`,
+  mend: `<rect x="3" y="28" width="34" height="6" fill="#9c968a"/><rect x="6" y="15" width="20" height="14" fill="${SAND}"/><rect x="5" y="12" width="22" height="4" fill="${C}"/><g transform="rotate(40 29 15)"><rect x="27" y="8" width="4" height="16" fill="${METAL}"/><rect x="24" y="4" width="10" height="6" rx="2" fill="${METAL}"/><rect x="27.5" y="3" width="3" height="4" fill="#3a3a3e"/></g>`,
   unload: `<rect x="3" y="28" width="34" height="6" fill="#9c968a"/><rect x="5" y="13" width="18" height="16" fill="${SAND}"/><rect x="4" y="10" width="20" height="4" fill="${C}"/><rect x="11" y="20" width="6" height="9" fill="${DARK}"/><rect x="24" y="18" width="7" height="5" fill="#e0b030"/><polygon points="30,13 38,20.5 30,28" fill="#e0b030"/>`,
 };
 
-export const ALL_ICONS = { ...ICONS, ...COMMANDS, conyard2: ICONS.conyard + CHEVRON, factory2: ICONS.factory + CHEVRON };
+export const ALL_ICONS = {
+  ...ICONS, ...COMMANDS,
+  conyard2: ICONS.conyard + CHEVRON, factory2: ICONS.factory + CHEVRON, barracks2: ICONS.barracks + CHEVRON, fab2: ICONS.fab + CHEVRON,
+};
 export type IconKey = keyof typeof ALL_ICONS;
 
 /** A card icon as an SVG element string, in the player's team color. */

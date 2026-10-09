@@ -1,6 +1,6 @@
 import {
-  BUILDINGS, PRODUCERS, TILE, UNITS, UPGRADES, reqName,
-  type BuildingType, type LevelUpType, type Req, type UnitType, type UpgradeType, type WeaponDef,
+  BUILDINGS, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, TILE, UPGRADES, reqName, shieldsFor,
+  type BuildingType, type LevelUpType, type Req, type ResearchSlot, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
 import { Building, SALVAGE, Unit } from '../entities';
 import type { Game } from '../game/game';
@@ -87,7 +87,7 @@ export class CommandCard {
   /** The selection's lead kind last frame, to follow Tab. */
   private lead: string | null = null;
   /** Command tab buttons by name, laid out per selection in `commandLayout`. */
-  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage', Slot>;
+  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend', Slot>;
   private tabEls: { el: HTMLElement; key: HTMLElement; bar: HTMLElement; badge: HTMLElement; state: string }[] = [];
   private cells: CardEl[] = [];
   private slots: Record<Tab, (Slot | null)[]>;
@@ -207,8 +207,8 @@ export class CommandCard {
     const lead = this.input.active()?.members[0];
     if (lead instanceof Building && lead.team === this.input.team) {
       if (lead.def.garrison) return [null, null, null, c.unload, null, null, null, c.salvage];
-      if (this.input.ownProducers().length) return [c.rally, null, null, null, null, null, null, null];
-      return [];
+      const mend = FACTIONS[this.faction].selfRepair ? c.mend : null;
+      return [this.input.ownProducers().length ? c.rally : null, null, null, null, null, null, null, mend];
     }
     if (!this.input.ownUnits().length) return [];
     const carryalls = lead instanceof Unit && lead.type === 'carryall';
@@ -228,6 +228,10 @@ export class CommandCard {
     return this.game.teams[this.game.localTeam];
   }
 
+  private get faction() {
+    return this.ts.faction;
+  }
+
   private buildSlots(): (Slot | null)[] {
     const slot = (t: BuildingType): Slot => {
       const d = BUILDINGS[t];
@@ -235,7 +239,11 @@ export class CommandCard {
         icon: () => t,
         name: () => d.name,
         cost: () => d.cost,
-        tip: () => `${d.desc}\nHP ${d.hp}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to cancel.`,
+        tip: () => {
+          const sh = shieldsFor(this.faction, d);
+          const gun = d.weapon ? `\n${weaponLine(d.weapon)}` : '';
+          return `${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}${gun}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to cancel.`;
+        },
         view: () => {
           const g = this.game;
           const b = this.ts.building;
@@ -267,13 +275,14 @@ export class CommandCard {
         },
       };
     };
-    // Home row: the economy and production line in build order. Bottom row: defense, and a spare yard.
-    return [slot('refinery'), slot('barracks'), slot('factory'), slot('hitech'), slot('bunker'), slot('conyard'), null, null];
+    // Home row: the economy and production line in build order. Bottom row: defense, support, and a spare yard.
+    return FACTIONS[this.faction].build.map((t) => (t ? slot(t) : null));
   }
 
   private trainSlots(): (Slot | null)[] {
     const slot = (t: UnitType): Slot => {
-      const d = UNITS[t];
+      const d = this.game.unitDef(this.game.localTeam, t);
+      const sh = shieldsFor(this.faction, d);
       return {
         icon: () => t,
         name: () => d.name,
@@ -281,7 +290,7 @@ export class CommandCard {
         tip: () => {
           const w = d.weapon ? `\n${weaponLine(d.weapon)}` : '';
           const anti = d.antiArmor ? `\nRockets (upgrade): ${weaponLine(d.antiArmor)}` : '';
-          return `[${d.tags.map(cap).join(', ')}]\n${d.desc}\nHP ${d.hp}  Speed ${d.speed}${w}${anti}\nBuilt at: ${BUILDINGS[d.producer].name}${
+          return `[${d.tags.map(cap).join(', ')}]\n${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}  Speed ${d.speed}${w}${anti}\nBuilt at: ${BUILDINGS[d.producer].name}${
             d.requires.length > 1 ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to remove from the queue.`;
         },
         view: () => {
@@ -302,7 +311,7 @@ export class CommandCard {
       };
     };
     // Home row: the army. Bottom row: support.
-    return [slot('infantry'), slot('trike'), slot('tank'), slot('rocket'), slot('harvester'), slot('repair'), slot('carryall'), null];
+    return FACTIONS[this.faction].train.map((t) => (t ? slot(t) : null));
   }
 
   private researchSlots(): (Slot | null)[] {
@@ -312,12 +321,13 @@ export class CommandCard {
         icon: () => `${t}2`,
         name: () => d.name,
         cost: () => d.cost,
-        tip: () => `${d.desc}\nTakes ${d.time} s.\nRight-click to cancel.`,
+        tip: () => `${d.desc}\nTakes ${d.time} s.${d.requires?.length ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to cancel.`,
         view: () => {
           const g = this.game;
           const l = this.ts.levelUps[t];
           const done = !l && g.meets(g.localTeam, `${t}2`);
-          return { done, locked: !l && !done && !g.has(g.localTeam, t), progress: l ? l.progress : null, status: done ? 'DONE' : '' };
+          const locked = !l && !done && (!g.has(g.localTeam, t) || !g.requirementsMet(g.localTeam, d.requires ?? []));
+          return { done, locked, progress: l ? l.progress : null, status: done ? 'DONE' : '' };
         },
         use: () => {
           if (!this.ts.levelUps[t] && this.game.canLevelUp(this.game.localTeam, t)) this.input.issue({ c: 'levelUp', type: t });
@@ -363,11 +373,10 @@ export class CommandCard {
         },
       };
     };
-    const tiered = (line: 'weapons' | 'armor') => (): UpgradeType => (this.ts.upgrades.has(`${line}1`) ? `${line}2` : `${line}1`);
-    return [
-      levelUp('conyard'), levelUp('factory'), upgrade(tiered('weapons')), upgrade(tiered('armor')),
-      upgrade(() => 'rockets'), upgrade(() => 'nitro'), upgrade(() => 'harvest'), null,
-    ];
+    // A line of upgrades (Weapons I then II) shows the first one not yet researched, or the last once all are done.
+    const next = (list: UpgradeType[]) => (): UpgradeType => list.find((u) => !this.ts.upgrades.has(u)) ?? list[list.length - 1];
+    const make = (r: ResearchSlot | null) => (!r ? null : 'levelUp' in r ? levelUp(r.levelUp) : upgrade(next(r.upgrades)));
+    return FACTIONS[this.faction].research.map(make);
   }
 
   private commandSlots(): CommandCard['commands'] {
@@ -391,6 +400,18 @@ export class CommandCard {
       rally: command('rally', 'Rally Point',
         'Then click a spot (or the minimap): new units from the selected buildings go there, leaving by the side that faces it. Right-clicking the ground does the same.',
         () => input.ownProducers().length > 0, () => input.rallyMode, () => input.rally()),
+      mend: {
+        icon: () => 'mend',
+        name: () => 'Repair',
+        cost: () => 0,
+        tip: () => `The selected structures mend themselves at ${SELF_REPAIR_RATE} HP/s, paying as they go, while you have a Construction Yard. Right-click to stop.`,
+        view: () => {
+          const on = input.ownBuildings().some((b) => b.repairing);
+          return { disabled: !on && !input.ownBuildings().some((b) => this.game.canSelfRepair(b)), active: on };
+        },
+        use: () => input.mend(true),
+        cancel: () => input.mend(false),
+      },
       salvage: {
         icon: () => 'salvage',
         name: () => 'Salvage',

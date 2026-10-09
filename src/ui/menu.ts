@@ -1,10 +1,10 @@
-import { MAP_SIZE_NAMES, MAP_SIZES, UNITS, type MapSize, type Team } from '../config';
+import { FACTION_LIST, FACTIONS, MAP_SIZE_NAMES, MAP_SIZES, UNITS, type Faction, type MapSize, type Team } from '../config';
 import type { RoomInfo } from '../net/protocol';
 import type { Difficulty, Game, TeamStats } from '../game/game';
 import { heroTitle } from '../game/heroes';
 
 export interface MenuHandlers {
-  onPlay: (difficulty: Difficulty, size: MapSize) => void;
+  onPlay: (difficulty: Difficulty, size: MapSize, faction: Faction) => void;
   onResume: () => void;
   onRestart: () => void;
   onQuit: () => void;
@@ -13,8 +13,8 @@ export interface MenuHandlers {
   onSurrenderAnswer: (accept: boolean) => void;
   /** Multiplayer page opened (connect and list games) or closed. */
   onLobby: (open: boolean) => void;
-  onHost: (name: string, size: MapSize) => void;
-  onJoin: (code: string, name: string) => void;
+  onHost: (name: string, size: MapSize, faction: Faction) => void;
+  onJoin: (code: string, name: string, faction: Faction) => void;
   onCancelHost: () => void;
   /** Online: give up the match. */
   onSurrender: () => void;
@@ -23,6 +23,25 @@ export interface MenuHandlers {
 const FPS_KEY = 'strat.showFps';
 const SIZE_KEY = 'strat.mapSize';
 const NAME_KEY = 'strat.name';
+const FACTION_KEY = 'strat.faction';
+
+/** The faction picked last time. */
+export function loadFaction(): Faction {
+  try {
+    const v = localStorage.getItem(FACTION_KEY);
+    return FACTION_LIST.includes(v as Faction) ? (v as Faction) : 'atreides';
+  } catch {
+    return 'atreides';
+  }
+}
+
+function saveFaction(v: Faction): void {
+  try {
+    localStorage.setItem(FACTION_KEY, v);
+  } catch {
+    // Storage unavailable: the choice just won't persist.
+  }
+}
 
 /** The map size picked last time, so the menu remembers it. */
 export function loadMapSize(): MapSize {
@@ -93,9 +112,11 @@ export class Menus {
   private status = document.getElementById('mp-status')!;
   showFps = loadFps();
   mapSize = loadMapSize();
+  faction = loadFaction();
 
   constructor(private h: MenuHandlers) {
     this.showMapSize();
+    this.showFaction();
     this.nameInput.value = loadName();
     this.nameInput.addEventListener('change', () => saveName(this.playerName));
     for (const box of document.querySelectorAll<HTMLInputElement>('.fps-check')) {
@@ -110,13 +131,17 @@ export class Menus {
         this.mapSize = Number(btn.dataset.size) as MapSize;
         saveMapSize(this.mapSize);
         this.showMapSize();
-      } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize);
-      else if (btn.dataset.join) this.h.onJoin(btn.dataset.join, this.playerName);
+      } else if (btn.dataset.faction) {
+        this.faction = btn.dataset.faction as Faction;
+        saveFaction(this.faction);
+        this.showFaction();
+      } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize, this.faction);
+      else if (btn.dataset.join) this.h.onJoin(btn.dataset.join, this.playerName, this.faction);
       else if (btn.dataset.action === 'play') this.page('difficulty');
       else if (btn.dataset.action === 'multiplayer') {
         this.page('multiplayer');
         this.h.onLobby(true);
-      } else if (btn.dataset.action === 'host') this.h.onHost(this.playerName, this.mapSize);
+      } else if (btn.dataset.action === 'host') this.h.onHost(this.playerName, this.mapSize, this.faction);
       else if (btn.dataset.action === 'cancel-host') this.h.onCancelHost();
       else if (btn.dataset.action === 'controls') this.page('controls');
       else if (btn.dataset.action === 'back') {
@@ -152,6 +177,10 @@ export class Menus {
     }
   }
 
+  private showFaction(): void {
+    for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-faction]')) b.classList.toggle('picked', b.dataset.faction === this.faction);
+  }
+
   private currentPage = 'main';
 
   get playerName(): string {
@@ -184,7 +213,7 @@ export class Menus {
   /** Multiplayer page: the open games on the server. */
   showRooms(rooms: RoomInfo[]): void {
     this.rooms.innerHTML = rooms.length
-      ? rooms.map((r) => `<button class="mbtn diff" data-join="${r.code}">${escapeHtml(r.host)} <span>${MAP_SIZE_NAMES[r.size]} map · ${r.code}</span></button>`).join('')
+      ? rooms.map((r) => `<button class="mbtn diff" data-join="${r.code}">${escapeHtml(r.host)} <span>${FACTIONS[r.faction]?.name ?? ''} · ${MAP_SIZE_NAMES[r.size]} map · ${r.code}</span></button>`).join('')
       : '<p class="note">No open games yet. Host one, or wait for someone to.</p>';
   }
 
