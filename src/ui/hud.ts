@@ -16,6 +16,11 @@ export class Hud {
   private fogImg: HTMLCanvasElement;
   private minimapTimer = 0;
   private messages: HTMLElement;
+  /**
+   * A click on the minimap at world (x, z) with a mouse button, offered to the controls first (orders, rally points,
+   * armed attack-moves). Returning false means it wasn't one, and a left click moves the camera.
+   */
+  onClick: (x: number, z: number, button: number) => boolean = () => false;
 
   constructor(private game: Game, private cam: RTSCamera) {
     this.creditsEl = document.getElementById('credits')!;
@@ -58,13 +63,19 @@ export class Hud {
 
   private setupMinimapInput(): void {
     let down = false;
-    const move = (e: MouseEvent) => {
+    const world = (e: MouseEvent) => {
       const r = this.minimap.getBoundingClientRect();
-      const world = this.game.map.worldSize();
-      this.cam.lookAt(((e.clientX - r.left) / r.width) * world, ((e.clientY - r.top) / r.height) * world);
+      const size = this.game.map.worldSize();
+      const clamp = (v: number) => Math.min(size - 0.01, Math.max(0, v));
+      return { x: clamp(((e.clientX - r.left) / r.width) * size), z: clamp(((e.clientY - r.top) / r.height) * size) };
+    };
+    const move = (e: MouseEvent) => {
+      const p = world(e);
+      this.cam.lookAt(p.x, p.z);
     };
     this.minimap.addEventListener('mousedown', (e) => {
-      if (e.button !== 0) return;
+      const p = world(e);
+      if (this.onClick(p.x, p.z, e.button) || e.button !== 0) return;
       down = true;
       move(e);
     });

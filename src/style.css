@@ -161,7 +161,19 @@ body {
   border-bottom: none;
   padding: 6px 12px;
   font-size: 13px;
+  white-space: pre-wrap;
   pointer-events: none;
+}
+
+/* The kind of unit leading a mixed selection (its abilities are on the command card). */
+#info .lead {
+  color: #ffd27a;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+#info .hint {
+  opacity: 0.6;
 }
 
 /* ---- Command card, bottom left: tabs (Q W E R) over two rows of buttons (A S D F, Z X C V) ---- */

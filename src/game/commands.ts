@@ -16,7 +16,9 @@ export type Command =
   | { c: 'drop'; units: number[]; x: number; z: number }
   | { c: 'stop'; units: number[] }
   | { c: 'unload'; buildings: number[] }
-  | { c: 'rally'; building: number; x: number; z: number }
+  | { c: 'rally'; buildings: number[]; x: number; z: number }
+  | { c: 'salvage'; buildings: number[] }
+  | { c: 'cancelSalvage'; buildings: number[] }
   | { c: 'build'; type: BuildingType }
   | { c: 'cancelBuild' }
   | { c: 'place'; cx: number; cz: number }
@@ -37,6 +39,12 @@ export function entityById(game: Game, id: number | null): Entity | null {
 function own(game: Game, team: Team, ids: number[]): Unit[] {
   const set = new Set(ids);
   return game.units.filter((u) => set.has(u.id) && u.team === team && !u.dead && !u.carrier);
+}
+
+/** The listed buildings that belong to the team and still stand. */
+function ownBuildings(game: Game, team: Team, ids: number[]): Building[] {
+  const set = new Set(ids);
+  return game.buildings.filter((b) => set.has(b.id) && b.team === team && !b.dead);
 }
 
 /** Applies one command for a team. Anything no longer valid (units gone, not enough credits) is skipped. */
@@ -62,11 +70,15 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
         if (b instanceof Building && b.team === team) game.unloadBunker(b);
       }
       return;
-    case 'rally': {
-      const b = entityById(game, cmd.building);
-      if (b instanceof Building && b.team === team && PRODUCERS.includes(b.type as Producer)) game.teams[team].rally[b.type as Producer] = { x: cmd.x, z: cmd.z };
+    case 'rally':
+      for (const b of ownBuildings(game, team, cmd.buildings)) if (PRODUCERS.includes(b.type as Producer)) game.setRally(b, cmd.x, cmd.z);
       return;
-    }
+    case 'salvage':
+      for (const b of ownBuildings(game, team, cmd.buildings)) game.startSalvage(b);
+      return;
+    case 'cancelSalvage':
+      for (const b of ownBuildings(game, team, cmd.buildings)) game.cancelSalvage(b);
+      return;
     case 'build':
       if (!game.teams[team].building && game.canBuild(team, cmd.type)) game.startBuilding(team, cmd.type);
       return;

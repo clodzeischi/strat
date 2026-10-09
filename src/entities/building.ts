@@ -1,6 +1,7 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { BUILDING_TAGS, BUILDINGS, TEAM_COLORS, TILE, type BuildingDef, type BuildingType, type Team } from '../config';
 import type { Cell } from '../map';
+import type { Point } from '../game/pathfinding';
 import { makeBuildingModel, makeLevelKit } from '../models';
 import { Entity } from './entity';
 import type { Unit } from './unit';
@@ -8,6 +9,22 @@ import type { Unit } from './unit';
 /** Which side a building's door (unit exit, harvester dock) is on. Models are built facing south (+z). */
 export type Facing = 'south' | 'east' | 'north' | 'west';
 const FACING_ANGLE: Record<Facing, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 };
+
+/**
+ * Buildings are drawn turned 45 degrees, the way StarCraft's look on its diagonal grid, though they occupy the
+ * square, camera-aligned tiles of their footprint. Purely cosmetic: the model is shrunk to the diamond that fits
+ * inside the footprint, so nothing pokes into the tiles around it.
+ */
+export const BUILDING_TURN = Math.PI / 4;
+
+/** Scale (across the ground) that fits a building's turned slab inside its square footprint. */
+export function diamondScale(size: number): number {
+  const slab = size * TILE - 0.3;
+  return (size * TILE) / (slab * Math.SQRT2);
+}
+
+/** Seconds a structure takes to salvage, and the share of its price that comes back. */
+export const SALVAGE = { time: 5, refund: 0.75 };
 
 /**
  * The side facing the point (x, z), in world units, from a building centered at (bx, bz). Exact diagonals pick the
@@ -32,6 +49,14 @@ export class Building extends Entity {
   occupants: Unit[] = [];
   /** Drawing only: the local player has seen it, so it stays on their screen in the fog (as last seen). */
   known = false;
+  /** Producers: where new units go. Starts a few tiles out of the door; the player moves it. */
+  rally: Point | null = null;
+  /** Whether the rally point is still the default one (new units then spread around it instead of stacking). */
+  rallyDefault = true;
+  /** Being salvaged: 0 to 1, after which it's removed and part of its price refunded. */
+  salvage: number | null = null;
+  /** Turned and scaled holder of the model, so level-2 parts line up with it. */
+  private model = new THREE.Group();
 
   constructor(id: number, team: Team, readonly type: BuildingType, readonly cx: number, readonly cz: number, groundY: number, readonly facing: Facing = 'south') {
     const def = BUILDINGS[type];
@@ -44,13 +69,17 @@ export class Building extends Entity {
     this.y = groundY;
     const model = makeBuildingModel(type, TEAM_COLORS[team], def.size);
     this.spinner = model.spinner;
-    model.group.rotation.y = FACING_ANGLE[facing];
-    this.root.add(model.group);
+    const k = diamondScale(def.size);
+    this.model.scale.set(k, 1, k);
+    this.model.rotation.y = FACING_ANGLE[facing] + BUILDING_TURN;
+    this.model.add(model.group);
+    this.root.add(this.model);
     this.root.position.set(this.x, this.y, this.z);
   }
 
-  /** Free places for infantry, 0 for buildings that don't hold any. */
+  /** Free places for infantry, 0 for buildings that don't hold any (or are being salvaged). */
   get room(): number {
+    if (this.salvage !== null) return 0;
     return (this.def.garrison ?? 0) - this.occupants.length;
   }
 
@@ -61,9 +90,7 @@ export class Building extends Entity {
   setLevel(level: number): void {
     this.level = level;
     if (level < 2) return;
-    const kit = makeLevelKit(this.type, TEAM_COLORS[this.team]);
-    kit.rotation.y = FACING_ANGLE[this.facing];
-    this.root.add(kit);
+    this.model.add(makeLevelKit(this.type, TEAM_COLORS[this.team]));
   }
 
   /** One step out of the door, in cells. */
@@ -75,6 +102,23 @@ export class Building extends Entity {
   doorHeading(): number {
     const d = this.doorStep();
     return Math.atan2(d.dz, d.dx);
+  }
+
+  /** The ring of cells around the footprint, sides first (no corners), then the corners. */
+  perimeter(): { cell: Cell; out: { dx: number; dz: number } }[] {
+    const sides: { cell: Cell; out: { dx: number; dz: number } }[] = [];
+    const corners: { cell: Cell; out: { dx: number; dz: number } }[] = [];
+    const { cx, cz, size: s } = this;
+    for (let i = 0; i < s; i++) {
+      sides.push({ cell: { cx: cx + i, cz: cz + s }, out: { dx: 0, dz: 1 } });
+      sides.push({ cell: { cx: cx + i, cz: cz - 1 }, out: { dx: 0, dz: -1 } });
+      sides.push({ cell: { cx: cx + s, cz: cz + i }, out: { dx: 1, dz: 0 } });
+      sides.push({ cell: { cx: cx - 1, cz: cz + i }, out: { dx: -1, dz: 0 } });
+    }
+    for (const [dx, dz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      corners.push({ cell: { cx: dx > 0 ? cx + s : cx - 1, cz: dz > 0 ? cz + s : cz - 1 }, out: { dx, dz } });
+    }
+    return [...sides, ...corners];
   }
 
   /**

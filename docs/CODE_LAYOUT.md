@@ -12,8 +12,8 @@
 | `models/` | 3D models, one file per model: `units/` (with each unit's upgrade parts), `buildings/` (with each building's level-2 parts), shared `parts.ts`, `parachute.ts`, and `index.ts`, which the game calls. |
 | `materials/` | Colors and materials: model `palette.ts`, the shared `lambert.ts` cache, `ground.ts` (ground colors), `overlays.ts` (health bars, selection rings), `upgrade-fx.ts` (lasers, nitro flames). |
 | `shaders/` | Shader patches: `ground.ts` (sand, rock, outcrops, cliff walls, spice and its shimmer), `instance-alpha.ts` and `dithered-shadow.ts` (particles). |
-| `render/` | Drawing: `terrain.ts` (ground mesh), `camera.ts`, `shadows.ts`, `effects/` (one file per effect pool, plus `effects.ts`). |
-| `ui/` | Player-facing: `input.ts` (mouse and keys, turned into commands), `command-card.ts` (the 4×3 grid of tabs and buttons) with `keys.ts` (hotkeys by key position) and `icons.ts`, `hud.ts` (credits, minimap, messages), `menu.ts`, `placement.ts` (building placement grid). |
+| `render/` | Drawing: `terrain.ts` (ground mesh), `camera.ts`, `shadows.ts`, `rally-lines.ts` (the selected buildings' rally points), `effects/` (one file per effect pool, plus `effects.ts`). |
+| `ui/` | Player-facing: `input.ts` (mouse and keys, turned into commands; the selection and its subgroups), `command-card.ts` (the 4×3 grid of tabs and buttons; its Command tab follows the selection's lead subgroup) with `keys.ts` (hotkeys by key position) and `icons.ts`, `hud.ts` (credits, minimap, messages), `menu.ts`, `placement.ts` (building placement grid). |
 
 Folders that are split into several files have an `index.ts`, so the rest of the code imports `../config`, `../map`, `../entities` or `../models` without caring which file something is in.
 

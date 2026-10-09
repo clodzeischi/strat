@@ -2,7 +2,7 @@ import {
   BUILDINGS, PRODUCERS, TILE, UNITS, UPGRADES, reqName,
   type BuildingType, type LevelUpType, type Req, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
-import { Building } from '../entities';
+import { Building, SALVAGE, Unit } from '../entities';
 import type { Game } from '../game/game';
 import type { Input } from './input';
 import { icon, type IconKey } from './icons';
@@ -72,8 +72,11 @@ interface CardEl {
 /**
  * Stormgate-style 4x3 command card, bottom left. The top row (Q W E R by position) picks a tab: Build, Train,
  * Research or Command. The two rows below (A S D F, Z X C V) hold that tab's buttons, always in the same places.
- * Selecting units opens the Command tab, so A is attack-move whenever an army is selected; letting go of them
- * returns to the tab you were on. Everything is sent through `input.issue` as commands, like any player action.
+ * Selecting units or a building with orders opens the Command tab, so A is attack-move whenever an army is selected;
+ * letting go of them returns to the tab you were on. The Command tab shows what the selection's lead kind can do
+ * (the highest tier in a mix, Tab for the next): attack-move and stop for any units, plus Drop for Carryalls, Rally
+ * for production buildings, Unload and Salvage for bunkers. Everything is sent through `input.issue` as commands,
+ * like any player action.
  */
 export class CommandCard {
   private tab: Tab = 'build';
@@ -81,6 +84,10 @@ export class CommandCard {
   private before: Tab = 'build';
   private following = false;
   private selected = new Set<number>();
+  /** The selection's lead kind last frame, to follow Tab. */
+  private lead: string | null = null;
+  /** Command tab buttons by name, laid out per selection in `commandLayout`. */
+  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage', Slot>;
   private tabEls: { el: HTMLElement; key: HTMLElement; bar: HTMLElement; badge: HTMLElement; state: string }[] = [];
   private cells: CardEl[] = [];
   private slots: Record<Tab, (Slot | null)[]>;
@@ -89,7 +96,8 @@ export class CommandCard {
   private tipText = '';
 
   constructor(private game: Game, private input: Input, root: HTMLElement) {
-    this.slots = { build: this.buildSlots(), train: this.trainSlots(), research: this.researchSlots(), command: this.commandSlots() };
+    this.commands = this.commandSlots();
+    this.slots = { build: this.buildSlots(), train: this.trainSlots(), research: this.researchSlots(), command: [] };
 
     this.tipEl = document.createElement('div');
     this.tipEl.className = 'card-tip';
@@ -143,13 +151,16 @@ export class CommandCard {
     for (const c of this.cells) c.state = '';
   }
 
-  /** Selecting units opens the Command tab; letting go of them goes back to the tab before. */
+  /** Selecting units (or a building with orders) opens the Command tab; letting go goes back to the tab before. */
   private followSelection(): void {
     const sel = this.input.selection;
-    const commandable = this.input.ownUnits().length > 0 || sel.some((e) => e instanceof Building && e.team === this.input.team && !!e.def.garrison);
-    // Only on picking something new: units dying out of the selection shouldn't pull you off another tab.
-    const added = sel.some((e) => !this.selected.has(e.id));
+    const commandable = this.input.ownUnits().length > 0 || this.input.ownProducers().length > 0 || this.input.ownBunkers().length > 0;
+    // Only on picking something new (or Tab to another kind): units dying out of the selection shouldn't pull you
+    // off another tab.
+    const lead = this.input.active()?.key ?? null;
+    const added = sel.some((e) => !this.selected.has(e.id)) || (lead !== this.lead && sel.length > 0);
     this.selected = new Set(sel.map((e) => e.id));
+    this.lead = lead;
     if (commandable && added) {
       if (!this.following) this.before = this.tab === 'command' ? this.before : this.tab;
       this.following = true;
@@ -186,7 +197,22 @@ export class CommandCard {
   }
 
   private slot(i: number): Slot | null {
+    if (this.tab === 'command') return this.commandLayout()[i] ?? null;
     return this.slots[this.tab][i] ?? null;
+  }
+
+  /** The Command tab for the selection's lead kind. */
+  private commandLayout(): (Slot | null)[] {
+    const c = this.commands;
+    const lead = this.input.active()?.members[0];
+    if (lead instanceof Building && lead.team === this.input.team) {
+      if (lead.def.garrison) return [null, null, null, c.unload, null, null, null, c.salvage];
+      if (this.input.ownProducers().length) return [c.rally, null, null, null, null, null, null, null];
+      return [];
+    }
+    if (!this.input.ownUnits().length) return [];
+    const carryalls = lead instanceof Unit && lead.type === 'carryall';
+    return [c.attack, c.stop, carryalls ? c.drop : null, null, null, null, null, null];
   }
 
   private use(i: number): void {
@@ -344,7 +370,7 @@ export class CommandCard {
     ];
   }
 
-  private commandSlots(): (Slot | null)[] {
+  private commandSlots(): CommandCard['commands'] {
     const input = this.input;
     const command = (key: IconKey, name: string, tip: string, can: () => boolean, active: () => boolean, use: () => void): Slot => ({
       icon: () => key,
@@ -354,15 +380,30 @@ export class CommandCard {
       view: () => ({ disabled: !can(), active: active() }),
       use,
     });
-    return [
-      command('attack', 'Attack-move', 'Then click a spot: units move there, fighting anything they meet on the way. Click an enemy to attack it.',
+    return {
+      attack: command('attack', 'Attack-move',
+        'Then click a spot (or the minimap): units move there, fighting anything they meet on the way. Click an enemy to attack it.',
         () => input.canAttackMove(), () => input.attackMode, () => input.attackMove()),
-      command('stop', 'Stop', 'Selected units stop what they are doing.', () => input.canStop(), () => false, () => input.stop()),
-      command('drop', 'Drop', 'Selected Carryalls: then click where to set down their load. Infantry jump on a fly-by.',
+      stop: command('stop', 'Stop', 'Selected units stop what they are doing.', () => input.canStop(), () => false, () => input.stop()),
+      drop: command('drop', 'Drop', 'Selected Carryalls: then click where to set down their load (or the minimap). Infantry jump on a fly-by.',
         () => input.canDrop(), () => input.dropMode, () => input.drop()),
-      command('unload', 'Unload', 'Selected bunkers let their infantry out.', () => input.canUnload(), () => false, () => input.unload()),
-      null, null, null, null,
-    ];
+      unload: command('unload', 'Unload', 'Selected bunkers let their infantry out.', () => input.canUnload(), () => false, () => input.unload()),
+      rally: command('rally', 'Rally Point',
+        'Then click a spot (or the minimap): new units from the selected buildings go there, leaving by the side that faces it. Right-clicking the ground does the same.',
+        () => input.ownProducers().length > 0, () => input.rallyMode, () => input.rally()),
+      salvage: {
+        icon: () => 'salvage',
+        name: () => 'Salvage',
+        cost: () => 0,
+        tip: () => `Tear down the selected bunkers for ${SALVAGE.refund * 100}% of their price. Takes ${SALVAGE.time} s; the infantry inside come out. Right-click to cancel.`,
+        view: () => {
+          const p = input.salvageProgress();
+          return { disabled: !input.canSalvage() && p === null, active: p !== null, progress: p };
+        },
+        use: () => (input.canSalvage() ? input.salvage() : input.cancelSalvage()),
+        cancel: () => input.cancelSalvage(),
+      },
+    };
   }
 
   // ---- Per frame --------------------------------------------------------------------

@@ -46,7 +46,7 @@ function readAutostart(): Autostart | null {
     const raw = sessionStorage.getItem(AUTOSTART_KEY);
     sessionStorage.removeItem(AUTOSTART_KEY);
     const [difficulty, size, seed] = (raw ?? '').split(':');
-    const okDifficulty = difficulty === 'normal' || difficulty === 'hard';
+    const okDifficulty = difficulty === 'normal' || difficulty === 'hard' || difficulty === 'brutal';
     const okSize = (MAP_SIZES as readonly number[]).includes(Number(size));
     const okSeed = seed !== '' && Number.isInteger(Number(seed));
     return okDifficulty && okSize && okSeed ? { difficulty, size: Number(size) as MapSize, seed: Number(seed) } : null;
@@ -89,6 +89,7 @@ const shadows = new ViewShadows(sun);
 const input = new Input(game, rts, canvas, document.getElementById('selbox')!, document.getElementById('info')!);
 const hud = new Hud(game, rts);
 const card = new CommandCard(game, input, document.getElementById('command-card')!);
+hud.onClick = (x, z, button) => input.minimapClick(x, z, button);
 game.onMessage = (t) => hud.showMessage(t);
 // Created when the game starts: the computer opponent (offline) and the lockstep that runs the simulation.
 let ai: AI | null = null;

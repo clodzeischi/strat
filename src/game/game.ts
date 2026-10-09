@@ -6,10 +6,10 @@ import {
   type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
 import { Effects } from '../render/effects/effects';
-import { Building, Carryall, distTo, facingToward, repairable, Unit, type Entity } from '../entities';
+import { Building, Carryall, distTo, facingToward, repairable, SALVAGE, Unit, type Entity } from '../entities';
 import { GameMap, ROCK, SPICE, type Cell } from '../map';
 import { mat } from '../materials/lambert';
-import { cellsAround, type Point } from './pathfinding';
+import { cellsAround } from './pathfinding';
 import { Terrain } from '../render/terrain';
 import { Hasher, mulberry32 } from './rng';
 import { Vision, VISION_EVERY } from './vision';
@@ -41,7 +41,6 @@ export interface TeamState {
   /** One queue per producer type. The first N items build in parallel, N = buildings of that type. */
   queues: Record<Producer, { type: UnitType; progress: number }[]>;
   research: { type: UpgradeType; progress: number } | null;
-  rally: Record<Producer, Point | null>;
   /** Building being upgraded to level 2, per upgradable type. */
   levelUps: Partial<Record<LevelUpType, { building: Building; progress: number }>>;
   /** Round-robin counter so units leave from each building of a type in turn. */
@@ -129,7 +128,7 @@ export class Game {
         spiceHarvested: 0, creditsSpent: 0,
       },
       building: null, queues: { barracks: [], factory: [], hitech: [] }, research: null,
-      rally: { barracks: null, factory: null, hitech: null }, spawnTurn: { barracks: 0, factory: 0, hitech: 0 }, levelUps: {},
+      spawnTurn: { barracks: 0, factory: 0, hitech: 0 }, levelUps: {},
     }));
     this.vision = new Vision(this.map, this.teams.length);
     this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
@@ -269,6 +268,61 @@ export class Game {
     return m.nearestCell(f.cx, f.cz, (x, z) => m.canEnter(x, z, 'vehicle') && (m.ramp[m.idx(x, z)] !== 0 || m.level[m.idx(x, z)] === level), 16) ?? f;
   }
 
+  /** Whether a unit of this class can stand on a cell next to a building: open, and on its level (or a ramp). */
+  private besideOk(b: Building, cx: number, cz: number, cls: 'foot' | 'vehicle'): boolean {
+    const m = this.map;
+    if (!m.inBounds(cx, cz) || !m.canEnter(cx, cz, cls)) return false;
+    const i = m.idx(cx, cz);
+    return m.ramp[i] !== 0 || m.level[i] === m.level[m.idx(b.cx, b.cz)];
+  }
+
+  /** Where a unit built here comes out: the open cell around the building nearest to (x, z), its rally point. */
+  exitCell(b: Building, x: number, z: number, cls: 'foot' | 'vehicle'): Cell {
+    const m = this.map;
+    let best: Cell | null = null;
+    let bestD = Infinity;
+    for (const { cell } of b.perimeter()) {
+      if (!this.besideOk(b, cell.cx, cell.cz, cls)) continue;
+      const d = hypot(m.center(cell.cx) - x, m.center(cell.cz) - z);
+      if (d < bestD - 1e-6) {
+        bestD = d;
+        best = cell;
+      }
+    }
+    return best ?? this.dockCell(b);
+  }
+
+  /**
+   * A refinery dock for this harvester: the nearest open cell along any side, preferring one no other harvester is
+   * using or heading to. `out` is the way out from the wall, which the harvester backs in against.
+   */
+  dockFor(h: Unit, ref: Building): { cell: Cell; out: { dx: number; dz: number } } {
+    const m = this.map;
+    const taken = new Set<number>();
+    for (const u of this.units) {
+      if (u !== h && u.dock?.ref === ref && (u.hstate === 'toRefinery' || u.hstate === 'unload')) taken.add(m.idx(u.dock!.cell.cx, u.dock!.cell.cz));
+    }
+    let best: { cell: Cell; out: { dx: number; dz: number } } | null = null;
+    let bestD = Infinity;
+    for (const side of ref.perimeter()) {
+      if (side.out.dx && side.out.dz) continue; // not the corners: backing in is against a wall
+      // One dock in the middle of each side, so harvesters at neighboring docks don't bump each other.
+      const along = side.out.dx ? side.cell.cz - ref.cz : side.cell.cx - ref.cx;
+      if (along !== Math.floor(ref.size / 2)) continue;
+      const { cx, cz } = side.cell;
+      if (!this.besideOk(ref, cx, cz, 'vehicle')) continue;
+      // A dock in use counts as further away, so harvesters spread around the refinery but still queue if all are busy.
+      const d = hypot(m.center(cx) - h.x, m.center(cz) - h.z) + (taken.has(m.idx(cx, cz)) ? 12 * TILE : 0);
+      if (d < bestD - 1e-6) {
+        bestD = d;
+        best = side;
+      }
+    }
+    if (best) return best;
+    const cell = this.dockCell(ref);
+    return { cell, out: ref.doorStep() };
+  }
+
   /** Whether a unit may move from where it is to a nearby point without crossing a level edge or blocked cell. */
   canMove(u: Unit, x: number, z: number): boolean {
     const m = this.map;
@@ -371,6 +425,12 @@ export class Game {
     }
     this.scene.add(b.root);
     this.buildings.push(b);
+    if (PRODUCERS.includes(type as Producer)) {
+      // Default rally point: a few tiles out of the door, where units used to gather.
+      const front = b.frontCell();
+      const out = b.doorStep();
+      b.rally = { x: this.map.center(front.cx + out.dx * 2), z: this.map.center(front.cz + out.dz * 2) };
+    }
     if (type === 'refinery') {
       const dock = this.dockCell(b);
       const h = this.spawnUnit('harvester', team, this.map.center(dock.cx), this.map.center(dock.cz), b.doorHeading());
@@ -390,25 +450,66 @@ export class Game {
       // Lifts off the pad and holds over the rally point, or over its factory.
       const c = this.spawnUnit(type, team, site.x, site.z, -Math.PI / 2) as Carryall;
       c.y = site.y + 1;
-      const r = ts.rally[producer];
-      c.task = r ? { kind: 'move', x: r.x, z: r.z } : { kind: 'orbit', x: site.x, z: site.z };
+      const r = site.rally;
+      c.task = r && !site.rallyDefault ? { kind: 'move', x: r.x, z: r.z } : { kind: 'orbit', x: site.x, z: site.z };
       return;
     }
-    const front = site.frontCell();
-    const cell = this.dockCell(site);
-    const u = this.spawnUnit(type, team, this.map.center(cell.cx), this.map.center(cell.cz), site.doorHeading());
+    // Out of the side facing the rally point, heading for it.
+    const rally = site.rally ?? { x: site.x, z: site.z };
+    const cls = UNITS[type].infantry ? 'foot' : 'vehicle';
+    const cell = this.exitCell(site, rally.x, rally.z, cls);
+    const x = this.map.center(cell.cx);
+    const z = this.map.center(cell.cz);
+    const u = this.spawnUnit(type, team, x, z, Math.atan2(rally.z - z, rally.x - x));
     if (type === 'harvester') {
       u.commandHarvest(this, null);
       return;
     }
-    const rally = ts.rally[producer];
-    if (rally) {
+    if (!site.rallyDefault) {
       u.command(this, { kind: 'move', x: rally.x, z: rally.z });
-    } else {
-      const out = site.doorStep();
-      const spots = cellsAround(this.map, front.cx + out.dx * 2, front.cz + out.dz * 2, 10);
-      const s = spots[Math.floor(this.random() * spots.length)];
-      if (s) u.command(this, { kind: 'move', x: this.map.center(s.cx), z: this.map.center(s.cz) });
+      return;
+    }
+    // The default rally point: spread around it rather than stacking on one spot.
+    const spots = cellsAround(this.map, this.map.cellOf(rally.x), this.map.cellOf(rally.z), 10);
+    const s = spots[Math.floor(this.random() * spots.length)];
+    if (s) u.command(this, { kind: 'move', x: this.map.center(s.cx), z: this.map.center(s.cz) });
+  }
+
+  /** Sets where a producer's new units go. */
+  setRally(b: Building, x: number, z: number): void {
+    b.rally = { x, z };
+    b.rallyDefault = false;
+  }
+
+  /** Starts salvaging a structure: its infantry come out, and in a few seconds it's gone for part of its price. */
+  startSalvage(b: Building): void {
+    if (b.dead || b.salvage !== null || !b.def.garrison) return;
+    b.salvage = 0;
+    this.unloadBunker(b);
+  }
+
+  cancelSalvage(b: Building): void {
+    b.salvage = null;
+  }
+
+  private updateSalvage(dt: number): void {
+    for (const b of this.buildings) {
+      if (b.salvage === null || b.dead) continue;
+      b.salvage += dt / SALVAGE.time;
+      if (b.salvage < 1) continue;
+      this.teams[b.team].credits += BUILDINGS[b.type].cost * SALVAGE.refund;
+      b.dead = true;
+      b.setSelected(false);
+      this.scene.remove(b.root);
+      this.clearFootprint(b);
+      this.effects.puff(new THREE.Vector3(b.x, b.y + 0.8, b.z), 0xd8c49a);
+      this.notifyTeam(b.team, `${b.name} salvaged.`);
+    }
+  }
+
+  private clearFootprint(b: Building): void {
+    for (let z = b.cz; z < b.cz + b.size; z++) {
+      for (let x = b.cx; x < b.cx + b.size; x++) this.map.occupied[this.map.idx(x, z)] = 0;
     }
   }
 
@@ -754,9 +855,7 @@ export class Game {
     if (e instanceof Building && e.known && !this.shown(e)) this.ghosts.push(e);
     else this.scene.remove(e.root);
     if (e instanceof Building) {
-      for (let z = e.cz; z < e.cz + e.size; z++) {
-        for (let x = e.cx; x < e.cx + e.size; x++) this.map.occupied[this.map.idx(x, z)] = 0;
-      }
+      this.clearFootprint(e);
       this.unloadBunker(e); // whoever was inside gets out
       for (let k = 0; k < 5; k++) {
         const p = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, e.y + 1 + Math.random(), e.z + (Math.random() - 0.5) * 4);
@@ -883,6 +982,7 @@ export class Game {
       }
     }
     this.updateBunkers(dt);
+    this.updateSalvage(dt);
     this.separate();
     for (const u of this.units) if (!u.carrier) u.syncVisual(this, dt);
     this.updateProjectiles(dt);
@@ -967,6 +1067,7 @@ export class Game {
       const a = us[i];
       for (let j = i + 1; j < us.length; j++) {
         const b = us[j];
+        if (a.team === b.team && (walksThrough(a, b) || walksThrough(b, a))) continue;
         const minD = a.radius + b.radius;
         let dx = b.x - a.x;
         let dz = b.z - a.z;
@@ -1004,6 +1105,14 @@ export class Game {
     if (inBlocked || step(cx2, cz, cx2, m.cellOf(u.z + dz))) u.z += dz;
   }
 
+}
+
+/**
+ * "Mineral walk": a harvester at work drives through its own side's other units, so an army parked on the route
+ * can't jam the economy. Harvesters still bump each other, and anyone on the other side.
+ */
+function walksThrough(h: Unit, other: Unit): boolean {
+  return h.type === 'harvester' && h.order.kind === 'harvest' && other.type !== 'harvester';
 }
 
 /** Base damage plus the weapon's bonus for each of the target's tags, before upgrades. */

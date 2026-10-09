@@ -22,7 +22,7 @@ export abstract class Entity {
   private barFg: THREE.Mesh;
   private ring: THREE.Mesh;
 
-  constructor(readonly id: number, readonly team: Team, readonly maxHp: number, barWidth: number, barHeight: number, ringRadius: number, square: boolean) {
+  constructor(readonly id: number, readonly team: Team, readonly maxHp: number, barWidth: number, barHeight: number, ringRadius: number, diamond: boolean) {
     this.hp = maxHp;
     const bg = new THREE.Mesh(barGeo, barBgMat);
     bg.scale.set(barWidth + 0.12, 0.3, 1);
@@ -38,10 +38,8 @@ export abstract class Entity {
     this.bar.userData.width = barWidth;
     this.root.add(this.bar);
 
-    const seg = square ? 4 : 24;
-    const outer = square ? ringRadius * Math.SQRT2 : ringRadius;
-    const ringGeo = new THREE.RingGeometry(outer - 0.15, outer, seg);
-    ringGeo.rotateZ(square ? Math.PI / 4 : 0);
+    // Buildings get a diamond, matching their 45-degree look; its points touch the footprint's sides.
+    const ringGeo = new THREE.RingGeometry(ringRadius - 0.15, ringRadius, diamond ? 4 : 24);
     ringGeo.rotateX(-Math.PI / 2);
     this.ring = new THREE.Mesh(ringGeo, ringMats[team === 0 ? 0 : 1]);
     this.ring.position.y = 0.08;

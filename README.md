@@ -6,7 +6,8 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 
 ## Features
 
-- **Classic Dune economy.** Harvesters collect spice and bring it to Refineries for credits. Spice fields shimmer and run out as they're harvested.
+- **Classic Dune economy.** Harvesters collect spice and bring it to Refineries for credits, backing in against whichever side of the refinery is closest, and drive straight through your own army on the way. Spice fields shimmer and run out as they're harvested.
+- **StarCraft-style base handling.** Buildings sit at a 45-degree angle (only for the look: they still take up square tiles). Each production building has its own rally point, shown with a line and a flag while it's selected, and new units come out of the side facing it.
 - **Procedural maps.** Every game gets a new, point-symmetric map in one of three sizes. The desert has dunes, scattered mesas and rock shelves with cliffs on one edge. Spawns are random, and the end screen shows the seed so you can replay a map with `?seed=N`.
 - **Elevation that matters.** Units only climb to high ground by ramps, and they shoot further downhill than up. A base on a rock shelf has a cliff flank that only rocket launchers can hit from below, once something spots for them.
 - **Fog of war.** You only see what your units and buildings see. Low ground can't see up onto high ground, and high ground blocks the view past it, so mesas hide what's behind them. A Carryall overhead sees everything around it. Anything that shoots at you is revealed for a moment. Enemy structures stay on screen as last seen. Add `?reveal` to the address to lift the fog in single player.
@@ -67,7 +68,8 @@ It prints addresses like `http://192.168.1.20:8080`. Both players open that addr
 | Input | Action |
 |---|---|
 | Left click / drag | Select units, or box-select |
-| Double click | Select every unit of that type on screen |
+| Double click | Select every unit (or building) of that type on screen |
+| **Tab** | In a mixed selection, hand the Command tab to the next unit type (the highest tier leads) |
 | Right click | Move, attack, harvest, set a rally point, repair (Repair Vehicle), pick up (Carryall) |
 | **Q W E R** | Command card tabs: Build, Train, Upgrade, Command |
 | **A S D F**, **Z X C V** | The buttons on the open tab |
@@ -75,6 +77,9 @@ It prints addresses like `http://192.168.1.20:8080`. Both players open that addr
 | **S** (Command tab) | Stop |
 | **D**, then click (Command tab) | Carryall drop |
 | **F** (Command tab) | Unload a selected bunker |
+| **V** (Command tab) | Salvage a selected bunker (75% back after 5 s; right-click the button to cancel) |
+| **A**, then click (Command tab, Barracks / Factory / Hi-Tech) | Set the rally point (right-click does it too) |
+| Minimap | Left click to look there; right click to send the selection there; attack-move, drop and rally clicks work on it too |
 | **Ctrl+1-9** / **1-9** | Set / select a control group (double-tap to jump to it) |
 | **Space** | Jump to your base |
 | **`** (left of 1) | Pause (not in online games) |

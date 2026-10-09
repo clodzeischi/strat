@@ -43,6 +43,13 @@ export function repairable(e: Entity): boolean {
 
 type HarvestState = 'seek' | 'toSpice' | 'harvest' | 'toRefinery' | 'unload';
 
+/** A harvester's spot at a refinery: a cell along one of its sides, and the way out from the wall. */
+export interface Dock {
+  ref: Building;
+  cell: Cell;
+  out: { dx: number; dz: number };
+}
+
 export class Unit extends Entity {
   readonly kind = 'unit';
   readonly def: UnitDef;
@@ -87,6 +94,10 @@ export class Unit extends Entity {
   hstate: HarvestState = 'seek';
   spiceCell: Cell | null = null;
   refinery: Building | null = null;
+  /** Where at the refinery this trip unloads, picked on the way back. */
+  dock: Dock | null = null;
+  /** Unloading: 0 turning its back to the wall, 1 backing in, 2 parked against it. */
+  private dockPhase = 0;
   private lastSpice: Cell | null = null;
   private puffTimer = 0;
 
@@ -191,6 +202,7 @@ export class Unit extends Entity {
     this.command(game, { kind: 'harvest' });
     this.hstate = 'toRefinery';
     this.refinery = refinery;
+    this.dock = null;
     this.setDockPath(game);
   }
 
@@ -213,9 +225,9 @@ export class Unit extends Entity {
     if (this.hstate === 'toSpice' && this.spiceCell) return { x: game.map.center(this.spiceCell.cx), z: game.map.center(this.spiceCell.cz) };
     if (this.hstate === 'toRefinery') {
       if (!this.refinery || this.refinery.dead) this.refinery = game.nearestBuilding(this.team, 'refinery', this.x, this.z);
-      if (!this.refinery) return null;
-      const dock = game.dockCell(this.refinery);
-      return { x: game.map.center(dock.cx), z: game.map.center(dock.cz) };
+      const dock = this.dockAt(game);
+      if (!dock) return null;
+      return { x: game.map.center(dock.cell.cx), z: game.map.center(dock.cell.cz) };
     }
     return null;
   }
@@ -227,6 +239,7 @@ export class Unit extends Entity {
     if (!ref || hypot(ref.x - this.x, ref.z - this.z) < 8 * TILE) return false;
     this.hstate = 'toRefinery';
     this.refinery = ref;
+    this.dock = null;
     this.path = [];
     return true;
   }
@@ -548,10 +561,18 @@ export class Unit extends Entity {
     return wrapAngle(current + Math.sign(diff) * maxStep);
   }
 
+  /** This trip's dock at the current refinery, picked the first time it's asked for. */
+  private dockAt(game: Game): Dock | null {
+    if (!this.refinery) return null;
+    if (this.dock?.ref !== this.refinery) this.dock = { ref: this.refinery, ...game.dockFor(this, this.refinery) };
+    return this.dock;
+  }
+
   private setDockPath(game: Game): void {
-    if (!this.refinery) return;
-    const dock = game.dockCell(this.refinery);
-    this.setPath(game, game.map.center(dock.cx), game.map.center(dock.cz));
+    const dock = this.dockAt(game);
+    if (!dock) return;
+    this.dockPhase = 0;
+    this.setPath(game, game.map.center(dock.cell.cx), game.map.center(dock.cell.cz));
   }
 
   private updateHarvester(game: Game, dt: number): void {
@@ -626,9 +647,11 @@ export class Unit extends Entity {
           this.setDockPath(game);
         }
         if (this.followPath(game, dt)) {
-          const dock = game.dockCell(this.refinery);
-          if (hypot(map.center(dock.cx) - this.x, map.center(dock.cz) - this.z) < TILE * 1.3) this.hstate = 'unload';
-          else this.setDockPath(game);
+          const dock = this.dockAt(game)!;
+          if (hypot(map.center(dock.cell.cx) - this.x, map.center(dock.cell.cz) - this.z) < TILE * 1.3) {
+            this.hstate = 'unload';
+            this.dockPhase = 0;
+          } else this.setDockPath(game);
         }
         break;
       }
@@ -638,8 +661,30 @@ export class Unit extends Entity {
           this.refinery = null;
           break;
         }
-        const face = Math.atan2(this.refinery.z - this.z, this.refinery.x - this.x) + Math.PI;
-        this.heading = this.rotateToward(this.heading, face, this.def.turnRate * dt);
+        // Backs in: turns its rear to the wall, then reverses up to it. Purely for the look: the spice flows from the
+        // moment it arrives, as it did when harvesters just turned on the spot.
+        const dock = this.dockAt(game)!;
+        if (this.dockPhase === 0) {
+          const face = Math.atan2(dock.out.dz, dock.out.dx);
+          this.heading = this.rotateToward(this.heading, face, this.def.turnRate * dt);
+          if (Math.abs(wrapAngle(face - this.heading)) < 0.05) this.dockPhase = 1;
+        } else if (this.dockPhase === 1) {
+          // The spot against the wall: the dock cell's center, pulled toward the refinery.
+          const tx = map.center(dock.cell.cx) - dock.out.dx * TILE * 0.3;
+          const tz = map.center(dock.cell.cz) - dock.out.dz * TILE * 0.3;
+          const dx = tx - this.x;
+          const dz = tz - this.z;
+          const d = hypot(dx, dz);
+          const step = this.speed(game) * 0.4 * dt;
+          if (d <= step) {
+            this.x = tx;
+            this.z = tz;
+            this.dockPhase = 2;
+          } else {
+            this.x += (dx / d) * step;
+            this.z += (dz / d) * step;
+          }
+        }
         const amount = Math.min(this.cargo, HARVESTER.unloadRate * dt);
         this.cargo -= amount;
         team.credits += amount;
@@ -647,6 +692,7 @@ export class Unit extends Entity {
         if (this.cargo <= 0.01) {
           this.cargo = 0;
           this.hstate = 'seek';
+          this.dock = null;
         }
         break;
       }
