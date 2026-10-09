@@ -11,16 +11,19 @@ import { cellsAround } from './pathfinding';
  * Units and buildings are named by id, places by world position.
  */
 export type Command =
-  /** Right click (or attack-move with `attack`): on a target, a place, or a unit's own Carryall, bunker or refinery. */
-  | { c: 'go'; units: number[]; x: number; z: number; target: number | null; attack: boolean }
+  /**
+   * Right click (or attack-move with `attack`): on a target, a place, or a unit's own Carryall, bunker or refinery.
+   * With `queue` (Shift), units already busy take it up after what they're doing.
+   */
+  | { c: 'go'; units: number[]; x: number; z: number; target: number | null; attack: boolean; queue?: boolean }
   | { c: 'drop'; units: number[]; x: number; z: number }
   | { c: 'stop'; units: number[] }
   | { c: 'unload'; buildings: number[] }
   | { c: 'rally'; buildings: number[]; x: number; z: number }
   | { c: 'salvage'; buildings: number[] }
   | { c: 'cancelSalvage'; buildings: number[] }
-  /** Artillery sets up (`on`) or packs up; Spice Crews set up their camp. */
-  | { c: 'deploy'; units: number[]; on: boolean }
+  /** Artillery sets up (`on`) or packs up; Spice Crews set up their camp. With `queue` (Shift), after their other orders. */
+  | { c: 'deploy'; units: number[]; on: boolean; queue?: boolean }
   /** Spice Camps pack up into crews again. */
   | { c: 'pack'; buildings: number[] }
   /** Devastators self-destruct. */
@@ -62,8 +65,15 @@ function ownBuildings(game: Game, team: Team, ids: number[]): Building[] {
 /** Applies one command for a team. Anything no longer valid (units gone, not enough credits) is skipped. */
 export function applyCommand(game: Game, team: Team, cmd: Command): void {
   switch (cmd.c) {
-    case 'go':
-      return go(game, own(game, team, cmd.units), cmd.x, cmd.z, entityById(game, cmd.target), cmd.attack, team);
+    case 'go': {
+      let units = own(game, team, cmd.units);
+      if (cmd.queue) {
+        const later = units.filter(busy);
+        queueGo(game, later, cmd.x, cmd.z, entityById(game, cmd.target), cmd.attack, team);
+        units = units.filter((u) => !later.includes(u));
+      } else for (const u of units) u.queue = [];
+      return go(game, units, cmd.x, cmd.z, entityById(game, cmd.target), cmd.attack, team);
+    }
     case 'drop': {
       const loaded = own(game, team, cmd.units).filter((u): u is Carryall => u instanceof Carryall && u.load.length > 0);
       loaded.forEach((c, i) => {
@@ -74,7 +84,10 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       return;
     }
     case 'stop':
-      for (const u of own(game, team, cmd.units)) u.command(game, { kind: 'idle' });
+      for (const u of own(game, team, cmd.units)) {
+        u.queue = [];
+        u.command(game, { kind: 'idle' });
+      }
       return;
     case 'unload':
       for (const id of cmd.buildings) {
@@ -93,8 +106,11 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       return;
     case 'deploy':
       for (const u of own(game, team, cmd.units)) {
-        if (u.def.camp) game.deployCamp(u);
-        else u.setDeployed(cmd.on);
+        if (cmd.queue && cmd.on && busy(u)) u.queue.push({ kind: 'deploy' });
+        else if (u.def.camp) {
+          u.queue = [];
+          game.setUpCamp(u);
+        } else u.setDeployed(cmd.on);
       }
       return;
     case 'pack':
@@ -142,6 +158,35 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
     case 'surrender':
       return game.acceptSurrender(team);
   }
+}
+
+/** Whether a unit has something to do first, so a queued order waits (Carryalls run their own errands: never). */
+function busy(u: Unit): boolean {
+  return !(u instanceof Carryall) && (u.order.kind !== 'idle' || u.queue.length > 0);
+}
+
+/**
+ * Shift + right click for units already busy: the order joins the end of their queue. An enemy is attacked (by those
+ * that can hit it; the rest walk to it); anywhere else is a move, or an attack-move, each unit to its own nearby cell.
+ */
+function queueGo(game: Game, units: Unit[], x: number, z: number, target: Entity | null, attack: boolean, team: Team): void {
+  if (!units.length) return;
+  if (target && (target.dead || target.team === team || !game.sees(team, target))) target = null;
+  const rest: Unit[] = [];
+  for (const u of units) {
+    if (target && game.weaponFor(u, target)) u.queue.push({ kind: 'attack', target });
+    else rest.push(u);
+  }
+  if (target) {
+    x = target.x;
+    z = target.z;
+  }
+  const kind = attack ? 'amove' : 'move';
+  const cells = rest.length > 1 ? cellsAround(game.map, game.map.cellOf(x), game.map.cellOf(z), rest.length) : [];
+  rest.forEach((u, i) => {
+    const c = cells[i];
+    u.queue.push(c ? { kind, x: game.map.center(c.cx), z: game.map.center(c.cz) } : { kind, x, z });
+  });
 }
 
 /** Right click with units selected (see the `go` command). */

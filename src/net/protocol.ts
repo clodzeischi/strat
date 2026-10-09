@@ -2,7 +2,7 @@ import type { Faction, MapSize, Team } from '../config';
 import type { Command } from '../game/commands';
 
 /** Bumped whenever the messages or the simulation change in a way that would split two different builds apart. */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 /** An open game waiting for a second player. */
 export interface RoomInfo {

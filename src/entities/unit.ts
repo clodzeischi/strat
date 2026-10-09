@@ -39,6 +39,14 @@ export type Order =
   | { kind: 'escort'; group: Unit[]; x: number; z: number }
   | { kind: 'enter'; target: Building };
 
+/** An order waiting its turn (Shift+click): taken up once the unit has nothing else to do. */
+export type QueuedOrder =
+  | { kind: 'move'; x: number; z: number }
+  | { kind: 'amove'; x: number; z: number }
+  | { kind: 'attack'; target: Entity }
+  /** Artillery sets up; a Spice Crew sets up camp (`walked`: it already walked to its spot, so it won't look for another). */
+  | { kind: 'deploy'; walked?: boolean };
+
 /** Combat aircraft (the Sky Raider) fly this high over the ground. */
 const AIR_HEIGHT = CARRYALL.altitude - 2;
 
@@ -79,6 +87,8 @@ export class Unit extends Entity {
   heading: number;
   turretHeading: number;
   order: Order = { kind: 'idle' };
+  /** Orders queued after the current one (Shift+click), first next. */
+  queue: QueuedOrder[] = [];
   /** Enemy units and structures destroyed by this unit. */
   kills = 0;
   target: Entity | null = null;
@@ -147,6 +157,10 @@ export class Unit extends Entity {
   private dockPhase = 0;
   private lastSpice: Cell | null = null;
   private puffTimer = 0;
+  /** Income tracking (the HUD's estimate): credits per second over the last round trip, and when that trip ended. */
+  tripRate = 0;
+  private deliveredAt: number | null = null;
+  private tripLoad = 0;
 
   constructor(id: number, team: Team, readonly type: UnitType, x: number, z: number, heading = 0, readonly faction: Faction = 'atreides') {
     const def = unitDef(faction, type);
@@ -954,9 +968,13 @@ export class Unit extends Entity {
         }
         const amount = Math.min(this.cargo, HARVESTER.unloadRate * dt);
         this.cargo -= amount;
+        this.tripLoad += amount;
         team.credits += amount;
         team.stats.spiceHarvested += amount;
         if (this.cargo <= 0.01) {
+          if (this.deliveredAt !== null && game.time > this.deliveredAt) this.tripRate = this.tripLoad / (game.time - this.deliveredAt);
+          this.deliveredAt = game.time;
+          this.tripLoad = 0;
           this.cargo = 0;
           this.hstate = 'seek';
           this.dock = null;

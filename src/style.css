@@ -45,21 +45,21 @@ body {
   pointer-events: none;
 }
 
+/* Messages: bottom center, just above the selection info, newest at the bottom. */
 #messages {
-  position: absolute;
-  top: 26px;
-  left: 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  pointer-events: none;
+  align-items: center;
+  gap: calc(4px * var(--ui));
+  margin-bottom: calc(6px * var(--ui));
 }
 
 .msg {
-  background: rgba(20, 16, 12, 0.72);
+  background: rgba(20, 16, 12, 0.8);
   border-left: 3px solid var(--accent);
-  padding: 4px 10px;
-  font-size: 13px;
+  padding: calc(4px * var(--ui)) calc(12px * var(--ui));
+  font-size: calc(14px * var(--ui));
+  text-align: center;
   transition: opacity 0.6s;
 }
 
@@ -69,12 +69,22 @@ body {
 
 /* ---- HUD ---- */
 
+/*
+ * The HUD is laid out for a ~1440 px wide screen and scaled up on bigger ones by --ui (set in ui/hud.ts): the
+ * command card, minimap and top bar with a transform from their corner, text in the middle by its font size.
+ */
+:root {
+  --ui: 1;
+}
+
 #hud {
   position: absolute;
   inset: 0;
   pointer-events: none;
   --cell: 64px;
   --gap: 4px;
+  /* Width of the command card (the wider of the two bottom corners), unscaled. */
+  --corner: calc(4 * var(--cell) + 3 * var(--gap) + 16px);
 }
 
 #hud > * {
@@ -98,6 +108,78 @@ body {
   padding: 4px 10px;
   border-top: none;
   border-right: none;
+  transform: scale(var(--ui));
+  transform-origin: right top;
+}
+
+#credits-box {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  cursor: default;
+}
+
+#idle-btn {
+  align-self: center;
+  background: #4a3a14;
+  color: #ffe040;
+  border: 1px solid #ffe040;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  cursor: pointer;
+  animation: idle-pulse 1s infinite alternate;
+}
+
+#idle-btn[hidden] {
+  display: none;
+}
+
+#idle-btn b {
+  font-size: 12px;
+}
+
+@keyframes idle-pulse {
+  from {
+    box-shadow: 0 0 0 0 rgba(255, 224, 64, 0);
+  }
+  to {
+    box-shadow: 0 0 8px 0 rgba(255, 224, 64, 0.6);
+  }
+}
+
+/* Hovering the credits: the income estimate. */
+#income-tip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 260px;
+  background: rgba(20, 16, 12, 0.95);
+  border: 1px solid var(--bar-edge);
+  border-left: 3px solid var(--accent);
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+#income-tip[hidden] {
+  display: none;
+}
+
+#income-tip .big {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--accent);
+}
+
+#income-tip .warn {
+  color: #ffe040;
+}
+
+#income-tip .muted {
+  color: var(--muted);
 }
 
 #topbar .label {
@@ -137,6 +219,8 @@ body {
   padding: 6px;
   border-right: none;
   border-bottom: none;
+  transform: scale(var(--ui));
+  transform-origin: right bottom;
 }
 
 #minimap {
@@ -149,20 +233,29 @@ body {
   image-rendering: pixelated;
 }
 
-#info {
+/* Between the command card and the minimap: messages over the selection info. */
+#hud-center {
   position: absolute;
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  max-width: calc(100% - 2 * (4 * var(--cell) + 3 * var(--gap) + 20px) - 24px);
+  width: calc(100% - 2 * var(--corner) * var(--ui) - 24px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none !important;
+}
+
+#info {
+  max-width: 100%;
   display: none;
   background: rgba(20, 16, 12, 0.85);
   border: 2px solid var(--bar-edge);
   border-bottom: none;
-  padding: 6px 12px;
-  font-size: 13px;
+  padding: calc(6px * var(--ui)) calc(12px * var(--ui));
+  font-size: calc(13px * var(--ui));
   white-space: pre-wrap;
-  pointer-events: none;
+  text-align: center;
 }
 
 /* The kind of unit leading a mixed selection (its abilities are on the command card). */
@@ -185,6 +278,8 @@ body {
   padding: 6px;
   border-left: none;
   border-bottom: none;
+  transform: scale(var(--ui));
+  transform-origin: left bottom;
 }
 
 .card-grid {
@@ -471,8 +566,7 @@ body {
 
 /* ---- Screens (title, pause, end) ---- */
 
-body.in-menu #hud,
-body.in-menu #messages {
+body.in-menu #hud {
   display: none !important;
 }
 

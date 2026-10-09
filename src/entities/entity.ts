@@ -12,6 +12,8 @@ export abstract class Entity {
   /** Shields (Corrino): soak up damage before health and recover on their own. */
   shields: number;
   dead = false;
+  /** What this turned into when it left the map without being lost (a Spice Crew into its camp, and back): the selection follows it. */
+  becomes: Entity | null = null;
   /** Game time this last took damage. */
   lastHurt = -Infinity;
   selected = false;

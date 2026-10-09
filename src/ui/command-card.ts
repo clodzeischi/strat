@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, TILE, UPGRADES, reqName, shieldsFor,
+  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, TILE, UPGRADES, reqName, shieldsFor,
   type BuildingType, type LevelUpType, type Req, type ResearchSlot, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
 import { Building, SALVAGE, Unit } from '../entities';
@@ -313,8 +313,18 @@ export class CommandCard {
         cancel: () => this.input.issue({ c: 'untrain', type: t }),
       };
     };
-    // Home row: the army. Bottom row: support.
-    return FACTIONS[this.faction].train.map((t) => (t ? slot(t) : null));
+    // Home row: the army. Bottom row: support, and V: Rally All, to send new units somewhere without letting go of the army.
+    const slots = FACTIONS[this.faction].train.map((t) => (t ? slot(t) : null));
+    const input = this.input;
+    slots[7] = {
+      icon: () => 'rally',
+      name: () => 'Rally All',
+      cost: () => 0,
+      tip: () => 'Then click a spot (or the minimap): new units from every one of your production buildings go there. What you have selected stays selected.',
+      view: () => ({ disabled: !input.allProducers().length, active: input.rallyAllMode }),
+      use: () => input.rallyAll(),
+    };
+    return slots;
   }
 
   private researchSlots(): (Slot | null)[] {
@@ -440,8 +450,8 @@ export class CommandCard {
         icon: () => 'setup',
         name: () => 'Set Up Camp',
         cost: () => 0,
-        tip: () => 'The selected Spice Crews set up a Spice Camp where they stand. It needs open, level ground with spice in reach, and turns that spice into credits until it runs dry.',
-        view: () => ({ disabled: !input.ownUnits().some((u) => u.def.camp && this.game.campSpot(u)) }),
+        tip: () => `The selected Spice Crews set up a Spice Camp: where they stand if they can, else on the best spot within ${CAMP_SEARCH} tiles. It needs open, level ground with spice in reach, and turns that spice into credits until it runs dry, then moves on by itself if there's spice nearby. Shift: after their other orders.`,
+        view: () => ({ disabled: !input.ownUnits().some((u) => u.def.camp) }),
         use: () => input.setUpCamp(),
       },
       pack: {

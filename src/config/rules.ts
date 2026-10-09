@@ -62,6 +62,8 @@ export const FREMEN_REGEN = { unit: 0.015, building: 0.006, delay: 6, stillsuit:
 export const CAMP_FULL = 12;
 /** Spice Mining: Spice Camps' extra rate. */
 export const CAMP_UPGRADE = 0.25;
+/** A Spice Crew told to set up camp off the spice walks to the nearest good spot within this many tiles (dry camps move on too). */
+export const CAMP_SEARCH = 10;
 
 export const CARRYALL = {
   capacity: 6, // lift space: infantry take 1, trikes 3, heavy vehicles 6

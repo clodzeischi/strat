@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  AMBUSH, ARMOR_BONUS, BUILDINGS, CAMP_FULL, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
+  AMBUSH, ARMOR_BONUS, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS,
   TEAM_COLORS, TILE, UNITS, UPGRADES, WEAPONS_BONUS, factionLevelUps, factionUpgrades, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
@@ -1371,6 +1371,74 @@ export class Game {
     return null;
   }
 
+  /**
+   * A Spice Crew told to set up camp: right here if it can, else (with `walk`) it heads for the best spot within
+   * CAMP_SEARCH tiles and sets up when it gets there. Returns false (and says why) if there's nowhere.
+   */
+  setUpCamp(u: Unit, walk = true): boolean {
+    if (u.dead || u.carrier || u.falling || !u.def.camp) return false;
+    if (this.campSpot(u) || !walk) return this.deployCamp(u);
+    const spot = this.campSpotNear(u.x, u.z, u.def.camp, u.team, u);
+    if (!spot) {
+      this.notifyTeam(u.team, 'No room for a Spice Camp on a spice field nearby.');
+      return false;
+    }
+    u.command(this, { kind: 'move', x: spot.x, z: spot.z });
+    u.queue.unshift({ kind: 'deploy', walked: true });
+    return true;
+  }
+
+  /**
+   * The best place for a camp within CAMP_SEARCH tiles of a point: close, with plenty of spice in reach (a spot on a
+   * field's edge counts as a few tiles further away). Returns the camp's center, or null if there's none.
+   */
+  campSpotNear(x: number, z: number, type: BuildingType, team: Team, ignore?: Unit): { x: number; z: number } | null {
+    const def = BUILDINGS[type];
+    const m = this.map;
+    const R = CAMP_SEARCH;
+    const bx = Math.round(x / TILE - def.size / 2);
+    const bz = Math.round(z / TILE - def.size / 2);
+    let best: { x: number; z: number } | null = null;
+    let bestScore = Infinity;
+    for (let dz = -R; dz <= R; dz++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const cx = bx + dx;
+        const cz = bz + dz;
+        const px = (cx + def.size / 2) * TILE;
+        const pz = (cz + def.size / 2) * TILE;
+        const d = hypot(px - x, pz - z) / TILE;
+        // Even a perfect spot can't beat the current best once it's further than the best's whole score.
+        if (d > R || d >= bestScore || !m.inBounds(cx, cz)) continue;
+        const level = m.level[m.idx(cx, cz)];
+        let ok = true;
+        for (let z2 = cz; z2 < cz + def.size && ok; z2++) {
+          for (let x2 = cx; x2 < cx + def.size && ok; x2++) ok = m.inBounds(x2, z2) && this.tileBuildable(x2, z2, level, team, type, ignore);
+        }
+        if (!ok) continue;
+        const n = this.spiceAround(px, pz, def.extract!.radius);
+        if (n === 0) continue;
+        const score = d + 0.5 * (CAMP_FULL - Math.min(n, CAMP_FULL));
+        if (score < bestScore || (score === bestScore && best && (pz < best.z || (pz === best.z && px < best.x)))) {
+          bestScore = score;
+          best = { x: px, z: pz };
+        }
+      }
+    }
+    return best;
+  }
+
+  /** Takes up a unit's next queued order (Shift+click), once it has nothing else to do. */
+  private nextQueued(u: Unit): void {
+    const q = u.queue.shift()!;
+    if (q.kind === 'deploy') {
+      if (u.def.camp) {
+        if (!this.setUpCamp(u, !q.walked)) u.queue = [];
+      } else u.setDeployed(true);
+    } else if (q.kind === 'attack') {
+      if (!q.target.dead) u.command(this, q);
+    } else u.command(this, q);
+  }
+
   /** A Spice Crew sets up its camp where it stands. Returns false (and says why) if it can't. */
   deployCamp(u: Unit): boolean {
     if (u.dead || u.carrier || u.falling || !u.def.camp) return false;
@@ -1382,6 +1450,7 @@ export class Game {
     const frac = u.hp / u.maxHp;
     this.remove(u);
     const b = this.placeBuilding(u.def.camp, u.team, c.cx, c.cz);
+    u.becomes = b;
     b.hp = b.maxHp * frac;
     b.reach = this.spiceReach(b.x, b.z, b.def.extract!.radius);
     this.teams[u.team].stats.structuresBuilt++;
@@ -1400,6 +1469,7 @@ export class Game {
     const c = m.nearestCell(m.cellOf(b.x), m.cellOf(b.z), (x, z) => m.canEnter(x, z, 'foot'), 6) ?? { cx: m.cellOf(b.x), cz: m.cellOf(b.z) };
     const u = this.spawnUnit(type, b.team, m.center(c.cx), m.center(c.cz), b.doorHeading());
     u.hp = u.maxHp * frac;
+    b.becomes = u;
     return u;
   }
 
@@ -1414,13 +1484,14 @@ export class Game {
   /** Spice Camps turn the spice in reach into credits: full rate with enough of it about, less on the field's edge. */
   private updateCamps(dt: number): void {
     const m = this.map;
+    const dried: Building[] = [];
     for (const b of this.buildings) {
       const ex = b.def.extract;
       if (!ex || b.dead) continue;
       let n = 0;
       for (const i of b.reach) if (m.tiles[i] === SPICE) n++;
       if (n === 0) {
-        if (!b.dry) this.notifyTeam(b.team, 'A Spice Camp has run dry. Pack it up (D) and move on.');
+        if (!b.dry) dried.push(b);
         b.dry = true;
         continue;
       }
@@ -1439,6 +1510,18 @@ export class Game {
       const ts = this.teams[b.team];
       ts.credits += got;
       ts.stats.spiceHarvested += got;
+    }
+    // A camp that runs dry packs up and moves on by itself if there's fresh spice close by.
+    for (const b of dried) {
+      const spot = this.campSpotNear(b.x, b.z, b.type, b.team);
+      const u = spot ? this.packCamp(b) : null;
+      if (!u || !spot) {
+        this.notifyTeam(b.team, 'A Spice Camp has run dry. Pack it up (D) and move on.');
+        continue;
+      }
+      u.command(this, { kind: 'move', x: spot.x, z: spot.z });
+      u.queue.push({ kind: 'deploy', walked: true });
+      this.notifyTeam(b.team, 'A Spice Camp ran dry. Its crew is moving to fresh spice nearby.');
     }
   }
 
@@ -1479,6 +1562,9 @@ export class Game {
       if (u.def.infantry && !u.maxShields && !u.def.hides && u.hp < u.maxHp && this.time - u.lastHurt > INFANTRY_REGEN.delay) {
         u.hp = Math.min(u.maxHp, u.hp + u.maxHp * INFANTRY_REGEN.rate * dt);
       }
+    }
+    for (const u of this.units) {
+      if (u.queue.length && !u.dead && !u.carrier && !u.falling && u.order.kind === 'idle' && u.deployState === 'mobile') this.nextQueued(u);
     }
     this.updateHiding(false);
     this.regenShields(dt);
@@ -1568,7 +1654,7 @@ export class Game {
     const h = new Hasher().int(this.ticks).int(this.nextId);
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
     for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading);
-    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected);
+    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected).int(u.queue.length);
     for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
     for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);

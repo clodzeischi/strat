@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { Game } from '../src/game/game';
 import { applyCommand } from '../src/game/commands';
 import { BUILDINGS, FACTIONS, HIDE, TILE, UNITS, type BuildingType, type Team } from '../src/config';
-import type { Building, Unit } from '../src/entities';
+import { Building, Unit } from '../src/entities';
+import { hypot } from '../src/game/hypot';
 import { ROCK, SAND, SPICE } from '../src/map';
 
 let failures = 0;
@@ -216,6 +217,70 @@ check(g.atLimit(F, 'worm') && !g.queueUnit(F, 'worm'), 'at most two Sandworms, c
   t.teams[F].upgrades.add('stillsuit');
   for (let k = 0; k < 400; k++) t.update(0.05);
   check(a.hp - 50 > (h1 - 50) * 1.5, 'Stillsuits heal faster');
+}
+
+// ---- Setting up off the field, queued orders, dry camps moving on ----
+{
+  const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
+  const tm = t.map;
+  for (const u of t.units) if (u.team === A) u.dead = true;
+  const ty = t.buildings.find((b) => b.team === F && b.type === 'conyard')!;
+  const tick = (seconds: number) => {
+    for (let k = 0; k < seconds * 20; k++) t.update(0.05);
+  };
+  // Off the spice, but with a good spot within reach: Set Up Camp walks there and sets up.
+  const near = tm.nearestCell(ty.cx, ty.cz, (x, z) => tm.canEnter(x, z, 'foot') && t.spiceAround(tm.center(x), tm.center(z)) === 0
+    && !!t.campSpotNear(tm.center(x), tm.center(z), 'camp', F), 60)!;
+  const c1 = t.spawnUnit('crew', F, tm.center(near.cx), tm.center(near.cz));
+  check(t.campSpot(c1) === null, 'a crew off the field has no spot right where it stands');
+  applyCommand(t, F, { c: 'deploy', units: [c1.id], on: true });
+  check(!c1.dead && c1.order.kind === 'move' && c1.queue[0]?.kind === 'deploy', 'Set Up Camp off the field: it walks to a spot nearby');
+  tick(30);
+  check(c1.dead && c1.becomes instanceof Building && !c1.becomes.dead, 'and sets up there (and the selection can follow it into the camp)');
+  const camp1 = c1.becomes as Building;
+  // Too far: nothing within reach, it stays put and says so.
+  let far = tm.nearestCell(ty.cx - 2, ty.cz - 2, (x, z) => tm.canEnter(x, z, 'foot'), 10)!;
+  let none = true;
+  for (let k = 0; k < tm.size * tm.size; k++) {
+    const x = k % tm.size;
+    const z = Math.floor(k / tm.size);
+    if (tm.canEnter(x, z, 'foot') && t.spiceAround(tm.center(x), tm.center(z)) === 0 && !t.campSpotNear(tm.center(x), tm.center(z), 'camp', F)) {
+      far = { cx: x, cz: z };
+      none = false;
+      break;
+    }
+  }
+  const c2 = t.spawnUnit('crew', F, tm.center(far.cx), tm.center(far.cz));
+  if (!none) {
+    applyCommand(t, F, { c: 'deploy', units: [c2.id], on: true });
+    check(!c2.dead && c2.order.kind === 'idle' && !c2.queue.length, 'no spice field near: the crew stays where it is');
+  }
+  // Queued: walk somewhere first (Shift), then set up.
+  applyCommand(t, F, { c: 'go', units: [c2.id], x: tm.center(near.cx), z: tm.center(near.cz), target: null, attack: false });
+  applyCommand(t, F, { c: 'deploy', units: [c2.id], on: true, queue: true });
+  check(!c2.dead && c2.queue.length === 1, 'Shift + Set Up Camp waits for the move');
+  tick(60);
+  check(c2.dead && c2.becomes instanceof Building, 'then sets up camp at the end of it');
+  // Waypoints: a queued move after a move; a plain order or Stop drops the queue.
+  const w1 = t.spawnUnit('warrior', F, ty.x + 6, ty.z + 6);
+  const a = tm.nearestCell(tm.cellOf(w1.x) + 6, tm.cellOf(w1.z), (x, z) => tm.canEnter(x, z, 'foot'), 10)!;
+  const b = tm.nearestCell(tm.cellOf(w1.x) + 6, tm.cellOf(w1.z) + 6, (x, z) => tm.canEnter(x, z, 'foot'), 10)!;
+  applyCommand(t, F, { c: 'go', units: [w1.id], x: tm.center(a.cx), z: tm.center(a.cz), target: null, attack: false });
+  applyCommand(t, F, { c: 'go', units: [w1.id], x: tm.center(b.cx), z: tm.center(b.cz), target: null, attack: false, queue: true });
+  check(w1.queue.length === 1, 'Shift + right click queues a move behind the current one');
+  tick(25);
+  check(hypot(w1.x - tm.center(b.cx), w1.z - tm.center(b.cz)) < 1.5 * TILE && !w1.queue.length, 'the unit walks both legs');
+  applyCommand(t, F, { c: 'go', units: [w1.id], x: tm.center(a.cx), z: tm.center(a.cz), target: null, attack: false });
+  applyCommand(t, F, { c: 'go', units: [w1.id], x: ty.x, z: ty.z, target: null, attack: false, queue: true });
+  applyCommand(t, F, { c: 'stop', units: [w1.id] });
+  check(w1.order.kind === 'idle' && !w1.queue.length, 'Stop drops the queue');
+  // Run a camp dry: it packs up and its crew sets up again on fresh spice nearby.
+  for (const i of camp1.reach) if (tm.tiles[i] === SPICE) tm.takeSpice(i % tm.size, Math.floor(i / tm.size), 1e9);
+  tick(0.1);
+  const crew3 = camp1.becomes;
+  check(camp1.dead && crew3 instanceof Unit && crew3.queue[0]?.kind === 'deploy', 'a camp run dry packs up and heads for spice nearby');
+  tick(40);
+  check(!!crew3 && crew3.dead && crew3.becomes instanceof Building && !crew3.becomes.dead, 'and sets up again there');
 }
 
 // ---- Determinism ----

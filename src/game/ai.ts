@@ -729,6 +729,7 @@ export class AI {
       const site = this.campSite(u);
       if (!site) continue;
       this.crewJobs.set(u, { x: site.x, z: site.z, since: g.time });
+      u.queue = [];
       u.command(g, { kind: 'move', x: site.x, z: site.z });
     }
   }

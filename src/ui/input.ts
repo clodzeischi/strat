@@ -7,6 +7,7 @@ import type { Game } from '../game/game';
 import { keyLabel } from './keys';
 import { PlacementGrid } from './placement';
 import { RallyLines } from '../render/rally-lines';
+import { WaypointLines } from '../render/waypoint-lines';
 
 const EDGE = 12; // px from the screen edge that triggers scrolling
 const PAN_SPEED = 45;
@@ -28,6 +29,12 @@ export interface Subgroup {
   members: Entity[];
 }
 
+/** What an entity is now: itself, or what it turned into (a crew into its camp and back), or null if it's gone. */
+function successor(e: Entity): Entity | null {
+  while (e.dead && e.becomes) e = e.becomes;
+  return e.dead ? null : e;
+}
+
 const isProducer = (e: Entity): e is Building => e instanceof Building && PRODUCERS.includes(e.type as Producer);
 
 /** Mouse and keyboard: camera control, selection, commands and building placement. */
@@ -41,6 +48,10 @@ export class Input {
   lockMode = false;
   /** Waiting for a click on the selected production buildings' new rally point. */
   rallyMode = false;
+  /** Rally All (Train tab): the next click sets the rally point of every production building, whatever is selected. */
+  rallyAllMode = false;
+  /** Attack-move kept armed by Shift-clicking waypoints: it ends when Shift is let go. */
+  private chainedAttack = false;
   paused = false;
   /** Clicks and hotkeys issued, for APM on the end screen. */
   actions = 0;
@@ -73,6 +84,8 @@ export class Input {
   private grid: PlacementGrid;
   /** Rally points of the selected production buildings. */
   private rallyLines: RallyLines;
+  /** Queued orders of the selected units. */
+  private waypoints: WaypointLines;
   /** The subgroup whose abilities the command card shows (Tab cycles it). */
   private primary: string | null = null;
 
@@ -89,6 +102,7 @@ export class Input {
     this.grid = new PlacementGrid(game);
     game.scene.add(this.grid.mesh);
     this.rallyLines = new RallyLines(game.scene, game.map);
+    this.waypoints = new WaypointLines(game.scene, game.map);
 
     canvas.addEventListener('mousedown', (e) => this.onMouseDown(e));
     window.addEventListener('mousemove', (e) => this.onMouseMove(e));
@@ -101,7 +115,12 @@ export class Input {
       if (!e.relatedTarget) this.screen.inside = false;
     });
     window.addEventListener('keydown', (e) => this.onKeyDown(e));
-    window.addEventListener('keyup', (e) => this.keys.delete(e.key.toLowerCase()));
+    window.addEventListener('keyup', (e) => {
+      const k = e.key.toLowerCase();
+      this.keys.delete(k);
+      // Shift-clicked attack-move waypoints: letting go of Shift ends the chain.
+      if (k === 'shift' && this.chainedAttack) this.attackMode = false;
+    });
     window.addEventListener('blur', () => {
       this.keys.clear();
       this.grab = null;
@@ -124,11 +143,17 @@ export class Input {
     this.attackMode = false;
     this.dropMode = false;
     this.rallyMode = false;
+    this.rallyAllMode = false;
     this.lockMode = false;
   }
 
   private get armed(): boolean {
-    return !!this.placing || this.attackMode || this.dropMode || this.rallyMode || this.lockMode;
+    return !!this.placing || this.attackMode || this.dropMode || this.rallyMode || this.rallyAllMode || this.lockMode;
+  }
+
+  /** Shift held: orders join the end of the units' queues instead of replacing what they're doing. */
+  private get queueing(): boolean {
+    return this.keys.has('shift');
   }
 
   // ---- Subgroups ----------------------------------------------------------------
@@ -232,6 +257,20 @@ export class Input {
     this.setSelection(list);
   }
 
+  /** The idle worker button: selects the next idle one and looks at it, or (`all`) selects every one. */
+  selectIdle(list: Entity[], all: boolean): void {
+    if (!list.length) return;
+    this.actions++;
+    if (all) {
+      this.select(list);
+      return;
+    }
+    const at = this.selection.length === 1 ? list.indexOf(this.selection[0]) : -1;
+    const next = list[(at + 1) % list.length];
+    this.select([next]);
+    this.cam.lookAt(next.x, next.z);
+  }
+
   ownUnits(): Unit[] {
     return this.selection.filter((e): e is Unit => e instanceof Unit && e.team === this.team && !e.dead);
   }
@@ -269,6 +308,7 @@ export class Input {
     if (!this.canAttackMove()) return;
     this.disarm();
     this.attackMode = true;
+    this.chainedAttack = false;
   }
 
   canStop(): boolean {
@@ -300,13 +340,13 @@ export class Input {
     const arty = this.withAbility((u) => !!u.def.deploy);
     if (!arty.length) return;
     const on = arty.some((u) => u.deployState === 'mobile' || u.deployState === 'packing');
-    this.issue({ c: 'deploy', units: arty.map((u) => u.id), on });
+    this.issue({ c: 'deploy', units: arty.map((u) => u.id), on, queue: on && this.queueing });
   }
 
   /** Selected Spice Crews set up camp where they stand. */
   setUpCamp(): void {
     const crews = this.withAbility((u) => !!u.def.camp);
-    if (crews.length) this.issue({ c: 'deploy', units: crews.map((u) => u.id), on: true });
+    if (crews.length) this.issue({ c: 'deploy', units: crews.map((u) => u.id), on: true, queue: this.queueing });
   }
 
   /** Selected Spice Camps. */
@@ -377,8 +417,21 @@ export class Input {
     this.rallyMode = true;
   }
 
-  private setRally(x: number, z: number): void {
-    const producers = this.ownProducers();
+  /** Every production building this player has. */
+  allProducers(): Building[] {
+    return this.game.buildings.filter((b) => b.team === this.team && !b.dead && isProducer(b));
+  }
+
+  /** Arms Rally All: the next left click sets every production building's rally point; the selection stays as it is. */
+  rallyAll(): void {
+    if (!this.allProducers().length) return;
+    const on = this.rallyAllMode;
+    this.disarm();
+    this.rallyAllMode = !on;
+  }
+
+  private setRally(x: number, z: number, all = false): void {
+    const producers = all ? this.allProducers() : this.ownProducers();
     if (!producers.length) return;
     this.issue({ c: 'rally', buildings: producers.map((b) => b.id), x, z });
     this.game.effects.marker(new THREE.Vector3(x, this.game.map.surfaceAt(x, z), z), 0x7cff7c);
@@ -504,7 +557,8 @@ export class Input {
       return;
     }
     if (this.attackMode) {
-      this.attackMode = false;
+      // Shift keeps attack-move armed for the next waypoint.
+      this.attackMode = this.chainedAttack = this.queueing;
       this.commandAt(p.x, p.y, true);
       return;
     }
@@ -521,10 +575,12 @@ export class Input {
       else this.game.onMessage('Lock On needs an enemy you can see.');
       return;
     }
-    if (this.rallyMode) {
+    if (this.rallyMode || this.rallyAllMode) {
+      const all = this.rallyAllMode;
       this.rallyMode = false;
+      this.rallyAllMode = false;
       const g = this.groundPoint(p.x, p.y);
-      if (g) this.setRally(g.x, g.z);
+      if (g) this.setRally(g.x, g.z, all);
       return;
     }
     if (wasDragging) this.boxSelect(start, p, e.shiftKey);
@@ -587,7 +643,7 @@ export class Input {
       this.setRally(point.x, point.z);
       return;
     }
-    this.issue({ c: 'go', units: units.map((u) => u.id), x: point.x, z: point.z, target: target?.id ?? null, attack: attackMove });
+    this.issue({ c: 'go', units: units.map((u) => u.id), x: point.x, z: point.z, target: target?.id ?? null, attack: attackMove, queue: this.queueing });
     if (target && target.team !== team) g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xff5040);
     else if (target && target.hp < target.maxHp && repairable(target) && units.some((u) => u.def.repair)) {
       g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xffd27a);
@@ -624,7 +680,7 @@ export class Input {
     if (button !== 0) return false;
     if (this.attackMode) this.orderAt(point, null, true);
     else if (this.dropMode) this.dropAtPoint(point);
-    else if (this.rallyMode) this.setRally(x, z);
+    else if (this.rallyMode || this.rallyAllMode) this.setRally(x, z, this.rallyAllMode);
     else return false;
     this.actions++;
     this.disarm();
@@ -652,7 +708,8 @@ export class Input {
         this.groups.set(k, this.ownUnits().length ? this.ownUnits() : this.ownBuildings());
         g.onMessage(`Group ${k} set.`);
       } else {
-        const list = (this.groups.get(k) ?? []).filter((u) => !u.dead);
+        const list = (this.groups.get(k) ?? []).map(successor).filter((u): u is Entity => !!u);
+        this.groups.set(k, list);
         this.select(list);
         const now = performance.now();
         if (this.lastGroupKey.key === k && now - this.lastGroupKey.time < 400 && list.length) {
@@ -704,13 +761,18 @@ export class Input {
     this.cam.apply();
 
     const gone = (e: Entity) => e.dead || (e instanceof Unit && (!!e.carrier || !this.game.shown(e)));
-    if (this.selection.some(gone)) this.setSelection(this.selection.filter((e) => !gone(e)));
+    if (this.selection.some(gone)) {
+      // A crew that set up camp (or a camp packed up) stays selected as what it became.
+      const next = this.selection.map(successor).filter((e): e is Entity => !!e && !gone(e));
+      this.setSelection([...new Set(next)]);
+    }
     if (this.dropMode && !this.ownCarryalls().some((c) => c.load.length)) this.dropMode = false;
     if (this.rallyMode && !this.ownProducers().length) this.rallyMode = false;
     if (this.placing && !this.game.teams[this.team].building?.ready) this.placing = null;
 
     this.updateGhost();
-    this.rallyLines.update(this.ownProducers());
+    this.rallyLines.update(this.rallyAllMode ? this.allProducers() : this.ownProducers());
+    this.waypoints.update(this.ownUnits());
     this.updateCursor();
     this.updateInfo();
   }
@@ -741,7 +803,7 @@ export class Input {
     let cursor = 'default';
     if (this.grab) cursor = 'grabbing';
     else if (this.placing) cursor = 'cell';
-    else if (this.attackMode || this.dropMode || this.rallyMode || this.lockMode) cursor = 'crosshair';
+    else if (this.attackMode || this.dropMode || this.rallyMode || this.rallyAllMode || this.lockMode) cursor = 'crosshair';
     else if (this.mouse.inside && this.ownUnits().length) {
       const t = this.pick(this.mouse.x, this.mouse.y);
       if (t && t.team !== this.team) cursor = 'crosshair';
@@ -758,6 +820,7 @@ export class Input {
     else if (this.dropMode) text = 'Drop: left-click where to drop. Vehicles are set down; infantry jump on a fly-by.';
     else if (this.lockMode) text = 'Lock On: left-click an enemy. Rockets home in on it for a while.';
     else if (this.rallyMode) text = 'Rally point: left-click a spot, on the map or the minimap.';
+    else if (this.rallyAllMode) text = 'Rally All: left-click a spot (or the minimap). New units from every production building go there.';
     else if (sel.length === 1) {
       const e = sel[0];
       text = `${e.name}  ${Math.ceil(e.hp)} / ${e.maxHp}`;
@@ -771,7 +834,7 @@ export class Input {
       }
       if (e instanceof Unit && e.detonateAt !== null) text += '   SELF-DESTRUCTING';
       if (e instanceof Unit && e.hidden && e.team === this.team) text += '   Hidden in the sand';
-      if (e instanceof Unit && e.def.camp && e.team === this.team) text += `   ${keyLabel('KeyD')}: set up camp on a spice field`;
+      if (e instanceof Unit && e.def.camp && e.team === this.team) text += `   ${keyLabel('KeyD')}: set up camp on spice nearby (Shift: after its other orders)`;
       if (e instanceof Building && e.def.extract) {
         text += e.dry ? `   Run dry${e.team === this.team ? ` (${keyLabel('KeyD')} to pack up)` : ''}` : `   Spice in reach: ${this.game.spiceAround(e.x, e.z)} tiles`;
       }

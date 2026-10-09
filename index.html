@@ -13,16 +13,20 @@
       <div id="view">
         <canvas id="c"></canvas>
         <div id="selbox"></div>
-        <div id="messages"></div>
         <div id="netwait" hidden></div>
-        <!-- HUD: credits top right; the command card, selection and minimap along the bottom. -->
+        <!-- HUD: credits top right; the command card, selection and minimap along the bottom, messages between them. -->
         <div id="hud">
           <div id="topbar">
-            <span class="label">CREDITS</span><span id="credits">0</span>
+            <button id="idle-btn" hidden>IDLE <b>0</b></button>
+            <span id="credits-box"><span class="label">CREDITS</span><span id="credits">0</span></span>
             <button id="menu-btn" title="Menu (Esc)">MENU</button>
+            <div id="income-tip" hidden></div>
           </div>
-          <div id="hud-map"><canvas id="minimap" width="240" height="240"></canvas></div>
-          <div id="info"></div>
+          <div id="hud-map"><canvas id="minimap" width="480" height="480"></canvas></div>
+          <div id="hud-center">
+            <div id="messages"></div>
+            <div id="info"></div>
+          </div>
           <div id="command-card"></div>
         </div>
       </div>
@@ -106,6 +110,9 @@
             <dt>Q W E R</dt><dd>Command card tabs: Build, Train, Research, Command</dd>
             <dt>A S D F / Z X C V</dt><dd>The buttons on the open tab</dd>
             <dt>Command tab</dt><dd>Units: A attack-move, S stop, D Carryall drop. Barracks / factories: A rally point. Bunkers: F unload, V salvage</dd>
+            <dt>Shift + right click / ability</dt><dd>Queue it after the units' current orders (e.g. walk to a spice field, then Set Up Camp)</dd>
+            <dt>Train tab, V</dt><dd>Rally All: set every production building's rally point, keeping your selection</dd>
+            <dt>IDLE button (top right)</dt><dd>Select the next idle harvester or Spice Crew (Shift: all of them)</dd>
             <dt>Tab</dt><dd>In a mixed selection, show the next unit type's commands</dd>
             <dt>Minimap</dt><dd>Left click: look there. Right click: move there (or set a rally point)</dd>
             <dt>Space</dt><dd>Jump to base</dd>
