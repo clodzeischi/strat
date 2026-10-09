@@ -87,7 +87,7 @@ export class CommandCard {
   /** The selection's lead kind last frame, to follow Tab. */
   private lead: string | null = null;
   /** Command tab buttons by name, laid out per selection in `commandLayout`. */
-  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine', Slot>;
+  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine' | 'lock', Slot>;
   private tabEls: { el: HTMLElement; key: HTMLElement; bar: HTMLElement; badge: HTMLElement; state: string }[] = [];
   private cells: CardEl[] = [];
   private slots: Record<Tab, (Slot | null)[]>;
@@ -213,7 +213,7 @@ export class CommandCard {
     if (!this.input.ownUnits().length) return [];
     const u = lead instanceof Unit ? lead : null;
     // D: the kind's ability (Carryall drop, Artillery deploy, Sky Raider mine). V, out of the way: self-destruct.
-    const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : null;
+    const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : u?.def.lockOn ? c.lock : null;
     return [c.attack, c.stop, ability, null, null, null, null, u?.def.detonate ? c.detonate : null];
   }
 
@@ -413,6 +413,17 @@ export class CommandCard {
       detonate: command('detonate', 'Self-Destruct',
         'Selected Devastators blow up after a short delay, wrecking every enemy around them. The enemy is warned if they can see it.',
         () => input.ownUnits().some((u) => !!u.def.detonate && u.detonateAt === null), () => false, () => input.detonate()),
+      lock: {
+        icon: () => 'lock',
+        name: () => 'Lock On',
+        cost: () => 0,
+        tip: () => 'Then click an enemy: the selected MLRS attack it, and for 8 s their rockets home in on it however it moves. Recharges in 20 s. Otherwise rockets fly at where the target was, and a moving target can dodge them.',
+        view: () => {
+          const wait = input.lockCooldown();
+          return { disabled: !input.lockReady().length, active: input.lockMode || input.lockActive(), status: wait > 0 ? `${Math.ceil(wait)}` : '' };
+        },
+        use: () => input.armLock(),
+      },
       mine: {
         icon: () => 'mine',
         name: () => 'Lay Mine',

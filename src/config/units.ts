@@ -35,9 +35,10 @@ export const UNITS: Record<UnitType, UnitDef> = {
   rocket: {
     name: 'MLRS', producer: 'factory', cost: 500, buildTime: 11, hp: 200, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory2'],
-    weapon: { range: 17, minRange: 6, damage: 40, bonus: { biological: 35, structure: 35, air: 25 }, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 2.5, air: true },
+    weapon: { range: 17, minRange: 6, damage: 40, bonus: { biological: 35, structure: 35, air: 25 }, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 2.5, air: true, unguided: true },
+    lockOn: { duration: 8, cooldown: 20 },
     lift: 6,
-    desc: 'Long-range artillery. Devastating vs infantry and buildings, and shoots down aircraft. Fragile and can\'t fire up close.',
+    desc: 'Long-range rocket artillery. Devastating vs infantry and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Fragile and can\'t fire up close.',
   },
   repair: {
     name: 'Repair Vehicle', producer: 'factory', cost: 450, buildTime: 8, hp: 300, speed: 4.2, turnRate: 3.5, radius: 0.9, sight: 10,

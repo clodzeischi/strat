@@ -33,7 +33,11 @@ function duel(c: UnitType, a: UnitType, seed: number, swap: boolean): number {
   spawn(ta, a, mid + 10, 1);
   const value = (t: Team) => g.units.filter((u) => u.team === t).reduce((s, u) => s + u.def.cost * ((u.hp + u.shields) / (u.maxHp + u.maxShields)), 0);
   const start = Math.min(value(tc), value(ta));
-  while (g.time < 120 && g.units.some((u) => u.team === tc) && g.units.some((u) => u.team === ta)) g.update(0.05);
+  while (g.time < 120 && g.units.some((u) => u.team === tc) && g.units.some((u) => u.team === ta)) {
+    g.update(0.05);
+    // MLRS lock on to the units they shoot at as soon as they can, as the AI does.
+    for (const u of g.units) if (u.def.lockOn && u.target?.kind === 'unit' && g.time >= u.nextLock) g.lockOn(u, u.target);
+  }
   return (value(tc) - value(ta)) / start;
 }
 

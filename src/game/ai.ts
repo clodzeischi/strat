@@ -832,9 +832,10 @@ export class AI {
   }
 
   /**
-   * Corrino abilities: damaged structures repair themselves, Artillery deploys when it has something to shell and
-   * packs up when it hasn't (or enemies get inside its minimum range), a Devastator about to die among enemies
-   * blows itself up, and Sky Raiders lay mines where enemies walk.
+   * Abilities. Atreides MLRS lock on to the units they shoot at. Corrino: damaged structures repair themselves,
+   * Soulcrushers deploy when they have something to shell and pack up when they haven't (or enemies get inside their
+   * minimum range), a Devastator about to die among enemies blows itself up, and Sky Raiders lay mines where enemies
+   * walk.
    */
   private manageAbilities(army: Unit[]): void {
     const g = this.game;
@@ -845,6 +846,7 @@ export class AI {
       if (u.def.deploy) this.useArtillery(u);
       else if (u.def.detonate) this.useDetonation(u);
       else if (u.def.mines) this.useMines(u);
+      else if (u.def.lockOn) this.useLockOn(u);
     }
     if (g.meets(this.team, 'barracks2')) this.useDropPods(army);
   }
@@ -914,6 +916,12 @@ export class AI {
     for (const e of g.units) if (e.team !== this.team && !e.dead && !e.def.air && g.sees(this.team, e) && distTo(e, u.x, u.z) < w.splash * 0.7) value += e.def.cost;
     for (const b of g.buildings) if (b.team !== this.team && !b.dead && g.sees(this.team, b) && distTo(b, u.x, u.z) < w.splash * 0.7) value += BUILDINGS[b.type].cost;
     if (value >= u.def.cost * 0.6) g.startDetonation(u);
+  }
+
+  /** MLRS lock on to whatever unit they're shooting at (structures don't move, so they don't need it). */
+  private useLockOn(u: Unit): void {
+    const t = u.target;
+    if (t && t.kind === 'unit' && this.game.time >= u.nextLock && this.game.time >= u.lockUntil) this.game.lockOn(u, t);
   }
 
   private useMines(u: Unit): void {

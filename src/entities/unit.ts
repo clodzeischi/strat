@@ -83,6 +83,10 @@ export class Unit extends Entity {
   detonateAt: number | null = null;
   /** Game time the next mine can be laid. */
   nextMine = 0;
+  /** Lock-on (MLRS): the enemy its shots home in on, until when, and when it can lock on again. */
+  lockTarget: Entity | null = null;
+  lockUntil = 0;
+  nextLock = 0;
   /** Seconds until the second gun (Devastator machine gun) can fire again. */
   private cooldown2 = 0;
   protected body: THREE.Group;

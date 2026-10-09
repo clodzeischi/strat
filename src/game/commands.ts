@@ -23,6 +23,8 @@ export type Command =
   | { c: 'deploy'; units: number[]; on: boolean }
   /** Devastators self-destruct. */
   | { c: 'detonate'; units: number[] }
+  /** MLRS lock on to an enemy: they attack it with homing rockets for a while. */
+  | { c: 'lock'; units: number[]; target: number }
   /** Sky Raiders lay a mine where they are. */
   | { c: 'mine'; units: number[] }
   /** Corrino: structures start (or stop) repairing themselves. */
@@ -93,6 +95,11 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
     case 'detonate':
       for (const u of own(game, team, cmd.units)) game.startDetonation(u);
       return;
+    case 'lock': {
+      const t = entityById(game, cmd.target);
+      if (t) for (const u of own(game, team, cmd.units)) game.lockOn(u, t);
+      return;
+    }
     case 'mine':
       for (const u of own(game, team, cmd.units)) game.layMine(u);
       return;

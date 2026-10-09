@@ -72,6 +72,8 @@ interface Projectile {
   weapon: WeaponDef;
   /** Attacker's damage multiplier at the moment of firing (Weapons upgrade). */
   mult: number;
+  /** Aimed at the ground where the target stood (it doesn't follow the target). */
+  unguided: boolean;
   trailTimer: number;
   /** Mesh positions at the last two ticks, for drawing in between. */
   from: THREE.Vector3;
@@ -99,6 +101,8 @@ rocketGeo.rotateX(Math.PI / 2); // point along +Z so lookAt aims it
 
 /** Splash damage to units other than the one aimed at, at the center of the blast (half that at its edge). */
 export const SPLASH_SHARE = 0.5;
+/** An unguided rocket landing this close to something hits it squarely. */
+const DIRECT_HIT = 0.8;
 
 export class Game {
   readonly map: GameMap;
@@ -811,13 +815,17 @@ export class Game {
     const mesh = new THREE.Mesh(w.projectile === 'shell' ? shellGeo : rocketGeo, mat(w.projectile === 'shell' ? 0x403020 : 0xeeeeee));
     mesh.position.copy(from);
     this.scene.add(mesh);
-    if (w.unguided) {
+    // Unguided shots fly at a spot, except against aircraft (nothing to aim at on the ground) and the target of a
+    // lock-on, which they home in on.
+    const locked = u instanceof Unit && u.lockTarget === target && this.time < u.lockUntil;
+    const unguided = !!w.unguided && !target.tags.includes('air') && !locked;
+    if (unguided) {
       // Aimed at the ground where the target stands now; anyone who can see the spot sees where it will land.
       to.set(target.x, this.map.surfaceAt(target.x, target.z), target.z);
       this.effects.marker(to.clone(), 0xff5030);
     }
     this.projectiles.push({
-      kind: w.projectile, x: target.x, z: target.z, mesh, start: from, end: to, target, owner: u, t: 0,
+      kind: w.projectile, x: target.x, z: target.z, mesh, start: from, end: to, target, owner: u, t: 0, unguided,
       duration: Math.max(0.1, hypot(target.x - u.x, target.z - u.z) / w.speed), weapon: w, mult, trailTimer: 0, from: from.clone(), to: from.clone(),
     });
   }
@@ -850,7 +858,7 @@ export class Game {
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
       p.t = Math.min(1, p.t + dt / p.duration);
-      const unguided = !!p.weapon.unguided;
+      const unguided = p.unguided;
       if (!p.target.dead && !unguided) {
         p.x = p.target.x;
         p.z = p.target.z;
@@ -873,8 +881,9 @@ export class Game {
         const splash = p.weapon.splash;
         this.effects.explosion(p.end, splash > 0 ? 1.3 : p.kind === 'rocket' ? 0.8 : 0.6);
         if (unguided) {
-          // Falls where it was aimed: whoever is in the blast takes full damage at its center, half at its edge.
-          this.blast(p.x, p.z, p.weapon, p.mult, p.owner);
+          // Falls where it was aimed. Shells: whoever is in the blast takes full damage at its center, half at its
+          // edge. Rockets: a direct hit takes the full rocket and the rest of the blast half, as guided ones do.
+          this.blast(p.x, p.z, p.weapon, p.mult, p.owner, p.owner.team, p.kind === 'rocket' ? DIRECT_HIT : undefined);
         } else if (splash > 0) {
           // The target takes the full hit; anything else in the blast takes half, fading toward the edge, so one
           // rocket into a tight group doesn't do full damage to every unit in it.
@@ -926,11 +935,40 @@ export class Game {
    * An explosion on the ground at (x, z): every enemy of `owner`'s side within the weapon's splash takes its damage,
    * full at the center and half at the edge. Aircraft are above it.
    */
-  blast(x: number, z: number, w: WeaponDef, mult: number, owner: Shooter | null, team: Team = owner!.team): void {
+  blast(x: number, z: number, w: WeaponDef, mult: number, owner: Shooter | null, team: Team = owner!.team, direct?: number): void {
     const victims = [...this.units, ...this.buildings].filter(
       (e) => e.team !== team && !e.dead && !e.tags.includes('air') && !(e instanceof Unit && (e.carrier || e.falling)) && distTo(e, x, z) <= w.splash,
     );
-    for (const v of victims) this.damage(v, w, mult * (1 - distTo(v, x, z) / w.splash / 2), owner);
+    // With `direct`: the one thing nearest the impact, if within it, takes the full hit; the rest of the blast the
+    // splash share (as a guided rocket's target and bystanders do).
+    let hit: Entity | null = null;
+    if (direct !== undefined) {
+      let best = direct;
+      for (const v of victims) {
+        const d = distTo(v, x, z);
+        if (d <= best) {
+          best = d;
+          hit = v;
+        }
+      }
+    }
+    for (const v of victims) {
+      const d = distTo(v, x, z);
+      const share = direct === undefined ? 1 - d / w.splash / 2 : v === hit ? 1 : SPLASH_SHARE * (1 - d / w.splash / 2);
+      this.damage(v, w, mult * share, owner);
+    }
+  }
+
+  /** Locks a unit that can (MLRS) on to an enemy its side sees: it attacks it, with shots homing in, for a while. */
+  lockOn(u: Unit, target: Entity): boolean {
+    const d = u.def.lockOn;
+    if (!d || u.dead || u.carrier || this.time < u.nextLock || target.dead || target.team === u.team || !this.sees(u.team, target) || !this.weaponFor(u, target)) return false;
+    u.lockTarget = target;
+    u.lockUntil = this.time + d.duration;
+    u.nextLock = this.time + d.cooldown;
+    u.command(this, { kind: 'attack', target });
+    this.effects.marker(new THREE.Vector3(target.x, this.map.surfaceAt(target.x, target.z), target.z), 0xffd040);
+    return true;
   }
 
   /** Whether a team saw this entity destroyed (so its AI knows it's gone rather than just out of sight). */
@@ -1301,7 +1339,7 @@ export class Game {
     const h = new Hasher().int(this.ticks).int(this.nextId);
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
     for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading);
-    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1);
+    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil);
     for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
     for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);

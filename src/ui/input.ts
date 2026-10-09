@@ -36,6 +36,8 @@ export class Input {
   attackMode = false;
   /** Waiting for a click on where the selected Carryalls should drop their load. */
   dropMode = false;
+  /** Lock On armed (MLRS): the next left click on an enemy locks the selected MLRS on to it. */
+  lockMode = false;
   /** Waiting for a click on the selected production buildings' new rally point. */
   rallyMode = false;
   paused = false;
@@ -121,10 +123,11 @@ export class Input {
     this.attackMode = false;
     this.dropMode = false;
     this.rallyMode = false;
+    this.lockMode = false;
   }
 
   private get armed(): boolean {
-    return !!this.placing || this.attackMode || this.dropMode || this.rallyMode;
+    return !!this.placing || this.attackMode || this.dropMode || this.rallyMode || this.lockMode;
   }
 
   // ---- Subgroups ----------------------------------------------------------------
@@ -310,6 +313,29 @@ export class Input {
     if (devs.length) this.issue({ c: 'detonate', units: devs.map((u) => u.id) });
   }
 
+  /** Selected MLRS whose Lock On has recharged. */
+  lockReady(): Unit[] {
+    return this.withAbility((u) => !!u.def.lockOn && this.game.time >= u.nextLock);
+  }
+
+  /** Seconds until the selected MLRS can lock on again (the soonest one). */
+  lockCooldown(): number {
+    const r = this.withAbility((u) => !!u.def.lockOn);
+    return r.length ? Math.max(0, Math.min(...r.map((u) => u.nextLock - this.game.time))) : 0;
+  }
+
+  /** Whether any selected MLRS is locked on right now. */
+  lockActive(): boolean {
+    return this.withAbility((u) => !!u.def.lockOn && this.game.time < u.lockUntil && !!u.lockTarget && !u.lockTarget.dead).length > 0;
+  }
+
+  /** Arms Lock On: the next left click picks the enemy. */
+  armLock(): void {
+    if (!this.lockReady().length) return;
+    this.disarm();
+    this.lockMode = true;
+  }
+
   canLayMine(): boolean {
     return this.withAbility((u) => !!u.def.mines && this.game.time >= u.nextMine).length > 0;
   }
@@ -462,6 +488,14 @@ export class Input {
     if (this.dropMode) {
       this.dropMode = false;
       this.dropAt(p.x, p.y);
+      return;
+    }
+    if (this.lockMode) {
+      this.lockMode = false;
+      const t = this.pick(p.x, p.y);
+      const mlrs = this.lockReady();
+      if (t && t.team !== this.team && mlrs.length) this.issue({ c: 'lock', units: mlrs.map((u) => u.id), target: t.id });
+      else this.game.onMessage('Lock On needs an enemy you can see.');
       return;
     }
     if (this.rallyMode) {
@@ -684,7 +718,7 @@ export class Input {
     let cursor = 'default';
     if (this.grab) cursor = 'grabbing';
     else if (this.placing) cursor = 'cell';
-    else if (this.attackMode || this.dropMode || this.rallyMode) cursor = 'crosshair';
+    else if (this.attackMode || this.dropMode || this.rallyMode || this.lockMode) cursor = 'crosshair';
     else if (this.mouse.inside && this.ownUnits().length) {
       const t = this.pick(this.mouse.x, this.mouse.y);
       if (t && t.team !== this.team) cursor = 'crosshair';
@@ -699,6 +733,7 @@ export class Input {
     if (this.placing) text = `Placing ${BUILDINGS[this.placing].name}. Left-click to place, right-click to cancel.`;
     else if (this.attackMode) text = 'Attack-move: left-click a target or location.';
     else if (this.dropMode) text = 'Drop: left-click where to drop. Vehicles are set down; infantry jump on a fly-by.';
+    else if (this.lockMode) text = 'Lock On: left-click an enemy. Rockets home in on it for a while.';
     else if (this.rallyMode) text = 'Rally point: left-click a spot, on the map or the minimap.';
     else if (sel.length === 1) {
       const e = sel[0];
@@ -712,6 +747,7 @@ export class Input {
         if (st) text += `   ${st}`;
       }
       if (e instanceof Unit && e.detonateAt !== null) text += '   SELF-DESTRUCTING';
+      if (e instanceof Unit && e.lockTarget && !e.lockTarget.dead && this.game.time < e.lockUntil) text += `   Locked on: ${e.lockTarget.name}`;
       if (e instanceof Unit && e.def.repair && e.team === this.team) text += '   Right-click a damaged vehicle or building to repair it';
       if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === this.team && e.occupants.length ? `   ${keyLabel('KeyF')} to unload` : ''}`;
     } else if (sel.length > 1) {

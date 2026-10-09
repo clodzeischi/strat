@@ -75,6 +75,8 @@ export interface UnitDef {
   deploy?: { time: number; weapon: WeaponDef };
   /** Can self-destruct: blows up `delay` seconds after the order, hitting everything in the weapon's splash. */
   detonate?: { delay: number; weapon: WeaponDef };
+  /** Can lock on to one enemy (aimed by the player): for `duration` s its shots home in on it; then `cooldown` s to recharge. */
+  lockOn?: { duration: number; cooldown: number };
   /** Lays mines: one every `cooldown` s; an enemy on the ground within `trigger` sets one off. At most `max` per side. */
   mines?: { cooldown: number; trigger: number; max: number; weapon: WeaponDef };
 }
