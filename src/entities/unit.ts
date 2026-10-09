@@ -103,7 +103,7 @@ export class Unit extends Entity {
 
   constructor(id: number, team: Team, readonly type: UnitType, x: number, z: number, heading = 0) {
     const def = UNITS[type];
-    super(id, team, def.hp, Math.max(1.2, def.radius * 1.8), def.infantry ? 1.6 : 2.0, def.radius + 0.25, false);
+    super(id, team, def.hp, Math.max(1.2, def.radius * 1.8), def.infantry ? 1.6 : 2.0, def.radius + 0.25);
     this.def = def;
     this.radius = def.radius;
     this.moveClass = def.infantry ? 'foot' : 'vehicle';

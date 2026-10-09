@@ -60,7 +60,7 @@ export class Building extends Entity {
 
   constructor(id: number, team: Team, readonly type: BuildingType, readonly cx: number, readonly cz: number, groundY: number, readonly facing: Facing = 'south') {
     const def = BUILDINGS[type];
-    super(id, team, def.hp, def.size * TILE * 0.8, 4.8, (def.size * TILE) / 2 + 0.1, true);
+    super(id, team, def.hp, def.size * TILE * 0.8, 4.8, (def.size * TILE) / 2 + 0.1);
     this.def = def;
     this.size = def.size;
     this.radius = (def.size * TILE) / 2;
