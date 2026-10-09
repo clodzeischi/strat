@@ -154,7 +154,7 @@ The Protoss of the game: slower, more expensive, stronger, and every loss hurts.
 | Razor | Fab | Fab | Dune buggy with a flamethrower | Infantry | Tanks |
 | Devastator | Fab | Tleilaxu Research, Fab upgrade | Slow heavy tank. Its machine gun fires while moving; the main gun doesn't. Can self-destruct in a big explosion | Armor; infantry up close | Aircraft, Rocket Launchers |
 | Sky Raider | Fab | Tleilaxu Research | Light ornithopter for scouting and disruption. Lays visible mines that wreck infantry and wear down harvesters | Armor | Anti-air |
-| Artillery | Fab | Tleilaxu Research | Self-propelled howitzer. Can't fire while moving; a short-range gun with modest damage. Deployed (static), it fires long-range, high-damage shells at a spot on the ground. Shells aren't guided, so a trike can drive out of the impact zone | Buildings, static defenses | Tanks |
+| Soulcrusher (artillery) | Fab | Tleilaxu Research | Self-propelled howitzer. Can't fire while moving; a short-range gun with modest damage. Deployed (static), it fires long-range, high-damage shells at a spot on the ground. Shells aren't guided, so a trike can drive out of the impact zone | Buildings, static defenses | Tanks |
 
 Corrino builds the same **Harvester** (with shields) at the Fab.
 

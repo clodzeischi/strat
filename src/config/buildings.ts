@@ -43,7 +43,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   },
   tleilaxu: {
     name: 'Tleilaxu Research', short: 'Tleilaxu', cost: 1300, buildTime: 18, hp: 1000, size: 3, requires: ['fab'],
-    desc: 'Tleilaxu biotech. Unlocks Sky Raiders, Artillery, Devastators and Shields.',
+    desc: 'Tleilaxu biotech. Unlocks Sky Raiders, Soulcrushers, Devastators and Shields.',
   },
   pad: {
     name: 'Repair Pad', short: 'Repair Pad', cost: 700, buildTime: 12, hp: 900, size: 2, requires: ['fab'], pad: { slots: 2, rate: 25, range: 2.5 },
