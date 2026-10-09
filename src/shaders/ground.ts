@@ -79,6 +79,23 @@ float sandGrain = (gNoise(gp * 14.0) - 0.5) * 0.06;
 // Rock: blotchy color, and faint layers that follow height so outcrop faces read as stratified stone.
 float mottle = (gNoise(gp * 1.3 + 70.0) * 0.6 + gNoise(gp * 4.1) * 0.4 - 0.5) * 0.16;
 float strata = (sin(vGround.y * 7.0 + gNoise(gp * 0.7) * 3.0) * 0.5) * 0.06;
+// Rock fine detail: grit that fades out before it would shimmer, thin branching fissures in patches, and the odd
+// pebble, light or dark. All of it stays faint; it only breaks up the flat color.
+vec2 g1 = gp * 6.0, g2 = gp * 12.0;
+float grit = (gNoise(g1 + 3.0) - 0.5) * 0.06 * (1.0 - smoothstep(0.3, 0.6, fwidth(g1.x)))
+  + (gNoise(g2 + 8.0) - 0.5) * 0.05 * (1.0 - smoothstep(0.3, 0.6, fwidth(g2.x)));
+float fissN = gNoise(gp * 0.85 + 120.0) * 0.7 + gNoise(gp * 2.4 + 60.0) * 0.3;
+float fiss = (1.0 - smoothstep(0.0, 0.012 + fwidth(fissN), abs(fissN - 0.5))) * smoothstep(0.45, 0.7, gNoise(gp * 0.3 + 200.0));
+vec2 pc = gp * 1.2;
+vec2 pCell = floor(pc);
+float pH = gHash(pCell + 51.3);
+float pD = length(fract(pc) - (vec2(gHash(pCell + 7.7), gHash(pCell + 13.9)) * 0.6 + 0.2));
+float pR = max(0.07 + 0.08 * gHash(pCell + 3.1), fwidth(pc.x) * 1.5);
+float pebble = (1.0 - smoothstep(pR * 0.5, pR, pD)) * step(pH, 0.2);
+float rockFine = grit - fiss * 0.16 + pebble * (pH < 0.1 ? 0.08 : -0.1);
+// A slow drift between warmer and greyer stone, so big rock plateaus aren't one flat tone.
+float tint = gNoise(gp * 0.18 + 300.0) - 0.5;
+vec3 rockTint = vec3(1.0 + tint * 0.07, 1.0, 1.0 - tint * 0.09);
 // Field edge: where the spice share crosses one half, pushed in and out by noise.
 float edge = vSpice.x - 0.5 + (gNoise(gp * 0.9) * 0.6 + gNoise(gp * 2.6) * 0.4 - 0.5) * 0.5;
 // Thinning: as a field is harvested, bare sand opens up in patches.
@@ -93,7 +110,8 @@ spiceCol = mix(spiceCol, uSpiceRim, (1.0 - smoothstep(0.0, 0.06, shape)) * 0.7);
 // The vertex color is sand with dune shading baked in; scaling it keeps that shading on the spice.
 diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * spiceCol / uSand, inside);
 // Sand and rock detail last, kept off the spice (it has its own grain).
-diffuseColor.rgb *= 1.0 + mix((mottle + strata) * (1.0 + oc), rippleShade + sandGrain, sandShare * (1.0 - oc)) * (1.0 - inside);
+diffuseColor.rgb *= 1.0 + mix((mottle + strata) * (1.0 + oc) + rockFine, rippleShade + sandGrain, sandShare * (1.0 - oc)) * (1.0 - inside);
+diffuseColor.rgb *= mix(vec3(1.0), rockTint, (1.0 - sandShare) * (1.0 - inside));
 // Cliff walls: their own brown with a crisp, slightly noisy edge onto the ground above and below (never a blend
 // with it), layered, streaked and cracked. Streaks run along the wall, so they use whichever horizontal axis the
 // wall faces across. Outcrops keep their own soft look.
