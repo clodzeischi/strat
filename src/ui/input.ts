@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { RTSCamera } from '../render/camera';
-import { BUILDINGS, PRODUCERS, TILE, type BuildingType, type Producer, type Team, type UnitType } from '../config';
+import { BUILDINGS, FACTIONS, PRODUCERS, TILE, type BuildingType, type Producer, type Team, type UnitType } from '../config';
 import { Building, BUILDING_TURN, Carryall, diamondScale, repairable, Unit, type Entity } from '../entities';
 import type { Command } from '../game/commands';
 import type { Game } from '../game/game';
@@ -18,6 +18,7 @@ const PAN_SPEED = 45;
 const TIER: Record<UnitType, number> = {
   carryall: 6, rocket: 5, repair: 4, tank: 3, trike: 2, infantry: 1, harvester: 0,
   devastator: 6, artillery: 5, raider: 4, sardaukar: 3, razor: 2, trooper: 1,
+  worm: 6, fedaykin: 4, commando: 3, warrior: 2, crew: 1,
 };
 
 /** One kind of thing in the selection: a unit type or a building type. */
@@ -302,6 +303,22 @@ export class Input {
     this.issue({ c: 'deploy', units: arty.map((u) => u.id), on });
   }
 
+  /** Selected Spice Crews set up camp where they stand. */
+  setUpCamp(): void {
+    const crews = this.withAbility((u) => !!u.def.camp);
+    if (crews.length) this.issue({ c: 'deploy', units: crews.map((u) => u.id), on: true });
+  }
+
+  /** Selected Spice Camps. */
+  ownCamps(): Building[] {
+    return this.ownBuildings().filter((b) => !!b.def.extract);
+  }
+
+  packCamps(): void {
+    const camps = this.ownCamps();
+    if (camps.length) this.issue({ c: 'pack', buildings: camps.map((b) => b.id) });
+  }
+
   /** Share of the selected Artillery that is deployed or setting up (for the card's look). */
   deployedShare(): number {
     const arty = this.withAbility((u) => !!u.def.deploy);
@@ -477,7 +494,13 @@ export class Input {
       if (this.game.canPlace(this.placing, this.team, c.cx, c.cz)) {
         this.issue({ c: 'place', cx: c.cx, cz: c.cz });
         this.placing = null;
-      } else this.game.onMessage('Cannot build there. Structures go on rock, near your base.');
+      } else {
+        const g = this.game;
+        const sand = FACTIONS[g.teams[this.team].faction].buildOnSand;
+        g.onMessage(BUILDINGS[this.placing].onSand ? 'A Thumper must stand on open sand, near your other structures.'
+          : sand ? 'Cannot build there. Structures go on level rock or sand (not spice), near your other structures.'
+            : 'Cannot build there. Structures go on rock, near your base.');
+      }
       return;
     }
     if (this.attackMode) {
@@ -747,6 +770,11 @@ export class Input {
         if (st) text += `   ${st}`;
       }
       if (e instanceof Unit && e.detonateAt !== null) text += '   SELF-DESTRUCTING';
+      if (e instanceof Unit && e.hidden && e.team === this.team) text += '   Hidden in the sand';
+      if (e instanceof Unit && e.def.camp && e.team === this.team) text += `   ${keyLabel('KeyD')}: set up camp on a spice field`;
+      if (e instanceof Building && e.def.extract) {
+        text += e.dry ? `   Run dry${e.team === this.team ? ` (${keyLabel('KeyD')} to pack up)` : ''}` : `   Spice in reach: ${this.game.spiceAround(e.x, e.z)} tiles`;
+      }
       if (e instanceof Unit && e.lockTarget && !e.lockTarget.dead && this.game.time < e.lockUntil) text += `   Locked on: ${e.lockTarget.name}`;
       if (e instanceof Unit && e.def.repair && e.team === this.team) text += '   Right-click a damaged vehicle or building to repair it';
       if (e instanceof Building && e.def.garrison) text += `   Infantry inside: ${e.occupants.length} / ${e.def.garrison}${e.team === this.team && e.occupants.length ? `   ${keyLabel('KeyF')} to unload` : ''}`;

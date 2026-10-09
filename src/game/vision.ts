@@ -22,7 +22,8 @@ const AIR = 3;
  *   what's behind it);
  * - from high ground or the air, everything in range is visible.
  * Aircraft are seen by anyone with the cell in range, cliffs or not: they're up in the sky. A unit that attacks is
- * revealed to the side it hit for a moment, so units below a cliff can shoot back.
+ * revealed to the side it hit for a moment, so units below a cliff can shoot back. Fremen hidden in the sand are
+ * only seen by a side with a unit or structure right next to them (`Unit.hidden`, `Unit.detected`, set by the game).
  *
  * This is game state: units only target what their team sees, so it's computed in the simulation for every team
  * on every machine. What the local player's screen shows is a separate, drawing-only matter (see Game.frame).
@@ -59,6 +60,8 @@ export class Vision {
     }
     const u = e as Unit;
     if (u.carrier) return false;
+    // Fremen dug into the sand: only seen by a side with something right next to them.
+    if (u.hidden && !(u.detected & (1 << team))) return false;
     const i = this.cellIndex(u.x, u.z);
     if (i < 0) return false;
     return (u.def.air ? this.inRange : this.visible)[team][i] === 1;

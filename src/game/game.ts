@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 import {
-  ARMOR_BONUS, BUILDINGS, FACTIONS, FLAME_RANGE, HIGH_GROUND_RANGE, INFANTRY_REGEN, LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX,
-  REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS, TEAM_COLORS, TILE, UNITS, UPGRADES, WEAPONS_BONUS,
-  factionLevelUps, factionUpgrades, unitDef,
+  AMBUSH, ARMOR_BONUS, BUILDINGS, CAMP_FULL, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
+  LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS,
+  TEAM_COLORS, TILE, UNITS, UPGRADES, WEAPONS_BONUS, factionLevelUps, factionUpgrades, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type BuildingType, type ProjectileKind, type Team,
   type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
 import { Effects } from '../render/effects/effects';
-import { Building, Carryall, distTo, facingToward, repairable, SALVAGE, Unit, type Entity } from '../entities';
-import { GameMap, ROCK, SPICE, type Cell } from '../map';
+import { Building, Carryall, distTo, facingToward, moveClassOf, repairable, SALVAGE, Unit, type Entity } from '../entities';
+import { CLIFF, GameMap, ROCK, SAND, SPICE, type Cell, type MoveClass } from '../map';
 import { mat } from '../materials/lambert';
 import { cellsAround } from './pathfinding';
 import { Terrain } from '../render/terrain';
@@ -157,8 +157,8 @@ export class Game {
         unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
         spiceHarvested: 0, creditsSpent: 0,
       },
-      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [] }, research: null,
-      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0 }, levelUps: {},
+      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [], thumper: [] }, research: null,
+      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0, thumper: 0 }, levelUps: {},
     }));
     this.vision = new Vision(this.map, this.teams.length);
     this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
@@ -237,6 +237,13 @@ export class Game {
     return FACTIONS[this.teams[team].faction].train.includes(type) && this.has(team, d.producer) && this.requirementsMet(team, d.requires);
   }
 
+  /** Whether the team already has as many of a limited unit (Sandworms) as it may, counting ones in production. */
+  atLimit(team: Team, type: UnitType): boolean {
+    const d = this.unitDef(team, type);
+    if (!d.limit) return false;
+    return this.count(team, type) + this.teams[team].queues[d.producer].filter((q) => q.type === type).length >= d.limit;
+  }
+
   canResearch(team: Team, type: UpgradeType): boolean {
     const d = UPGRADES[type];
     const ups = this.teams[team].upgrades;
@@ -309,7 +316,7 @@ export class Game {
   }
 
   /** Whether a unit of this class can stand on a cell next to a building: open, and on its level (or a ramp). */
-  private besideOk(b: Building, cx: number, cz: number, cls: 'foot' | 'vehicle'): boolean {
+  private besideOk(b: Building, cx: number, cz: number, cls: MoveClass): boolean {
     const m = this.map;
     if (!m.inBounds(cx, cz) || !m.canEnter(cx, cz, cls)) return false;
     const i = m.idx(cx, cz);
@@ -317,7 +324,7 @@ export class Game {
   }
 
   /** Where a unit built here comes out: the open cell around the building nearest to (x, z), its rally point. */
-  exitCell(b: Building, x: number, z: number, cls: 'foot' | 'vehicle'): Cell {
+  exitCell(b: Building, x: number, z: number, cls: MoveClass): Cell {
     const m = this.map;
     let best: Cell | null = null;
     let bestD = Infinity;
@@ -404,23 +411,31 @@ export class Game {
   canPlace(type: BuildingType, team: Team, cx: number, cz: number): boolean {
     const size = BUILDINGS[type].size;
     const m = this.map;
-    if (!m.inBounds(cx, cz)) return false;
+    if (!m.inBounds(cx, cz) || BUILDINGS[type].deployed) return false;
     const level = m.level[m.idx(cx, cz)];
     for (let z = cz; z < cz + size; z++) {
-      for (let x = cx; x < cx + size; x++) if (!this.tileBuildable(x, z, level)) return false;
+      for (let x = cx; x < cx + size; x++) if (!this.tileBuildable(x, z, level, team, type)) return false;
     }
     return this.inBuildRange(type, team, cx, cz);
   }
 
+  /** The ground a team may build this on: rock, and for Fremen open sand too; a Thumper only on sand; a camp on spice too. */
+  private groundFor(team: Team, type?: BuildingType): (t: number) => boolean {
+    if (type && BUILDINGS[type].onSand) return (t) => t === SAND;
+    if (type && BUILDINGS[type].deployed) return (t) => t !== CLIFF;
+    return FACTIONS[this.teams[team].faction].buildOnSand ? (t) => t === ROCK || t === SAND : (t) => t === ROCK;
+  }
+
   /**
-   * Whether one tile could hold part of a building standing on `level`: rock, free, on that level (footprints are
-   * flat), not a ramp or next to one (ramps stay clear), and no unit on it.
+   * Whether one tile could hold part of the team's building standing on `level`: ground it may build on (rock, see
+   * `groundFor`), free, on that level (footprints are flat), not a ramp or next to one (ramps stay clear), and no
+   * unit on it (but `ignore`, the Spice Crew setting up there).
    */
-  tileBuildable(cx: number, cz: number, level: number): boolean {
+  tileBuildable(cx: number, cz: number, level: number, team: Team, type?: BuildingType, ignore?: Unit): boolean {
     const m = this.map;
     if (!m.inBounds(cx, cz)) return false;
     const i = m.idx(cx, cz);
-    if (m.tiles[i] !== ROCK || m.occupied[i] !== 0 || m.level[i] !== level || m.ramp[i]) return false;
+    if (!this.groundFor(team, type)(m.tiles[i]) || m.occupied[i] !== 0 || m.level[i] !== level || m.ramp[i]) return false;
     for (let z = cz - 1; z <= cz + 1; z++) {
       for (let x = cx - 1; x <= cx + 1; x++) if (m.inBounds(x, z) && m.ramp[m.idx(x, z)]) return false;
     }
@@ -428,7 +443,7 @@ export class Game {
     const z0 = cz * TILE;
     const x1 = x0 + TILE;
     const z1 = z0 + TILE;
-    return !this.units.some((u) => !u.def.air && !u.carrier && u.x + u.radius > x0 && u.x - u.radius < x1 && u.z + u.radius > z0 && u.z - u.radius < z1);
+    return !this.units.some((u) => u !== ignore && !u.def.air && !u.carrier && u.x + u.radius > x0 && u.x - u.radius < x1 && u.z + u.radius > z0 && u.z - u.radius < z1);
   }
 
   /** Whether a footprint at (cx, cz) is close enough to one of the team's own buildings. */
@@ -448,6 +463,7 @@ export class Game {
     const faction = this.teams[team].faction;
     const u = type === 'carryall' ? new Carryall(this.nextId++, team, x, z, heading) : new Unit(this.nextId++, team, type, x, z, heading, faction);
     u.y = this.map.surfaceAt(x, z);
+    u.stillSince = this.time;
     u.stagger(this.random);
     u.syncVisual(this, 0);
     this.scene.add(u.root);
@@ -509,7 +525,7 @@ export class Game {
       this.onDrop(u, u);
       return;
     }
-    const cls = UNITS[type].infantry ? 'foot' : 'vehicle';
+    const cls = moveClassOf(this.unitDef(team, type));
     const cell = this.exitCell(site, rally.x, rally.z, cls);
     const x = this.map.center(cell.cx);
     const z = this.map.center(cell.cz);
@@ -669,6 +685,10 @@ export class Game {
     const ts = this.teams[team];
     const queue = ts.queues[this.unitDef(team, type).producer];
     if (!this.canTrain(team, type)) return false;
+    if (this.atLimit(team, type)) {
+      this.notifyTeam(team, `You can have at most ${this.unitDef(team, type).limit} of those.`);
+      return false;
+    }
     if (queue.length >= QUEUE_MAX) {
       this.notifyTeam(team, 'Production queue full.');
       return false;
@@ -797,9 +817,24 @@ export class Game {
   }
 
   fire(u: Shooter, target: Entity, w: WeaponDef): void {
-    const mult = 1 + WEAPONS_BONUS * this.tier(u.team, 'weapons');
+    let mult = 1 + WEAPONS_BONUS * this.tier(u.team, 'weapons');
+    if (u instanceof Unit && u.def.hides) {
+      // Striking out of hiding: Ambush adds damage for a few seconds; either way the shooter comes out of the sand.
+      if (u.hidden && this.teams[u.team].upgrades.has('ambush')) u.ambushUntil = this.time + AMBUSH.time;
+      if (this.time < u.ambushUntil) mult *= 1 + AMBUSH.bonus;
+      this.unhide(u);
+    }
     const from = u.muzzleWorld();
     const to = target.aimPoint();
+    if (w.suicide && u instanceof Unit) {
+      // Death Commando: the charge goes off where it stands, and so does it. What it ran at takes the whole charge.
+      this.blast(u.x, u.z, w, mult, u, u.team, w.range + target.radius + 1);
+      this.effects.explosion(u.aimPoint(), 2.2);
+      this.effects.dust(new THREE.Vector3(u.x, this.map.surfaceAt(u.x, u.z) + 0.2, u.z), 0xd8c49a, 1.6);
+      u.hp = 0;
+      this.kill(u, null);
+      return;
+    }
     if (w.cone) {
       this.flame(u, target, w, mult, from);
       return;
@@ -809,7 +844,11 @@ export class Game {
       to.x += (Math.random() - 0.5) * 0.5;
       to.z += (Math.random() - 0.5) * 0.5;
       this.effects.tracer(from, to);
-      this.damage(target, w, mult, u);
+      if (w.splash > 0) {
+        // A Sandworm's bite: the target takes it whole, whatever is next to it some of it.
+        this.blast(target.x, target.z, w, mult, u, u.team, Infinity);
+        this.effects.dust(new THREE.Vector3(target.x, this.map.surfaceAt(target.x, target.z) + 0.3, target.z), 0xd8b080, 1.4);
+      } else this.damage(target, w, mult, u);
       return;
     }
     const mesh = new THREE.Mesh(w.projectile === 'shell' ? shellGeo : rocketGeo, mat(w.projectile === 'shell' ? 0x403020 : 0xeeeeee));
@@ -906,6 +945,7 @@ export class Game {
   damage(target: Entity, w: WeaponDef, mult: number, attacker: Shooter | null): void {
     if (target.dead || (target instanceof Unit && target.carrier)) return;
     target.lastHurt = this.time;
+    if (target instanceof Unit && target.def.hides) this.unhide(target);
     // Whoever fires is seen by the side it hits for a moment, so units below a cliff can shoot back.
     if (attacker && attacker.team !== target.team) this.vision.reveal(target.team, attacker.x, attacker.z, this.ticks);
     let dmg = weaponDamage(w, target) * mult;
@@ -1026,7 +1066,7 @@ export class Game {
 
   /** Puts an infantry unit into its own team's bunker, if there's room. */
   enterBunker(u: Unit, b: Building): boolean {
-    if (!u.def.infantry || u.team !== b.team || b.dead || b.room <= 0 || u.carrier) return false;
+    if (!u.def.infantry || u.def.weapon?.suicide || u.team !== b.team || b.dead || b.room <= 0 || u.carrier) return false;
     u.carrier = b;
     u.path = [];
     u.target = null;
@@ -1221,6 +1261,184 @@ export class Game {
     return FACTIONS[this.teams[b.team].faction].selfRepair && !b.dead && b.hp < b.maxHp && this.has(b.team, 'conyard');
   }
 
+  // ---- Fremen: hiding, healing, Spice Camps ------------------------------------------
+
+  /** Brings a hidden unit out of the sand (it fired, or was hit), and starts its wait to hide again. */
+  unhide(u: Unit): void {
+    u.hidden = false;
+    u.stillSince = this.time;
+  }
+
+  /**
+   * Every tick: a unit that hides and has moved (more than a nudge) starts its wait over. On vision ticks: who is
+   * dug in (still long enough, on sand or spice), and which sides have something close enough to see them anyway.
+   */
+  private updateHiding(visionTick: boolean): void {
+    for (const u of this.units) {
+      if (!u.def.hides) continue;
+      if (u.carrier || u.falling || hypot(u.x - u.hideX, u.z - u.hideZ) > 0.3) {
+        u.hideX = u.x;
+        u.hideZ = u.z;
+        u.stillSince = this.time;
+        u.hidden = false;
+      }
+      if (!visionTick) continue;
+      u.hidden = this.time - u.stillSince >= HIDE.delay && u.onSand(this);
+      u.detected = 0;
+      if (!u.hidden) continue;
+      for (const ts of this.teams) {
+        if (ts.team === u.team) continue;
+        const near = this.units.some((e) => e.team === ts.team && !e.dead && !e.carrier && hypot(e.x - u.x, e.z - u.z) - e.radius - u.radius <= HIDE.detect)
+          || this.buildings.some((b) => b.team === ts.team && !b.dead && distTo(b, u.x, u.z) <= HIDE.detect);
+        if (near) u.detected |= 1 << ts.team;
+      }
+    }
+  }
+
+  /** Fremen units and structures heal slowly once they haven't been hurt for a while (faster with Stillsuits). */
+  private updateRegen(dt: number): void {
+    for (const ts of this.teams) {
+      if (!FACTIONS[ts.faction].regen) continue;
+      const still = ts.upgrades.has('stillsuit');
+      const delay = still ? FREMEN_REGEN.quick : FREMEN_REGEN.delay;
+      const k = still ? FREMEN_REGEN.stillsuit : 1;
+      for (const u of this.units) {
+        if (u.team !== ts.team || u.hp >= u.maxHp || u.carrier || this.time - u.lastHurt <= delay) continue;
+        u.hp = Math.min(u.maxHp, u.hp + u.maxHp * FREMEN_REGEN.unit * k * dt);
+      }
+      for (const b of this.buildings) {
+        if (b.team !== ts.team || b.hp >= b.maxHp || this.time - b.lastHurt <= delay) continue;
+        b.hp = Math.min(b.maxHp, b.hp + b.maxHp * FREMEN_REGEN.building * k * dt);
+      }
+    }
+  }
+
+  /** Spice tiles within a camp's reach of a point, nearest first (ties by index, so every machine agrees). */
+  private spiceReach(x: number, z: number, radius: number): number[] {
+    const m = this.map;
+    const out: { i: number; d: number }[] = [];
+    const r = Math.ceil(radius / TILE) + 1;
+    const cx = m.cellOf(x);
+    const cz = m.cellOf(z);
+    for (let dz = -r; dz <= r; dz++) {
+      for (let dx = -r; dx <= r; dx++) {
+        const x2 = cx + dx;
+        const z2 = cz + dz;
+        if (!m.inBounds(x2, z2)) continue;
+        const d = hypot(m.center(x2) - x, m.center(z2) - z);
+        if (d <= radius) out.push({ i: m.idx(x2, z2), d });
+      }
+    }
+    return out.sort((a, b) => a.d - b.d || a.i - b.i).map((o) => o.i);
+  }
+
+  /** Spice tiles left in reach of a camp (or a camp that would stand at a point). */
+  spiceAround(x: number, z: number, radius = BUILDINGS.camp.extract!.radius): number {
+    let n = 0;
+    for (const i of this.spiceReach(x, z, radius)) if (this.map.tiles[i] === SPICE) n++;
+    return n;
+  }
+
+  /** Where a Spice Crew could set up its camp: the free footprint nearest it, with spice in reach. Null if none. */
+  campSpot(u: Unit): Cell | null {
+    const type = u.def.camp;
+    if (!type) return null;
+    const def = BUILDINGS[type];
+    const m = this.map;
+    const bx = Math.round(u.x / TILE - def.size / 2);
+    const bz = Math.round(u.z / TILE - def.size / 2);
+    const tries: Cell[] = [];
+    for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) tries.push({ cx: bx + dx, cz: bz + dz });
+    const centerOf = (c: Cell) => ({ x: (c.cx + def.size / 2) * TILE, z: (c.cz + def.size / 2) * TILE });
+    tries.sort((a, b) => {
+      const pa = centerOf(a);
+      const pb = centerOf(b);
+      return hypot(pa.x - u.x, pa.z - u.z) - hypot(pb.x - u.x, pb.z - u.z) || a.cz - b.cz || a.cx - b.cx;
+    });
+    for (const c of tries) {
+      if (!m.inBounds(c.cx, c.cz)) continue;
+      const level = m.level[m.idx(c.cx, c.cz)];
+      let ok = true;
+      for (let z = c.cz; z < c.cz + def.size && ok; z++) {
+        for (let x = c.cx; x < c.cx + def.size && ok; x++) ok = this.tileBuildable(x, z, level, u.team, type, u);
+      }
+      const p = centerOf(c);
+      if (ok && this.spiceAround(p.x, p.z, def.extract!.radius) > 0) return c;
+    }
+    return null;
+  }
+
+  /** A Spice Crew sets up its camp where it stands. Returns false (and says why) if it can't. */
+  deployCamp(u: Unit): boolean {
+    if (u.dead || u.carrier || u.falling || !u.def.camp) return false;
+    const c = this.campSpot(u);
+    if (!c) {
+      this.notifyTeam(u.team, 'A Spice Camp needs open, level ground on a spice field.');
+      return false;
+    }
+    const frac = u.hp / u.maxHp;
+    this.remove(u);
+    const b = this.placeBuilding(u.def.camp, u.team, c.cx, c.cz);
+    b.hp = b.maxHp * frac;
+    b.reach = this.spiceReach(b.x, b.z, b.def.extract!.radius);
+    this.teams[u.team].stats.structuresBuilt++;
+    this.effects.dust(new THREE.Vector3(b.x, b.y + 0.2, b.z), 0xd8c49a, 1.2);
+    return true;
+  }
+
+  /** A Spice Camp packs up into its crew again, to move on to another field. */
+  packCamp(b: Building): Unit | null {
+    if (b.dead || !b.def.extract) return null;
+    const type = (Object.keys(UNITS) as UnitType[]).find((t) => this.unitDef(b.team, t).camp === b.type);
+    if (!type) return null;
+    const frac = b.hp / b.maxHp;
+    this.remove(b);
+    const m = this.map;
+    const c = m.nearestCell(m.cellOf(b.x), m.cellOf(b.z), (x, z) => m.canEnter(x, z, 'foot'), 6) ?? { cx: m.cellOf(b.x), cz: m.cellOf(b.z) };
+    const u = this.spawnUnit(type, b.team, m.center(c.cx), m.center(c.cz), b.doorHeading());
+    u.hp = u.maxHp * frac;
+    return u;
+  }
+
+  /** Takes a unit or structure off the map without it counting as lost (a crew becoming a camp, and back). */
+  private remove(e: Unit | Building): void {
+    e.dead = true;
+    e.setSelected(false);
+    this.scene.remove(e.root);
+    if (e instanceof Building) this.clearFootprint(e);
+  }
+
+  /** Spice Camps turn the spice in reach into credits: full rate with enough of it about, less on the field's edge. */
+  private updateCamps(dt: number): void {
+    const m = this.map;
+    for (const b of this.buildings) {
+      const ex = b.def.extract;
+      if (!ex || b.dead) continue;
+      let n = 0;
+      for (const i of b.reach) if (m.tiles[i] === SPICE) n++;
+      if (n === 0) {
+        if (!b.dry) this.notifyTeam(b.team, 'A Spice Camp has run dry. Pack it up (D) and move on.');
+        b.dry = true;
+        continue;
+      }
+      let want = ex.rate * Math.min(1, n / CAMP_FULL) * (1 + CAMP_UPGRADE * this.tier(b.team, 'harvest')) * dt;
+      let got = 0;
+      for (const i of b.reach) {
+        if (want <= 0) break;
+        if (m.tiles[i] !== SPICE) continue;
+        const cx = i % m.size;
+        const cz = Math.floor(i / m.size);
+        const t = m.takeSpice(cx, cz, want);
+        if (t > 0) this.terrain.refreshTile(cx, cz);
+        want -= t;
+        got += t;
+      }
+      const ts = this.teams[b.team];
+      ts.credits += got;
+      ts.stats.spiceHarvested += got;
+    }
+  }
+
   offerSurrender(team: Team): void {
     if (this.winner === null) this.onSurrenderOffer(team);
   }
@@ -1242,7 +1460,11 @@ export class Game {
     // Frames draw units between ticks; put them back where the simulation left them (muzzles aim from there).
     for (const u of this.units) u.beginTick();
     this.time += dt;
-    if ((this.ticks - 1) % VISION_EVERY === 0) this.vision.update(this.units, this.buildings, this.ticks);
+    const visionTick = (this.ticks - 1) % VISION_EVERY === 0;
+    if (visionTick) {
+      this.updateHiding(true);
+      this.vision.update(this.units, this.buildings, this.ticks);
+    }
     for (const ts of this.teams) this.updateProduction(ts, dt);
     // Alternate the order units act in, so neither side always gets the first shot in a tick.
     const order = this.ticks % 2 ? this.units : [...this.units].reverse();
@@ -1250,12 +1472,15 @@ export class Game {
       if (u.dead || u.carrier) continue;
       if (u.falling) u.updateFall(this, dt);
       else u.update(this, dt);
-      // Atreides infantry patch themselves up; Corrino health only comes back at a Repair Pad.
-      if (u.def.infantry && !u.maxShields && u.hp < u.maxHp && this.time - u.lastHurt > INFANTRY_REGEN.delay) {
+      // Atreides infantry patch themselves up; Corrino health only comes back at a Repair Pad; Fremen see updateRegen.
+      if (u.def.infantry && !u.maxShields && !u.def.hides && u.hp < u.maxHp && this.time - u.lastHurt > INFANTRY_REGEN.delay) {
         u.hp = Math.min(u.maxHp, u.hp + u.maxHp * INFANTRY_REGEN.rate * dt);
       }
     }
+    this.updateHiding(false);
     this.regenShields(dt);
+    this.updateRegen(dt);
+    this.updateCamps(dt);
     this.updateDetonations();
     this.updateMines();
     this.updateBunkers(dt);
@@ -1296,7 +1521,8 @@ export class Game {
     this.drawFog(dt);
     for (const b of this.buildings) {
       if (b.def.weapon) b.aimGun();
-      else if (b.spinner) b.spinner.rotation.y += dt * (b.type === 'factory' ? 1.5 : 0.25);
+      else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + Math.abs(Math.sin(this.time * 5 + b.id)) * 0.35;
+      else if (b.spinner && !(b.def.extract && b.dry)) b.spinner.rotation.y += dt * (b.type === 'factory' || b.type === 'camp' ? 1.5 : 0.25);
     }
     this.effects.update(dt);
     this.terrain.flush();
@@ -1339,7 +1565,7 @@ export class Game {
     const h = new Hasher().int(this.ticks).int(this.nextId);
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
     for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading);
-    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil);
+    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected);
     for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
     for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);

@@ -71,7 +71,7 @@ export class PlacementGrid {
         const z = cz + dz;
         // 0 inside the footprint, 1 for the context ring.
         const ring = Math.max(0, -dx, dx - size + 1, -dz, dz - size + 1);
-        const buildable = g.tileBuildable(x, z, level);
+        const buildable = g.tileBuildable(x, z, level, team, type);
         const color = ring === 0 ? (buildable && inRange ? OK : BAD) : buildable ? FREE : BAD;
         const alpha = m.inBounds(x, z) ? ALPHA[ring] : 0;
         const base = t * (SUB + 1) * (SUB + 1);

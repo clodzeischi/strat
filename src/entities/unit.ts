@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import {
-  BUILDINGS, CARRYALL, HARVEST_UPGRADE, HARVESTER, NITRO, REPAIR_COST, TEAM_COLORS, TILE, shieldsFor, unitDef,
+  BUILDINGS, CARRYALL, HARVEST_UPGRADE, HARVESTER, NITRO, REPAIR_COST, SAND_SPEED, TEAM_COLORS, TILE, shieldsFor, unitDef,
   type Faction, type Tag, type Team, type UnitDef, type UnitType,
 } from '../config';
 import type { Game } from '../game/game';
 import { findPath, type Point } from '../game/pathfinding';
-import { SPICE, type Cell, type MoveClass } from '../map';
+import { SAND, SPICE, type Cell, type MoveClass } from '../map';
 import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit } from '../models';
 import { Building } from './building';
 import { distTo } from './distance';
@@ -43,7 +43,14 @@ export type Order =
 const AIR_HEIGHT = CARRYALL.altitude - 2;
 
 /** Paratroopers come down at this speed; vehicles on their bigger canopies a little slower. */
-const FALL_SPEED = { foot: 2.2, vehicle: 1.7 };
+const FALL_SPEED = { foot: 2.2, vehicle: 1.7, worm: 1.7 };
+/** How far a hidden Fremen sinks into the sand (drawing). */
+const HIDDEN_SINK = 0.45;
+
+/** How a unit of this kind gets about: on foot, on wheels and tracks, or through the sand (Sandworms). */
+export function moveClassOf(def: UnitDef): MoveClass {
+  return def.sandOnly ? 'worm' : def.infantry ? 'foot' : 'vehicle';
+}
 /** Corrino drop pods come in fast from this high, braking at the last moment. */
 const POD = { height: 30, speed: 12 };
 
@@ -92,6 +99,15 @@ export class Unit extends Entity {
   lockTarget: Entity | null = null;
   lockUntil = 0;
   nextLock = 0;
+  /** Fremen hiding: when it last moved, fired or was hit, from where (small nudges don't count), and whether it's dug in. */
+  stillSince = 0;
+  hideX = 0;
+  hideZ = 0;
+  hidden = false;
+  /** Teams (bit per team) with something close enough to see it even while it's hidden. */
+  detected = 0;
+  /** Ambush: game time until which it deals the bonus damage of having struck out of hiding. */
+  ambushUntil = 0;
   /** Seconds until the second gun (Devastator machine gun) can fire again. */
   private cooldown2 = 0;
   protected body: THREE.Group;
@@ -137,9 +153,11 @@ export class Unit extends Entity {
     super(id, team, def.hp, shieldsFor(faction, def), Math.max(1.2, def.radius * 1.8), def.infantry ? 1.6 : 2.0, def.radius + 0.25);
     this.def = def;
     this.radius = def.radius;
-    this.moveClass = def.infantry ? 'foot' : 'vehicle';
+    this.moveClass = moveClassOf(def);
     this.x = x;
     this.z = z;
+    this.hideX = x;
+    this.hideZ = z;
     this.lastX = x;
     this.lastZ = z;
     this.heading = heading;
@@ -199,7 +217,19 @@ export class Unit extends Entity {
     const ups = game.teams[this.team].upgrades;
     if (this.type === 'harvester' && game.tier(this.team, 'harvest')) return this.def.speed * HARVEST_UPGRADE.speed;
     if (this.type === 'trike' && ups.has('nitro')) return this.def.speed * NITRO.speed;
+    // Fremen infantry are quicker on sand and spice.
+    if (this.def.hides && this.def.infantry && this.onSand(game)) return this.def.speed * (1 + SAND_SPEED.base + (ups.has('sandwalk') ? SAND_SPEED.sandwalk : 0));
     return this.def.speed;
+  }
+
+  /** Whether it stands on open sand or spice (where Fremen hide and walk faster). */
+  onSand(game: Game): boolean {
+    const m = game.map;
+    const cx = m.cellOf(this.x);
+    const cz = m.cellOf(this.z);
+    if (!m.inBounds(cx, cz)) return false;
+    const t = m.tile(cx, cz);
+    return t === SAND || t === SPICE;
   }
 
   muzzleWorld(): THREE.Vector3 {
@@ -403,7 +433,8 @@ export class Unit extends Entity {
       }
       if (!this.target && this.scanTimer <= 0) {
         this.scanTimer = 0.4 + game.random() * 0.2;
-        this.target = game.nearestEnemy(this.team, this.x, this.z, this.def.sight, this);
+        // Dug in, Fremen lie in wait: they only take on what walks into range, rather than give themselves away.
+        this.target = game.nearestEnemy(this.team, this.x, this.z, this.hidden ? weapon.range : this.def.sight, this);
       }
     } else {
       this.target = null;
@@ -961,7 +992,7 @@ export class Unit extends Entity {
   syncVisual(game: Game, dt: number): void {
     this.refreshKit(game);
     if (!this.falling) {
-      const groundY = game.map.surfaceAt(this.x, this.z) + (this.def.air ? AIR_HEIGHT : 0);
+      const groundY = game.map.surfaceAt(this.x, this.z) + (this.def.air ? AIR_HEIGHT : this.hidden ? -HIDDEN_SINK : 0);
       this.y += (groundY - this.y) * Math.min(1, dt * (this.def.air ? 3 : 10));
     }
     this.root.position.set(this.x, this.y, this.z);

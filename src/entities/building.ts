@@ -63,6 +63,9 @@ export class Building extends Entity {
   aim = 0;
   /** Repair Pads: the units being mended now. */
   patients: Unit[] = [];
+  /** Spice Camps: map cells within reach, nearest first (worked in this order), and whether they've all run dry. */
+  reach: number[] = [];
+  dry = false;
   /** Turned and scaled holder of the model, so level-2 parts line up with it. */
   private model = new THREE.Group();
 

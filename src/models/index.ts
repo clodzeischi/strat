@@ -11,6 +11,9 @@ import { fab } from './buildings/fab';
 import { pad } from './buildings/pad';
 import { tleilaxu } from './buildings/tleilaxu';
 import { turret } from './buildings/turret';
+import { camp } from './buildings/camp';
+import { sietch } from './buildings/sietch';
+import { thumper } from './buildings/thumper';
 import { box } from './parts';
 import type { BuildingBlueprint, BuildingModel, UnitBlueprint, UnitModel, UpgradeKit, UpgradeLook } from './types';
 import { carryall } from './units/carryall';
@@ -26,6 +29,11 @@ import { raider } from './units/raider';
 import { razor } from './units/razor';
 import { sardaukar } from './units/sardaukar';
 import { trooper } from './units/trooper';
+import { commando } from './units/commando';
+import { crew } from './units/crew';
+import { fedaykin } from './units/fedaykin';
+import { warrior } from './units/warrior';
+import { worm } from './units/worm';
 
 export type { BuildingModel, UnitModel, UpgradeKit, UpgradeLook } from './types';
 export { makeParachute } from './parachute';
@@ -34,8 +42,11 @@ export { CARRYALL_HOOK_Y, NACELLES, SEATS, SEAT_OFF, SEAT_ON } from './units/car
 
 const UNIT_MODELS: Record<UnitType, UnitBlueprint> = {
   harvester, infantry, trike, tank, rocket, repair, carryall, trooper, sardaukar, razor, devastator, raider, artillery,
+  warrior, fedaykin, commando, crew, worm,
 };
-const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = { conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret };
+const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = {
+  conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret, sietch, thumper, camp,
+};
 
 /** Unit models face +X. */
 export function makeUnitModel(type: UnitType, color: number): UnitModel {

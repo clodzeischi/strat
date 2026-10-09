@@ -19,8 +19,10 @@ export type Command =
   | { c: 'rally'; buildings: number[]; x: number; z: number }
   | { c: 'salvage'; buildings: number[] }
   | { c: 'cancelSalvage'; buildings: number[] }
-  /** Artillery sets up (`on`) or packs up. */
+  /** Artillery sets up (`on`) or packs up; Spice Crews set up their camp. */
   | { c: 'deploy'; units: number[]; on: boolean }
+  /** Spice Camps pack up into crews again. */
+  | { c: 'pack'; buildings: number[] }
   /** Devastators self-destruct. */
   | { c: 'detonate'; units: number[] }
   /** MLRS lock on to an enemy: they attack it with homing rockets for a while. */
@@ -90,7 +92,13 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       for (const b of ownBuildings(game, team, cmd.buildings)) game.cancelSalvage(b);
       return;
     case 'deploy':
-      for (const u of own(game, team, cmd.units)) u.setDeployed(cmd.on);
+      for (const u of own(game, team, cmd.units)) {
+        if (u.def.camp) game.deployCamp(u);
+        else u.setDeployed(cmd.on);
+      }
+      return;
+    case 'pack':
+      for (const b of ownBuildings(game, team, cmd.buildings)) game.packCamp(b);
       return;
     case 'detonate':
       for (const u of own(game, team, cmd.units)) game.startDetonation(u);

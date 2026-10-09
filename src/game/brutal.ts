@@ -203,7 +203,7 @@ export class BrutalAI extends AI {
       let flank: Sighting | null = null;
       let far = 15 * TILE;
       for (const s of [...this.intel.buildings.values(), ...this.intel.placedUnits()]) {
-        if (s.type !== 'refinery' && s.type !== 'harvester') continue;
+        if (s.type !== 'refinery' && s.type !== 'harvester' && s.type !== 'camp') continue;
         const d = hypot(s.x - main.x, s.z - main.z);
         if (d > far) {
           far = d;

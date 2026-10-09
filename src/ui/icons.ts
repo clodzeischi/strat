@@ -8,6 +8,10 @@ const DARK = '#3a3a3e';
 const METAL = '#8a8a86';
 const GOLD = '#c8a040';
 const LACQ = '#2e2a30';
+const ROBE = '#9a7a54';
+const IBAD = '#3a7cff';
+/** A hooded Fremen head and robe, the base of the faction's infantry icons. */
+const FREMEN = (robe: string) => `<path d="M14 15 Q20 3 26 15 L27 27 L13 27 Z" fill="${robe}"/><rect x="13" y="19" width="14" height="3" fill="${C}"/><rect x="17" y="10" width="6" height="2" fill="${IBAD}"/><rect x="15" y="27" width="4" height="9" fill="#55504a"/><rect x="21" y="27" width="4" height="9" fill="#55504a"/>`;
 
 const STAR = `<polygon points="20,4 24,16 36,16 26,23 30,35 20,27 10,35 14,23 4,16 16,16" fill="#e0902a"/>`;
 const SHIELD = `<path d="M20 4 L34 9 L32 24 Q28 32 20 36 Q12 32 8 24 L6 9 Z" fill="${METAL}"/><path d="M20 9 L29 12 L28 23 Q25 29 20 31 Z" fill="${C}"/>`;
@@ -51,6 +55,21 @@ const ICONS: Record<BuildingType | UnitType | UpgradeType, string> = {
   cArmor: SHIELD + tierMark(1),
   cShields: `<circle cx="20" cy="20" r="15" fill="#5ab8ff" opacity="0.35"/><circle cx="20" cy="20" r="15" fill="none" stroke="#5ab8ff" stroke-width="2.5"/><rect x="13" y="16" width="14" height="10" fill="${C}"/>` + tierMark(1),
   cHarvest: `<rect x="6" y="18" width="28" height="14" fill="#d08a3a"/><polygon points="20,4 30,16 24,16 24,22 16,22 16,16 10,16" fill="#7cff7c"/>`,
+  // ---- Fremen ----
+  warrior: FREMEN(ROBE) + `<rect x="22" y="17" width="14" height="2" fill="${DARK}"/><rect x="9" y="20" width="2" height="6" fill="#e8e0c8"/>`,
+  fedaykin: FREMEN('#5c4a3a') + `<rect x="22" y="16" width="9" height="5" fill="#55504a"/><circle cx="33" cy="18.5" r="3" fill="#9ad8ff"/><path d="M36 14 Q39 18.5 36 23" stroke="#9ad8ff" stroke-width="1.5" fill="none"/>`,
+  commando: FREMEN('#8a5a3a') + `<rect x="5" y="14" width="5" height="12" rx="2" fill="#b8402e"/><rect x="9" y="15" width="5" height="12" rx="2" fill="#b8402e"/><polygon points="8,7 11,12 6,12" fill="#ffd060"/>`,
+  crew: FREMEN('#b08a5a') + `<rect x="4" y="13" width="9" height="5" rx="2" fill="#d88a3a"/><rect x="31" y="4" width="2" height="30" fill="${METAL}"/><rect x="29" y="31" width="6" height="4" fill="#d08a3a"/>`,
+  worm: `<path d="M2 34 Q8 20 16 22 Q26 24 30 12" stroke="#a8865a" stroke-width="9" fill="none" stroke-linecap="round"/><circle cx="31" cy="11" r="6.5" fill="#4a1810"/><circle cx="31" cy="11" r="6.5" fill="none" stroke="#e8e0c8" stroke-width="1.8" stroke-dasharray="1.5 1.5"/><rect x="16" y="11" width="3" height="8" fill="${C}"/><rect x="2" y="34" width="36" height="3" fill="${SAND}"/>`,
+  sietch: `<rect x="2" y="27" width="36" height="8" fill="#a89268"/><polygon points="4,27 9,13 18,10 26,6 33,14 36,27" fill="#a89268"/><polygon points="9,27 12,17 20,15 28,18 31,27" fill="#8e7a56"/><path d="M15 27 Q20 18 25 27 Z" fill="${DARK}"/><rect x="25" y="1" width="1.5" height="8" fill="${DARK}"/><rect x="26.5" y="1" width="6" height="4" fill="${C}"/>`,
+  thumper: `<rect x="3" y="33" width="34" height="4" fill="${SAND}"/><line x1="12" y1="33" x2="20" y2="8" stroke="${ROBE}" stroke-width="2.5"/><line x1="28" y1="33" x2="20" y2="8" stroke="${ROBE}" stroke-width="2.5"/><rect x="18.5" y="10" width="3" height="20" fill="${METAL}"/><rect x="16" y="28" width="8" height="4" fill="${DARK}"/><rect x="16" y="6" width="8" height="3" fill="${C}"/><path d="M6 30 Q4 26 6 22 M34 30 Q36 26 34 22" stroke="#e0902a" stroke-width="1.5" fill="none"/>`,
+  camp: `<rect x="2" y="30" width="36" height="6" fill="#d08a3a"/><polygon points="4,30 14,12 24,30" fill="${ROBE}"/><rect x="12" y="23" width="4" height="7" fill="${DARK}"/><rect x="28" y="8" width="3" height="22" fill="${METAL}"/><rect x="24" y="10" width="11" height="2" fill="${METAL}"/><rect x="5" y="28" width="18" height="2" fill="${C}"/>`,
+  fWeapons: STAR + tierMark(1),
+  fArmor: SHIELD + tierMark(1),
+  fHarvest: `<rect x="2" y="26" width="36" height="8" fill="#d08a3a"/><polygon points="6,26 14,12 22,26" fill="${ROBE}"/><polygon points="29,4 37,14 32,14 32,22 26,22 26,14 21,14" fill="#7cff7c"/>`,
+  stillsuit: FREMEN('#55504a') + `<path d="M31 6 Q36 13 31 16 Q26 13 31 6 Z" fill="#5ab8ff"/>`,
+  sandwalk: `<rect x="2" y="30" width="36" height="6" fill="${SAND}"/><path d="M4 30 Q10 26 16 30 Q22 26 28 30 Q34 26 38 30" stroke="#a89268" stroke-width="1.5" fill="none"/>` + `<g transform="translate(-4 -4)">${FREMEN(ROBE)}</g><polygon points="28,12 38,16 28,20" fill="#e0b030"/>`,
+  ambush: `<rect x="2" y="24" width="36" height="12" fill="${SAND}"/><path d="M14 24 Q20 14 26 24 Z" fill="${ROBE}"/><rect x="17" y="18" width="6" height="2" fill="${IBAD}"/><polygon points="20,2 24,12 34,10 26,16 30,22 20,17 10,22 14,16 6,10 16,12" fill="#e05a40" opacity="0.85"/>`,
   flame: `<circle cx="9" cy="30" r="4" fill="${DARK}"/><rect x="5" y="22" width="16" height="5" fill="${C}"/><rect x="19" y="21" width="5" height="2" fill="${DARK}"/><path d="M24 22 Q30 12 38 16 Q32 18 36 24 Q30 22 24 22 Z" fill="#ff8a2a"/><path d="M24 22 Q29 17 33 19 Q29 20 24 22 Z" fill="#ffe080"/>`,
 };
 
@@ -68,12 +87,15 @@ const COMMANDS = {
   lock: `<circle cx="20" cy="20" r="13" fill="none" stroke="#e0902a" stroke-width="2.5"/><circle cx="20" cy="20" r="6" fill="none" stroke="#e0902a" stroke-width="2"/><rect x="18.5" y="2" width="3" height="8" fill="#e0902a"/><rect x="18.5" y="30" width="3" height="8" fill="#e0902a"/><rect x="2" y="18.5" width="8" height="3" fill="#e0902a"/><rect x="30" y="18.5" width="8" height="3" fill="#e0902a"/><circle cx="20" cy="20" r="2" fill="#e05a40"/>`,
   mine: `<rect x="3" y="31" width="34" height="3" fill="#9c968a"/><ellipse cx="20" cy="27" rx="11" ry="4" fill="${C}"/><rect x="9" y="22" width="22" height="5" fill="${C}"/><ellipse cx="20" cy="22" rx="11" ry="4" fill="${LACQ}"/><circle cx="20" cy="21" r="2" fill="#e05a40"/><line x1="12" y1="10" x2="16" y2="16" stroke="#e05a40" stroke-width="2"/><line x1="28" y1="10" x2="24" y2="16" stroke="#e05a40" stroke-width="2"/><line x1="20" y1="7" x2="20" y2="14" stroke="#e05a40" stroke-width="2"/>`,
   mend: `<rect x="3" y="28" width="34" height="6" fill="#9c968a"/><rect x="6" y="15" width="20" height="14" fill="${SAND}"/><rect x="5" y="12" width="22" height="4" fill="${C}"/><g transform="rotate(40 29 15)"><rect x="27" y="8" width="4" height="16" fill="${METAL}"/><rect x="24" y="4" width="10" height="6" rx="2" fill="${METAL}"/><rect x="27.5" y="3" width="3" height="4" fill="#3a3a3e"/></g>`,
+  setup: `<rect x="2" y="30" width="36" height="6" fill="#d08a3a"/><polygon points="6,30 16,12 26,30" fill="${ROBE}"/><rect x="14" y="23" width="4" height="7" fill="${DARK}"/><polygon points="30,4 36,10 33,10 33,18 27,18 27,10 24,10" fill="#7cff7c" transform="rotate(180 30 11)"/>`,
+  pack: `<rect x="2" y="30" width="36" height="6" fill="#d08a3a"/><rect x="6" y="20" width="18" height="8" rx="3" fill="${ROBE}"/><rect x="6" y="23" width="18" height="2" fill="${C}"/><polygon points="30,4 36,10 33,10 33,18 27,18 27,10 24,10" fill="#7cff7c"/>`,
   unload: `<rect x="3" y="28" width="34" height="6" fill="#9c968a"/><rect x="5" y="13" width="18" height="16" fill="${SAND}"/><rect x="4" y="10" width="20" height="4" fill="${C}"/><rect x="11" y="20" width="6" height="9" fill="${DARK}"/><rect x="24" y="18" width="7" height="5" fill="#e0b030"/><polygon points="30,13 38,20.5 30,28" fill="#e0b030"/>`,
 };
 
 export const ALL_ICONS = {
   ...ICONS, ...COMMANDS,
   conyard2: ICONS.conyard + CHEVRON, factory2: ICONS.factory + CHEVRON, barracks2: ICONS.barracks + CHEVRON, fab2: ICONS.fab + CHEVRON,
+  sietch2: ICONS.sietch + CHEVRON,
 };
 export type IconKey = keyof typeof ALL_ICONS;
 

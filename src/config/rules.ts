@@ -14,9 +14,9 @@ export const TEAM_CSS = ['#3d7be0', '#d8402f'];
 
 export const START_CREDITS = 2500;
 
-export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab'];
+export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab', 'thumper'];
 export const QUEUE_MAX = 5; // per producer type
-export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab'];
+export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab', 'sietch'];
 
 /** Upgrade effects. */
 export const WEAPONS_BONUS = 0.2; // damage per Weapons tier
@@ -46,6 +46,22 @@ export const INFANTRY_REGEN = { rate: 0.02, delay: 5 };
 export const SHIELD_REGEN = { delay: 7, full: 10 };
 /** Corrino structures repairing themselves: health per second, paid as repairs are (REPAIR_COST). */
 export const SELF_REPAIR_RATE = 12;
+
+/**
+ * Fremen hiding: a unit that `hides` and has stood still on sand or spice for `delay` s is out of the enemy's sight,
+ * unless an enemy unit or structure is within `detect` (world units) of it. Firing or being hit brings it out.
+ */
+export const HIDE = { delay: 3, detect: 2 * 2 };
+/** Fremen infantry speed on sand and spice: the bonus, and the Sandwalk upgrade's on top. */
+export const SAND_SPEED = { base: 0.2, sandwalk: 0.25 };
+/** Ambush: units that strike out of hiding deal this much more damage for `time` seconds. */
+export const AMBUSH = { bonus: 0.5, time: 4 };
+/** Fremen healing: a share of health per second once unhurt for `delay` s (Stillsuits: x`stillsuit`, after `quick` s). */
+export const FREMEN_REGEN = { unit: 0.015, building: 0.006, delay: 6, stillsuit: 2, quick: 3 };
+/** A Spice Camp works at full rate with this many spice tiles in reach, proportionally less with fewer. */
+export const CAMP_FULL = 12;
+/** Spice Mining: Spice Camps' extra rate. */
+export const CAMP_UPGRADE = 0.25;
 
 export const CARRYALL = {
   capacity: 6, // lift space: infantry take 1, trikes 3, heavy vehicles 6

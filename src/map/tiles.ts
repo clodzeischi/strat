@@ -17,8 +17,8 @@ export const HIGH_Y = 1.1;
 /** Vertices per tile edge in the smooth ground surface (the visual mesh, and what units ride on). */
 export const SURFACE_RES = 4;
 
-/** Infantry can use narrow ramps; vehicles can't. */
-export type MoveClass = 'foot' | 'vehicle';
+/** Infantry can use narrow ramps; vehicles can't. Sandworms only go on sand and spice (no rock, no ramps). */
+export type MoveClass = 'foot' | 'vehicle' | 'worm';
 
 /** A map tile by column and row. */
 export interface Cell {

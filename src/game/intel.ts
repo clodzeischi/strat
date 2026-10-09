@@ -22,6 +22,7 @@ export interface Sighting {
   power: number;
   /** Game time it was last seen. */
   seen: number;
+  /** A harvester, or a Fremen Spice Camp: the enemy's income, what raids go for. */
   harvester: boolean;
   /** Whether we still have an idea where it is (a unit seen recently whose last spot hasn't been seen empty). */
   placed: boolean;
@@ -61,7 +62,7 @@ export class Intel {
     }
     for (const b of g.buildings) {
       if (b.team === this.team || b.dead || !g.sees(this.team, b)) continue;
-      this.buildings.set(b.id, { id: b.id, team: b.team, type: b.type, x: b.x, z: b.z, seen: t, harvester: false, placed: true, power: 0 });
+      this.buildings.set(b.id, { id: b.id, team: b.team, type: b.type, x: b.x, z: b.z, seen: t, harvester: b.type === 'camp', placed: true, power: 0 });
       this.lastBaseSeen = t;
     }
     const v = g.vision;

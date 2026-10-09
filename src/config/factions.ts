@@ -18,6 +18,12 @@ export interface FactionDef {
   selfRepair: boolean;
   /** Shared units that differ for this faction (Corrino builds Harvesters at the Fab). */
   units?: Partial<Record<UnitType, Partial<UnitDef>>>;
+  /** Structures may go on open sand, not just rock (Fremen). */
+  buildOnSand?: boolean;
+  /** Units and structures heal slowly on their own (Fremen; see FREMEN_REGEN). */
+  regen?: boolean;
+  /** No harvesters and refineries: income comes from Spice Camps that crews set up on the fields. */
+  camps?: boolean;
 }
 
 export const FACTIONS: Record<Faction, FactionDef> = {
@@ -46,9 +52,24 @@ export const FACTIONS: Record<Faction, FactionDef> = {
     selfRepair: true,
     units: { harvester: { producer: 'fab', requires: ['fab', 'refinery'] } },
   },
+  fremen: {
+    name: 'Fremen',
+    build: ['barracks', 'sietch', 'thumper', null, 'bunker', 'conyard', null, null],
+    train: ['warrior', 'fedaykin', 'commando', 'worm', 'crew', null, null, null],
+    research: [
+      { levelUp: 'sietch' }, { upgrades: ['fWeapons'] }, { upgrades: ['fArmor'] }, { upgrades: ['ambush'] },
+      { upgrades: ['stillsuit'] }, { upgrades: ['sandwalk'] }, { upgrades: ['fHarvest'] }, null,
+    ],
+    start: ['warrior', 'warrior', 'warrior', 'crew'],
+    shields: false,
+    selfRepair: false,
+    buildOnSand: true,
+    regen: true,
+    camps: true,
+  },
 };
 
-export const FACTION_LIST: Faction[] = ['atreides', 'corrino'];
+export const FACTION_LIST: Faction[] = ['atreides', 'corrino', 'fremen'];
 
 /** Shields of shared units and of structures, for a faction with shields: this share of their health. */
 export const SHARED_SHIELDS = 0.5;

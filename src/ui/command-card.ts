@@ -87,7 +87,7 @@ export class CommandCard {
   /** The selection's lead kind last frame, to follow Tab. */
   private lead: string | null = null;
   /** Command tab buttons by name, laid out per selection in `commandLayout`. */
-  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine' | 'lock', Slot>;
+  private commands: Record<'attack' | 'stop' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine' | 'lock' | 'setup' | 'pack', Slot>;
   private tabEls: { el: HTMLElement; key: HTMLElement; bar: HTMLElement; badge: HTMLElement; state: string }[] = [];
   private cells: CardEl[] = [];
   private slots: Record<Tab, (Slot | null)[]>;
@@ -154,7 +154,7 @@ export class CommandCard {
   /** Selecting units (or a building with orders) opens the Command tab; letting go goes back to the tab before. */
   private followSelection(): void {
     const sel = this.input.selection;
-    const commandable = this.input.ownUnits().length > 0 || this.input.ownProducers().length > 0 || this.input.ownBunkers().length > 0;
+    const commandable = this.input.ownUnits().length > 0 || this.input.ownProducers().length > 0 || this.input.ownBunkers().length > 0 || this.input.ownCamps().length > 0;
     // Only on picking something new (or Tab to another kind): units dying out of the selection shouldn't pull you
     // off another tab.
     const lead = this.input.active()?.key ?? null;
@@ -207,13 +207,14 @@ export class CommandCard {
     const lead = this.input.active()?.members[0];
     if (lead instanceof Building && lead.team === this.input.team) {
       if (lead.def.garrison) return [null, null, null, c.unload, null, null, null, c.salvage];
+      if (lead.def.extract) return [null, null, c.pack, null, null, null, null, null];
       const mend = FACTIONS[this.faction].selfRepair ? c.mend : null;
       return [this.input.ownProducers().length ? c.rally : null, null, null, null, null, null, null, mend];
     }
     if (!this.input.ownUnits().length) return [];
     const u = lead instanceof Unit ? lead : null;
     // D: the kind's ability (Carryall drop, Artillery deploy, Sky Raider mine). V, out of the way: self-destruct.
-    const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : u?.def.lockOn ? c.lock : null;
+    const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : u?.def.lockOn ? c.lock : u?.def.camp ? c.setup : null;
     return [c.attack, c.stop, ability, null, null, null, null, u?.def.detonate ? c.detonate : null];
   }
 
@@ -303,7 +304,7 @@ export class CommandCard {
           const building = queue.slice(0, lines).filter((q) => q.type === t);
           return {
             locked: !queued && !g.requirementsMet(g.localTeam, d.requires),
-            disabled: !g.canTrain(g.localTeam, t),
+            disabled: !g.canTrain(g.localTeam, t) || g.atLimit(g.localTeam, t),
             progress: queued ? Math.max(0, ...building.map((q) => q.progress)) : null,
             badge: queued > 1 ? `${queued}` : '',
           };
@@ -434,6 +435,22 @@ export class CommandCard {
           return { disabled: !input.canLayMine(), status: wait > 0 ? `${Math.ceil(wait)}` : '' };
         },
         use: () => input.layMine(),
+      },
+      setup: {
+        icon: () => 'setup',
+        name: () => 'Set Up Camp',
+        cost: () => 0,
+        tip: () => 'The selected Spice Crews set up a Spice Camp where they stand. It needs open, level ground with spice in reach, and turns that spice into credits until it runs dry.',
+        view: () => ({ disabled: !input.ownUnits().some((u) => u.def.camp && this.game.campSpot(u)) }),
+        use: () => input.setUpCamp(),
+      },
+      pack: {
+        icon: () => 'pack',
+        name: () => 'Pack Up',
+        cost: () => 0,
+        tip: () => 'The selected Spice Camps pack up into Spice Crews again, to move on to a fresh field.',
+        view: () => ({ active: input.ownCamps().some((b) => b.dry) }),
+        use: () => input.packCamps(),
       },
       mend: {
         icon: () => 'mend',

@@ -21,23 +21,33 @@ interface FactionKit {
   defense: BuildingType;
   raider: UnitType;
   scouts: UnitType[];
-  /** Atreides: Repair Vehicles at home. Corrino: a Repair Pad. */
-  mender: { unit: UnitType } | { building: BuildingType };
-  /** Structures to put up before levelling up (Corrino needs Tleilaxu Research). */
+  /** Atreides: Repair Vehicles at home. Corrino: a Repair Pad. Fremen heal on their own. */
+  mender: { unit: UnitType } | { building: BuildingType } | null;
+  /** Structures to put up once there's an army (Corrino's Tleilaxu Research; the Fremen Thumper once it's unlocked). */
   tech: BuildingType[];
-  levels: [LevelUpType, LevelUpType];
+  levels: LevelUpType[];
   research: UpgradeType[];
   fallback: UnitType;
+  /** What earns the money: harvesters (with refineries), or Spice Crews setting up camps (Fremen). */
+  worker: UnitType;
 }
 
 const KITS: Record<Faction, FactionKit> = {
   atreides: {
     factory: 'factory', defense: 'bunker', raider: 'trike', scouts: ['trike', 'infantry'], mender: { unit: 'repair' }, tech: [],
     levels: ['conyard', 'factory'], research: ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'], fallback: 'infantry',
+    worker: 'harvester',
   },
   corrino: {
     factory: 'fab', defense: 'turret', raider: 'razor', scouts: ['raider', 'razor', 'trooper'], mender: { building: 'pad' }, tech: ['tleilaxu'],
     levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'], fallback: 'trooper',
+    worker: 'harvester',
+  },
+  // The Sietch stands in for the factory (the second step of the opening); the Thumper is the late tech structure.
+  fremen: {
+    factory: 'sietch', defense: 'bunker', raider: 'warrior', scouts: ['warrior'], mender: null, tech: ['thumper'],
+    levels: ['sietch'], research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush'], fallback: 'warrior',
+    worker: 'crew',
   },
 };
 
@@ -152,7 +162,8 @@ const DEFENSE_TIMEOUT = 4;
 
 /** 'garrison': on its way into one of our bunkers, or in it. */
 /** 'mend': pulled out of a fight to heal or be repaired; 'drop': on a Carryall operation (Brutal). */
-export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop';
+/** 'hunt': a Sandworm prowling the open desert on its own. */
+export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop' | 'hunt';
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -239,18 +250,31 @@ export class AI {
     this.nextScoutTime = profile.scout.first;
     this.intel = new Intel(game, team);
     this.kit = KITS[game.teams[team].faction];
-    const [a, b] = this.kit.levels;
-    this.techOrder = game.random() < 0.5 ? [a, b] : [b, a];
+    this.camps = !!FACTIONS[game.teams[team].faction].camps;
+    const flip = game.random() < 0.5;
+    this.techOrder = flip ? [...this.kit.levels].reverse() : [...this.kit.levels];
   }
 
-  /** A profile's building, in this faction's terms ('factory' is a Fab for Corrino, 'bunker' a turret). */
-  protected own(t: BuildingType): BuildingType {
+  /** Fremen: income from Spice Camps that crews set up, not harvesters and refineries. */
+  protected readonly camps: boolean;
+
+  /**
+   * A profile's building, in this faction's terms ('factory' is a Fab for Corrino and the Sietch for Fremen,
+   * 'bunker' a turret for Corrino). Null for one the faction doesn't build (Fremen have no refinery).
+   */
+  protected own(t: BuildingType): BuildingType | null {
+    if (t === 'refinery' && this.camps) return null;
     return t === 'factory' ? this.kit.factory : t === 'bunker' ? this.kit.defense : t;
+  }
+
+  /** What the income stands on: a refinery, or for Fremen a Barracks (where crews come from). */
+  private incomeBase(): BuildingType {
+    return this.camps ? 'barracks' : 'refinery';
   }
 
   /** The first opening structure we don't have yet (a type listed twice needs two of it). */
   private openingStep(): BuildingType | null {
-    const opening = this.profile.opening.map((t) => this.own(t));
+    const opening = this.profile.opening.map((t) => this.own(t)).filter((t): t is BuildingType => t !== null);
     return opening.find((t, i) => this.game.count(this.team, t) < opening.slice(0, i + 1).filter((o) => o === t).length) ?? null;
   }
 
@@ -261,6 +285,7 @@ export class AI {
   }
 
   private wantRefineries(): number {
+    if (this.camps) return 0;
     if (this.profile.extraRefinery !== 'threat') return this.profile.extraRefinery === 'always' ? 2 : 1;
     const g = this.game;
     const damaged = g.buildings.some((b) => b.team === this.team && b.type === 'refinery' && b.hp < b.maxHp * 0.7);
@@ -269,13 +294,17 @@ export class AI {
 
   private wantHarvesters(): number {
     const h = this.profile.harvesters;
+    // A camp earns a little less than a harvester: Fremen keep one more of them.
+    if (this.camps) return h === 'perRefinery' ? 3 : h + 1;
     return h === 'perRefinery' ? this.game.count(this.team, 'refinery') : h;
   }
 
-  /** Harvesters alive plus ones in the factory queue. */
+  /** Harvesters alive plus ones in the factory queue; for Fremen, working camps plus crews (and crews in training). */
   private harvesterCount(): number {
-    const p = this.game.unitDef(this.team, 'harvester').producer;
-    return this.game.count(this.team, 'harvester') + this.ts.queues[p].filter((q) => q.type === 'harvester').length;
+    const w = this.kit.worker;
+    const p = this.game.unitDef(this.team, w).producer;
+    const camps = this.camps ? this.game.buildings.filter((b) => b.team === this.team && b.type === 'camp' && !b.dry).length : 0;
+    return camps + this.game.count(this.team, w) + this.ts.queues[p].filter((q) => q.type === w).length;
   }
 
   /**
@@ -286,6 +315,12 @@ export class AI {
    */
   private econGoal(): { type: BuildingType | 'harvester'; cost: number } | null {
     const g = this.game;
+    if (this.camps) {
+      // Fremen: crews come from the Barracks.
+      if (!g.has(this.team, 'barracks')) return g.has(this.team, 'conyard') && this.harvesterCount() === 0 ? { type: 'barracks', cost: BUILDINGS.barracks.cost } : null;
+      if (this.harvesterCount() >= Math.min(this.profile.minHarvesters, this.wantHarvesters())) return null;
+      return { type: 'harvester', cost: UNITS[this.kit.worker].cost };
+    }
     const refinery = { type: 'refinery' as const, cost: BUILDINGS.refinery.cost };
     if (!g.has(this.team, 'refinery')) return g.has(this.team, 'conyard') ? refinery : null;
     if (this.harvesterCount() >= Math.min(this.profile.minHarvesters, this.wantHarvesters())) return null;
@@ -359,13 +394,13 @@ export class AI {
     const goal = this.econGoal();
     // Rushed: anything but a refinery, barracks or bunker under construction is called off (full refund) for units.
     const keepBuilding = ['barracks', 'refinery', this.kit.defense];
-    if (ts.building && this.rushed() && g.has(this.team, 'refinery') && !keepBuilding.includes(ts.building.type)) {
+    if (ts.building && this.rushed() && g.has(this.team, this.incomeBase()) && !keepBuilding.includes(ts.building.type)) {
       g.cancelBuilding(this.team);
       return;
     }
     if (ts.building || !g.has(this.team, 'conyard')) return;
 
-    if (this.rushed() && !goal && g.has(this.team, 'refinery')) {
+    if (this.rushed() && !goal && g.has(this.team, this.incomeBase())) {
       // A bunker first (the infantry we're making anyway hold out far better in it), then more barracks.
       const def = this.kit.defense;
       if (g.has(this.team, 'barracks') && g.count(this.team, def) < 1 && ts.credits >= BUILDINGS[def].cost && this.findSpot(def)) {
@@ -382,7 +417,7 @@ export class AI {
     // Tech structures (Tleilaxu Research), once there's an army and the economy is up.
     const techBuilding = this.kit.tech.find((t) => !g.has(this.team, t) && g.canBuild(this.team, t));
     // The faction's way of mending the army, if it's a structure (Corrino's Repair Pad).
-    const mender = 'building' in this.kit.mender && this.profile.sustain.repairPer ? this.kit.mender.building : null;
+    const mender = this.kit.mender && 'building' in this.kit.mender && this.profile.sustain.repairPer ? this.kit.mender.building : null;
     let want: BuildingType | null = goal && goal.type !== 'harvester' ? goal.type : this.openingStep();
     if (want) {
       // getting income back, still in the opening, or rebuilding what the opening had
@@ -390,8 +425,9 @@ export class AI {
     else if (g.count(this.team, this.kit.defense) < this.profile.bunkers && barracks > 0 && (ts.credits > 900 || this.behindFor > 0)) want = this.kit.defense;
     else if (techBuilding && army >= this.profile.techArmy) want = techBuilding;
     else if (mender && !g.has(this.team, mender) && g.canBuild(this.team, mender) && army >= this.profile.techArmy) want = mender;
-    else if (barracks < 2 && ts.credits > this.profile.more.barracks) want = 'barracks';
-    else if (factories < 2 && ts.credits > this.profile.more.factory) want = this.kit.factory;
+    // Fremen train everything but worms at the Barracks: they want more of them, and only one Sietch.
+    else if (barracks < (this.camps ? 3 : 2) && ts.credits > this.profile.more.barracks) want = 'barracks';
+    else if (!this.camps && factories < 2 && ts.credits > this.profile.more.factory) want = this.kit.factory;
     else if (g.count(this.team, 'conyard') < 2 && ts.credits > 4000) want = 'conyard';
     if (!want || ts.credits < BUILDINGS[want].cost || (this.noRoom.get(want) ?? -Infinity) > g.time) return;
     // Only start what there's room for: a cramped base would otherwise build, fail to place, refund and retry forever.
@@ -410,8 +446,9 @@ export class AI {
     // (just the minimum, so income doesn't collapse).
     const holding = this.ownPower() >= this.intel.armyPower() * 0.8;
     const harvesterGoal = rushed ? 1 : holding ? this.wantHarvesters() : Math.min(this.wantHarvesters(), this.profile.minHarvesters);
-    if (this.harvesterCount() < harvesterGoal && g.canTrain(this.team, 'harvester')) {
-      if (!full(g.unitDef(this.team, 'harvester').producer) && ts.credits >= UNITS.harvester.cost) g.queueUnit(this.team, 'harvester');
+    const w = this.kit.worker;
+    if (this.harvesterCount() < harvesterGoal && g.canTrain(this.team, w)) {
+      if (!full(g.unitDef(this.team, w).producer) && ts.credits >= UNITS[w].cost) g.queueUnit(this.team, w);
       return;
     }
     // Money set aside, most urgent first: getting income back, rebuilding lost production, the opening (if the
@@ -483,7 +520,8 @@ export class AI {
    */
   private rushSuspected(): boolean {
     const barracks = this.intel.structures('barracks').length;
-    const refineries = this.intel.structures('refinery').length;
+    // Against Fremen, their camps play the part of refineries.
+    const refineries = this.intel.structures(FACTIONS[this.game.teams[1 - this.team].faction].camps ? 'camp' : 'refinery').length;
     return barracks >= 2 || (barracks >= 1 && refineries === 0 && this.game.time > 60 && this.game.time - this.intel.lastBaseSeen < 60);
   }
 
@@ -548,7 +586,7 @@ export class AI {
   private counterWeights(): [UnitType, number][] {
     const g = this.game;
     const roster = FACTIONS[this.ts.faction].train;
-    const options = (MATCHUP_TYPES as Matchup[]).filter((t) => roster.includes(t) && g.requirementsMet(this.team, g.unitDef(this.team, t).requires));
+    const options = (MATCHUP_TYPES as Matchup[]).filter((t) => roster.includes(t) && g.requirementsMet(this.team, g.unitDef(this.team, t).requires) && !g.atLimit(this.team, t));
     // The enemy army as we've seen it.
     const enemy = new Map<Matchup, number>();
     let total = 0;
@@ -619,6 +657,8 @@ export class AI {
     for (const u of army) if (!this.roles.has(u)) this.roles.set(u, 'home');
     this.updateRally();
 
+    this.manageCrews();
+    this.manageWorms(army);
     this.manageRepairs(army);
     this.managePads(army);
     this.manageAbilities(army);
@@ -647,6 +687,124 @@ export class AI {
       for (const u of army) {
         if (this.roles.get(u) !== 'home' || u.order.kind !== 'idle' || u.target) continue;
         if (hypot(u.x - this.rally.x, u.z - this.rally.z) > 8 * TILE) this.sendHome(u);
+      }
+    }
+  }
+
+  // ---- Fremen economy and Sandworms ---------------------------------------------------------
+
+  /** Where each Spice Crew on its way is going to set up camp. */
+  private crewJobs = new Map<Unit, { x: number; z: number; since: number }>();
+  /** Spots a crew couldn't set up on (or never got to), left alone for a while. */
+  private badSpots: { x: number; z: number; until: number }[] = [];
+  /** Candidate camp sites (spice tiles with spice around them), refreshed every few seconds. */
+  private sites: { x: number; z: number; n: number }[] = [];
+  private sitesAt = -Infinity;
+
+  /**
+   * Fremen: idle Spice Crews walk to the best free spot on a spice field (rich, near home, not next to another camp
+   * or the enemy) and set up camp; camps that have run dry pack up and their crews move on.
+   */
+  private manageCrews(): void {
+    if (!this.camps) return;
+    const g = this.game;
+    for (const b of [...g.buildings]) if (b.team === this.team && b.def.extract && b.dry) g.packCamp(b);
+    for (const u of [...this.crewJobs.keys()]) if (u.dead) this.crewJobs.delete(u);
+    this.badSpots = this.badSpots.filter((b) => b.until > g.time);
+    const crews = g.units.filter((u) => u.team === this.team && u.def.camp && !u.carrier && !u.falling && !u.dead);
+    for (const u of crews) {
+      const job = this.crewJobs.get(u);
+      if (job) {
+        const d = hypot(u.x - job.x, u.z - job.z);
+        if (d < 1.5 * TILE || (u.order.kind === 'idle' && d < 4 * TILE)) {
+          if (!g.deployCamp(u)) this.badSpots.push({ x: job.x, z: job.z, until: g.time + 120 });
+          this.crewJobs.delete(u);
+        } else if (g.time - job.since > 120) {
+          this.badSpots.push({ x: job.x, z: job.z, until: g.time + 120 });
+          this.crewJobs.delete(u);
+        } else if (u.order.kind === 'idle') u.command(g, { kind: 'move', x: job.x, z: job.z });
+        continue;
+      }
+      const site = this.campSite(u);
+      if (!site) continue;
+      this.crewJobs.set(u, { x: site.x, z: site.z, since: g.time });
+      u.command(g, { kind: 'move', x: site.x, z: site.z });
+    }
+  }
+
+  /** The best free camp site for a crew: plenty of spice in reach, near home, clear of other camps and of the enemy. */
+  private campSite(u: Unit): { x: number; z: number } | null {
+    const g = this.game;
+    const m = g.map;
+    if (g.time - this.sitesAt > 8) {
+      this.sitesAt = g.time;
+      this.sites = [];
+      for (let cz = 0; cz < m.size; cz += 2) {
+        for (let cx = 0; cx < m.size; cx += 2) {
+          if (m.tile(cx, cz) !== SPICE) continue;
+          const x = m.center(cx);
+          const z = m.center(cz);
+          const n = g.spiceAround(x, z);
+          if (n >= 6) this.sites.push({ x, z, n });
+        }
+      }
+    }
+    const home = this.home() ?? u;
+    const taken = [
+      ...g.buildings.filter((b) => b.team === this.team && b.type === 'camp'),
+      ...this.crewJobs.values(),
+      ...this.badSpots,
+    ];
+    const enemyBuildings = [...this.intel.buildings.values()];
+    let best: { x: number; z: number } | null = null;
+    let bestScore = -Infinity;
+    for (const s of this.sites) {
+      if (taken.some((t) => hypot(t.x - s.x, t.z - s.z) < 5 * TILE)) continue;
+      if (enemyBuildings.some((b) => hypot(b.x - s.x, b.z - s.z) < 14 * TILE)) continue;
+      if (this.intel.powerAround(s.x, s.z, 12 * TILE) > 200) continue;
+      const score = Math.min(s.n, 30) - (hypot(s.x - home.x, s.z - home.z) / TILE) * 0.5;
+      if (score > bestScore) {
+        bestScore = score;
+        best = s;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Sandworms hunt on their own in the open desert: the nearest enemy unit we know of standing on sand or spice
+   * (harvesters first), else they travel with the wave that's out, else they wait on the sand near home. They join a
+   * defense when it's at home.
+   */
+  private manageWorms(army: Unit[]): void {
+    const g = this.game;
+    const m = g.map;
+    const onSand = (x: number, z: number) => m.canEnter(m.cellOf(x), m.cellOf(z), 'worm');
+    for (const u of army) {
+      if (!u.def.sandOnly || this.roles.get(u) === 'defend') continue;
+      this.roles.set(u, 'hunt');
+      if (u.target && !u.target.dead) continue;
+      let best: { x: number; z: number } | null = null;
+      let bestD = 45 * TILE;
+      for (const s of this.intel.placedUnits()) {
+        if (!onSand(s.x, s.z) || UNITS[s.type as UnitType]?.air) continue;
+        const d = hypot(s.x - u.x, s.z - u.z) - (s.harvester ? 15 * TILE : 0);
+        if (d < bestD) {
+          bestD = d;
+          best = s;
+        }
+      }
+      if (!best) {
+        const wave = this.waves.find((w) => w.units.size >= 3);
+        if (wave) {
+          const c = this.centroid(wave.units);
+          if (onSand(c.x, c.z)) best = c;
+        }
+      }
+      if (best) {
+        if (u.order.kind !== 'amove' || hypot(u.order.x - best.x, u.order.z - best.z) > 4 * TILE) u.command(g, { kind: 'amove', x: best.x, z: best.z });
+      } else if (u.order.kind === 'idle' && this.rally && hypot(u.x - this.rally.x, u.z - this.rally.z) > 12 * TILE) {
+        u.command(g, { kind: 'amove', x: this.rally.x, z: this.rally.z });
       }
     }
   }
@@ -799,6 +957,7 @@ export class AI {
    */
   protected menders(u: Unit): { x: number; z: number }[] {
     const g = this.game;
+    if (!this.kit.mender) return [];
     if ('building' in this.kit.mender) {
       const type = this.kit.mender.building;
       return g.buildings.filter((b) => b.team === this.team && b.type === type && !b.dead);
@@ -818,7 +977,7 @@ export class AI {
    * (role 'mend'), and come home once mended. Nobody is pulled out of a fight.
    */
   private managePads(army: Unit[]): void {
-    if (!('building' in this.kit.mender)) return;
+    if (!this.kit.mender || !('building' in this.kit.mender)) return;
     for (const u of army) {
       const role = this.roles.get(u);
       const pad = this.nearestMender(u);
@@ -939,7 +1098,7 @@ export class AI {
     if (g.time < u.nextMine) return;
     // Where enemies come by: near their harvesters and refineries, or right under enemy ground units.
     const spot = g.units.some((e) => e.team !== this.team && !e.dead && !e.def.air && g.sees(this.team, e) && hypot(e.x - u.x, e.z - u.z) < (e.type === 'harvester' ? 10 : 6) * TILE)
-      || g.buildings.some((b) => b.team !== this.team && b.type === 'refinery' && g.sees(this.team, b) && distTo(b, u.x, u.z) < 6 * TILE);
+      || g.buildings.some((b) => b.team !== this.team && (b.type === 'refinery' || b.type === 'camp') && g.sees(this.team, b) && distTo(b, u.x, u.z) < 6 * TILE);
     if (spot) g.layMine(u);
   }
 
@@ -1178,7 +1337,7 @@ export class AI {
   protected pickHarvester(from: { x: number; z: number }, strength: number): Sighting | null {
     let best: Sighting | null = null;
     let bestScore = Infinity;
-    for (const h of this.intel.placedUnits()) {
+    for (const h of [...this.intel.placedUnits(), ...this.intel.buildings.values()]) {
       if (!h.harvester) continue;
       const guard = this.guardAround(h, 12);
       if (guard > strength * 0.5) continue;
@@ -1199,7 +1358,7 @@ export class AI {
     let best: { x: number; z: number } | null = null;
     let bestD = Infinity;
     const consider = (s: Sighting, building: boolean) => {
-      const econ = economy && (s.type === 'refinery' || s.type === 'harvester');
+      const econ = economy && (s.type === 'refinery' || s.type === 'harvester' || s.type === 'camp');
       const d = hypot(s.x - from.x, s.z - from.z) + (building ? 0 : 20) - (econ ? 40 : 0);
       if (d < bestD) {
         bestD = d;
@@ -1225,10 +1384,14 @@ export class AI {
     const g = this.game;
     const t = this.team;
     const credits = this.ts.credits;
-    const income = g.count(t, 'harvester') > 0 && g.has(t, 'refinery');
-    const canBuyIncome = (g.has(t, 'refinery') && g.has(t, 'factory') && credits >= UNITS.harvester.cost)
-      || (g.has(t, 'conyard') && credits >= BUILDINGS.refinery.cost);
-    const canProduce = g.has(t, 'conyard') || g.has(t, 'barracks') || g.has(t, 'factory');
+    const fremen = this.camps;
+    const income = fremen
+      ? g.buildings.some((b) => b.team === t && b.type === 'camp' && !b.dry) || g.count(t, 'crew') > 0
+      : g.count(t, 'harvester') > 0 && g.has(t, 'refinery');
+    const canBuyIncome = fremen
+      ? (g.has(t, 'barracks') && credits >= UNITS.crew.cost) || (g.has(t, 'conyard') && credits >= BUILDINGS.barracks.cost + UNITS.crew.cost)
+      : (g.has(t, 'refinery') && g.has(t, this.kit.factory) && credits >= UNITS.harvester.cost) || (g.has(t, 'conyard') && credits >= BUILDINGS.refinery.cost);
+    const canProduce = g.has(t, 'conyard') || g.has(t, 'barracks') || g.has(t, this.kit.factory);
     if ((income || canBuyIncome) && canProduce) {
       this.brokeSince = Infinity;
       return false;

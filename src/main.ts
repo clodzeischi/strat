@@ -157,7 +157,9 @@ const opponentName = match ? match.names[ENEMY] : null;
 
 /** The opening build hint for the local player's faction. */
 function firstSteps(): string {
-  return `Build a Refinery and a Barracks, then a ${game.teams[game.localTeam].faction === 'corrino' ? 'Fab' : 'Factory'}.`;
+  const f = game.teams[game.localTeam].faction;
+  if (f === 'fremen') return 'Walk your Spice Crew onto a spice field and Set Up Camp (D). Then a Barracks for more crews and warriors.';
+  return `Build a Refinery and a Barracks, then a ${f === 'corrino' ? 'Fab' : 'Factory'}.`;
 }
 
 function beginPlay(): void {

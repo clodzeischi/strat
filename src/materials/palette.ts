@@ -10,6 +10,13 @@ export const PLATE = 0x6c6a64;
 /** Corrino trim: imperial gold, and the dark lacquer of their hulls. */
 export const GOLD = 0xc8a040;
 export const LACQUER = 0x2e2a30;
+/** Fremen: desert robes and stillsuits, and the spice blue of their eyes. */
+export const ROBE = 0x9a7a54;
+export const STILLSUIT = 0x55504a;
+export const IBAD = 0x3a7cff;
+/** Sandworm hide, and its teeth. */
+export const WORM_HIDE = 0xa8865a;
+export const TOOTH = 0xe8e0c8;
 
 /** A color scaled brighter or darker. */
 export function shade(color: number, f: number): number {

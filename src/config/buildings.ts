@@ -1,6 +1,8 @@
 import type { BuildingDef, BuildingType, Req, Tag } from './types';
 
-export const BUILDING_ORDER: BuildingType[] = ['conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech', 'fab', 'tleilaxu', 'pad', 'turret'];
+export const BUILDING_ORDER: BuildingType[] = [
+  'conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech', 'fab', 'tleilaxu', 'pad', 'turret', 'sietch', 'thumper', 'camp',
+];
 
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   conyard: {
@@ -53,6 +55,21 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     name: 'Auto Turret', short: 'Turret', cost: 350, buildTime: 9, hp: 700, size: 1, requires: ['barracks'],
     weapon: { range: 12, minRange: 0, damage: 12, bonus: { mechanical: 6, structure: -6 }, cooldown: 0.9, projectile: 'bullet', speed: 0, splash: 0 },
     desc: 'Small automatic gun emplacement. Shoots ground targets in range.',
+  },
+
+  // ---- Fremen (who also build on open sand) ----
+  sietch: {
+    name: 'Sietch', short: 'Sietch', cost: 1000, buildTime: 15, hp: 1400, size: 3, requires: ['barracks'],
+    desc: 'A Fremen stronghold. Unlocks Fedaykin, Death Commandos and research.',
+    levelUp: { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades the Sietch. Unlocks the Thumper, which calls Sandworms, and Ambush.' },
+  },
+  thumper: {
+    name: 'Thumper', short: 'Thumper', cost: 600, buildTime: 12, hp: 500, size: 1, requires: ['sietch2'], onSand: true,
+    desc: 'Drums on the sand to call a Sandworm. Must stand on open sand. Each Thumper adds a production line.',
+  },
+  camp: {
+    name: 'Spice Camp', short: 'Spice Camp', cost: 300, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 12, radius: 7 },
+    desc: 'Set up by a Spice Crew on a spice field: turns the spice around it into credits. Packs up into a crew again (D) when the field runs dry.',
   },
 };
 

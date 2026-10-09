@@ -351,7 +351,10 @@ export class GameMap {
 
   /** Cell is passable and open to this movement class (vehicles can't use narrow ramps). */
   canEnter(cx: number, cz: number, cls: MoveClass): boolean {
-    return this.passable(cx, cz) && !(cls === 'vehicle' && this.ramp[this.idx(cx, cz)] === NARROW);
+    if (!this.passable(cx, cz)) return false;
+    const i = this.idx(cx, cz);
+    if (cls === 'worm') return (this.tiles[i] === SAND || this.tiles[i] === SPICE) && this.ramp[i] === 0;
+    return !(cls === 'vehicle' && this.ramp[i] === NARROW);
   }
 
   /** Whether two orthogonal neighbours are joined: same level, or one of them is a ramp. */
