@@ -176,6 +176,15 @@ function go(game: Game, selected: Unit[], x: number, z: number, target: Entity |
     units = units.filter((u) => !mechs.includes(u));
     if (units.length === 0) return;
   }
+  // Attacking with a group: Repair Vehicles follow behind its longest-range unit rather than charge in.
+  const armed = units.filter((u) => u.def.weapon);
+  if ((attack || (target && target.team !== team)) && armed.length) {
+    const mechs = units.filter((u) => u.def.repair && !u.def.weapon);
+    const goal = target ?? { x, z };
+    for (const u of mechs) u.command(game, { kind: 'escort', group: [...armed], x: goal.x, z: goal.z });
+    units = units.filter((u) => !mechs.includes(u));
+    if (units.length === 0) return;
+  }
   if (target && target.team !== team) {
     const rest: Unit[] = [];
     for (const u of units) {

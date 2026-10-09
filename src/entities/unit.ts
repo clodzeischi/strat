@@ -32,6 +32,11 @@ export type Order =
   | { kind: 'attack'; target: Entity }
   | { kind: 'harvest' }
   | { kind: 'repair'; target: Entity }
+  /**
+   * Repair Vehicles attack-moving with a group: keep station a cell behind the group's longest-range unit, mending
+   * what comes within reach, instead of driving into the fight. (x, z) is where the group is headed.
+   */
+  | { kind: 'escort'; group: Unit[]; x: number; z: number }
   | { kind: 'enter'; target: Building };
 
 /** Combat aircraft (the Sky Raider) fly this high over the ground. */
@@ -422,7 +427,13 @@ export class Unit extends Entity {
           if (!game.ferryFor(this)?.wantsToLift(game, this)) this.updateHarvester(game, dt);
           break;
         case 'repair':
-          this.updateRepair(game, this.order.target, dt);
+          if (this.updateRepair(game, this.order.target, dt)) {
+            this.order = { kind: 'idle' };
+            this.path = [];
+          }
+          break;
+        case 'escort':
+          this.updateEscort(game, dt);
           break;
         case 'enter': {
           // Walk to the bunker and get in, if there's still room when we arrive.
@@ -624,13 +635,10 @@ export class Unit extends Entity {
   }
 
   /** Drives up to a damaged friendly unit or structure and mends it, paying as it goes. */
-  private updateRepair(game: Game, target: Entity, dt: number): void {
+  /** Drives up to a damaged friendly unit or structure and mends it, paying as it goes. Returns true when done. */
+  private updateRepair(game: Game, target: Entity, dt: number): boolean {
     const rep = this.def.repair!;
-    if (target.dead || target.hp >= target.maxHp || (target instanceof Unit && (target.carrier || target.falling))) {
-      this.order = { kind: 'idle' };
-      this.path = [];
-      return;
-    }
+    if (target.dead || target.hp >= target.maxHp || (target instanceof Unit && (target.carrier || target.falling))) return true;
     const d = distTo(target, this.x, this.z);
     if (d > rep.range) {
       this.repathTimer -= dt;
@@ -639,10 +647,17 @@ export class Unit extends Entity {
         this.setPath(game, target.x, target.z);
       }
       this.followPath(game, dt);
-      return;
+      return false;
     }
     this.path = [];
     this.heading = this.rotateToward(this.heading, Math.atan2(target.z - this.z, target.x - this.x), this.def.turnRate * dt);
+    this.mendStep(game, target, dt);
+    return false;
+  }
+
+  /** One step of mending a target in reach: health for credits, and sparks. */
+  private mendStep(game: Game, target: Entity, dt: number): void {
+    const rep = this.def.repair!;
     const price = target instanceof Unit ? target.def.cost : BUILDINGS[(target as Building).type].cost;
     const hp = Math.min(rep.rate * dt, target.maxHp - target.hp);
     if (!game.pay(this.team, (hp / target.maxHp) * price * REPAIR_COST)) return;
@@ -658,6 +673,69 @@ export class Unit extends Entity {
       game.effects.flash(p, 0.12);
       if (Math.random() < 0.4) game.effects.puff(p, 0xffd27a);
     }
+  }
+
+  /** The damaged friend an escorting Repair Vehicle is driving over to, once the fighting has moved off. */
+  private escortJob: Entity | null = null;
+
+  /**
+   * Escort (Repair Vehicles in an attack-move): station a cell behind the group's longest-range unit, on the side
+   * away from what it's fighting (or from where the group is headed). Anything damaged within reach is mended on
+   * the spot. With no armed enemy about, it drives over to damaged members of the group (then anything damaged
+   * nearby), and falls back in behind once they're mended.
+   */
+  private updateEscort(game: Game, dt: number): void {
+    const o = this.order as Extract<Order, { kind: 'escort' }>;
+    o.group = o.group.filter((u) => !u.dead);
+    if (!o.group.length) {
+      this.order = { kind: 'idle' };
+      this.path = [];
+      return;
+    }
+    const rep = this.def.repair!;
+    const calm = !game.units.some((e) => e.team !== this.team && !e.dead && !e.carrier && e.def.weapon && game.sees(this.team, e) && hypot(e.x - this.x, e.z - this.z) < this.def.sight + 4 * TILE);
+    if (calm) {
+      if (!this.escortJob && this.scanTimer <= 0) {
+        this.scanTimer = 0.8 + game.random() * 0.4;
+        // Its own group first, wherever they've got to; then anything damaged nearby.
+        const hurt = o.group.filter((u) => u.hp < u.maxHp && repairable(u) && !u.carrier && !u.falling);
+        hurt.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp || a.id - b.id);
+        this.escortJob = hurt[0] ?? game.damagedFriend(this, this.def.sight);
+      }
+      if (this.escortJob && !this.updateRepair(game, this.escortJob, dt)) return;
+      this.escortJob = null;
+    } else {
+      this.escortJob = null;
+      const near = game.damagedFriend(this, rep.range);
+      if (near) this.mendStep(game, near, dt);
+    }
+    // The lead: the group's longest reach (ties go to the first in the group).
+    const reach = (u: Unit) => (u.deployState === 'deployed' ? u.def.deploy!.weapon.range : u.def.weapon?.range ?? 0);
+    let lead = o.group[0];
+    for (const u of o.group) if (reach(u) > reach(lead)) lead = u;
+    // Behind it: away from what it's shooting at, or from where it's headed (or, there already, from us).
+    const ahead = lead.target && !lead.target.dead ? lead.target : hypot(o.x - lead.x, o.z - lead.z) > TILE ? o : this;
+    let dx = ahead.x - lead.x;
+    let dz = ahead.z - lead.z;
+    if (ahead === this) {
+      dx = -dx;
+      dz = -dz;
+    }
+    const len = hypot(dx, dz) || 1;
+    const back = lead.radius + this.radius + TILE;
+    const sx = lead.x - (dx / len) * back;
+    const sz = lead.z - (dz / len) * back;
+    if (hypot(sx - this.x, sz - this.z) < TILE * 0.5) {
+      this.path = [];
+      this.heading = this.rotateToward(this.heading, Math.atan2(dz, dx), this.def.turnRate * dt);
+      return;
+    }
+    this.repathTimer -= dt;
+    if (this.repathTimer <= 0 || this.path.length === 0) {
+      this.repathTimer = 0.5;
+      this.setPath(game, sx, sz);
+    }
+    this.followPath(game, dt);
   }
 
   /** Steps along the path. Returns true once the path is finished (or empty). */

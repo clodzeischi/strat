@@ -127,6 +127,8 @@ Suggestion: rather than making harvesters slower overall, make home fields run o
   - Picking up a harvester assigns the Carryall to it: whenever the harvester would set off on a trip longer than 10 tiles (to spice or back to a refinery), it waits to be lifted and is set down at the far end. A ferried harvester that comes under fire heads home and calls its Carryall, which flies it to the refinery whatever the distance. In the sim ferrying doubles a harvester's income from a field 40 tiles away. Giving the Carryall another order ends the assignment.
   - **Anti-air:** infantry (rifles and rockets) and rocket launchers can shoot aircraft (rockets get +25 against them); nothing else can. A Carryall that's shot down loses vehicles aboard (hanging trikes included), while infantry bail out by parachute. Drops landing within 22 tiles of the other side's buildings warn its owner.
 
+- **Repair Vehicles in an attack-move** (or sent with a group to attack something) don't charge in: they keep station a cell behind the group's longest-range unit, on the side away from the fight, mending anything that comes within reach. Once no armed enemy is near, they drive to damaged members of the group (then anything damaged nearby) and fall back in behind. Check with `npx tsx sim/escort-check.ts`.
+
 Follow-ups: the AI doesn't build Repair Vehicles, the Hi-Tech Factory or Carryalls yet (its units do shoot at enemy aircraft). Carryalls ignore threats when choosing a path.
 
 ## 6. Factions
