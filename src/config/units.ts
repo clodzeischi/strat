@@ -82,7 +82,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   raider: {
     name: 'Sky Raider', producer: 'fab', cost: 500, buildTime: 11, hp: 260, shields: 120, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
     turret: false, infantry: false, tags: ['mechanical', 'air'], requires: ['tleilaxu'], air: true,
-    weapon: { range: 8, minRange: 0, damage: 12, bonus: { armored: 24, structure: -4 }, cooldown: 1.2, projectile: 'rocket', speed: 22, splash: 0 },
+    weapon: { range: 5, minRange: 0, damage: 12, bonus: { armored: 24, structure: -4 }, cooldown: 1.2, projectile: 'rocket', speed: 22, splash: 0 },
     mines: {
       cooldown: 15, trigger: 2.2, max: 12,
       weapon: { range: 0, minRange: 0, damage: 30, bonus: { biological: 90, armored: -10 }, cooldown: 0, projectile: 'shell', speed: 0, splash: 4 },

@@ -194,7 +194,7 @@ Equal-cost duels after stage 2 ($4500 a side; +1 Corrino wins untouched, -1 Atre
 | Sardaukar | 0.31 | -0.56 | 0.66 | -0.90 |
 | Razor | 0.77 | 0.28 | -0.58 | 0.00 |
 | Devastator | 0.51 | 0.47 | 0.23 | 0.47 |
-| Sky Raider | -0.78 | 1.00 | 0.96 | -0.23 |
+| Sky Raider (range 8, before the cut) | -0.78 | 1.00 | 0.96 | -0.23 |
 | Artillery | -0.15 | -0.43 | -0.60 | -0.51 |
 
 Open point: the Devastator beats Rocket Launchers in a straight fight; they only win by kiting with their longer range (17 against 10).
