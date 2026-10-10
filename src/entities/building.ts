@@ -7,9 +7,11 @@ import { Entity } from './entity';
 import type { Unit } from './unit';
 import * as dm from '../game/dmath';
 
-/** Which side a building's door (unit exit, harvester dock) is on. Models are built facing south (+z). */
+/**
+ * Which side a building's door (fallback unit exit, harvester dock) is on. Gameplay only: models are never turned
+ * to match, they always face south (+z).
+ */
 export type Facing = 'south' | 'east' | 'north' | 'west';
-const FACING_ANGLE: Record<Facing, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 };
 
 /**
  * Buildings are drawn turned 45 degrees, the way StarCraft's look on its diagonal grid, though they occupy the
@@ -45,6 +47,8 @@ export class Building extends Entity {
   readonly radius: number;
   readonly size: number;
   readonly spinner: THREE.Object3D | null;
+  /** A Blender model's level-2 structure, shown at level 2. */
+  private level2: THREE.Object3D | null;
   level = 1;
   /** Infantry inside (bunkers). */
   occupants: Unit[] = [];
@@ -67,7 +71,7 @@ export class Building extends Entity {
   /** Spice Camps: map cells within reach, nearest first (worked in this order), and whether they've all run dry. */
   reach: number[] = [];
   dry = false;
-  /** Turned and scaled holder of the model, so level-2 parts line up with it. */
+  /** Holder of the model (turned and squashed for procedural models), so level-2 parts line up with it. */
   private model = new THREE.Group();
 
   constructor(
@@ -82,11 +86,14 @@ export class Building extends Entity {
     this.x = (cx + def.size / 2) * TILE;
     this.z = (cz + def.size / 2) * TILE;
     this.y = groundY;
-    const model = makeBuildingModel(type, TEAM_COLORS[team], def.size);
+    const model = makeBuildingModel(type, faction, TEAM_COLORS[team], def.size);
     this.spinner = model.spinner;
-    const k = diamondScale(def.size);
-    this.model.scale.set(k, 1, k);
-    this.model.rotation.y = FACING_ANGLE[facing] + BUILDING_TURN;
+    this.level2 = model.level2;
+    if (!model.dropIn) {
+      const k = diamondScale(def.size);
+      this.model.scale.set(k, 1, k);
+      this.model.rotation.y = BUILDING_TURN;
+    }
     this.model.add(model.group);
     this.root.add(this.model);
     this.root.position.set(this.x, this.y, this.z);
@@ -115,7 +122,8 @@ export class Building extends Entity {
   setLevel(level: number): void {
     this.level = level;
     if (level < 2) return;
-    this.model.add(makeLevelKit(this.type, TEAM_COLORS[this.team]));
+    if (this.level2) this.level2.visible = true;
+    else this.model.add(makeLevelKit(this.type, TEAM_COLORS[this.team]));
   }
 
   /** One step out of the door, in cells. */

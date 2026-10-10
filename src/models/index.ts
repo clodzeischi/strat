@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { TILE, type BuildingType, type UnitType } from '../config';
+import { TILE, type BuildingType, type Faction, type UnitType } from '../config';
 import { CONCRETE } from '../materials/palette';
 import { barracks } from './buildings/barracks';
 import { bunker } from './buildings/bunker';
@@ -14,6 +14,7 @@ import { turret } from './buildings/turret';
 import { camp } from './buildings/camp';
 import { sietch } from './buildings/sietch';
 import { thumper } from './buildings/thumper';
+import { cloneBuildingModel } from './gltf';
 import { box } from './parts';
 import type { BuildingBlueprint, BuildingModel, UnitBlueprint, UnitModel, UpgradeKit, UpgradeLook } from './types';
 import { carryall } from './units/carryall';
@@ -36,6 +37,7 @@ import { mortar } from './units/mortar';
 import { warrior } from './units/warrior';
 
 export type { BuildingModel, UnitModel, UpgradeKit, UpgradeLook } from './types';
+export { hasBuildingModel, loadModels } from './gltf';
 export { makeParachute } from './parachute';
 export { makePod } from './pod';
 export { makeSandworm, WORM_DEPTH, type SandwormModel } from './sandworm';
@@ -54,17 +56,23 @@ export function makeUnitModel(type: UnitType, color: number): UnitModel {
   return UNIT_MODELS[type].build(color);
 }
 
-/** Buildings are centered on their footprint, standing on a concrete slab with team trim; front faces +Z. */
-export function makeBuildingModel(type: BuildingType, color: number, size: number): BuildingModel {
+/**
+ * Buildings are centered on their footprint, standing on a concrete slab; front faces +Z. Team color is on the
+ * structure. A faction's Blender model replaces the procedural one when it has been loaded.
+ */
+export function makeBuildingModel(type: BuildingType, faction: Faction, color: number, size: number): BuildingModel {
   const group = new THREE.Group();
   const w = size * TILE - 0.3;
-  if (!BUILDING_MODELS[type].bare) {
-    box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
-    // Team-colored trim on the slab edge.
-    box(group, w + 0.05, 0.12, 0.2, color, 0, 0.3, w / 2 - 0.1);
+  if (!BUILDING_MODELS[type].bare) box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
+  const model = cloneBuildingModel(type, faction, color);
+  if (model) {
+    group.add(model);
+    const level2 = model.getObjectByName('level2') ?? null;
+    if (level2) level2.visible = false;
+    return { group, spinner: model.getObjectByName('spinner') ?? null, level2, dropIn: true };
   }
   const spinner = BUILDING_MODELS[type].build(group, color);
-  return { group, spinner };
+  return { group, spinner, level2: null, dropIn: false };
 }
 
 /**

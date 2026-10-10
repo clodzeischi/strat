@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { RTSCamera } from './render/camera';
 import { FACTION_LIST, FACTIONS, MAP_SIZES, TILE, type Faction, type MapSize, type Team } from './config';
 import { Game, type Difficulty } from './game/game';
+import { loadModels } from './models';
 import { Input } from './ui/input';
 import { loadEnemy, loadFaction, loadMapSize, Menus, type Channel, type EnemyChoice, type ReplayEntry } from './ui/menu';
 import { ReplayViewer, type ReplayView } from './ui/replay-viewer';
@@ -106,6 +107,9 @@ const playerFaction = autostart?.faction ?? loadFaction();
 const rollEnemy = (c: EnemyChoice): Faction => (c === 'random' ? FACTION_LIST[Math.floor(Math.random() * FACTION_LIST.length)] : c);
 const enemyFaction = autostart?.enemy ?? rollEnemy(loadEnemy());
 const factions: Faction[] = match?.factions ?? watching?.factions ?? [playerFaction, enemyFaction];
+
+// Blender models must be in before the first building is made; anything that fails keeps its procedural model.
+await loadModels();
 
 const rts = new RTSCamera(mapSize * TILE);
 const game = new Game(scene, rts.camera, mapSize, mapSeed, factions);

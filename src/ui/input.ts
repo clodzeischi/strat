@@ -4,6 +4,7 @@ import { BUILDINGS, FACTIONS, PRODUCERS, THUMPER, TILE, type AckKind, type Build
 import { Building, BUILDING_TURN, Carryall, diamondScale, repairable, Unit, type Entity } from '../entities';
 import type { Command } from '../game/commands';
 import type { Game } from '../game/game';
+import { hasBuildingModel } from '../models';
 import { keyLabel } from './keys';
 import { PlacementGrid } from './placement';
 import { RallyLines } from '../render/rally-lines';
@@ -874,10 +875,11 @@ export class Input {
     const c = this.placementCell(p, type);
     this.grid.update(type, this.team, c.cx, c.cz);
     this.ghost.visible = true;
-    // Turned like the buildings themselves, over the square tiles of the placement grid.
-    const k = diamondScale(size) * (size * TILE - 0.3);
+    // The shape of the slab: square for Blender models, turned like the procedural buildings themselves otherwise.
+    const dropIn = hasBuildingModel(type, this.game.teams[this.team].faction);
+    const k = (dropIn ? 1 : diamondScale(size)) * (size * TILE - 0.3);
     this.ghost.scale.set(k, 1.2, k);
-    this.ghost.rotation.y = BUILDING_TURN;
+    this.ghost.rotation.y = dropIn ? 0 : BUILDING_TURN;
     const x = (c.cx + size / 2) * TILE;
     const z = (c.cz + size / 2) * TILE;
     this.ghost.position.set(x, this.game.map.surfaceAt(x, z) + 0.6, z);
