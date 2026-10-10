@@ -1984,7 +1984,8 @@ export class Game {
     for (const b of this.buildings) {
       if (b.def.weapon) b.aimGun();
       else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + Math.abs(dm.sin(this.time * 5 + b.id)) * 0.35;
-      else if (b.spinner && !(b.def.extract && b.dry)) b.spinner.rotation.y += dt * (b.type === 'factory' || b.type === 'camp' ? 1.5 : 0.25);
+      else if (b.type === 'conyard' || b.type === 'factory') b.slew(dt, b.type === 'factory' ? 1.8 : 0.5);
+      else if (b.spinner && !(b.def.extract && b.dry)) b.spinner.rotation.y += dt * (b.type === 'camp' ? 1.5 : 0.25);
     }
     this.effects.update(dt);
     this.terrain.flush();

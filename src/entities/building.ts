@@ -49,6 +49,9 @@ export class Building extends Entity {
   readonly spinner: THREE.Object3D | null;
   /** A Blender model's level-2 structure, shown at level 2. */
   private level2: THREE.Object3D | null;
+  /** Slewing spinners (see `slew`): seconds until the next heading, and the heading being turned to. */
+  private slewWait = Math.random() * 10;
+  private slewTo = 0;
   level = 1;
   /** Infantry inside (bunkers). */
   occupants: Unit[] = [];
@@ -97,6 +100,23 @@ export class Building extends Entity {
     this.model.add(model.group);
     this.root.add(this.model);
     this.root.position.set(this.x, this.y, this.z);
+  }
+
+  /**
+   * Cranes and print heads: every 8-10 s picks a new heading and swings there, easing in. Each building keeps its
+   * own random timer, so neighbors never move in step. Drawing only (Math.random, not the game's seeded random).
+   */
+  slew(dt: number, speed: number): void {
+    if (!this.spinner) return;
+    this.slewWait -= dt;
+    if (this.slewWait <= 0) {
+      this.slewWait = 8 + Math.random() * 2;
+      const turn = (0.5 + Math.random() * (Math.PI - 0.5)) * (Math.random() < 0.5 ? -1 : 1);
+      this.slewTo = this.spinner.rotation.y + turn;
+    }
+    const d = this.slewTo - this.spinner.rotation.y;
+    const step = Math.min(speed, Math.abs(d) * 1.5) * dt;
+    this.spinner.rotation.y += Math.abs(d) <= step ? d : Math.sign(d) * step;
   }
 
   /** Turns a gun emplacement's head (its spinner, built facing +X) toward its aim. */
