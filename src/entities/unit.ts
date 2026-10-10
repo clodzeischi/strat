@@ -11,6 +11,7 @@ import { Building } from './building';
 import { distTo } from './distance';
 import { Entity } from './entity';
 import { hypot } from '../game/hypot';
+import * as dm from '../game/dmath';
 
 /** Steepest a vehicle leans to follow the ground, so cliff-foot slopes don't stand it on end. */
 const MAX_TILT = THREE.MathUtils.degToRad(25);
@@ -564,22 +565,22 @@ export class Unit extends Entity {
         this.orbitZ = o.kind === 'move' || o.kind === 'amove' ? o.z : this.z;
       }
       if (this.orbitX === null) {
-        this.orbitX = this.x + Math.cos(this.heading) * R;
-        this.orbitZ = this.z + Math.sin(this.heading) * R;
+        this.orbitX = this.x + dm.cos(this.heading) * R;
+        this.orbitZ = this.z + dm.sin(this.heading) * R;
       }
       // The circle stays over the map.
       this.orbitX = THREE.MathUtils.clamp(this.orbitX, R + TILE, edge - R - TILE);
       this.orbitZ = THREE.MathUtils.clamp(this.orbitZ, R + TILE, edge - R - TILE);
       // Chase a point a little ahead on the circle (counterclockwise): from anywhere, that brings it onto the circle.
-      const a = Math.atan2(this.z - this.orbitZ, this.x - this.orbitX) + 0.7;
-      gx = this.orbitX + Math.cos(a) * R;
-      gz = this.orbitZ + Math.sin(a) * R;
+      const a = dm.atan2(this.z - this.orbitZ, this.x - this.orbitX) + 0.7;
+      gx = this.orbitX + dm.cos(a) * R;
+      gz = this.orbitZ + dm.sin(a) * R;
     }
     this.path = [];
-    this.heading = this.rotateToward(this.heading, Math.atan2(gz - this.z, gx - this.x), this.def.turnRate * dt);
+    this.heading = this.rotateToward(this.heading, dm.atan2(gz - this.z, gx - this.x), this.def.turnRate * dt);
     const v = this.speed(game) * dt;
-    this.x = THREE.MathUtils.clamp(this.x + Math.cos(this.heading) * v, TILE, edge - TILE);
-    this.z = THREE.MathUtils.clamp(this.z + Math.sin(this.heading) * v, TILE, edge - TILE);
+    this.x = THREE.MathUtils.clamp(this.x + dm.cos(this.heading) * v, TILE, edge - TILE);
+    this.z = THREE.MathUtils.clamp(this.z + dm.sin(this.heading) * v, TILE, edge - TILE);
   }
 
   /** Whether a target is within its weapon's reach from where it stands (not too close, not too far). */
@@ -674,7 +675,7 @@ export class Unit extends Entity {
     if (!t) return;
     // Dug in, the hull stays put and the turret turns (slowly: it's a heavy gun); without a turret (a Fremen Mortar),
     // the gunner turns where he kneels.
-    const angle = Math.atan2(t.z - this.z, t.x - this.x);
+    const angle = dm.atan2(t.z - this.z, t.x - this.x);
     let aligned: boolean;
     if (this.turret) {
       this.turretHeading = this.rotateToward(this.turretHeading, angle, 1.5 * dt);
@@ -714,7 +715,7 @@ export class Unit extends Entity {
     }
     const target = this.sideTarget;
     if (!target) return false;
-    const angle = Math.atan2(target.z - this.z, target.x - this.x);
+    const angle = dm.atan2(target.z - this.z, target.x - this.x);
     this.turretHeading = this.rotateToward(this.turretHeading, angle, 4 * dt);
     if (Math.abs(wrapAngle(angle - this.turretHeading)) < 0.12 && this.cooldown <= 0) {
       const w = game.weaponFor(this, target)!;
@@ -728,7 +729,7 @@ export class Unit extends Entity {
   private engage(game: Game, target: Entity, dt: number): boolean {
     const w = game.weaponFor(this, target)!;
     const d = distTo(target, this.x, this.z);
-    const angle = Math.atan2(target.z - this.z, target.x - this.x);
+    const angle = dm.atan2(target.z - this.z, target.x - this.x);
     if (d < w.minRange) {
       // Too close to fire: back away from the target to open the distance.
       this.chasing = true;
@@ -736,7 +737,7 @@ export class Unit extends Entity {
       if (this.repathTimer <= 0 || this.path.length === 0) {
         this.repathTimer = 0.6;
         const away = w.minRange + TILE * 1.5;
-        this.setPath(game, target.x - Math.cos(angle) * (d + away), target.z - Math.sin(angle) * (d + away));
+        this.setPath(game, target.x - dm.cos(angle) * (d + away), target.z - dm.sin(angle) * (d + away));
       }
       this.followPath(game, dt);
       return false;
@@ -783,7 +784,7 @@ export class Unit extends Entity {
       return false;
     }
     this.path = [];
-    this.heading = this.rotateToward(this.heading, Math.atan2(target.z - this.z, target.x - this.x), this.def.turnRate * dt);
+    this.heading = this.rotateToward(this.heading, dm.atan2(target.z - this.z, target.x - this.x), this.def.turnRate * dt);
     this.mendStep(game, target, dt);
     return false;
   }
@@ -860,7 +861,7 @@ export class Unit extends Entity {
     const sz = lead.z - (dz / len) * back;
     if (hypot(sx - this.x, sz - this.z) < TILE * 0.5) {
       this.path = [];
-      this.heading = this.rotateToward(this.heading, Math.atan2(dz, dx), this.def.turnRate * dt);
+      this.heading = this.rotateToward(this.heading, dm.atan2(dz, dx), this.def.turnRate * dt);
       return;
     }
     this.repathTimer -= dt;
@@ -883,10 +884,10 @@ export class Unit extends Entity {
       this.path.shift();
       return this.path.length === 0;
     }
-    const desired = Math.atan2(dz, dx);
+    const desired = dm.atan2(dz, dx);
     this.heading = this.rotateToward(this.heading, desired, this.def.turnRate * dt);
     const diff = Math.abs(wrapAngle(desired - this.heading));
-    const align = this.def.infantry ? 1 : Math.max(0, Math.cos(diff));
+    const align = this.def.infantry ? 1 : Math.max(0, dm.cos(diff));
     if (diff < 1.3 || this.def.infantry) {
       const step = Math.min(d, this.speed(game) * dt * align);
       const nx = this.x + (dx / d) * step;
@@ -996,11 +997,11 @@ export class Unit extends Entity {
         this.lastSpice = c;
         this.cargo += map.takeSpice(c.cx, c.cz, HARVESTER.rate * dt);
         game.terrain.refreshTile(c.cx, c.cz);
-        this.heading += Math.sin(game.time * 1.5) * dt * 0.5;
+        this.heading += dm.sin(game.time * 1.5) * dt * 0.5;
         this.puffTimer -= dt;
         if (this.puffTimer <= 0) {
           this.puffTimer = 0.25;
-          const p = new THREE.Vector3(this.x + Math.cos(this.heading) * 1.2, this.y + 0.3, this.z + Math.sin(this.heading) * 1.2);
+          const p = new THREE.Vector3(this.x + dm.cos(this.heading) * 1.2, this.y + 0.3, this.z + dm.sin(this.heading) * 1.2);
           game.effects.puff(p, 0xd88a3a);
         }
         if (this.cargo >= capacity) {
@@ -1034,7 +1035,7 @@ export class Unit extends Entity {
         // moment it arrives, as it did when harvesters just turned on the spot.
         const dock = this.dockAt(game)!;
         if (this.dockPhase === 0) {
-          const face = Math.atan2(dock.out.dz, dock.out.dx);
+          const face = dm.atan2(dock.out.dz, dock.out.dx);
           this.heading = this.rotateToward(this.heading, face, this.def.turnRate * dt);
           if (Math.abs(wrapAngle(face - this.heading)) < 0.05) this.dockPhase = 1;
         } else if (this.dockPhase === 1) {
@@ -1108,9 +1109,9 @@ export class Unit extends Entity {
       this.drawnHeading = this.heading;
       this.glideBank += (THREE.MathUtils.clamp(-turn * 0.45, -0.6, 0.6) - this.glideBank) * Math.min(1, dt * 4);
       // Roll about its own nose (+X) first, then turn to its heading.
-      this.body.rotation.set(this.glideBank + Math.sin(game.time * 1.7 + this.id) * 0.05, -this.heading, 0, 'YXZ');
+      this.body.rotation.set(this.glideBank + dm.sin(game.time * 1.7 + this.id) * 0.05, -this.heading, 0, 'YXZ');
     } else if (this.falling || this.def.air) {
-      this.body.rotation.set(0, -this.heading, Math.sin(game.time * 2.3 + this.id) * 0.08);
+      this.body.rotation.set(0, -this.heading, dm.sin(game.time * 2.3 + this.id) * 0.08);
     } else if (this.def.infantry) {
       this.body.rotation.set(0, -this.heading, 0);
     } else {
@@ -1122,10 +1123,10 @@ export class Unit extends Entity {
         2 * r,
         m.surfaceAt(this.x, this.z - r) - m.surfaceAt(this.x, this.z + r),
       ).normalize();
-      if (n.y < Math.cos(MAX_TILT)) {
+      if (n.y < dm.cos(MAX_TILT)) {
         const flat = hypot(n.x, n.z);
-        const s = Math.sin(MAX_TILT) / flat;
-        n.set(n.x * s, Math.cos(MAX_TILT), n.z * s);
+        const s = dm.sin(MAX_TILT) / flat;
+        n.set(n.x * s, dm.cos(MAX_TILT), n.z * s);
       }
       this.groundUp.lerp(n, Math.min(1, dt * 8)).normalize();
       tilt.setFromUnitVectors(UP, this.groundUp);
@@ -1140,8 +1141,8 @@ export class Unit extends Entity {
         // The spades bite into the ground.
         if (this.drawnDeploy < 0.42 && t >= 0.42) {
           for (const [fx, fz] of [[0.75, 0.9], [-0.75, 0.9], [0.75, -0.9], [-0.75, -0.9]]) {
-            const c = Math.cos(this.heading);
-            const sn = Math.sin(this.heading);
+            const c = dm.cos(this.heading);
+            const sn = dm.sin(this.heading);
             game.effects.dust(new THREE.Vector3(this.x + fx * c - fz * sn, this.y + 0.1, this.z + fx * sn + fz * c), 0xc8b088, 0.6);
           }
         }

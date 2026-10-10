@@ -2,6 +2,7 @@ import { SPICE_MAX, TILE } from '../config';
 import { blur, fbm, hash, percentile, valueNoise } from './noise';
 import { CLIFF, HIGH_Y, LARGE, NARROW, NORMAL, RAMP_WIDTH, ROCK, SAND, SPICE, SURFACE_RES, type Cell, type MoveClass } from './tiles';
 import { hypot } from '../game/hypot';
+import * as dm from '../game/dmath';
 
 // Generator tuning.
 
@@ -85,8 +86,8 @@ export class GameMap {
     const mid = (N - 1) / 2;
     const room = mid - BASE_MARGIN; // farthest a base may sit from the middle along either axis
     const angle = hash(1, 2, seed) * Math.PI * 2;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
+    const cos = dm.cos(angle);
+    const sin = dm.sin(angle);
     const rMax = room / Math.max(Math.abs(cos), Math.abs(sin));
     const rMin = Math.min(0.32 * N, rMax);
     const r = rMin + (rMax - rMin) * Math.sqrt(hash(3, 4, seed)); // leans toward far apart
@@ -757,7 +758,7 @@ export class GameMap {
       // Walk the edge in angle order around the plateau's middle, so picks spread out.
       const mx = plateau.reduce((s, i) => s + (i % N), 0) / plateau.length;
       const mz = plateau.reduce((s, i) => s + ((i / N) | 0), 0) / plateau.length;
-      edge.sort((a, b) => Math.atan2(((a.i / N) | 0) - mz, (a.i % N) - mx) - Math.atan2(((b.i / N) | 0) - mz, (b.i % N) - mx));
+      edge.sort((a, b) => dm.atan2(((a.i / N) | 0) - mz, (a.i % N) - mx) - dm.atan2(((b.i / N) | 0) - mz, (b.i % N) - mx));
       // Rock shelves keep one unbroken stretch of cliff and open the rest of their edge with ramps.
       // Desert mesas get a single ramp: they're mainly obstacles.
       const shelf = plateau.filter((i) => this.tiles[i] === ROCK).length > plateau.length / 2;

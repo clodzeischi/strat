@@ -2,6 +2,7 @@ import { ARMOR_BONUS, TILE, WEAPONS_BONUS, type Team } from '../config';
 import { distTo, type Building, type Entity, type Order, type Unit } from '../entities';
 import { weaponDamage, type Game } from './game';
 import { hypot } from './hypot';
+import * as dm from './dmath';
 
 /** How much past an enemy's reach a kiting unit keeps, on top of what the enemy covers in this many seconds. */
 const KITE_BUFFER = 1;
@@ -112,8 +113,8 @@ export class Micro {
   private openSpot(u: Unit, dx: number, dz: number): { x: number; z: number } | null {
     const m = this.game.map;
     for (const turn of [0, 0.6, -0.6, 1.2, -1.2]) {
-      const c = Math.cos(turn);
-      const s = Math.sin(turn);
+      const c = dm.cos(turn);
+      const s = dm.sin(turn);
       const x = u.x + (dx * c - dz * s) * KITE_STEP;
       const z = u.z + (dx * s + dz * c) * KITE_STEP;
       const cx = m.cellOf(x);

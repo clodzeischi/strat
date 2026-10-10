@@ -10,6 +10,7 @@ import { SPICE, type Cell } from '../map';
 import { hypot } from './hypot';
 import { cellsAround } from './pathfinding';
 import { distTo } from '../entities';
+import * as dm from './dmath';
 
 /**
  * What the AI's plans mean for each faction: its vehicle factory, its defensive structure, the fast unit that raids
@@ -629,7 +630,7 @@ export class AI {
         const r = MATCHUPS[key][t][e];
         score += (value / total) * (r < 0 ? 2 * r : r);
       }
-      return [t, base(t) * Math.exp(this.profile.counterFocus * score)];
+      return [t, base(t) * dm.exp(this.profile.counterFocus * score)];
     });
   }
 
@@ -978,7 +979,7 @@ export class AI {
     // Spread out a little so the group doesn't pile onto one cell.
     const a = this.game.random() * Math.PI * 2;
     const r = this.game.random() * 3 * TILE;
-    u.command(this.game, { kind: 'amove', x: this.rally.x + Math.cos(a) * r, z: this.rally.z + Math.sin(a) * r });
+    u.command(this.game, { kind: 'amove', x: this.rally.x + dm.cos(a) * r, z: this.rally.z + dm.sin(a) * r });
   }
 
   /** Enemy combat units near our buildings or harvesters, grouped into separate attacks. */

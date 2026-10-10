@@ -4,6 +4,7 @@ import { SPICE } from '../map';
 import type { Game } from './game';
 import { hypot } from './hypot';
 import { cellsAround } from './pathfinding';
+import * as dm from './dmath';
 
 /**
  * Everything a player can tell the game, as plain data. The screen turns clicks and keys into commands; the
@@ -47,7 +48,9 @@ export type Command =
   | { c: 'cancelResearch' }
   | { c: 'levelUp'; type: LevelUpType }
   | { c: 'cancelLevelUp'; type: LevelUpType }
-  | { c: 'surrender' };
+  | { c: 'surrender' }
+  /** Accept the computer opponent's offer to surrender. */
+  | { c: 'acceptSurrender' };
 
 export function entityById(game: Game, id: number | null): Entity | null {
   if (id === null) return null;
@@ -83,7 +86,7 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       loaded.forEach((c, i) => {
         const a = (i / loaded.length) * Math.PI * 2;
         const r = loaded.length > 1 ? 2.5 : 0;
-        c.orderDrop(game, cmd.x + Math.cos(a) * r, cmd.z + Math.sin(a) * r);
+        c.orderDrop(game, cmd.x + dm.cos(a) * r, cmd.z + dm.sin(a) * r);
       });
       return;
     }
@@ -171,6 +174,9 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       return game.cancelLevelUp(team, cmd.type);
     case 'surrender':
       return game.acceptSurrender(team);
+    case 'acceptSurrender':
+      if (game.surrenderOffers.has((1 - team) as Team)) game.acceptSurrender((1 - team) as Team);
+      return;
   }
 }
 
@@ -305,7 +311,7 @@ function commandCarryalls(game: Game, carryalls: Carryall[], target: Entity | nu
   carryalls.forEach((c, i) => {
     const a = (i / carryalls.length) * Math.PI * 2;
     const r = carryalls.length > 1 ? 3 : 0;
-    c.command(game, { kind: 'move', x: x + Math.cos(a) * r, z: z + Math.sin(a) * r });
+    c.command(game, { kind: 'move', x: x + dm.cos(a) * r, z: z + dm.sin(a) * r });
   });
 }
 

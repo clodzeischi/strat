@@ -261,7 +261,7 @@ export class Input {
   }
 
   /** Starts a fresh selection (the lead goes back to its highest tier). */
-  private select(list: Entity[]): void {
+  select(list: Entity[]): void {
     this.primary = null;
     this.setSelection(list);
     if (this.ownUnits().length) this.onAck('select');

@@ -5,6 +5,7 @@ import type { Point } from '../game/pathfinding';
 import { makeBuildingModel, makeLevelKit } from '../models';
 import { Entity } from './entity';
 import type { Unit } from './unit';
+import * as dm from '../game/dmath';
 
 /** Which side a building's door (unit exit, harvester dock) is on. Models are built facing south (+z). */
 export type Facing = 'south' | 'east' | 'north' | 'west';
@@ -98,7 +99,7 @@ export class Building extends Entity {
 
   /** Where a gun emplacement's shots start: the top of the gun, a little toward its aim. */
   muzzleWorld(): THREE.Vector3 {
-    return new THREE.Vector3(this.x + Math.cos(this.aim) * 0.6, this.y + 1.3, this.z + Math.sin(this.aim) * 0.6);
+    return new THREE.Vector3(this.x + dm.cos(this.aim) * 0.6, this.y + 1.3, this.z + dm.sin(this.aim) * 0.6);
   }
 
   /** Free places for infantry, 0 for buildings that don't hold any (or are being salvaged). */
@@ -125,7 +126,7 @@ export class Building extends Entity {
   /** Heading (as units use it) of something leaving through the door. */
   doorHeading(): number {
     const d = this.doorStep();
-    return Math.atan2(d.dz, d.dx);
+    return dm.atan2(d.dz, d.dx);
   }
 
   /** The ring of cells around the footprint, sides first (no corners), then the corners. */

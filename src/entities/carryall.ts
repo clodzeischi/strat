@@ -6,6 +6,7 @@ import { SAND, SPICE } from '../map';
 import { CARRYALL_HOOK_Y, NACELLES, SEAT_OFF, SEAT_ON, SEATS } from '../models';
 import { Unit, type Order } from './unit';
 import { hypot } from '../game/hypot';
+import * as dm from '../game/dmath';
 
 /** How far below the hook a hanging vehicle's wheels are. */
 const HANG_DEPTH = 1.35;
@@ -213,9 +214,9 @@ export class Carryall extends Unit {
       if (d < 3) this.task = { kind: 'orbit', x: mech.x, z: mech.z };
       return;
     }
-    const a = Math.atan2(this.z - z, this.x - x);
+    const a = dm.atan2(this.z - z, this.x - x);
     const far = hypot(this.x - x, this.z - z) > CARRYALL.orbit * 2;
-    const p = this.inside(game, far ? x : x + Math.cos(a + 0.7) * CARRYALL.orbit, far ? z : z + Math.sin(a + 0.7) * CARRYALL.orbit);
+    const p = this.inside(game, far ? x : x + dm.cos(a + 0.7) * CARRYALL.orbit, far ? z : z + dm.sin(a + 0.7) * CARRYALL.orbit);
     this.fly(game, p.x, p.z, dt, { cruise: this.def.speed * (far ? 1 : 0.45) });
   }
 
@@ -257,7 +258,7 @@ export class Carryall extends Unit {
 
   /** Climbs out straight ahead after a touchdown, then carries on with `then`. */
   private climbOut(game: Game, then: Task): void {
-    const p = this.inside(game, this.x + Math.cos(this.heading) * CLIMB_OUT, this.z + Math.sin(this.heading) * CLIMB_OUT);
+    const p = this.inside(game, this.x + dm.cos(this.heading) * CLIMB_OUT, this.z + dm.sin(this.heading) * CLIMB_OUT);
     this.task = { kind: 'climb', x: p.x, z: p.z, then };
   }
 
@@ -298,7 +299,7 @@ export class Carryall extends Unit {
       u.carrier = null;
       if (u.def.infantry) {
         const side = (this.load.length % 2 ? 1 : -1) * 0.6;
-        u.startFall(game, this.x - Math.sin(this.heading) * side, this.y - 0.6, this.z + Math.cos(this.heading) * side);
+        u.startFall(game, this.x - dm.sin(this.heading) * side, this.y - 0.6, this.z + dm.cos(this.heading) * side);
       } else {
         u.startFall(game, u.x, u.y, u.z); // from where it hangs
       }
@@ -386,8 +387,8 @@ export class Carryall extends Unit {
     this.load = [];
     out.forEach((u, i) => {
       const side = out.length > 1 ? (i - (out.length - 1) / 2) * 1.8 : 0;
-      let x = this.x + Math.cos(this.heading) * side;
-      let z = this.z + Math.sin(this.heading) * side;
+      let x = this.x + dm.cos(this.heading) * side;
+      let z = this.z + dm.sin(this.heading) * side;
       if (!m.canEnter(m.cellOf(x), m.cellOf(z), u.moveClass)) {
         const c = m.nearestCell(m.cellOf(x), m.cellOf(z), (cx, cz) => m.canEnter(cx, cz, u.moveClass), 12);
         if (c) {
@@ -421,7 +422,7 @@ export class Carryall extends Unit {
     // Nose up while braking, slightly down while speeding up.
     const pitchWant = dt > 0 ? THREE.MathUtils.clamp((-accel / dt) * 0.07, -0.08, 0.3) : 0;
     this.pitch += (pitchWant - this.pitch) * Math.min(1, dt * 3);
-    const desired = Math.atan2(dz, dx);
+    const desired = dm.atan2(dz, dx);
     const slow = 1 - THREE.MathUtils.clamp(this.speedNow / cruise, 0, 1);
     const before = this.heading;
     if (d > 0.3) this.heading = this.rotateToward(this.heading, desired, this.def.turnRate * (1 + slow * 2) * dt);
@@ -431,8 +432,8 @@ export class Carryall extends Unit {
     const hover = o.stop ? THREE.MathUtils.clamp(1 - this.speedNow / 3, 0, 1) : 0;
     const step = Math.min(this.speedNow * dt, o.stop ? d : Infinity);
     if (d > 1e-4) {
-      this.x += (Math.cos(this.heading) * (1 - hover) + (dx / d) * hover) * step;
-      this.z += (Math.sin(this.heading) * (1 - hover) + (dz / d) * hover) * step;
+      this.x += (dm.cos(this.heading) * (1 - hover) + (dx / d) * hover) * step;
+      this.z += (dm.sin(this.heading) * (1 - hover) + (dz / d) * hover) * step;
     }
     const size = game.map.worldSize();
     this.x = THREE.MathUtils.clamp(this.x, 0, size);
@@ -462,7 +463,7 @@ export class Carryall extends Unit {
     const vehicles = this.load.filter((u) => !u.def.infantry);
     vehicles.forEach((u, i) => {
       const along = vehicles.length > 1 ? (i - 0.5) * 1.6 : 0;
-      u.hangAt(this.x + Math.cos(this.heading) * along, this.y + CARRYALL_HOOK_Y - HANG_DEPTH, this.z + Math.sin(this.heading) * along, this.heading);
+      u.hangAt(this.x + dm.cos(this.heading) * along, this.y + CARRYALL_HOOK_Y - HANG_DEPTH, this.z + dm.sin(this.heading) * along, this.heading);
     });
     for (const u of this.load) {
       if (!u.def.infantry) continue;

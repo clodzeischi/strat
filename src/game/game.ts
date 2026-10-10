@@ -17,6 +17,7 @@ import { Terrain } from '../render/terrain';
 import { Hasher, mulberry32 } from './rng';
 import { Vision, VISION_EVERY } from './vision';
 import { hypot } from './hypot';
+import * as dm from './dmath';
 
 /** Running totals for the end-of-game screen. */
 export interface TeamStats {
@@ -174,6 +175,8 @@ export class Game {
   surrendered: Team | null = null;
   /** Called when a computer opponent offers to surrender; answer with `acceptSurrender` or ignore it to play on. */
   onSurrenderOffer: (team: Team) => void = () => {};
+  /** The teams that have offered to surrender. */
+  readonly surrenderOffers = new Set<Team>();
   difficulty: Difficulty = 'normal';
   /** Called with notifications for the local player. */
   onMessage: (text: string, voice?: Announcement | null) => void = () => {};
@@ -247,7 +250,7 @@ export class Game {
       const cells = cellsAround(this.map, towardCenter.cx, towardCenter.cz, 12);
       FACTIONS[this.teams[team].faction].start.forEach((type, k) => {
         const c = cells[k * 2] ?? cells[0];
-        this.spawnUnit(type, team, this.map.center(c.cx), this.map.center(c.cz), Math.atan2(uz, ux));
+        this.spawnUnit(type, team, this.map.center(c.cx), this.map.center(c.cz), dm.atan2(uz, ux));
       });
     });
   }
@@ -590,7 +593,7 @@ export class Game {
     const cell = this.exitCell(site, rally.x, rally.z, cls);
     const x = this.map.center(cell.cx);
     const z = this.map.center(cell.cz);
-    const u = this.spawnUnit(type, team, x, z, Math.atan2(rally.z - z, rally.x - x));
+    const u = this.spawnUnit(type, team, x, z, dm.atan2(rally.z - z, rally.x - x));
     if (type === 'harvester') {
       u.commandHarvest(this, null);
       return;
@@ -947,13 +950,13 @@ export class Game {
 
   /** Flamethrower: burns every enemy within reach inside the cone around the aim (the target always). */
   private flame(u: Shooter, target: Entity, w: WeaponDef, mult: number, from: THREE.Vector3): void {
-    const aim = Math.atan2(target.z - u.z, target.x - u.x);
+    const aim = dm.atan2(target.z - u.z, target.x - u.x);
     const reach = this.rangeFor(u, w, target) + 0.3;
     const burn = (e: Entity) => {
       if (e === target || e.team === u.team || e.dead || e.tags.includes('air') || (e instanceof Unit && e.carrier)) return;
       if (distTo(e, u.x, u.z) > reach) return;
-      const off = Math.atan2(e.z - u.z, e.x - u.x) - aim;
-      if (Math.abs(Math.atan2(Math.sin(off), Math.cos(off))) <= w.cone!) this.damage(e, w, mult, u);
+      const off = dm.atan2(e.z - u.z, e.x - u.x) - aim;
+      if (Math.abs(dm.atan2(dm.sin(off), dm.cos(off))) <= w.cone!) this.damage(e, w, mult, u);
     };
     for (const e of this.units) burn(e);
     for (const e of this.buildings) burn(e);
@@ -1238,7 +1241,7 @@ export class Game {
       this.blast(u.x, u.z, w, 1, u);
       for (let k = 0; k < 6; k++) {
         const a = (k / 6) * Math.PI * 2;
-        this.effects.explosion(new THREE.Vector3(u.x + Math.cos(a) * w.splash * 0.4, u.y + 0.5, u.z + Math.sin(a) * w.splash * 0.4), 1.8);
+        this.effects.explosion(new THREE.Vector3(u.x + dm.cos(a) * w.splash * 0.4, u.y + 0.5, u.z + dm.sin(a) * w.splash * 0.4), 1.8);
       }
       this.effects.explosion(u.aimPoint(), 3);
       this.onSound('explosion_Large', u.x, u.z);
@@ -1295,7 +1298,7 @@ export class Game {
         b.target = this.nearestEnemy(b.team, b.x, b.z, w.range, b);
       }
       if (!b.target) continue;
-      b.aim = Math.atan2(b.target.z - b.z, b.target.x - b.x);
+      b.aim = dm.atan2(b.target.z - b.z, b.target.x - b.x);
       if (b.cooldown > 0) continue;
       this.fire(b, b.target, w);
       b.cooldown = w.cooldown * (0.9 + this.random() * 0.2);
@@ -1825,7 +1828,7 @@ export class Game {
           step -= d;
           w.path.shift();
         } else {
-          w.heading = Math.atan2(p.z - w.z, p.x - w.x);
+          w.heading = dm.atan2(p.z - w.z, p.x - w.x);
           w.x += ((p.x - w.x) / d) * step;
           w.z += ((p.z - w.z) / d) * step;
           step = 0;
@@ -1859,7 +1862,7 @@ export class Game {
     const ground = this.map.surfaceAt(x, z);
     for (let k = 0; k < 6; k++) {
       const a = (k / 6) * Math.PI * 2;
-      this.effects.dust(new THREE.Vector3(x + Math.cos(a) * 2.5, ground + 0.3, z + Math.sin(a) * 2.5), 0xd8b080, 1.8);
+      this.effects.dust(new THREE.Vector3(x + dm.cos(a) * 2.5, ground + 0.3, z + dm.sin(a) * 2.5), 0xd8b080, 1.8);
     }
   }
 
@@ -1877,13 +1880,13 @@ export class Game {
       body.visible = up > 0;
       const travelling = w.path.length > 0 && up === 0;
       ridge.visible = up === 0;
-      ridge.scale.y = travelling ? 0.6 + Math.sin(now * 9) * 0.08 : 0.35;
+      ridge.scale.y = travelling ? 0.6 + dm.sin(now * 9) * 0.08 : 0.35;
       root.visible = this.revealAll || this.vision.seesAt(this.localTeam, root.position.x, root.position.z);
       if (travelling && root.visible) {
         w.dustTimer -= dt;
         if (w.dustTimer <= 0) {
           w.dustTimer = 0.12;
-          const back = new THREE.Vector3(root.position.x - Math.cos(w.heading) * 2.5, root.position.y + 0.2, root.position.z - Math.sin(w.heading) * 2.5);
+          const back = new THREE.Vector3(root.position.x - dm.cos(w.heading) * 2.5, root.position.y + 0.2, root.position.z - dm.sin(w.heading) * 2.5);
           this.effects.dust(back, 0xd8c49a, 0.8);
         }
       }
@@ -1891,7 +1894,9 @@ export class Game {
   }
 
   offerSurrender(team: Team): void {
-    if (this.winner === null) this.onSurrenderOffer(team);
+    if (this.winner !== null) return;
+    this.surrenderOffers.add(team);
+    this.onSurrenderOffer(team);
   }
 
   acceptSurrender(team: Team): void {
@@ -1978,7 +1983,7 @@ export class Game {
     this.drawWorms(dt, alpha);
     for (const b of this.buildings) {
       if (b.def.weapon) b.aimGun();
-      else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + Math.abs(Math.sin(this.time * 5 + b.id)) * 0.35;
+      else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + Math.abs(dm.sin(this.time * 5 + b.id)) * 0.35;
       else if (b.spinner && !(b.def.extract && b.dry)) b.spinner.rotation.y += dt * (b.type === 'factory' || b.type === 'camp' ? 1.5 : 0.25);
     }
     this.effects.update(dt);

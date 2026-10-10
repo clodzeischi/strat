@@ -43,6 +43,8 @@
         <div class="menu-page" data-page="main">
           <button class="mbtn" data-action="play">Play</button>
           <button class="mbtn" data-action="multiplayer">Multiplayer</button>
+          <button class="mbtn" data-action="replays">Replays</button>
+          <button class="mbtn" data-action="settings">Settings</button>
           <button class="mbtn" data-action="controls">Controls</button>
         </div>
 
@@ -101,6 +103,21 @@
           <button class="mbtn back" data-action="cancel-host">Cancel</button>
         </div>
 
+        <div class="menu-page" data-page="replays" hidden>
+          <div class="page-head">Replays</div>
+          <div id="replay-list" class="mp-rooms"><p class="note">Loading…</p></div>
+          <button class="mbtn" data-action="open-replay">Open a file <span>A replay saved from the end screen</span></button>
+          <input id="replay-file" type="file" accept=".json,application/json" hidden />
+          <p id="replay-status" class="note mp-status"></p>
+          <button class="mbtn back" data-action="back">Back</button>
+        </div>
+
+        <div class="menu-page" data-page="settings" hidden>
+          <div class="page-head">Volume</div>
+          <div class="volumes"></div>
+          <button class="mbtn back" data-action="back">Back</button>
+        </div>
+
         <div class="menu-page" data-page="controls" hidden>
           <div class="page-head">Controls</div>
           <dl class="controls">
@@ -118,7 +135,7 @@
             <dt>Space</dt><dd>Jump to the latest alert (else to base)</dd>
             <dt>` (left of 1)</dt><dd>Select the whole army (twice: jump to it)</dd>
             <dt>~ (Shift + `)</dt><dd>Select all idle harvesters and Spice Crews</dd>
-            <dt>P</dt><dd>Pause (not online)</dd>
+            <dt>P</dt><dd>Pause (not online; in a replay too)</dd>
             <dt>Ctrl + 1-9</dt><dd>Set control group</dd>
             <dt>1-9 (twice)</dt><dd>Select group (and jump to it)</dd>
             <dt>Barracks / Factory selected, right click</dt><dd>Set rally point</dd>
@@ -142,6 +159,7 @@
         <button class="mbtn" data-action="restart">Restart</button>
         <button class="mbtn" data-action="surrender" hidden>Surrender</button>
         <button class="mbtn" data-action="quit">Quit</button>
+        <div class="volumes"></div>
         <label class="fps-toggle"><input type="checkbox" class="fps-check" /> Show FPS</label>
       </div>
     </div>
@@ -166,6 +184,7 @@
         <div class="heroes"></div>
         <div class="row">
           <button class="mbtn" data-action="restart">Play again</button>
+          <button class="mbtn" data-action="save-replay">Save replay</button>
           <button class="mbtn" data-action="quit">Main menu</button>
         </div>
       </div>

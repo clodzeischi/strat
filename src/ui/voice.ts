@@ -22,6 +22,11 @@ export class Voice {
 
   constructor(private bank: AudioBank) {}
 
+  /** Whose units answer (the menu's settings preview them before a match). */
+  setFaction(faction: Faction): void {
+    this.faction = faction;
+  }
+
   /** Fetches the announcer's lines and this faction's acknowledgements, in the background. */
   load(faction: Faction): void {
     this.faction = faction;
@@ -52,13 +57,13 @@ export class Voice {
     if (last && n >= last) n++;
     this.lastAck.set(kind, n);
     this.acking = true;
-    void this.bank.play(`${this.faction}/${kind}_${n}`, 'voice', VOLUME.ack).then(() => (this.acking = false));
+    void this.bank.play(`${this.faction}/${kind}_${n}`, 'units', VOLUME.ack).then(() => (this.acking = false));
   }
 
   private speak(line: Announcement): void {
     this.speaking = line;
     this.lastSaid.set(line, performance.now() / 1000);
-    void this.bank.play(`announcer/${line}`, 'voice', VOLUME.announcer).then(() => {
+    void this.bank.play(`announcer/${line}`, 'announcer', VOLUME.announcer).then(() => {
       this.speaking = null;
       const now = performance.now() / 1000;
       this.queue = this.queue.filter((q) => now - q.at < STALE);

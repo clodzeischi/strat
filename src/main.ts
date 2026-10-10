@@ -1,11 +1,10 @@
 import * as THREE from 'three';
-import type { AI } from './game/ai';
-import { createAI } from './game/brutal';
 import { RTSCamera } from './render/camera';
-import { FACTION_LIST, MAP_SIZES, TILE, type Faction, type MapSize, type Team } from './config';
+import { FACTION_LIST, FACTIONS, MAP_SIZES, TILE, type Faction, type MapSize, type Team } from './config';
 import { Game, type Difficulty } from './game/game';
 import { Input } from './ui/input';
-import { loadEnemy, loadFaction, loadMapSize, Menus, type EnemyChoice } from './ui/menu';
+import { loadEnemy, loadFaction, loadMapSize, Menus, type Channel, type EnemyChoice, type ReplayEntry } from './ui/menu';
+import { ReplayViewer, type ReplayView } from './ui/replay-viewer';
 import { ViewShadows } from './render/shadows';
 import { CommandCard } from './ui/command-card';
 import { Hud } from './ui/hud';
@@ -14,6 +13,7 @@ import { Music } from './ui/music';
 import { Sounds } from './ui/sounds';
 import { Voice } from './ui/voice';
 import { Lockstep, TICK } from './net/lockstep';
+import { Match, parseReplay, replayFileName, type Replay } from './net/replay';
 import { NetClient } from './net/client';
 import { PROTOCOL_VERSION, type MatchInfo, type ServerMsg } from './net/protocol';
 import './style.css';
@@ -61,6 +61,23 @@ function readAutostart(): Autostart | null {
     return null;
   }
 }
+// Watching a replay: the page reloads into it (the map is built at load), with where to start and how.
+const REPLAY_KEY = 'strat.replay';
+const DIFFICULTY_NAMES: Record<Difficulty, string> = { normal: 'Normal', hard: 'Hard', brutal: 'Brutal' };
+/** The last game played on this browser, kept to watch again. */
+const LAST_REPLAY_KEY = 'strat.lastReplay';
+interface ReplayStart { replay: Replay; seek: number; speed: number; view: ReplayView }
+function readReplay(): ReplayStart | null {
+  try {
+    const raw = sessionStorage.getItem(REPLAY_KEY);
+    sessionStorage.removeItem(REPLAY_KEY);
+    if (!raw) return null;
+    const r = JSON.parse(raw) as ReplayStart;
+    return { ...r, replay: parseReplay(JSON.stringify(r.replay)) };
+  } catch {
+    return null;
+  }
+}
 function readMatch(): MatchInfo | null {
   try {
     const raw = sessionStorage.getItem(MATCH_KEY);
@@ -77,16 +94,18 @@ function urlSeed(): number | null {
   return v !== null && /^\d+$/.test(v) ? Number(v) : null;
 }
 const match = readMatch();
-const autostart = match ? null : readAutostart();
-const mapSize = match?.size ?? autostart?.size ?? loadMapSize();
+const watch = match ? null : readReplay();
+const watching = watch?.replay ?? null;
+const autostart = match || watch ? null : readAutostart();
+const mapSize = match?.size ?? watching?.size ?? autostart?.size ?? loadMapSize();
 // Every visit gets a new map; Restart keeps the seed so the same map comes back.
-const mapSeed = match?.seed ?? autostart?.seed ?? urlSeed() ?? randomSeed();
+const mapSeed = match?.seed ?? watching?.seed ?? autostart?.seed ?? urlSeed() ?? randomSeed();
 
 // The player's faction and the computer opponent's ('random' is rolled once per page, so Restart keeps it).
 const playerFaction = autostart?.faction ?? loadFaction();
 const rollEnemy = (c: EnemyChoice): Faction => (c === 'random' ? FACTION_LIST[Math.floor(Math.random() * FACTION_LIST.length)] : c);
 const enemyFaction = autostart?.enemy ?? rollEnemy(loadEnemy());
-const factions: Faction[] = match?.factions ?? [playerFaction, enemyFaction];
+const factions: Faction[] = match?.factions ?? watching?.factions ?? [playerFaction, enemyFaction];
 
 const rts = new RTSCamera(mapSize * TILE);
 const game = new Game(scene, rts.camera, mapSize, mapSeed, factions);
@@ -109,8 +128,10 @@ const audio = new AudioBank();
 const voice = new Voice(audio);
 const sounds = new Sounds(audio, rts.camera);
 void audio.fetch('effects/click');
-// The title screen's music (not when the page loads straight into a match).
-const music = match || autostart ? null : new Music('music/menu');
+// The title screen's music (not when the page loads straight into a match), and the match's.
+const menuMusic = new Music(['music/menu'], 0.5);
+const gameMusic = new Music(['music/game_1', 'music/game_2'], 0.3);
+if (!match && !autostart && !watch) menuMusic.play();
 // Buttons click: the menus' and the command card's.
 document.addEventListener('click', (e) => {
   if ((e.target as Element).closest?.('button, #command-card .card, #command-card .tab')) sounds.ui('click');
@@ -128,9 +149,13 @@ game.onSound = (s, x, z) => {
   if (game.effects.visibleAt(x, z)) sounds.at(s, x, z);
 };
 input.takeAlert = () => hud.takeAlert();
-// Created when the game starts: the computer opponent (offline) and the lockstep that runs the simulation.
-let ai: AI | null = null;
+// Created when the game starts: the match (its computer players and recording) and the lockstep that runs it.
+let session: Match | null = null;
 let lockstep: Lockstep | null = null;
+/** Watching a replay: its controls. */
+let viewer: ReplayViewer | null = null;
+/** The match just played, once it's over, as a replay. */
+let finished: Replay | null = null;
 if (import.meta.env.DEV) Object.assign(window, { game, input, rts, renderer, card });
 
 // Start looking at the home base, nudged toward the middle of the map where the action will come from.
@@ -191,7 +216,8 @@ function firstSteps(): string {
 }
 
 function beginPlay(): void {
-  music?.stop();
+  menuMusic.stop();
+  gameMusic.play();
   mode = 'playing';
   game.revealAll = revealParam;
   menus.hideTitle();
@@ -200,15 +226,15 @@ function beginPlay(): void {
   input.issue = (cmd) => lockstep?.issue(cmd);
   voice.load(game.teams[game.localTeam].faction);
   sounds.load();
-  if (import.meta.env.DEV) Object.assign(window, { ai, lockstep });
+  if (import.meta.env.DEV) Object.assign(window, { session, lockstep });
 }
 
 function startGame(difficulty: Difficulty): void {
   game.difficulty = difficulty;
-  ai = createAI(game, ENEMY, difficulty);
-  lockstep = new Lockstep(game, game.localTeam);
-  const opponent = ai;
-  lockstep.onTick = () => opponent.update(TICK);
+  const ai: (Difficulty | null)[] = [null, null];
+  ai[ENEMY] = difficulty;
+  session = new Match(game, ai, game.localTeam);
+  lockstep = session.lockstep;
   beginPlay();
   hud.showMessage(`${firstSteps()} Destroy the red base.`);
 }
@@ -240,7 +266,8 @@ function onMatchMessage(msg: ServerMsg): void {
   switch (msg.t) {
     case 'go': {
       if (lockstep) return;
-      lockstep = new Lockstep(game, game.localTeam, net);
+      session = new Match(game, [null, null], game.localTeam, net);
+      lockstep = session.lockstep;
       const ls = lockstep;
       ls.onDesync = (tick) => {
         console.error(`Desync with ${opponentName} at tick ${tick}`);
@@ -271,14 +298,110 @@ function showNetWait(text: string): void {
   netWaitEl.hidden = !text;
 }
 
+/** Watches a replay, from `seek` (in ticks). */
+function startReplay(w: ReplayStart): void {
+  const r = w.replay;
+  game.difficulty = r.ai.find((d) => d) ?? 'normal';
+  // A person's answer to a surrender offer is in the recording; nobody is asked again.
+  game.onSurrenderOffer = () => {};
+  session = Match.playback(game, r);
+  lockstep = session.lockstep;
+  viewer = new ReplayViewer(game, session, r, () => input.paused, (p) => (input.paused = p));
+  viewer.onRestart = (tick) => watchReplay(r, tick);
+  viewer.onView = () => {
+    input.select([]);
+    voice.load(game.teams[game.localTeam].faction);
+    // Watching one side: go to its base.
+    const base = viewer?.view === 'all' ? null : game.buildings.find((b) => b.team === game.localTeam && !b.dead);
+    if (base) rts.lookAt(base.x, base.z);
+  };
+  viewer.setSpeed(w.speed);
+  viewer.setView(w.view);
+  beginPlay();
+  // Watching only: whatever is clicked doesn't reach the game.
+  input.issue = () => {};
+  game.revealAll = w.view === 'all';
+  document.body.classList.add('replay');
+  if (w.seek > 0) viewer.seek(w.seek);
+  else hud.showMessage('Replay. P pauses; the panel sets the speed, the moment and whose eyes to watch through.');
+}
+
+/** Reloads the page into a replay (the map is built at load). */
+function watchReplay(replay: Replay, seek = 0): void {
+  try {
+    sessionStorage.setItem(REPLAY_KEY, JSON.stringify({ replay, seek, speed: viewer?.speed ?? 1, view: viewer?.view ?? 'all' } satisfies ReplayStart));
+  } catch {
+    menus.setReplayStatus('This browser blocks session storage, which replays need.');
+    return;
+  }
+  location.reload();
+}
+
+/** The replays on the Replays page: the last game played here, and the ones that ship with the game. */
+async function listReplays(): Promise<ReplayEntry[]> {
+  const list: ReplayEntry[] = [];
+  try {
+    const last = localStorage.getItem(LAST_REPLAY_KEY);
+    if (last) {
+      const r = parseReplay(last);
+      const vs = r.factions.map((f) => FACTIONS[f].name).join(' vs ');
+      list.push({ key: 'last', title: 'Your last game', detail: `${vs} · ${Math.floor((r.ticks * TICK) / 60)} min · ${r.date.slice(0, 10)}` });
+    }
+  } catch {
+    // Nothing kept, or storage unavailable.
+  }
+  try {
+    const shipped = (await (await fetch('replays/index.json')).json()) as { file: string; title: string; detail: string }[];
+    for (const e of shipped) list.push({ key: `replays/${e.file}`, title: e.title, detail: e.detail });
+  } catch {
+    // No list of replays shipped with this build.
+  }
+  return list;
+}
+
+async function loadReplay(from: { key: string } | { text: string }): Promise<void> {
+  try {
+    let text: string;
+    if ('text' in from) text = from.text;
+    else if (from.key === 'last') text = localStorage.getItem(LAST_REPLAY_KEY) ?? '';
+    else text = await (await fetch(from.key)).text();
+    watchReplay(parseReplay(text));
+  } catch {
+    menus.setReplayStatus("That isn't a replay this game can read.");
+  }
+}
+
+/** The match is over: keep it as a replay (the last game is kept on this browser to watch again). */
+function finishMatch(): void {
+  if (!session || viewer || finished) return;
+  const names = game.teams.map((_, i) => (online ? match!.names[i] : i === game.localTeam ? menus.playerName : `${DIFFICULTY_NAMES[game.difficulty]} AI`));
+  finished = session.replay(names);
+  try {
+    localStorage.setItem(LAST_REPLAY_KEY, JSON.stringify(finished));
+  } catch {
+    // Too big or storage unavailable: it can still be saved from the end screen.
+  }
+}
+
+function saveReplay(): void {
+  if (!finished) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(finished)], { type: 'application/json' }));
+  a.download = replayFileName(finished);
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+}
+
 /** Online games end early when the other player leaves or the connection drops: whoever's still here wins. */
 function endGame(note: string): void {
   showNetWait('');
   if (game.winner === null && mode !== 'connecting') game.winner = game.localTeam;
+  finishMatch();
   mode = 'ended';
   game.revealAll = true;
   menus.setPaused(false);
   menus.showEnd(game, input.actions / Math.max(1, game.time / 60), opponentName, note);
+  gameMusic.stop();
   if (game.winner === game.localTeam) sounds.ui('win');
   net?.close();
 }
@@ -345,17 +468,22 @@ const menus = new Menus({
     else reload({ difficulty, size, seed: urlSeed() ?? randomSeed(), faction, enemy: rollEnemy(enemy) });
   },
   onResume: () => setPaused(false),
-  onRestart: () => reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed, faction: playerFaction, enemy: enemyFaction }),
+  onRestart: () => (watching ? watchReplay(watching) : reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed, faction: playerFaction, enemy: enemyFaction })),
   onQuit: () => {
     net?.send({ t: 'leave' });
     reload(null);
   },
   onFps: (show) => (fpsEl.hidden = !show),
+  onVolume: (channel, level, done) => {
+    setVolume(channel, level);
+    if (done) previewVolume(channel);
+  },
   onSurrenderAnswer: (accept) => {
     if (mode !== 'offer') return;
     menus.setSurrenderOffer(false);
     mode = 'playing';
-    if (accept) game.acceptSurrender(ENEMY);
+    // A command like any other, so the replay has it.
+    if (accept) lockstep?.issue({ c: 'acceptSurrender' });
     else hud.showMessage('Surrender refused. The enemy fights on.');
   },
   onLobby: (open) => {
@@ -376,7 +504,27 @@ const menus = new Menus({
     lockstep?.issue({ c: 'surrender' });
     setPaused(false);
   },
+  onReplays: () => void listReplays().then((list) => menus.showReplays(list)),
+  onWatch: (from) => void loadReplay(from),
+  onSaveReplay: saveReplay,
 });
+for (const [channel, level] of Object.entries(menus.volumes)) setVolume(channel as Channel, level);
+
+function setVolume(channel: Channel, level: number): void {
+  if (channel === 'music') {
+    menuMusic.setLevel(level);
+    gameMusic.setLevel(level);
+  } else audio.setLevel(channel, level);
+}
+
+/** A sample of what a volume slider sets, once it's let go (the music is already playing). */
+function previewVolume(channel: Channel): void {
+  if (channel === 'effects') sounds.ui('single_shot');
+  else if (channel === 'units') {
+    if (mode === 'title') voice.setFaction(menus.faction);
+    voice.ack('select');
+  } else if (channel === 'announcer') voice.say('construction_complete');
+}
 // The game waits for the player's answer, like the pause menu.
 game.onSurrenderOffer = (team) => {
   if (team !== ENEMY || mode !== 'playing') return;
@@ -410,6 +558,7 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', () => net?.send({ t: 'leave' }));
 
 if (match) startOnline(match);
+else if (watch) startReplay(watch);
 else if (autostart) startGame(autostart.difficulty);
 else menus.showTitle();
 
@@ -442,16 +591,21 @@ function frame(now: number): void {
     let alpha = 1;
     // Online, the menu doesn't stop the game: the other player is still playing.
     const running = mode === 'playing' || (online && mode === 'paused');
-    if (running && lockstep) {
+    if (running && viewer) {
+      input.update(dt);
+      alpha = viewer.advance(Math.min(rawDt, 0.25));
+    } else if (running && lockstep) {
       input.update(dt);
       if (!input.paused) alpha = lockstep.advance(Math.min(rawDt, 0.25));
       if (online) showNetWait(lockstep.waiting > 0.5 ? `Waiting for ${opponentName}…` : '');
       if (game.winner !== null) {
         if (online) endGame(game.surrendered === null ? '' : game.surrendered === game.localTeam ? 'You surrendered' : `${opponentName} surrendered`);
         else {
+          finishMatch();
           mode = 'ended';
           game.revealAll = true;
           menus.showEnd(game, input.actions / Math.max(1, game.time / 60));
+          gameMusic.stop();
           if (game.winner === game.localTeam) sounds.ui('win');
         }
       }

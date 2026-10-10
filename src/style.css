@@ -742,6 +742,35 @@ body.in-menu #hud {
   margin: 0;
 }
 
+.volumes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 4px 0 8px;
+}
+
+.volume {
+  display: grid;
+  grid-template-columns: 6.5em 1fr 3em;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.volume input {
+  width: 100%;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.volume-value {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
 .fps-toggle {
   display: flex;
   align-items: center;
@@ -946,4 +975,149 @@ body.in-menu #hud {
   padding: 10px 18px;
   font-size: 15px;
   pointer-events: none;
+}
+
+/* ---- Replays: the controls take the command card's corner ---- */
+
+body.replay #command-card,
+body.replay #idle-btn {
+  display: none;
+}
+
+#replay-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: var(--corner);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(43, 38, 33, 0.94);
+  border: 2px solid var(--bar-edge);
+  border-left: none;
+  border-bottom: none;
+  font-size: 12px;
+  transform: scale(var(--ui));
+  transform-origin: left bottom;
+}
+
+.rp-head {
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-tag {
+  color: var(--accent);
+  letter-spacing: 0.2em;
+  margin-right: 4px;
+}
+
+.rp-vs {
+  color: var(--muted);
+}
+
+.rp-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.rp-timeline {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+
+.rp-time {
+  font: 11px ui-monospace, Menlo, monospace;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.rp-btn {
+  flex: 1;
+  padding: 3px 0;
+  background: #221d18;
+  color: var(--muted);
+  border: 1px solid var(--bar-edge);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.rp-play {
+  flex: 0 0 30px;
+  color: var(--text);
+}
+
+.rp-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.rp-btn.on {
+  background: var(--bar-panel);
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.rp-stats {
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.rp-stats td,
+.rp-stats th {
+  padding: 1px 4px;
+  text-align: right;
+}
+
+.rp-stats td:first-child {
+  text-align: left;
+  color: var(--muted);
+}
+
+.rp-stats th.t0 {
+  color: #6fa8ff;
+}
+
+.rp-stats th.t1 {
+  color: #ff6f5f;
+}
+
+.rp-note {
+  color: var(--accent);
+  font-size: 11px;
+}
+
+.rp-note:empty {
+  display: none;
+}
+
+#replay-bar.seeking .rp-stats {
+  opacity: 0.5;
+}
+
+.rp-who {
+  margin-top: -4px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rp-who:empty {
+  display: none;
+}
+
+/* Replays page: the title over its details. */
+.mbtn.stack {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }

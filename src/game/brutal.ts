@@ -5,6 +5,7 @@ import type { Difficulty, Game } from './game';
 import { hypot } from './hypot';
 import type { Sighting } from './intel';
 import { Micro } from './micro';
+import * as dm from './dmath';
 
 /**
  * Brutal: Hard's economy and army planning, plus what a strong player does with their hands. Its units kite and
@@ -577,7 +578,7 @@ export class BrutalAI extends AI {
         if (c.hp < op.hp0 - 30) {
           if (op.kind === 'para') {
             this.stats.paraBails++;
-            this.dropAt(op, { x: c.x + Math.cos(c.heading) * 3 * TILE, z: c.z + Math.sin(c.heading) * 3 * TILE });
+            this.dropAt(op, { x: c.x + dm.cos(c.heading) * 3 * TILE, z: c.z + dm.sin(c.heading) * 3 * TILE });
           } else this.goHome(op);
           break;
         }
@@ -719,8 +720,8 @@ export class BrutalAI extends AI {
       const taken = [...this.ops.values()].some((o) => o.victim?.id === h.id);
       const turn = taken ? 0.8 : 0;
       const l = hypot(dx, dz) || 1;
-      const ux = (dx * Math.cos(turn) - dz * Math.sin(turn)) / l;
-      const uz = (dx * Math.sin(turn) + dz * Math.cos(turn)) / l;
+      const ux = (dx * dm.cos(turn) - dz * dm.sin(turn)) / l;
+      const uz = (dx * dm.sin(turn) + dz * dm.cos(turn)) / l;
       const cell = m.nearestCell(m.cellOf(h.x + ux * standoff), m.cellOf(h.z + uz * standoff), (cx, cz) => m.canEnter(cx, cz, 'vehicle'), 5);
       if (!cell) continue;
       const drop = { x: m.center(cell.cx), z: m.center(cell.cz) };

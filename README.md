@@ -20,6 +20,7 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
   - A Carryall assigned to a harvester ferries it between field and refinery, and flies it home if it comes under attack.
 - **Anti-air.** Infantry and rocket launchers can shoot Carryalls down. Troopers aboard a downed Carryall bail out by parachute.
 - **Repair.** Repair Vehicles fix vehicles, aircraft and buildings for credits. Infantry heal on their own once out of combat.
+- **Replays.** Every game is kept to watch again (title screen, Replays), and the end screen saves it as a small file to share. Watch at up to 16× speed, jump to any moment, and see the battle through either side's fog of war with both sides' numbers alongside. Two Brutal-vs-Brutal games, Fremen beating Corrino, come with the game.
 - **Online 1v1.** Host a game on your own server (a Raspberry Pi is plenty) and play a friend on your network. See [Multiplayer](#multiplayer).
 - **A computer opponent** that plays under the same fog of war as you, with no map knowledge: it scouts to find your base and see what you're building, and plans only from what it has seen. It defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Hard it runs a bigger economy, attacks when it's stronger, raids your harvesters, repairs its vehicles after defending and pulls back from fights it's losing. On Brutal its units kite and focus fire, pull badly hurt units out of fights, and march in formation; it splits its attacks, raids more, and late in the game drops rocket launchers and paratroopers on your harvesters by Carryall, lifting them out again before you can catch them. End-of-game stats screen.
 
@@ -128,9 +129,14 @@ Click a button or press its key to build, train or research, and right-click it 
   - `npx tsx sim/vision-check.ts`: fog of war rules (cliffs, mesas, aircraft, attackers revealed).
   - `npx tsx sim/determinism.ts`: the simulation is deterministic (same seed and commands, same game), which online play depends on.
   - `npx tsx sim/netplay-check.ts`: an online match between two headless players through the real server, checked for desyncs, and replayed from its command log.
+  - `SAVE=replays npx tsx sim/replay-match.ts fremen,corrino brutal,brutal 8`: AI-vs-AI games saved as replay files (watch them from the title screen's Replays page, or with `npx tsx sim/replay-trace.ts <file>` minute by minute); `npx tsx sim/replay-check.ts <file>` checks a replay still plays back as recorded.
 - [docs/CODE_LAYOUT.md](docs/CODE_LAYOUT.md): where everything lives in `src/`.
 - [docs/PLAN.md](docs/PLAN.md): the roadmap and design decisions.
 
+## Credits
+
+Music by [Eitan Epstein Music](https://www.youtube.com/channel/UCsqtmlVpv6jxZzUo3n89J_w).
+
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) for the code. The music belongs to its composer (see [Credits](#credits)) and isn't covered by this license.

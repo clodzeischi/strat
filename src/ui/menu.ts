@@ -9,6 +9,8 @@ export interface MenuHandlers {
   onRestart: () => void;
   onQuit: () => void;
   onFps: (show: boolean) => void;
+  /** A volume slider moved (`done` once it's let go). */
+  onVolume: (channel: Channel, level: number, done: boolean) => void;
   /** The player's answer to the enemy's surrender offer. */
   onSurrenderAnswer: (accept: boolean) => void;
   /** Multiplayer page opened (connect and list games) or closed. */
@@ -18,9 +20,23 @@ export interface MenuHandlers {
   onCancelHost: () => void;
   /** Online: give up the match. */
   onSurrender: () => void;
+  /** Replays page opened: list what there is to watch. */
+  onReplays: () => void;
+  /** Watch a replay: one from the list (by key), or a file the player picked (its text). */
+  onWatch: (from: { key: string } | { text: string }) => void;
+  /** End screen: download the match just played. */
+  onSaveReplay: () => void;
+}
+
+/** A replay on the Replays page. */
+export interface ReplayEntry {
+  key: string;
+  title: string;
+  detail: string;
 }
 
 const FPS_KEY = 'strat.showFps';
+const VOLUME_KEY = 'strat.volume';
 const SIZE_KEY = 'strat.mapSize';
 const NAME_KEY = 'strat.name';
 const FACTION_KEY = 'strat.faction';
@@ -114,6 +130,39 @@ function saveFps(v: boolean): void {
   }
 }
 
+/** What the player sets the volume of. */
+export type Channel = 'effects' | 'units' | 'announcer' | 'music';
+const CHANNELS: { key: Channel; name: string }[] = [
+  { key: 'effects', name: 'Effects' },
+  { key: 'units', name: 'Units' },
+  { key: 'announcer', name: 'Announcer' },
+  { key: 'music', name: 'Music' },
+];
+export type Volumes = Record<Channel, number>;
+
+/** The volumes set last time, 0 to 1 (all full at first). */
+export function loadVolumes(): Volumes {
+  const v: Volumes = { effects: 1, units: 1, announcer: 1, music: 1 };
+  try {
+    const saved = JSON.parse(localStorage.getItem(VOLUME_KEY) ?? '{}') as Partial<Volumes>;
+    for (const { key } of CHANNELS) {
+      const x = saved[key];
+      if (typeof x === 'number' && x >= 0 && x <= 1) v[key] = x;
+    }
+  } catch {
+    // Storage unavailable or garbled: full volume.
+  }
+  return v;
+}
+
+function saveVolumes(v: Volumes): void {
+  try {
+    localStorage.setItem(VOLUME_KEY, JSON.stringify(v));
+  } catch {
+    // Storage unavailable: the settings just won't persist.
+  }
+}
+
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = Math.floor(seconds % 60);
@@ -131,10 +180,12 @@ export class Menus {
   private nameInput = document.getElementById('mp-name') as HTMLInputElement;
   private rooms = document.getElementById('mp-rooms')!;
   private status = document.getElementById('mp-status')!;
+  private replayFile = document.getElementById('replay-file') as HTMLInputElement;
   showFps = loadFps();
   mapSize = loadMapSize();
   faction = loadFaction();
   enemy = loadEnemy();
+  volumes = loadVolumes();
 
   constructor(private h: MenuHandlers) {
     this.showMapSize();
@@ -145,6 +196,7 @@ export class Menus {
       box.checked = this.showFps;
       box.addEventListener('change', () => this.setFps(box.checked));
     }
+    for (const el of document.querySelectorAll<HTMLElement>('.volumes')) this.buildVolumes(el);
 
     this.title.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('button');
@@ -169,11 +221,23 @@ export class Menus {
         this.h.onLobby(true);
       } else if (btn.dataset.action === 'host') this.h.onHost(this.playerName, this.mapSize, this.faction);
       else if (btn.dataset.action === 'cancel-host') this.h.onCancelHost();
+      else if (btn.dataset.watch) this.h.onWatch({ key: btn.dataset.watch });
+      else if (btn.dataset.action === 'replays') {
+        this.page('replays');
+        this.setReplayStatus('');
+        this.h.onReplays();
+      } else if (btn.dataset.action === 'open-replay') this.replayFile.click();
+      else if (btn.dataset.action === 'settings') this.page('settings');
       else if (btn.dataset.action === 'controls') this.page('controls');
       else if (btn.dataset.action === 'back') {
         if (this.currentPage === 'multiplayer') this.h.onLobby(false);
         this.page('main');
       }
+    });
+    this.replayFile.addEventListener('change', () => {
+      const file = this.replayFile.files?.[0];
+      this.replayFile.value = '';
+      if (file) void file.text().then((text) => this.h.onWatch({ text }));
     });
     this.surrender.addEventListener('click', (e) => {
       const action = (e.target as HTMLElement).closest('button')?.dataset.action;
@@ -186,8 +250,39 @@ export class Menus {
         else if (action === 'surrender') this.h.onSurrender();
         else if (action === 'restart') this.h.onRestart();
         else if (action === 'quit') this.h.onQuit();
+        else if (action === 'save-replay') this.h.onSaveReplay();
       });
     }
+  }
+
+  /** The volume sliders (on the title's Settings page and in the pause menu, kept in step). */
+  private buildVolumes(el: HTMLElement): void {
+    for (const { key, name } of CHANNELS) {
+      const row = document.createElement('label');
+      row.className = 'volume';
+      row.innerHTML = `<span class="volume-name">${name}</span><input type="range" min="0" max="100" step="5" /><span class="volume-value"></span>`;
+      const slider = row.querySelector('input')!;
+      slider.dataset.channel = key;
+      slider.value = String(Math.round(this.volumes[key] * 100));
+      row.querySelector('.volume-value')!.textContent = `${slider.value}%`;
+      slider.addEventListener('input', () => this.setVolume(key, Number(slider.value) / 100, false));
+      slider.addEventListener('change', () => {
+        this.setVolume(key, Number(slider.value) / 100, true);
+        // Let go of it, so the arrow keys pan the map again rather than move it.
+        slider.blur();
+      });
+      el.appendChild(row);
+    }
+  }
+
+  private setVolume(channel: Channel, level: number, done: boolean): void {
+    this.volumes[channel] = level;
+    for (const s of document.querySelectorAll<HTMLInputElement>(`.volumes input[data-channel="${channel}"]`)) {
+      s.value = String(Math.round(level * 100));
+      s.parentElement!.querySelector('.volume-value')!.textContent = `${s.value}%`;
+    }
+    if (done) saveVolumes(this.volumes);
+    this.h.onVolume(channel, level, done);
   }
 
   private setFps(v: boolean): void {
@@ -255,12 +350,24 @@ export class Menus {
     this.page('hosting');
   }
 
+  /** Replays page: the replays to watch. */
+  showReplays(list: ReplayEntry[]): void {
+    document.getElementById('replay-list')!.innerHTML = list.length
+      ? list.map((r) => `<button class="mbtn diff stack" data-watch="${escapeHtml(r.key)}">${escapeHtml(r.title)} <span>${escapeHtml(r.detail)}</span></button>`).join('')
+      : '<p class="note">No replays yet. Finish a game and it shows up here.</p>';
+  }
+
+  /** A line under the Replays page (a file that couldn't be read). */
+  setReplayStatus(text: string): void {
+    document.getElementById('replay-status')!.textContent = text;
+  }
+
   setSurrenderOffer(open: boolean): void {
     this.surrender.hidden = !open;
   }
 
   /** `opponent`: the other player's name online, or null against the computer. */
-  showEnd(game: Game, apm: number, opponent: string | null = null, note = ''): void {
+  showEnd(game: Game, apm: number, opponent: string | null = null, note = '', canSave = true): void {
     const PLAYER = game.localTeam;
     const ENEMY = (1 - PLAYER) as Team;
     const won = game.winner === PLAYER;
@@ -271,6 +378,7 @@ export class Menus {
     const vs = `${FACTIONS[game.teams[PLAYER].faction].name} vs ${FACTIONS[game.teams[ENEMY].faction].name}`;
     const against = `${opponent === null ? `${DIFFICULTY_NAMES[game.difficulty]} AI` : `Online vs ${opponent}`}  ·  ${vs}`;
     this.end.querySelector<HTMLElement>('[data-action="restart"]')!.hidden = opponent !== null;
+    this.end.querySelector<HTMLElement>('[data-action="save-replay"]')!.hidden = !canSave;
     this.end.querySelector('.sub')!.textContent = `${how}${formatTime(game.time)}  ·  ${against}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map  ·  seed ${game.map.seed}`;
 
     const you = game.teams[PLAYER];

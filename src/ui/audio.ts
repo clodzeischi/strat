@@ -1,16 +1,18 @@
-/** Mix levels of the two buses. */
-const BUS_VOLUME = { voice: 0.9, sfx: 0.55 };
+/** Mix levels of the buses at full volume (the player's settings scale them). */
+const BUS_VOLUME = { effects: 0.55, units: 0.9, announcer: 0.9 };
 
 export type Bus = keyof typeof BUS_VOLUME;
+const BUSES = Object.keys(BUS_VOLUME) as Bus[];
 
 /**
  * The audio files and the mixer: files under public/audio are fetched once and decoded the first time they play (so
- * only the sounds a match uses take up memory), and play on one of two buses, voice or sound effects. The browser
- * only lets audio start once the player has clicked or pressed a key, so until then nothing plays.
+ * only the sounds a match uses take up memory), and play on a bus (effects, units, announcer) whose volume the player
+ * sets. The browser only lets audio start once the player has clicked or pressed a key, so until then nothing plays.
  */
 export class AudioBank {
   private ctx: AudioContext | null = null;
   private buses: Record<Bus, GainNode> | null = null;
+  private levels: Record<Bus, number> = { effects: 1, units: 1, announcer: 1 };
   private bytes = new Map<string, Promise<ArrayBuffer | null>>();
   private decoded = new Map<string, Promise<AudioBuffer | null>>();
 
@@ -18,19 +20,25 @@ export class AudioBank {
     const wake = () => {
       if (!this.ctx) {
         const ctx = new AudioContext();
-        const bus = (v: number) => {
+        const bus = (b: Bus) => {
           const g = ctx.createGain();
-          g.gain.value = v;
+          g.gain.value = BUS_VOLUME[b] * this.levels[b];
           g.connect(ctx.destination);
           return g;
         };
         this.ctx = ctx;
-        this.buses = { voice: bus(BUS_VOLUME.voice), sfx: bus(BUS_VOLUME.sfx) };
+        this.buses = Object.fromEntries(BUSES.map((b) => [b, bus(b)])) as Record<Bus, GainNode>;
       }
       void this.ctx.resume();
     };
     window.addEventListener('pointerdown', wake, true);
     window.addEventListener('keydown', wake, true);
+  }
+
+  /** Sets a bus's volume, 0 (silent) to 1 (full). */
+  setLevel(bus: Bus, level: number): void {
+    this.levels[bus] = level;
+    if (this.buses) this.buses[bus].gain.value = BUS_VOLUME[bus] * level;
   }
 
   /** Whether sounds can play now. */

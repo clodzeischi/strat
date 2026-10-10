@@ -32,6 +32,8 @@ export class Lockstep {
   waiting = 0;
   /** Called before each step, with the game at the tick about to run (computer players think here). */
   onTick: () => void = () => {};
+  /** Called after each step, with the game at the tick just run. */
+  onStepped: () => void = () => {};
   /** Called once with the first tick at which the two machines' games differ. */
   onDesync: (tick: number) => void = () => {};
   readonly delay: number;
@@ -98,6 +100,7 @@ export class Lockstep {
     }
     this.onTick();
     this.game.update(TICK);
+    this.onStepped();
 
     if (this.net && this.game.ticks % HASH_EVERY === 0) {
       const hash = this.game.hash();

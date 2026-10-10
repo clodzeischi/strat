@@ -1,37 +1,45 @@
-const VOLUME = 0.5;
-/** Seconds the music takes to fade out when a match begins. */
+/** Seconds music takes to fade out when it stops. */
 const FADE = 1.5;
 
 /**
- * The title screen's music: streamed rather than decoded whole (it's long), looping. Browsers may not allow it to
- * start until the player clicks or presses a key, so it tries right away and again on the first one. Once the match
- * begins it fades out for good.
+ * Music: tracks streamed rather than decoded whole (they're long), one after another from a random first one, round
+ * and round (one track just loops). Browsers may not allow it to start until the player clicks or presses a key, so
+ * it tries right away and again on every one until it's playing.
  */
 export class Music {
-  private el: HTMLAudioElement;
-  private over = false;
+  private el: HTMLAudioElement | null = null;
+  private track = 0;
+  private wanted = false;
+  private level = 1;
 
-  constructor(name: string) {
-    this.el = new Audio(`${import.meta.env.BASE_URL}audio/${name}.mp3`);
-    this.el.loop = true;
-    this.el.volume = VOLUME;
-    this.el.preload = 'none';
-    const start = () => {
-      window.removeEventListener('pointerdown', start, true);
-      window.removeEventListener('keydown', start, true);
-      this.start();
+  /** `volume` is its level at full volume (the player's setting scales it). */
+  constructor(private tracks: string[], private volume: number) {
+    const retry = () => {
+      if (this.wanted && this.el?.paused) this.el.play().catch(() => {});
     };
-    window.addEventListener('pointerdown', start, true);
-    window.addEventListener('keydown', start, true);
-    this.start();
+    window.addEventListener('pointerdown', retry, true);
+    window.addEventListener('keydown', retry, true);
   }
 
-  /** Fades out and stops for good. */
+  /** Sets the volume, 0 (silent) to 1 (full). */
+  setLevel(level: number): void {
+    this.level = level;
+    if (this.el && this.wanted) this.el.volume = this.volume * level;
+  }
+
+  play(): void {
+    if (this.wanted) return;
+    this.wanted = true;
+    this.track = Math.floor(Math.random() * this.tracks.length);
+    this.load();
+  }
+
+  /** Fades out and stops. */
   stop(): void {
-    if (this.over) return;
-    this.over = true;
+    if (!this.wanted) return;
+    this.wanted = false;
     const el = this.el;
-    if (el.paused) return;
+    if (!el || el.paused) return;
     const from = el.volume;
     const t0 = performance.now();
     const step = () => {
@@ -43,10 +51,18 @@ export class Music {
     requestAnimationFrame(step);
   }
 
-  private start(): void {
-    if (this.over || !this.el.paused) return;
-    this.el.play().catch(() => {
-      // Not allowed yet: the first click or key tries again.
+  private load(): void {
+    const el = new Audio(`${import.meta.env.BASE_URL}audio/${this.tracks[this.track]}.mp3`);
+    el.volume = this.volume * this.level;
+    el.loop = this.tracks.length === 1;
+    el.addEventListener('ended', () => {
+      if (!this.wanted || el !== this.el) return;
+      this.track = (this.track + 1) % this.tracks.length;
+      this.load();
+    });
+    this.el = el;
+    el.play().catch(() => {
+      // Not allowed yet: the next click or key tries again.
     });
   }
 }

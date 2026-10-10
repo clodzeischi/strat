@@ -73,7 +73,7 @@ export class Sounds {
     this.playing.set(sound, n + 1);
     this.started.set(sound, now);
     this.all++;
-    void this.bank.play(`effects/${sound}`, 'sfx', mix.volume * level, pan, rate).then(() => {
+    void this.bank.play(`effects/${sound}`, 'effects', mix.volume * level, pan, rate).then(() => {
       this.playing.set(sound, (this.playing.get(sound) ?? 1) - 1);
       this.all--;
     });
