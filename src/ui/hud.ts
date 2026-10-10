@@ -98,15 +98,16 @@ export class Hud {
 
   /**
    * An alert with a place: the message, and a ping on the minimap. A fight the army is in only counts when it's off
-   * screen (the player is already looking at one on it).
+   * screen (the player is already looking at one on it). Returns whether it showed.
    */
-  alert(text: string, x: number, z: number, kind: PingKind): void {
-    if (kind === 'army' && this.onScreen(x, z)) return;
+  alert(text: string, x: number, z: number, kind: PingKind): boolean {
+    if (kind === 'army' && this.onScreen(x, z)) return false;
     this.showMessage(text);
     const at = performance.now();
     this.pings.push({ x, z, kind, at });
     if (kind !== 'info') this.lastAlert = { x, z, at };
     this.minimapTimer = 0;
+    return true;
   }
 
   /** Where Space should take the camera: the latest alert from the last few seconds (once), else nowhere. */

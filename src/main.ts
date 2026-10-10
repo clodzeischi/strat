@@ -9,6 +9,10 @@ import { loadEnemy, loadFaction, loadMapSize, Menus, type EnemyChoice } from './
 import { ViewShadows } from './render/shadows';
 import { CommandCard } from './ui/command-card';
 import { Hud } from './ui/hud';
+import { AudioBank } from './ui/audio';
+import { Music } from './ui/music';
+import { Sounds } from './ui/sounds';
+import { Voice } from './ui/voice';
 import { Lockstep, TICK } from './net/lockstep';
 import { NetClient } from './net/client';
 import { PROTOCOL_VERSION, type MatchInfo, type ServerMsg } from './net/protocol';
@@ -101,8 +105,28 @@ const card = new CommandCard(game, input, document.getElementById('command-card'
 hud.onClick = (x, z, button) => input.minimapClick(x, z, button);
 hud.onIdle = (list, all) => input.selectIdle(list, all);
 input.idleWorkers = () => hud.idleWorkers();
-game.onMessage = (t) => hud.showMessage(t);
-game.onAlert = (t, x, z, kind) => hud.alert(t, x, z, kind);
+const audio = new AudioBank();
+const voice = new Voice(audio);
+const sounds = new Sounds(audio, rts.camera);
+void audio.fetch('effects/click');
+// The title screen's music (not when the page loads straight into a match).
+const music = match || autostart ? null : new Music('music/menu');
+// Buttons click: the menus' and the command card's.
+document.addEventListener('click', (e) => {
+  if ((e.target as Element).closest?.('button, #command-card .card, #command-card .tab')) sounds.ui('click');
+}, true);
+game.onMessage = (t, line) => {
+  hud.showMessage(t);
+  if (line) voice.say(line);
+};
+game.onAlert = (t, x, z, kind, line) => {
+  if (hud.alert(t, x, z, kind) && line) voice.say(line);
+};
+input.onAck = (kind) => voice.ack(kind);
+// Shots and blasts are heard where the player can see them.
+game.onSound = (s, x, z) => {
+  if (game.effects.visibleAt(x, z)) sounds.at(s, x, z);
+};
 input.takeAlert = () => hud.takeAlert();
 // Created when the game starts: the computer opponent (offline) and the lockstep that runs the simulation.
 let ai: AI | null = null;
@@ -167,12 +191,15 @@ function firstSteps(): string {
 }
 
 function beginPlay(): void {
+  music?.stop();
   mode = 'playing';
   game.revealAll = revealParam;
   menus.hideTitle();
   document.body.classList.remove('in-menu');
   scene.fog = gameFog;
   input.issue = (cmd) => lockstep?.issue(cmd);
+  voice.load(game.teams[game.localTeam].faction);
+  sounds.load();
   if (import.meta.env.DEV) Object.assign(window, { ai, lockstep });
 }
 
@@ -252,6 +279,7 @@ function endGame(note: string): void {
   game.revealAll = true;
   menus.setPaused(false);
   menus.showEnd(game, input.actions / Math.max(1, game.time / 60), opponentName, note);
+  if (game.winner === game.localTeam) sounds.ui('win');
   net?.close();
 }
 
@@ -424,6 +452,7 @@ function frame(now: number): void {
           mode = 'ended';
           game.revealAll = true;
           menus.showEnd(game, input.actions / Math.max(1, game.time / 60));
+          if (game.winner === game.localTeam) sounds.ui('win');
         }
       }
     } else if (mode === 'ended') {

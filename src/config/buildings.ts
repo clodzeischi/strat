@@ -53,7 +53,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   },
   turret: {
     name: 'Auto Turret', short: 'Turret', cost: 350, buildTime: 9, hp: 700, size: 1, requires: ['barracks'],
-    weapon: { range: 12, minRange: 0, damage: 12, bonus: { mechanical: 6, structure: -6 }, cooldown: 0.9, projectile: 'bullet', speed: 0, splash: 0 },
+    weapon: { range: 12, minRange: 0, damage: 12, bonus: { mechanical: 6, structure: -6 }, cooldown: 0.9, projectile: 'bullet', speed: 0, splash: 0, sound: 'auto_laser' },
     desc: 'Small automatic gun emplacement. Shoots ground targets in range.',
   },
 

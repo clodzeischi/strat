@@ -268,9 +268,9 @@ export class CommandCard {
           const b = this.ts.building;
           if (b) {
             if (b.type === t && b.ready) this.input.beginPlacement(t);
-            else if (b.type !== t) g.onMessage(`Already building ${BUILDINGS[b.type].name}.`);
+            else if (b.type !== t) g.onMessage(`Already building ${BUILDINGS[b.type].name}.`, 'already_building');
           } else if (g.canBuild(g.localTeam, t)) {
-            if (this.ts.credits < d.cost) g.onMessage('Insufficient funds.');
+            if (this.ts.credits < d.cost) g.onMessage('Insufficient funds.', 'insufficient_funds');
             else this.input.issue({ c: 'build', type: t });
           }
         },
@@ -381,7 +381,7 @@ export class CommandCard {
         use: () => {
           const { t, r, done, g } = state();
           if (done) return;
-          if (r && r.type !== t) g.onMessage(`Already researching ${UPGRADES[r.type].name}.`);
+          if (r && r.type !== t) g.onMessage(`Already researching ${UPGRADES[r.type].name}.`, 'already_researching');
           else if (!r) this.input.issue({ c: 'research', type: t });
         },
         cancel: () => {

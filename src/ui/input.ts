@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { RTSCamera } from '../render/camera';
-import { BUILDINGS, FACTIONS, PRODUCERS, THUMPER, TILE, type BuildingType, type Producer, type Team, type UnitType } from '../config';
+import { BUILDINGS, FACTIONS, PRODUCERS, THUMPER, TILE, type AckKind, type BuildingType, type Producer, type Team, type UnitType } from '../config';
 import { Building, BUILDING_TURN, Carryall, diamondScale, repairable, Unit, type Entity } from '../entities';
 import type { Command } from '../game/commands';
 import type { Game } from '../game/game';
@@ -69,6 +69,8 @@ export class Input {
   idleWorkers: () => Entity[] = () => [];
   /** Called whenever the selection changes (the command card follows it). */
   onSelect: () => void = () => {};
+  /** Called when the player's own units are selected or given an order (they answer it). */
+  onAck: (kind: AckKind) => void = () => {};
 
   private keys = new Set<string>();
   private mouse = { x: 0, y: 0, inside: false };
@@ -262,6 +264,7 @@ export class Input {
   private select(list: Entity[]): void {
     this.primary = null;
     this.setSelection(list);
+    if (this.ownUnits().length) this.onAck('select');
   }
 
   /** The idle worker button: selects the next idle one and looks at it, or (`all`) selects every one. */
@@ -361,7 +364,7 @@ export class Input {
     if (!this.hasThumpers()) return;
     const why = this.game.thumpBlocked(this.team);
     if (why) {
-      this.game.onMessage(why);
+      this.game.onMessage(why, this.game.thumpVoice(why));
       return;
     }
     this.disarm();
@@ -600,7 +603,7 @@ export class Input {
         const g = this.game;
         const sand = FACTIONS[g.teams[this.team].faction].buildOnSand;
         g.onMessage(sand ? 'Cannot build there. Structures go on level rock or sand (not spice), near your other structures.'
-            : 'Cannot build there. Structures go on rock, near your base.');
+            : 'Cannot build there. Structures go on rock, near your base.', 'cannot_build_there');
       }
       return;
     }
@@ -619,15 +622,20 @@ export class Input {
       this.thumpMode = false;
       const g = this.groundPoint(p.x, p.y);
       const planters = this.ownUnits().filter((u) => u.def.thumper);
-      if (g && planters.length) this.issue({ c: 'thump', units: planters.map((u) => u.id), x: g.x, z: g.z });
+      if (g && planters.length) {
+        this.issue({ c: 'thump', units: planters.map((u) => u.id), x: g.x, z: g.z });
+        this.onAck('move');
+      }
       return;
     }
     if (this.lockMode) {
       this.lockMode = false;
       const t = this.pick(p.x, p.y);
       const mlrs = this.lockReady();
-      if (t && t.team !== this.team && mlrs.length) this.issue({ c: 'lock', units: mlrs.map((u) => u.id), target: t.id });
-      else this.game.onMessage('Lock On needs an enemy you can see.');
+      if (t && t.team !== this.team && mlrs.length) {
+        this.issue({ c: 'lock', units: mlrs.map((u) => u.id), target: t.id });
+        this.onAck('attack');
+      } else this.game.onMessage('Lock On needs an enemy you can see.', 'lockon_needs_visible_target');
       return;
     }
     if (this.rallyMode || this.rallyAllMode) {
@@ -652,8 +660,10 @@ export class Input {
       const s = this.toScreen(u.x, u.y + 0.5, u.z);
       return s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1;
     });
-    if (add) this.setSelection([...new Set([...this.ownUnits(), ...hits])]);
-    else this.select(hits);
+    if (add) {
+      this.setSelection([...new Set([...this.ownUnits(), ...hits])]);
+      if (hits.length) this.onAck('select');
+    } else this.select(hits);
   }
 
   private clickSelect(x: number, y: number, add: boolean): void {
@@ -677,6 +687,7 @@ export class Input {
     if (add && e instanceof Unit && e.team === this.team) {
       const own = this.ownUnits();
       this.setSelection(own.includes(e) ? own.filter((u) => u !== e) : [...own, e]);
+      if (!own.includes(e)) this.onAck('select');
     } else {
       this.select([e]);
     }
@@ -699,6 +710,7 @@ export class Input {
       return;
     }
     this.issue({ c: 'go', units: units.map((u) => u.id), x: point.x, z: point.z, target: target?.id ?? null, attack: attackMove, queue: this.queueing });
+    this.onAck(attackMove || (target && target.team !== team) ? 'attack' : 'move');
     if (target && target.team !== team) g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xff5040);
     else if (target && target.hp < target.maxHp && repairable(target) && units.some((u) => u.def.repair)) {
       g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xffd27a);
@@ -717,6 +729,7 @@ export class Input {
     const loaded = this.ownCarryalls().filter((c) => c.load.length);
     if (!loaded.length) return;
     this.issue({ c: 'drop', units: loaded.map((c) => c.id), x: point.x, z: point.z });
+    this.onAck('move');
     this.game.effects.marker(point, 0xffb040);
   }
 
@@ -766,7 +779,7 @@ export class Input {
       if (e.shiftKey) {
         const idle = this.idleWorkers();
         if (idle.length) this.selectIdle(idle, true);
-        else g.onMessage('No idle gatherers.');
+        else g.onMessage('No idle gatherers.', 'no_idle_gatherers');
       } else this.selectArmy();
       return;
     }

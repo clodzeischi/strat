@@ -4,7 +4,7 @@ import {
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS,
   TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
-  type BuildingType, type ProjectileKind, type Team,
+  type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
   type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
 import { Effects } from '../render/effects/effects';
@@ -146,6 +146,9 @@ export interface Sandworm {
 const MINE_ARM = 1;
 const mineGeo = new THREE.CylinderGeometry(0.4, 0.45, 0.16, 8);
 const DEPLOY_CODE = { mobile: 0, deploying: 1, deployed: 2, packing: 3 } as const;
+/** Reasons a Thumper can't be planted that the announcer has a line for. */
+const WORM_ABOUT = 'The worm you called is still about.';
+const NO_FUNDS = 'Insufficient funds.';
 
 const shellGeo = new THREE.IcosahedronGeometry(0.12, 0);
 const rocketGeo = new THREE.ConeGeometry(0.12, 0.6, 5);
@@ -173,9 +176,11 @@ export class Game {
   onSurrenderOffer: (team: Team) => void = () => {};
   difficulty: Difficulty = 'normal';
   /** Called with notifications for the local player. */
-  onMessage: (text: string) => void = () => {};
+  onMessage: (text: string, voice?: Announcement | null) => void = () => {};
   /** Called with notifications for the local player that have a place on the map (the HUD pings the minimap). */
-  onAlert: (text: string, x: number, z: number, kind: PingKind) => void = (text) => this.onMessage(text);
+  onAlert: (text: string, x: number, z: number, kind: PingKind, voice?: Announcement | null) => void = (text, _x, _z, _kind, voice) => this.onMessage(text, voice);
+  /** Called with a sound effect and where on the map it happens (shots, blasts), whoever's it is. */
+  onSound: (sound: Sound, x: number, z: number) => void = () => {};
   /** The team this screen plays (presentation only: whose messages and alerts show). */
   localTeam: Team = PLAYER;
   /** Drawing only: show the whole map, fog or not (single player with ?reveal, and after the game). */
@@ -628,7 +633,7 @@ export class Game {
       this.scene.remove(b.root);
       this.clearFootprint(b);
       this.effects.puff(new THREE.Vector3(b.x, b.y + 0.8, b.z), 0xd8c49a);
-      this.notifyTeam(b.team, `${b.name} salvaged.`);
+      this.notifyTeam(b.team, `${b.name} salvaged.`, null);
     }
   }
 
@@ -697,16 +702,19 @@ export class Game {
       if (ts.team === carrier.team || this.time - this.lastDropAlert < 12) continue;
       if (this.buildings.some((b) => b.team === ts.team && !b.dead && hypot(b.x - u.x, b.z - u.z) < 22 * TILE)) {
         if (ts.team === this.localTeam) this.lastDropAlert = this.time;
-        this.notifyTeam(ts.team, 'Enemy airdrop detected!', u);
+        this.notifyTeam(ts.team, 'Enemy airdrop detected!', 'enemy_airdrop_detected', u);
       }
     }
   }
 
-  /** Shows a message, if the team is the one playing on this screen; with a place, the minimap pings it too. */
-  notifyTeam(team: Team, text: string, at?: { x: number; z: number }, kind: PingKind = 'attack'): void {
+  /**
+   * Shows a message, if the team is the one playing on this screen, and the announcer says its line (if it has one);
+   * with a place, the minimap pings it too.
+   */
+  notifyTeam(team: Team, text: string, voice: Announcement | null, at?: { x: number; z: number }, kind: PingKind = 'attack'): void {
     if (team !== this.localTeam) return;
-    if (at) this.onAlert(text, at.x, at.z, kind);
-    else this.onMessage(text);
+    if (at) this.onAlert(text, at.x, at.z, kind, voice);
+    else this.onMessage(text, voice);
   }
 
   /**
@@ -717,20 +725,22 @@ export class Game {
     if (target.team !== this.localTeam) return;
     let key: string;
     let text: string;
+    let voice: Announcement;
     let kind: PingKind = 'attack';
     if (target instanceof Building) {
       if (target.type === 'thumper') return;
-      [key, text] = target.def.extract ? ['camp', 'Spice Camp under attack!'] : ['base', 'Our base is under attack!'];
+      [key, text, voice] = target.def.extract ? ['camp', 'Spice Camp under attack!', 'spice_camp_under_attack']
+        : ['base', 'Our base is under attack!', 'our_base_under_attack'];
     } else {
       const u = target as Unit;
-      if (u.type === 'harvester') [key, text] = ['harvester', 'Harvester under attack!'];
-      else if (u.def.camp) [key, text] = ['harvester', 'Spice Crew under attack!'];
-      else [key, text, kind] = ['army', 'Our forces are under attack!', 'army'];
+      if (u.type === 'harvester') [key, text, voice] = ['harvester', 'Harvester under attack!', 'harvester_under_attack'];
+      else if (u.def.camp) [key, text, voice] = ['harvester', 'Spice Crew under attack!', 'spice_crew_under_attack'];
+      else [key, text, voice, kind] = ['army', 'Our forces are under attack!', 'our_forces_are_under_attack', 'army'];
     }
     const last = this.lastAlerts.get(key);
     if (last && this.time - last.t < 15 && hypot(last.x - target.x, last.z - target.z) < 20 * TILE) return;
     this.lastAlerts.set(key, { t: this.time, x: target.x, z: target.z });
-    this.onAlert(text, target.x, target.z, kind);
+    this.onAlert(text, target.x, target.z, kind, voice);
   }
 
   startBuilding(team: Team, type: BuildingType): boolean {
@@ -738,7 +748,7 @@ export class Game {
     if (ts.building || !this.canBuild(team, type)) return false;
     const cost = BUILDINGS[type].cost;
     if (ts.credits < cost) {
-      this.notifyTeam(team, 'Insufficient funds.');
+      this.notifyTeam(team, 'Insufficient funds.', 'insufficient_funds');
       return false;
     }
     this.spend(ts, cost);
@@ -768,12 +778,12 @@ export class Game {
     const queue = ts.queues[this.unitDef(team, type).producer];
     if (!this.canTrain(team, type)) return false;
     if (queue.length >= QUEUE_MAX) {
-      this.notifyTeam(team, 'Production queue full.');
+      this.notifyTeam(team, 'Production queue full.', 'production_queue_full');
       return false;
     }
     const cost = UNITS[type].cost;
     if (ts.credits < cost) {
-      this.notifyTeam(team, 'Insufficient funds.');
+      this.notifyTeam(team, 'Insufficient funds.', 'insufficient_funds');
       return false;
     }
     this.spend(ts, cost);
@@ -797,7 +807,7 @@ export class Game {
     if (ts.research || !this.canResearch(team, type)) return false;
     const cost = UPGRADES[type].cost;
     if (ts.credits < cost) {
-      this.notifyTeam(team, 'Insufficient funds.');
+      this.notifyTeam(team, 'Insufficient funds.', 'insufficient_funds');
       return false;
     }
     this.spend(ts, cost);
@@ -811,7 +821,7 @@ export class Game {
     if (!building || !this.canLevelUp(team, type)) return false;
     const cost = BUILDINGS[type].levelUp!.cost;
     if (ts.credits < cost) {
-      this.notifyTeam(team, 'Insufficient funds.');
+      this.notifyTeam(team, 'Insufficient funds.', 'insufficient_funds');
       return false;
     }
     this.spend(ts, cost);
@@ -840,7 +850,7 @@ export class Game {
       if (b.progress >= 1) {
         b.progress = 1;
         b.ready = true;
-        this.notifyTeam(ts.team, 'Construction complete. Click the card to place it.');
+        this.notifyTeam(ts.team, 'Construction complete. Click the card to place it.', 'construction_complete');
       }
     }
     for (const p of PRODUCERS) {
@@ -853,7 +863,7 @@ export class Game {
         if (q.progress >= 1) {
           queue.splice(i--, 1);
           this.spawnFromProducer(ts.team, q.type);
-          this.notifyTeam(ts.team, `${UNITS[q.type].name} ready.`);
+          this.notifyTeam(ts.team, `${UNITS[q.type].name} ready.`, 'unit_ready');
         }
       }
     }
@@ -869,7 +879,7 @@ export class Game {
       if (l.progress >= 1) {
         l.building.setLevel(2);
         delete ts.levelUps[type];
-        this.notifyTeam(ts.team, `${up.name} complete.`);
+        this.notifyTeam(ts.team, `${up.name} complete.`, 'upgrade_complete');
       }
     }
     const r = ts.research;
@@ -878,7 +888,7 @@ export class Game {
       if (r.progress >= 1) {
         ts.upgrades.add(r.type);
         ts.research = null;
-        this.notifyTeam(ts.team, `Upgrade complete: ${UPGRADES[r.type].name}.`);
+        this.notifyTeam(ts.team, `Upgrade complete: ${UPGRADES[r.type].name}.`, 'upgrade_complete');
       }
     }
   }
@@ -904,6 +914,7 @@ export class Game {
     }
     const from = u.muzzleWorld();
     const to = target.aimPoint();
+    if (w.sound) this.onSound(w.sound, u.x, u.z);
     if (w.cone) {
       this.flame(u, target, w, mult, from);
       return;
@@ -984,6 +995,7 @@ export class Game {
       if (p.t >= 1) {
         const splash = p.weapon.splash;
         this.effects.explosion(p.end, splash > 0 ? 1.3 : p.kind === 'rocket' ? 0.8 : 0.6);
+        this.onSound(splash > 0 ? 'explosion_med' : 'explosion_small', p.end.x, p.end.z);
         if (unguided) {
           // Falls where it was aimed. Shells: whoever is in the blast takes full damage at its center, half at its
           // edge. Rockets: a direct hit takes the full rocket and the rest of the blast half, as guided ones do.
@@ -1106,9 +1118,11 @@ export class Game {
         const p = new THREE.Vector3(e.x + (Math.random() - 0.5) * 4, e.y + 1 + Math.random(), e.z + (Math.random() - 0.5) * 4);
         this.effects.explosion(p, 1.5 + Math.random() * 1.5);
       }
-      this.notifyTeam(e.team, `${e.name} destroyed.`, e);
+      this.notifyTeam(e.team, `${e.name} destroyed.`, null, e);
+      this.onSound('explosion_Large', e.x, e.z);
     } else {
       this.effects.explosion(e.aimPoint(), (e as Unit).def.infantry ? 0.5 : 1.3);
+      if (!(e as Unit).def.infantry) this.onSound('explosion_med', e.x, e.z);
     }
     if (e instanceof Carryall) {
       // Shot down: troopers bail out by parachute; vehicles go down with it.
@@ -1210,7 +1224,7 @@ export class Game {
     const d = u.def.detonate;
     if (!d || u.dead || u.detonateAt !== null || u.carrier) return;
     u.detonateAt = this.time + d.delay;
-    for (const ts of this.teams) if (ts.team !== u.team && this.vision.sees(ts.team, u)) this.notifyTeam(ts.team, `Enemy ${u.name} is about to self-destruct!`, u);
+    for (const ts of this.teams) if (ts.team !== u.team && this.vision.sees(ts.team, u)) this.notifyTeam(ts.team, `Enemy ${u.name} is about to self-destruct!`, 'enemy_unit_about_to_selfdestruct', u);
   }
 
   private updateDetonations(): void {
@@ -1227,6 +1241,7 @@ export class Game {
         this.effects.explosion(new THREE.Vector3(u.x + Math.cos(a) * w.splash * 0.4, u.y + 0.5, u.z + Math.sin(a) * w.splash * 0.4), 1.8);
       }
       this.effects.explosion(u.aimPoint(), 3);
+      this.onSound('explosion_Large', u.x, u.z);
       u.hp = 0;
       this.kill(u, null);
     }
@@ -1264,6 +1279,7 @@ export class Game {
       if (!hit) continue;
       this.removeMine(m);
       this.effects.explosion(new THREE.Vector3(m.x, this.map.surfaceAt(m.x, m.z) + 0.4, m.z), 1.4);
+      this.onSound('explosion_med', m.x, m.z);
       this.blast(m.x, m.z, m.weapon, 1, null, m.team);
     }
   }
@@ -1445,7 +1461,7 @@ export class Game {
     if (this.campSpot(u) || !walk) return this.deployCamp(u);
     const spot = this.campSpotNear(u.x, u.z, u.def.camp, u.team, u);
     if (!spot) {
-      this.notifyTeam(u.team, 'No room for a Spice Camp on a spice field nearby.');
+      this.notifyTeam(u.team, 'No room for a Spice Camp on a spice field nearby.', 'no_room_for_spice_camp');
       return false;
     }
     u.command(this, { kind: 'move', x: spot.x, z: spot.z });
@@ -1509,7 +1525,7 @@ export class Game {
     if (u.dead || u.carrier || u.falling || !u.def.camp) return false;
     const c = this.campSpot(u);
     if (!c) {
-      this.notifyTeam(u.team, 'A Spice Camp needs open, level ground on a spice field.');
+      this.notifyTeam(u.team, 'A Spice Camp needs open, level ground on a spice field.', 'cannot_build_there');
       return false;
     }
     const frac = u.hp / u.maxHp;
@@ -1581,12 +1597,12 @@ export class Game {
       const spot = this.campSpotNear(b.x, b.z, b.type, b.team);
       const u = spot ? this.packCamp(b) : null;
       if (!u || !spot) {
-        this.notifyTeam(b.team, 'A Spice Camp has run dry. Pack it up (D) and move on.', b, 'info');
+        this.notifyTeam(b.team, 'A Spice Camp has run dry. Pack it up (D) and move on.', 'a_spice_camp_has_run_dry', b, 'info');
         continue;
       }
       u.command(this, { kind: 'move', x: spot.x, z: spot.z });
       u.queue.push({ kind: 'deploy', walked: true });
-      this.notifyTeam(b.team, 'A Spice Camp ran dry. Its crew is moving to fresh spice nearby.', b, 'info');
+      this.notifyTeam(b.team, 'A Spice Camp ran dry. Its crew is moving to fresh spice nearby.', 'spice_camp_dry_crew_moving', b, 'info');
     }
   }
 
@@ -1596,17 +1612,22 @@ export class Game {
   thumpBlocked(team: Team): string | null {
     const ts = this.teams[team];
     if (!this.has(team, 'sietch')) return 'Thumpers need a Sietch.';
-    if (this.drums.some((d) => d.b.team === team) || this.worms.some((w) => w.team === team)) return 'The worm you called is still about.';
+    if (this.drums.some((d) => d.b.team === team) || this.worms.some((w) => w.team === team)) return WORM_ABOUT;
     if (this.time < ts.nextThumper) return `Next Thumper in ${Math.ceil(ts.nextThumper - this.time)} s.`;
-    if (ts.credits < THUMPER.cost) return 'Insufficient funds.';
+    if (ts.credits < THUMPER.cost) return NO_FUNDS;
     return null;
+  }
+
+  /** The announcer's line for a reason `thumpBlocked` gives, if it has one. */
+  thumpVoice(why: string): Announcement | null {
+    return why === WORM_ABOUT ? 'the_worm_you_called_is_still_about' : why === NO_FUNDS ? 'insufficient_funds' : null;
   }
 
   /** Tells the unit among these nearest to (x, z) that can plant a Thumper to go and plant one there. */
   orderThumper(team: Team, units: Unit[], x: number, z: number): boolean {
     const why = this.thumpBlocked(team);
     if (why) {
-      this.notifyTeam(team, why);
+      this.notifyTeam(team, why, this.thumpVoice(why));
       return false;
     }
     let best: Unit | null = null;
@@ -1633,7 +1654,7 @@ export class Game {
     const why = this.thumpBlocked(u.team);
     const spot = why ? null : this.thumperSpot(u, x, z);
     if (why || !spot) {
-      this.notifyTeam(u.team, why ?? 'A Thumper needs open, level sand or spice.');
+      this.notifyTeam(u.team, why ?? 'A Thumper needs open, level sand or spice.', why ? this.thumpVoice(why) : 'thumper_needs_open_level_sand');
       return false;
     }
     const ts = this.teams[u.team];
@@ -1641,7 +1662,7 @@ export class Game {
     ts.nextThumper = this.time + THUMPER.cooldown;
     const b = this.placeBuilding('thumper', u.team, spot.cx, spot.cz);
     this.drums.push({ b, due: this.time + THUMPER.delay, nextReveal: this.time, heard: 0 });
-    this.notifyTeam(u.team, `Thumper planted. The worm comes in ${THUMPER.delay} s: get off the sand, or stand still.`, b, 'worm');
+    this.notifyTeam(u.team, `Thumper planted. The worm comes in ${THUMPER.delay} s: get off the sand, or stand still.`, 'thumper_planted', b, 'worm');
     return true;
   }
 
@@ -1660,7 +1681,7 @@ export class Game {
       const b = d.b;
       if (b.dead) {
         this.drums.splice(this.drums.indexOf(d), 1);
-        this.notifyTeam(b.team, 'Our Thumper was destroyed. No worm will come.', b, 'worm');
+        this.notifyTeam(b.team, 'Our Thumper was destroyed. No worm will come.', 'our_thumper_destroyed', b, 'worm');
         continue;
       }
       if (this.time >= d.nextReveal) {
@@ -1672,7 +1693,7 @@ export class Game {
           this.vision.reveal(ts.team, b.x, b.z, this.ticks);
           if (!(d.heard & (1 << ts.team))) {
             d.heard |= 1 << ts.team;
-            this.notifyTeam(ts.team, 'Thumper detected! A Sandworm is coming: destroy it, or get off the sand.', b, 'worm');
+            this.notifyTeam(ts.team, 'Thumper detected! A Sandworm is coming: destroy it, or get off the sand.', 'thumper_detected_sandworm_is_coming', b, 'worm');
           }
         }
       }
@@ -1696,8 +1717,8 @@ export class Game {
     this.remove(b);
     for (const ts of this.teams) {
       const near = (e: Entity) => e.team === ts.team && !e.dead && hypot(e.x - b.x, e.z - b.z) <= WORM.range + 10 * TILE;
-      if (ts.team === b.team) this.notifyTeam(ts.team, 'Shai-Hulud has come.', b, 'worm');
-      else if (this.units.some(near) || this.buildings.some(near)) this.notifyTeam(ts.team, 'Wormsign! Get off the sand!', b, 'worm');
+      if (ts.team === b.team) this.notifyTeam(ts.team, 'Shai-Hulud has come.', 'shaihulud_has_come', b, 'worm');
+      else if (this.units.some(near) || this.buildings.some(near)) this.notifyTeam(ts.team, 'Wormsign! Get off the sand!', 'worm_sign', b, 'worm');
     }
     this.wormBite(w, b.x, b.z);
   }

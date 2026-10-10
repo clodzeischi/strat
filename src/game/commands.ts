@@ -151,7 +151,7 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       return game.cancelBuilding(team);
     case 'place':
       if (!game.finishPlacement(team, cmd.cx, cmd.cz) && game.teams[team].building?.ready) {
-        game.notifyTeam(team, `Cannot build ${BUILDINGS[game.teams[team].building!.type].name} there any more. Click its card to place it again.`);
+        game.notifyTeam(team, `Cannot build ${BUILDINGS[game.teams[team].building!.type].name} there any more. Click its card to place it again.`, 'cannot_build_there');
       }
       return;
     case 'train':

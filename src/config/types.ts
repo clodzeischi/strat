@@ -1,5 +1,7 @@
 // Shared game data types.
 
+import type { Sound } from './audio';
+
 export type Team = 0 | 1;
 
 /**
@@ -48,6 +50,8 @@ export interface WeaponDef {
   cone?: number;
   /** Passes straight through shields to health (sound: the Fedaykin's weirding modules). */
   pierce?: boolean;
+  /** The sound of a shot (none for a flamethrower, or for blasts that aren't fired, like mines). */
+  sound?: Sound;
 }
 
 export interface UnitDef {
