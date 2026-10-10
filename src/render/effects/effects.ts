@@ -81,6 +81,16 @@ export class Effects {
     });
   }
 
+  /** A little dust kicked up behind a vehicle on sand: it hangs low and drifts. */
+  trail(p: THREE.Vector3, color: number, size = 1): void {
+    if (!this.visibleAt(p.x, p.z)) return;
+    this.smoke.spawn({
+      x: p.x + rand(-0.15, 0.15) * size, y: p.y + 0.1, z: p.z + rand(-0.15, 0.15) * size,
+      vx: rand(-0.4, 0.4), vy: rand(0.2, 0.6), vz: rand(-0.4, 0.4), drag: 1.2,
+      life: rand(0.8, 1.3), size: [0.2 * size, rand(0.6, 0.9) * size], color: [color, color], alpha: [0.45, 0],
+    });
+  }
+
   /** Dust blown outward along the ground by an aircraft's downwash; `size` scales the cloud. */
   dust(p: THREE.Vector3, color: number, size = 1): void {
     if (!this.visibleAt(p.x, p.z)) return;

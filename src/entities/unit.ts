@@ -133,6 +133,9 @@ export class Unit extends Entity {
   /** Drawing only: gliders bank into their turns. */
   private glideBank = 0;
   private drawnHeading = 0;
+  /** Drawing only: where the dust trail last left a puff (vehicles on sand). */
+  private dustX = NaN;
+  private dustZ = 0;
   /** Seconds until the second gun (Devastator machine gun) can fire again. */
   private cooldown2 = 0;
   protected body: THREE.Group;
@@ -251,6 +254,31 @@ export class Unit extends Entity {
     // Fremen infantry are quicker on sand and spice.
     if (this.def.hides && this.def.infantry && this.onSand(game)) return this.def.speed * (1 + SAND_SPEED.base + (ups.has('sandwalk') ? SAND_SPEED.sandwalk : 0));
     return this.def.speed;
+  }
+
+  /**
+   * Drawing only: vehicles driving over sand or spice leave a trail of dust, a puff every so far, so the faster they
+   * go the thicker it is. Trikes with Nitro kick up more.
+   */
+  private trailDust(game: Game): void {
+    const moved = hypot(this.x - this.dustX, this.z - this.dustZ);
+    // Starting out, or set down somewhere else (a Carryall drop): start the trail afresh.
+    if (!(moved < 3) || this.falling || this.carrier) {
+      this.dustX = this.x;
+      this.dustZ = this.z;
+      return;
+    }
+    const nitro = this.type === 'trike' && game.teams[this.team].upgrades.has('nitro');
+    if (moved < (nitro ? 0.4 : 0.55)) return;
+    this.dustX = this.x;
+    this.dustZ = this.z;
+    if (!this.onSand(game)) return;
+    const m = game.map;
+    const spice = m.tile(m.cellOf(this.x), m.cellOf(this.z)) === SPICE;
+    // From behind the hull.
+    const back = this.radius * 0.8;
+    const p = new THREE.Vector3(this.x - dm.cos(this.heading) * back, this.y, this.z - dm.sin(this.heading) * back);
+    game.effects.trail(p, spice ? 0xc4532a : 0xe2c896, (nitro ? 1.35 : 1) * Math.max(0.7, this.radius));
   }
 
   /** Whether it stands on open sand or spice (where Fremen hide and walk faster). */
@@ -1103,11 +1131,12 @@ export class Unit extends Entity {
       this.y += (groundY - this.y) * Math.min(1, dt * (this.def.air ? 3 : 10));
     }
     this.root.position.set(this.x, this.y, this.z);
+    if (!this.def.infantry && !this.def.air) this.trailDust(game);
     if (this.def.glides && !this.falling) {
       // Banks into its turns, rocking a little on the wind.
       const turn = dt > 0 ? wrapAngle(this.heading - this.drawnHeading) / dt : 0;
       this.drawnHeading = this.heading;
-      this.glideBank += (THREE.MathUtils.clamp(-turn * 0.45, -0.6, 0.6) - this.glideBank) * Math.min(1, dt * 4);
+      this.glideBank += (THREE.MathUtils.clamp(turn * 0.45, -0.6, 0.6) - this.glideBank) * Math.min(1, dt * 4);
       // Roll about its own nose (+X) first, then turn to its heading.
       this.body.rotation.set(this.glideBank + dm.sin(game.time * 1.7 + this.id) * 0.05, -this.heading, 0, 'YXZ');
     } else if (this.falling || this.def.air) {

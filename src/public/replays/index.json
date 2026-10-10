@@ -1,4 +1,12 @@
 [
-  { "file": "fremen-beat-corrino-brutal.json", "title": "Fremen beat Corrino", "detail": "Brutal AI vs Brutal AI · 9 min · out-mine, then mass Warriors" },
-  { "file": "fremen-beat-corrino-brutal-long.json", "title": "Fremen beat Corrino, the long way", "detail": "Brutal AI vs Brutal AI · 22 min · a war of attrition" }
+  {
+    "file": "fremen-beat-corrino-brutal.json",
+    "title": "Fremen beat Corrino",
+    "detail": "Brutal AI vs Brutal AI \u00b7 9 min \u00b7 out-mine, then mass Warriors"
+  },
+  {
+    "file": "fremen-beat-corrino-brutal-long.json",
+    "title": "Fremen beat Corrino, the long way",
+    "detail": "Brutal AI vs Brutal AI \u00b7 13 min \u00b7 lose the fights, win on spice"
+  }
 ]

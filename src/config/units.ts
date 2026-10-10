@@ -132,7 +132,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   },
   glider: {
     name: 'Wind Glider', producer: 'barracks', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,
-    turret: false, infantry: false, tags: ['light', 'air'], weapon: null, requires: ['sietch'], air: true, glides: { orbit: 8 },
+    turret: false, infantry: false, tags: ['light', 'air'], weapon: null, requires: ['sietch'], air: true, glides: { orbit: 12 },
     desc: 'A Fremen rider on a cloth wing, riding the desert winds. The fastest thing in the sky and sees far, but unarmed and frail. It can\'t hover: with nowhere to go, it circles.',
   },
 };
