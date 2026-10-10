@@ -6,7 +6,7 @@ import type { BuildingType, Faction } from '../config';
  * Blender-made models in src/public/models/ (see docs/model-spec.md), as `<kind>/<type>.<faction>`. Anything not
  * listed keeps its procedural model.
  */
-const FILES = ['buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides', 'buildings/bunker.atreides'];
+const FILES = ['buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides', 'buildings/bunker.atreides', 'buildings/hitech.atreides'];
 
 const scenes = new Map<string, THREE.Object3D>();
 let paletteMat: THREE.MeshLambertMaterial | null = null;
