@@ -82,6 +82,13 @@ A swarm of geodesic domes with Jetsons verticality. The 45° turn on a cross pla
 - **Verticality:** a needle tower at the back on tripod legs, with two saucer decks and banners; its crown of antennas is the `spinner`. A column at the front left lifts a saucer deck with the data-relay dish.
 - **Bio:** glowing axlotl tanks (accent cyan) at the front right, a cyan bio-waste pool at the back left.
 
+### Repair Pad (`pad`)
+
+Outer works: low and wide, the 45° turn on a cross plan (inside |x| + |y| ≤ 3.7 m before the turn).
+- **Center:** a big round service deck, dark with a team ring and a light service circle. Keep it clear: nothing on it, so the pad reads at a glance.
+- **Arms:** four fat, short vehicle ramps down to the slab, dark with light tread stripes between purple-topped curbs. (Damaged units park around the pad, not on it.)
+- **Between the ramps:** a workshop shed, a parts store, a fuel stand (tanks, pump, oil slick) and two banner pylons. Stadium lights (a bank of cyan lamps facing the deck) stand at the sides and back, never at the front, where they'd hide the deck.
+
 ## Fremen
 
 To be defined.
