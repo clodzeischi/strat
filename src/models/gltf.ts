@@ -11,7 +11,7 @@ import type { UnitModel, UpgradeLook } from './types';
 const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
   'buildings/bunker.atreides', 'buildings/hitech.atreides',
-  'units/harvester.atreides', 'units/harvester.corrino', 'units/trike.atreides',
+  'units/harvester.atreides', 'units/harvester.corrino', 'units/trike.atreides', 'units/tank.atreides',
 ];
 
 const scenes = new Map<string, THREE.Object3D>();
@@ -95,14 +95,20 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
   const turret = model.getObjectByName('turret') ?? null;
   const muzzle = model.getObjectByName('muzzle') ?? new THREE.Object3D();
   if (!muzzle.parent) (turret ?? body).add(muzzle);
-  const tiers = (prefix: string) => [0, 1, 2].map((i) => model.getObjectByName(`${prefix}${i}`) ?? null);
+  // A tier can be split across hull and turret (`armor1` on the hull, `armor1_turret` turning with the turret).
+  const tiers = (prefix: string) => [0, 1, 2].map((i) => {
+    const re = new RegExp(`^${prefix}${i}(_[a-z]+)?$`);
+    const parts: THREE.Object3D[] = [];
+    model.traverse((o) => { if (re.test(o.name)) parts.push(o); });
+    return parts.length ? parts : null;
+  });
   const armor = tiers('armor');
   const weapons = tiers('weapons');
   const extras = { rockets: model.getObjectByName('up_rockets'), nitro: model.getObjectByName('up_nitro'), harvest: model.getObjectByName('up_harvest') };
-  const pick = (set: (THREE.Object3D | null)[], level: number) => {
+  const pick = (set: (THREE.Object3D[] | null)[], level: number) => {
     let shown = -1;
     for (let i = 0; i <= level; i++) if (set[i]) shown = i;
-    set.forEach((o, i) => { if (o) o.visible = i === shown; });
+    set.forEach((parts, i) => parts?.forEach((o) => { o.visible = i === shown; }));
   };
   const showUpgrades = (look: UpgradeLook) => {
     pick(armor, look.armor);
