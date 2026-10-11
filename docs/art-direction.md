@@ -66,6 +66,14 @@ A temple more than a barracks: worship first, berthing second. Back to the usual
 - **Level 1:** a sloped nave front to back and two long wings across it, towers at the wing ends and along the nave, a crossing tower with pinnacles, and a grand stair up to a portal at the front corner. Banners on the nave sides and the wings.
 - **Level 2 (Imperial Barracks):** the indoctrination spire rises from the crossing tower (crown of pinnacles, a banner on each face), two hooded Sardaukar statues flank the stair, and six free-standing banner pylons stand between the arms.
 
+### Fab (`fab`)
+
+A factory, not a temple: they really build vehicles here, and it poisons the ground like the refinery. The usual 45° turn on a cross plan, like the barracks (inside |x| + |y| ≤ 5.7 m before the turn).
+- **Level 1:** a long assembly hall front to back (pitched roof with a glazed ridge, buttress fins, a huge dark vehicle door with a welding glow at the front), foundry wings across it with a glowing furnace mouth and a press shop, and a tower over the crossing with the rotating beacon, the `spinner`. Four smokestacks of different heights, each with a `smoke` empty. Between the arms: an outfall pouring green sludge into a lake of black oil with drums dumped around it, scrap and crates, tanks piped into the walls, and a hull in its cradle in the assembly yard.
+- **Level 2 (Heavy Fab):** a gantry crane over the yard lifting a heavy hull, and a press tower on the right wing.
+
+Clutter (drums, crates) is built 1/0.707 larger so it ends up the refinery's size after the squash. Keep all of it on the slab and clear of the walls.
+
 ## Fremen
 
 To be defined.
