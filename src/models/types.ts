@@ -2,11 +2,13 @@ import type * as THREE from 'three';
 
 export interface UnitModel {
   body: THREE.Group;
-  turret: THREE.Group | null;
+  turret: THREE.Object3D | null;
   /** Local offset (in turret or body space) where projectiles spawn. */
   muzzle: THREE.Object3D;
   /** Units that deploy: poses the model from 0 (mobile) to 1 (dug in). Drawing only. */
   deploy?: (t: number) => void;
+  /** Blender models: shows the parts for these upgrades (instead of building an upgrade kit). */
+  showUpgrades?: (look: UpgradeLook) => void;
 }
 
 /** Extra parts showing upgrades; `turret` parts follow the turret's rotation. */

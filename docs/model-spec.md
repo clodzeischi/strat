@@ -96,7 +96,7 @@ The loader finds parts by object name. Names are exact and lowercase.
 | `muzzle` | Empty | Where shots start. Child of `turret` if there is one, otherwise of `body`. Every armed unit, plus the Auto Turret. |
 | `spinner` | mesh | A building's moving piece. Origin on its rotation axis (Z). |
 | `level2` | mesh | Structure added at building level 2. Child of `body`. |
-| `armor0`, `armor1`, `armor2` | mesh | Armor tiers. Each is a complete, separate hull, not a bolt-on: exactly one is shown, and `armor0` is hidden once `armor1` is researched. Child of `body`. |
+| `armor0`, `armor1`, `armor2` | mesh | Armor tiers. Each is a complete, separate hull, not a bolt-on: exactly one is shown, and `armor0` is hidden once `armor1` is researched. If a tier is missing, the highest one the model has below it shows (Corrino units only have `armor0` and `armor1`). Child of `body`. |
 | `weapons0`, `weapons1`, `weapons2` | mesh | Weapon tiers, swapped the same way and independently of armor, so always separate objects. Child of `turret` if there is one, otherwise of `body`. |
 | `up_<upgrade>` | mesh | Parts added once a one-step upgrade is researched: `up_rockets`, `up_nitro`, `up_harvest`. Child of `turret` if it moves with it, otherwise of `body`. |
 

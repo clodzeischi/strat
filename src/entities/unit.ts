@@ -6,7 +6,7 @@ import {
 import type { Game } from '../game/game';
 import { findPath, type Point } from '../game/pathfinding';
 import { SAND, SPICE, type Cell } from '../map';
-import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit } from '../models';
+import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit, type UpgradeLook } from '../models';
 import { Building } from './building';
 import { distTo } from './distance';
 import { Entity } from './entity';
@@ -139,9 +139,12 @@ export class Unit extends Entity {
   /** Seconds until the second gun (Devastator machine gun) can fire again. */
   private cooldown2 = 0;
   protected body: THREE.Group;
-  private turret: THREE.Group | null;
+  private turret: THREE.Object3D | null;
   /** Parts showing researched upgrades, rebuilt when the team's upgrades change. */
   private kit: { key: string; body: THREE.Group; turret: THREE.Group } | null = null;
+  /** Blender models: switches their upgrade parts on and off, and which upgrades it last showed. */
+  private showUpgrades: ((look: UpgradeLook) => void) | null;
+  private upgradeKey = '';
   private muzzle: THREE.Object3D;
   /** Deploying units: poses the model from mobile (0) to dug in (1). */
   private deployPose: ((t: number) => void) | null;
@@ -196,11 +199,12 @@ export class Unit extends Entity {
     this.lastZ = z;
     this.heading = heading;
     this.turretHeading = heading;
-    const model = makeUnitModel(type, TEAM_COLORS[team]);
+    const model = makeUnitModel(type, faction, TEAM_COLORS[team]);
     this.body = model.body;
     this.turret = model.turret;
     this.muzzle = model.muzzle;
     this.deployPose = model.deploy ?? null;
+    this.showUpgrades = model.showUpgrades ?? null;
     this.root.add(this.body);
   }
 
@@ -1111,6 +1115,12 @@ export class Unit extends Entity {
       harvest: game.tier(this.team, 'harvest') > 0,
     };
     const key = `${look.weapons}${look.armor}${+look.rockets}${+look.nitro}${+look.harvest}`;
+    if (this.showUpgrades) {
+      // Blender models carry their upgrade parts and just switch them on and off.
+      if (this.upgradeKey !== key) this.showUpgrades(look);
+      this.upgradeKey = key;
+      return;
+    }
     if (this.kit?.key === key) return;
     if (this.kit) {
       this.kit.body.removeFromParent();

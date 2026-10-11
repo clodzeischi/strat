@@ -14,7 +14,7 @@ import { turret } from './buildings/turret';
 import { camp } from './buildings/camp';
 import { sietch } from './buildings/sietch';
 import { thumper } from './buildings/thumper';
-import { cloneBuildingModel } from './gltf';
+import { cloneBuildingModel, cloneUnitModel } from './gltf';
 import { box } from './parts';
 import type { BuildingBlueprint, BuildingModel, UnitBlueprint, UnitModel, UpgradeKit, UpgradeLook } from './types';
 import { carryall } from './units/carryall';
@@ -51,9 +51,9 @@ const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = {
   conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret, sietch, thumper, camp,
 };
 
-/** Unit models face +X. */
-export function makeUnitModel(type: UnitType, color: number): UnitModel {
-  return UNIT_MODELS[type].build(color);
+/** Unit models face +X. A faction's Blender model replaces the procedural one when it has been loaded. */
+export function makeUnitModel(type: UnitType, faction: Faction, color: number): UnitModel {
+  return cloneUnitModel(type, faction, color) ?? UNIT_MODELS[type].build(color);
 }
 
 /**

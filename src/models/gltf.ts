@@ -1,18 +1,23 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { BuildingType, Faction } from '../config';
+import type { BuildingType, Faction, UnitType } from '../config';
+import type { UnitModel, UpgradeLook } from './types';
 
 /**
  * Blender-made models in src/public/models/ (see docs/model-spec.md), as `<kind>/<type>.<faction>`. Anything not
  * listed keeps its procedural model.
  */
-const FILES = ['buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides', 'buildings/bunker.atreides', 'buildings/hitech.atreides'];
+const FILES = [
+  'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
+  'buildings/bunker.atreides', 'buildings/hitech.atreides',
+  'units/harvester.atreides',
+];
 
 const scenes = new Map<string, THREE.Object3D>();
 let paletteMat: THREE.MeshLambertMaterial | null = null;
 const teamMats = new Map<number, THREE.MeshLambertMaterial>();
 
-/** Loads the shared palette and every listed model. Call once before the first building is made. */
+/** Loads the shared palette and every listed model. Call once before the first building or unit is made. */
 export async function loadModels(): Promise<void> {
   const palette = await new THREE.TextureLoader().loadAsync('models/palette.png');
   palette.colorSpace = THREE.SRGBColorSpace;
@@ -57,12 +62,47 @@ export function hasBuildingModel(type: BuildingType, faction: Faction): boolean 
 }
 
 /** A copy of a loaded model with team-colored parts, sharing geometry with every other copy. */
-export function cloneBuildingModel(type: BuildingType, faction: Faction, color: number): THREE.Object3D | null {
-  const src = scenes.get(`buildings/${type}.${faction}`);
+function cloneModel(key: string, color: number): THREE.Object3D | null {
+  const src = scenes.get(key);
   if (!src) return null;
   const copy = src.clone(true);
   copy.traverse((o) => {
     if (o instanceof THREE.Mesh) o.material = o.userData.team ? teamMat(color) : paletteMat!;
   });
   return copy;
+}
+
+export function cloneBuildingModel(type: BuildingType, faction: Faction, color: number): THREE.Object3D | null {
+  return cloneModel(`buildings/${type}.${faction}`, color);
+}
+
+/**
+ * A unit's Blender model, facing +X. Armor and weapon tiers are whole alternative parts (`armor0`-`armor2`,
+ * `weapons0`-`weapons2`): exactly one of each set shows, the highest researched one the model has. One-step upgrades
+ * (`up_rockets`, `up_nitro`, `up_harvest`) show once researched.
+ */
+export function cloneUnitModel(type: UnitType, faction: Faction, color: number): UnitModel | null {
+  const model = cloneModel(`units/${type}.${faction}`, color);
+  if (!model) return null;
+  const body = new THREE.Group();
+  body.add(model);
+  const turret = model.getObjectByName('turret') ?? null;
+  const muzzle = model.getObjectByName('muzzle') ?? new THREE.Object3D();
+  if (!muzzle.parent) (turret ?? body).add(muzzle);
+  const tiers = (prefix: string) => [0, 1, 2].map((i) => model.getObjectByName(`${prefix}${i}`) ?? null);
+  const armor = tiers('armor');
+  const weapons = tiers('weapons');
+  const extras = { rockets: model.getObjectByName('up_rockets'), nitro: model.getObjectByName('up_nitro'), harvest: model.getObjectByName('up_harvest') };
+  const pick = (set: (THREE.Object3D | null)[], level: number) => {
+    let shown = -1;
+    for (let i = 0; i <= level; i++) if (set[i]) shown = i;
+    set.forEach((o, i) => { if (o) o.visible = i === shown; });
+  };
+  const showUpgrades = (look: UpgradeLook) => {
+    pick(armor, look.armor);
+    pick(weapons, look.weapons);
+    for (const k of ['rockets', 'nitro', 'harvest'] as const) if (extras[k]) extras[k]!.visible = look[k];
+  };
+  showUpgrades({ weapons: 0, armor: 0, rockets: false, nitro: false, harvest: false });
+  return { body, turret, muzzle, showUpgrades };
 }
