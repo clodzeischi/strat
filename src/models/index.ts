@@ -69,10 +69,12 @@ export function makeBuildingModel(type: BuildingType, faction: Faction, color: n
     group.add(model);
     const level2 = model.getObjectByName('level2') ?? null;
     if (level2) level2.visible = false;
-    return { group, spinner: model.getObjectByName('spinner') ?? null, level2, dropIn: true };
+    const smoke: THREE.Object3D[] = [];
+    model.traverse((o) => { if (o.name.startsWith('smoke')) smoke.push(o); });
+    return { group, spinner: model.getObjectByName('spinner') ?? null, level2, smoke, dropIn: true };
   }
   const spinner = BUILDING_MODELS[type].build(group, color);
-  return { group, spinner, level2: null, dropIn: false };
+  return { group, spinner, level2: null, smoke: [], dropIn: false };
 }
 
 /**

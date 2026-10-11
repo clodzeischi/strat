@@ -49,6 +49,8 @@ export class Building extends Entity {
   readonly spinner: THREE.Object3D | null;
   /** A Blender model's level-2 structure, shown at level 2. */
   private level2: THREE.Object3D | null;
+  /** Smokestack tops that belch black smoke (drawing only). */
+  readonly smoke: THREE.Object3D[];
   /** Slewing spinners (see `slew`): seconds until the next heading, and the heading being turned to. */
   private slewWait = Math.random() * 10;
   private slewTo = 0;
@@ -92,6 +94,7 @@ export class Building extends Entity {
     const model = makeBuildingModel(type, faction, TEAM_COLORS[team], def.size);
     this.spinner = model.spinner;
     this.level2 = model.level2;
+    this.smoke = model.smoke;
     if (!model.dropIn) {
       const k = diamondScale(def.size);
       this.model.scale.set(k, 1, k);

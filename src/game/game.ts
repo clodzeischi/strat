@@ -21,6 +21,9 @@ import * as dm from './dmath';
 
 /** Fallen infantry: seconds lying after the death animation, then sinking at `sink` m/s for `sinkTime` seconds. */
 const CORPSE = { lie: 2.5, sink: 0.4, sinkTime: 1.5 };
+/** Puffs per second from each smokestack (`smoke` empties on building models), and a scratch vector for them. */
+const SOOT_RATE = 7;
+const sootAt = new THREE.Vector3();
 
 /** Running totals for the end-of-game screen. */
 export interface TeamStats {
@@ -2016,6 +2019,9 @@ export class Game {
       else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + Math.abs(dm.sin(this.time * 5 + b.id)) * 0.35;
       else if (b.type === 'conyard' || b.type === 'factory') b.slew(dt, b.type === 'factory' ? 1.8 : 0.5);
       else if (b.spinner && !(b.def.extract && b.dry)) b.spinner.rotation.y += dt * (b.type === 'camp' ? 1.5 : 0.25);
+    }
+    for (const b of this.buildings) {
+      for (const s of b.smoke) if (Math.random() < dt * SOOT_RATE) this.effects.soot(s.getWorldPosition(sootAt));
     }
     this.effects.update(dt);
     this.terrain.flush();

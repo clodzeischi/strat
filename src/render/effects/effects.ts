@@ -81,6 +81,16 @@ export class Effects {
     });
   }
 
+  /** Thick black smoke from a smokestack: billows up, spreads and drifts with the wind. */
+  soot(p: THREE.Vector3): void {
+    if (!this.visibleAt(p.x, p.z)) return;
+    this.smoke.spawn({
+      x: p.x + rand(-0.08, 0.08), y: p.y, z: p.z + rand(-0.08, 0.08),
+      vx: rand(0.2, 0.6), vy: rand(1.2, 1.8), vz: rand(-0.5, -0.1), drag: 0.5,
+      life: rand(2.2, 3.2), size: [rand(0.25, 0.35), rand(1.1, 1.6)], color: [0x141010, 0x3a3532], alpha: [0.9, 0],
+    });
+  }
+
   /** A little dust kicked up behind a vehicle on sand: it hangs low and drifts. */
   trail(p: THREE.Vector3, color: number, size = 1): void {
     if (!this.visibleAt(p.x, p.z)) return;

@@ -99,6 +99,7 @@ The loader finds parts by object name. Names are exact and lowercase.
 | `armor0`, `armor1`, `armor2` | mesh | Armor tiers. On vehicles each is a complete, separate hull, not a bolt-on (infantry differ, see Infantry below): exactly one is shown, and `armor0` is hidden once `armor1` is researched. If a tier is missing, the highest one the model has below it shows (Corrino units only have `armor0` and `armor1`). Child of `body`. On a turreted unit, the turret's share of a tier is a second object named `armor1_turret` (etc.), child of `turret`; it shows and hides with `armor1`. |
 | `weapons0`, `weapons1`, `weapons2` | mesh | Weapon tiers, swapped the same way and independently of armor, so always separate objects. Child of `turret` if there is one, otherwise of `body`. On infantry they're add-ons (see Infantry below). |
 | `up_<upgrade>` | mesh | Parts added once a one-step upgrade is researched: `up_rockets`, `up_nitro`, `up_harvest`. Child of `turret` if it moves with it, otherwise of `body`. |
+| `smoke` | Empty | A smokestack top: the game puffs thick black smoke from it, rising along +Z. Any number (`smoke`, `smoke.001`, ...). Child of `body`. Buildings only. |
 | `laser` | Empty | A fading laser-sight beam, drawn by the game. It points forward (+X) from the empty; the custom property `len` sets its length (default 1). Child of the weapon tier that has it (usually `weapons2`), so it shows and hides with it. Needs Data → Custom Properties on at export. |
 
 Every visible piece must belong to one of these meshes. Leftover objects are ignored.

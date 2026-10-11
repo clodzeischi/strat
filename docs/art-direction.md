@@ -52,6 +52,14 @@ A regional palace that doubles as the command center. Unlike the other factions'
 
 The Corrino conyard doesn't level up, so it has no `level2`. Built by the `build.py` text block in the .blend.
 
+### Refinery (`refinery`)
+
+Ecological disaster: an industrial cathedral that poisons the ground around it. Square to the slab like the palace.
+- **Center:** a sloped processing core with a spire on each corner and a central tower.
+- **2, 4, 6, 8:** four harvester bays, long sheds with dark open mouths, one in the middle of each side, where the game docks harvesters.
+- **1, 3, 7, 9:** tall smokestacks with sooted tops, each with a `smoke` empty so it belches black smoke in game. Storage tanks pipe into the core.
+- **The mess:** one big toxic green pool (accent `41FE73`) at 3, fed by a broken drain, with toxic waste drums (grey, green lids) dumped around and in it. Black goo slicks in the other corners, each a different size. Keep it to one pool: repeated spills look cheap.
+
 ## Fremen
 
 To be defined.
