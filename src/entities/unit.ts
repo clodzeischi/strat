@@ -53,7 +53,9 @@ export type QueuedOrder =
   | { kind: 'deploy'; walked?: boolean };
 
 /** Combat aircraft (the Sky Raider) fly this high over the ground. */
-const AIR_HEIGHT = CARRYALL.altitude - 2;
+const AIR_HEIGHT = CARRYALL.altitude - 3; // other aircraft fly lower than Carryalls
+/** How far a paratrooper falls while the canopy opens. */
+const CHUTE_OPEN = 1.6;
 
 /** Paratroopers come down at this speed; vehicles on their bigger canopies a little slower. */
 const FALL_SPEED = { foot: 2.2, vehicle: 1.7 };
@@ -102,7 +104,7 @@ export class Unit extends Entity {
   /** The Carryall carrying this unit, or the bunker it's in. */
   carrier: Unit | Building | null = null;
   /** Paratrooper (or drop pod) on the way down: drifts toward the landing cell under its parachute. */
-  falling: { x: number; z: number; chute: THREE.Object3D; pod?: boolean } | null = null;
+  falling: { x: number; z: number; chute: THREE.Object3D; pod?: boolean; top?: number } | null = null;
   /** Units that deploy (Artillery): can't move unless mobile; `deployTimer` counts down setting up or packing. */
   deployState: DeployState = 'mobile';
   deployTimer = 0;
@@ -378,7 +380,8 @@ export class Unit extends Entity {
     const chute = makeParachute(TEAM_COLORS[this.team], this.def.infantry ? 1 : 1.9);
     this.root.add(chute);
     this.root.visible = true;
-    this.falling = { x: m.center(cell.cx) + (game.random() - 0.5) * 0.8, z: m.center(cell.cz) + (game.random() - 0.5) * 0.8, chute };
+    chute.userData.full = chute.scale.x;
+    this.falling = { x: m.center(cell.cx) + (game.random() - 0.5) * 0.8, z: m.center(cell.cz) + (game.random() - 0.5) * 0.8, chute, top: y };
     this.x = x;
     this.z = z;
     this.y = y;
@@ -1136,6 +1139,11 @@ export class Unit extends Entity {
 
   syncVisual(game: Game, dt: number): void {
     this.refreshKit(game);
+    if (this.falling?.top !== undefined) {
+      // The canopy opens over the first stretch of the fall, so it never blooms inside the aircraft.
+      const open = THREE.MathUtils.clamp((this.falling.top - this.y) / CHUTE_OPEN, 0.05, 1);
+      this.falling.chute.scale.setScalar(this.falling.chute.userData.full * open);
+    }
     if (!this.falling) {
       const groundY = game.map.surfaceAt(this.x, this.z) + (this.def.air ? AIR_HEIGHT : this.hidden ? -HIDDEN_SINK : 0);
       this.y += (groundY - this.y) * Math.min(1, dt * (this.def.air ? 3 : 10));

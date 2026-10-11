@@ -83,7 +83,8 @@ export const CAMP_SEARCH = 10;
 
 export const CARRYALL = {
   capacity: 6, // lift space: infantry take 1, trikes 3, heavy vehicles 6
-  altitude: 7, // cruising height above y = 0
-  orbit: 8, // radius of the holding circle
+  altitude: 8, // cruising height above y = 0
+  clearance: 4.2, // least height over the ground under and just ahead (climbs over cliffs with a vehicle hanging)
+  orbit: 11, // radius of the holding circle
   ferryMin: 10, // tiles: harvester trips shorter than this aren't worth a lift
 };

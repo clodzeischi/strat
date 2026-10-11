@@ -8,6 +8,8 @@ import { Unit, type Order } from './unit';
 import { hypot } from '../game/hypot';
 import * as dm from '../game/dmath';
 
+/** Touch-and-go flare (drawing only): height over the touchdown it starts at, nose-up pitch and extra engine tilt at full flare. */
+const FLARE = { height: 3, pitch: 0.35, tilt: 0.45 };
 /** How far below the hook a hanging vehicle's wheels are. */
 const HANG_DEPTH = 1.35;
 /** Lowest the hull comes over the ground when picking up or setting down: a vehicle's height under the hook. */
@@ -59,6 +61,8 @@ export class Carryall extends Unit {
   private dropTimer = 0;
   private lastDropD = Infinity;
   private pitch = 0;
+  /** Drawing only: 0..1, how far into a touch-and-go flare. */
+  private flare = 0;
   private shownTroops = -1; // -1: sets the pod and seat lights on the first frame (a Blender model arrives with the pod showing)
   private dustDebt = 0;
   /** Engine nacelle angle: 0 pointing forward (cruise), PI/2 straight up (hover). */
@@ -298,8 +302,10 @@ export class Carryall extends Unit {
       this.dropTimer = u.def.infantry ? 0.2 : 0.45;
       u.carrier = null;
       if (u.def.infantry) {
-        const side = (this.load.length % 2 ? 1 : -1) * 0.6;
-        u.startFall(game, this.x - dm.sin(this.heading) * side, this.y - 0.6, this.z + dm.cos(this.heading) * side);
+        // Out of the rear ramp, below the belly and claws, alternating sides.
+        const side = (this.load.length % 2 ? 1 : -1) * 0.4;
+        const back = 1.1;
+        u.startFall(game, this.x - dm.cos(this.heading) * back - dm.sin(this.heading) * side, this.y - 1.4, this.z - dm.sin(this.heading) * back + dm.cos(this.heading) * side);
       } else {
         u.startFall(game, u.x, u.y, u.z); // from where it hangs
       }
@@ -438,18 +444,37 @@ export class Carryall extends Unit {
     const size = game.map.worldSize();
     this.x = THREE.MathUtils.clamp(this.x, 0, size);
     this.z = THREE.MathUtils.clamp(this.z, 0, size);
-    const alt = o.alt ?? CARRYALL.altitude;
+    const alt = o.alt ?? this.cruiseHeight(game);
     const climb = o.climb ?? 4;
     this.y += THREE.MathUtils.clamp(alt - this.y, -climb * dt, climb * dt);
     return d;
   }
 
+  /** Cruising height: the usual altitude, or higher to keep clear of cliffs under and just ahead of the hull. */
+  private cruiseHeight(game: Game): number {
+    const m = game.map;
+    const size = m.worldSize();
+    let ground = 0;
+    for (const ahead of [0, 3, 6]) {
+      const x = THREE.MathUtils.clamp(this.x + dm.cos(this.heading) * ahead, 0, size);
+      const z = THREE.MathUtils.clamp(this.z + dm.sin(this.heading) * ahead, 0, size);
+      ground = Math.max(ground, m.surfaceAt(x, z));
+    }
+    return Math.max(CARRYALL.altitude, ground + CARRYALL.clearance);
+  }
+
   syncVisual(game: Game, dt: number): void {
     this.refreshKit(game);
     this.root.position.set(this.x, this.y, this.z);
-    this.body.rotation.set(this.bank, -this.heading, this.pitch, 'YXZ');
+    // Touch-and-go: low and still fast, it flares, nose up, engines swung past vertical to blow down and forward.
+    const ground = game.map.surfaceAt(this.x, this.z);
+    const low = 1 - THREE.MathUtils.clamp((this.y - ground - LOW) / FLARE.height, 0, 1);
+    const fast = THREE.MathUtils.clamp(this.speedNow / (this.def.speed * 0.35), 0, 1);
+    this.flare += (low * fast - this.flare) * Math.min(1, dt * 4);
+    this.body.rotation.set(this.bank, -this.heading, this.pitch + this.flare * FLARE.pitch, 'YXZ');
     // Nacelles stand up to hover and swing forward as it picks up speed.
-    const tiltWant = (Math.PI / 2) * THREE.MathUtils.clamp(1 - this.speedNow / (this.def.speed * 0.75), 0, 1);
+    const cruiseTilt = (Math.PI / 2) * THREE.MathUtils.clamp(1 - this.speedNow / (this.def.speed * 0.75), 0, 1);
+    const tiltWant = THREE.MathUtils.lerp(cruiseTilt, Math.PI / 2 + FLARE.tilt, this.flare);
     this.tilt += (tiltWant - this.tilt) * Math.min(1, dt * 3);
     for (const name of NACELLES) this.body.getObjectByName(name)!.rotation.z = this.tilt;
     // Infantry aboard: the troop pod shows and one seat light per trooper comes on.
