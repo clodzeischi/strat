@@ -8,6 +8,7 @@ import { loadEnemy, loadFaction, loadMapSize, Menus, type Channel, type EnemyCho
 import { ReplayViewer, type ReplayView } from './ui/replay-viewer';
 import { ViewShadows } from './render/shadows';
 import { CommandCard } from './ui/command-card';
+import { renderModelIcons } from './ui/model-icons';
 import { Hud } from './ui/hud';
 import { AudioBank } from './ui/audio';
 import { Music } from './ui/music';
@@ -114,6 +115,8 @@ await loadModels();
 const rts = new RTSCamera(mapSize * TILE);
 const game = new Game(scene, rts.camera, mapSize, mapSeed, factions);
 game.localTeam = match?.team ?? 0;
+// Card icons for whatever the player's faction has Blender models of, in their team color.
+renderModelIcons(factions[game.localTeam] ?? 'atreides', game.localTeam);
 // `?reveal` lifts the fog of war on screen, offline only (for testing). The title fly-over shows the whole map.
 const revealParam = !match && new URLSearchParams(location.search).has('reveal');
 game.revealAll = true;

@@ -37,7 +37,7 @@ import { mortar } from './units/mortar';
 import { warrior } from './units/warrior';
 
 export type { BuildingModel, UnitAnimator, UnitModel, UpgradeKit, UpgradeLook } from './types';
-export { hasBuildingModel, loadModels } from './gltf';
+export { hasBuildingModel, hasUnitModel, loadModels } from './gltf';
 export { makeParachute } from './parachute';
 export { makePod } from './pod';
 export { makeSandworm, WORM_DEPTH, type SandwormModel } from './sandworm';

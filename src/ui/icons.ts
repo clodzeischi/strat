@@ -94,6 +94,9 @@ const COMMANDS = {
   unload: `<rect x="3" y="28" width="34" height="6" fill="#9c968a"/><rect x="5" y="13" width="18" height="16" fill="${SAND}"/><rect x="4" y="10" width="20" height="4" fill="${C}"/><rect x="11" y="20" width="6" height="9" fill="${DARK}"/><rect x="24" y="18" width="7" height="5" fill="#e0b030"/><polygon points="30,13 38,20.5 30,28" fill="#e0b030"/>`,
 };
 
+/** Level-up icons: the building's icon with green chevrons. */
+const LEVEL_UPS: readonly string[] = ['conyard2', 'factory2', 'barracks2', 'fab2', 'sietch2'];
+
 export const ALL_ICONS = {
   ...ICONS, ...COMMANDS,
   conyard2: ICONS.conyard + CHEVRON, factory2: ICONS.factory + CHEVRON, barracks2: ICONS.barracks + CHEVRON, fab2: ICONS.fab + CHEVRON,
@@ -101,7 +104,16 @@ export const ALL_ICONS = {
 };
 export type IconKey = keyof typeof ALL_ICONS;
 
+/** Icons rendered from the local player's Blender models (see model-icons.ts); they replace the drawings above. */
+const rendered = new Map<IconKey, string>();
+
+export function setModelIcons(urls: Map<IconKey, string>): void {
+  for (const [k, url] of urls) rendered.set(k, url);
+}
+
 /** A card icon as an SVG element string, in the player's team color. */
 export function icon(key: IconKey, team: Team): string {
-  return `<svg viewBox="0 0 40 40" style="color:${TEAM_CSS[team]}">${ALL_ICONS[key]}</svg>`;
+  const url = rendered.get(key);
+  const body = url ? `<image href="${url}" width="40" height="40"/>${LEVEL_UPS.includes(key) ? CHEVRON : ''}` : ALL_ICONS[key];
+  return `<svg viewBox="0 0 40 40" style="color:${TEAM_CSS[team]}">${body}</svg>`;
 }

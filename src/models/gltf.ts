@@ -71,6 +71,11 @@ export function hasBuildingModel(type: BuildingType, faction: Faction): boolean 
   return scenes.has(`buildings/${type}.${faction}`);
 }
 
+/** Whether this unit has a Blender model. */
+export function hasUnitModel(type: UnitType, faction: Faction): boolean {
+  return scenes.has(`units/${type}.${faction}`);
+}
+
 /** A copy of a loaded model with team-colored parts, sharing geometry with every other copy. */
 function cloneModel(key: string, color: number): THREE.Object3D | null {
   const src = scenes.get(key);
