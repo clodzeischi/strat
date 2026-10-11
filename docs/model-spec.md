@@ -31,7 +31,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 
 | Type | Unit | Faction | Radius | Turret | Upgrade parts | Notes |
 |---|---|---|---|---|---|---|
-| `infantry` | Infantry | Atreides | 0.45 | | weapons, armor, rockets | animated; ~0.75 m tall |
+| `infantry` | Infantry | Atreides | 0.45 | | weapons, armor, rockets | animated; ~0.75 m tall (the game draws infantry 1.6× bigger) |
 | `trike` | Trike | Atreides | 0.8 | | weapons, armor, nitro | ~1.3 m long |
 | `tank` | Tank | Atreides | 1.1 | yes | weapons, armor | |
 | `rocket` | MLRS | Atreides | 1.0 | yes | weapons, armor | |
@@ -96,8 +96,8 @@ The loader finds parts by object name. Names are exact and lowercase.
 | `muzzle` | Empty | Where shots start. Child of `turret` if there is one, otherwise of `body`. Every armed unit, plus the Auto Turret. |
 | `spinner` | mesh | A building's moving piece. Origin on its rotation axis (Z). |
 | `level2` | mesh | Structure added at building level 2. Child of `body`. |
-| `armor0`, `armor1`, `armor2` | mesh | Armor tiers. Each is a complete, separate hull, not a bolt-on: exactly one is shown, and `armor0` is hidden once `armor1` is researched. If a tier is missing, the highest one the model has below it shows (Corrino units only have `armor0` and `armor1`). Child of `body`. On a turreted unit, the turret's share of a tier is a second object named `armor1_turret` (etc.), child of `turret`; it shows and hides with `armor1`. |
-| `weapons0`, `weapons1`, `weapons2` | mesh | Weapon tiers, swapped the same way and independently of armor, so always separate objects. Child of `turret` if there is one, otherwise of `body`. |
+| `armor0`, `armor1`, `armor2` | mesh | Armor tiers. On vehicles each is a complete, separate hull, not a bolt-on (infantry differ, see Infantry below): exactly one is shown, and `armor0` is hidden once `armor1` is researched. If a tier is missing, the highest one the model has below it shows (Corrino units only have `armor0` and `armor1`). Child of `body`. On a turreted unit, the turret's share of a tier is a second object named `armor1_turret` (etc.), child of `turret`; it shows and hides with `armor1`. |
+| `weapons0`, `weapons1`, `weapons2` | mesh | Weapon tiers, swapped the same way and independently of armor, so always separate objects. Child of `turret` if there is one, otherwise of `body`. On infantry they're add-ons (see Infantry below). |
 | `up_<upgrade>` | mesh | Parts added once a one-step upgrade is researched: `up_rockets`, `up_nitro`, `up_harvest`. Child of `turret` if it moves with it, otherwise of `body`. |
 | `laser` | Empty | A fading laser-sight beam, drawn by the game. It points forward (+X) from the empty; the custom property `len` sets its length (default 1). Child of the weapon tier that has it (usually `weapons2`), so it shows and hides with it. Needs Data → Custom Properties on at export. |
 
@@ -157,6 +157,16 @@ Rig with an armature and animate as usual. A build step samples each frame and b
 - Keep each action short. `walk` is one stride cycle of about 0.6–0.8 s at walking speed (2.4–3 m/s, see `speed` in `units.ts`). Total across all actions ≤ 90 frames.
 - The rig moves on the spot: no root motion. The game moves the unit.
 - `up_*` parts are skinned to the same armature.
+
+Infantry upgrades are **add-ons**, not swap bodies (the game shows every tier up to the researched one):
+
+- `body`: the bare soldier, always shown. There is no `armor0`.
+- `armor1`, `armor2`: armor pieces worn over `body`; tier 2 shows both, so `armor2` holds only what it adds (Atreides: `armor1` is helmet and shoulder pads, `armor2` the chest plate).
+- `weapons0`: the base gun, skinned 100% to `hand.R` with its barrel along the hand bone. `weapons1`, `weapons2` hold only what each tier adds (Atreides: optic, then laser module plus the `laser` empty).
+- `up_rockets`: stays slung on the back (skinned to `chest`), also while firing.
+- Every mesh is skinned to the one shared armature, so all parts follow every action.
+- `muzzle` is an Empty parented to the `hand.R` bone at the base gun's barrel tip. `muzzle_rockets` (same idea, on the rocket tube) is reserved; the game doesn't read it yet.
+- Count the triangle budget with every add-on shown.
 
 ### Rigid moving parts (vehicles, buildings)
 

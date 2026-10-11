@@ -36,7 +36,7 @@ import { glider } from './units/glider';
 import { mortar } from './units/mortar';
 import { warrior } from './units/warrior';
 
-export type { BuildingModel, UnitModel, UpgradeKit, UpgradeLook } from './types';
+export type { BuildingModel, UnitAnimator, UnitModel, UpgradeKit, UpgradeLook } from './types';
 export { hasBuildingModel, loadModels } from './gltf';
 export { makeParachute } from './parachute';
 export { makePod } from './pod';

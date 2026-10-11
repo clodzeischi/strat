@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import type { BuildingType, Faction, UnitType } from '../config';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { UNITS, type BuildingType, type Faction, type UnitType } from '../config';
 import { laser } from './parts';
-import type { UnitModel, UpgradeLook } from './types';
+import type { AnimState, UnitAnimator, UnitModel, UpgradeLook } from './types';
 
 /**
  * Blender-made models in src/public/models/ (see docs/model-spec.md), as `<kind>/<type>.<faction>`. Anything not
@@ -12,9 +13,14 @@ const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
   'buildings/bunker.atreides', 'buildings/hitech.atreides',
   'units/harvester.atreides', 'units/harvester.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
+  'units/infantry.atreides',
 ];
 
 const scenes = new Map<string, THREE.Object3D>();
+/** Infantry are modelled ~0.75 m tall (docs/model-spec.md) and drawn this much bigger, so they read on screen. */
+const INFANTRY_SCALE = 1.6;
+/** Animated (skinned) models' actions by name: `idle`, `walk`, `shoot`, `die`. */
+const clips = new Map<string, THREE.AnimationClip[]>();
 let paletteMat: THREE.MeshLambertMaterial | null = null;
 const teamMats = new Map<number, THREE.MeshLambertMaterial>();
 
@@ -38,8 +44,11 @@ export async function loadModels(): Promise<void> {
           o.userData.team = (o.material as THREE.Material).name === 'team';
           o.castShadow = true;
           o.receiveShadow = true;
+          // Skinned parts move far from their rest pose (lying down when dying): cull them by a generous sphere.
+          if (o instanceof THREE.SkinnedMesh) o.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.3, 0), 0.9);
         });
         scenes.set(f, gltf.scene);
+        if (gltf.animations.length) clips.set(f, gltf.animations);
       } catch (e) {
         console.warn(`model ${f} failed to load, using the procedural one`, e);
       }
@@ -66,7 +75,8 @@ export function hasBuildingModel(type: BuildingType, faction: Faction): boolean 
 function cloneModel(key: string, color: number): THREE.Object3D | null {
   const src = scenes.get(key);
   if (!src) return null;
-  const copy = src.clone(true);
+  // Skinned meshes need their own skeleton per copy; plain models share everything but transforms.
+  const copy = clips.has(key) ? cloneSkinned(src) : src.clone(true);
   copy.traverse((o) => {
     if (o instanceof THREE.Mesh) o.material = o.userData.team ? teamMat(color) : paletteMat!;
   });
@@ -78,20 +88,26 @@ export function cloneBuildingModel(type: BuildingType, faction: Faction, color: 
 }
 
 /**
- * A unit's Blender model, facing +X. Armor and weapon tiers are whole alternative parts (`armor0`-`armor2`,
- * `weapons0`-`weapons2`): exactly one of each set shows, the highest researched one the model has. One-step upgrades
- * (`up_rockets`, `up_nitro`, `up_harvest`) show once researched.
+ * A unit's Blender model, facing +X. Armor and weapon tiers (`armor0`-`armor2`, `weapons0`-`weapons2`) are whole
+ * alternative parts on vehicles: exactly one of each set shows, the highest researched one the model has. On infantry
+ * they're add-ons: every tier up to the researched one shows on top of `body`. One-step upgrades (`up_rockets`,
+ * `up_nitro`, `up_harvest`) show once researched.
  * `laser` empties turn into fading laser-sight beams, shown with whatever part they belong to.
  */
 export function cloneUnitModel(type: UnitType, faction: Faction, color: number): UnitModel | null {
   const model = cloneModel(`units/${type}.${faction}`, color);
   if (!model) return null;
   const body = new THREE.Group();
+  const scale = UNITS[type].infantry ? INFANTRY_SCALE : 1;
+  model.scale.setScalar(scale);
   body.add(model);
-  // `laser` empties become the game's fading laser-sight beam, pointing forward (+X), `len` (custom property) long.
+  // `laser` empties become the game's fading laser-sight beam along the empty's +X, `len` (custom property) long.
+  // One hung on a bone (infantry) names the part it shows with in its `part` property.
   const lasers: THREE.Object3D[] = [];
   model.traverse((o) => { if (o.name.startsWith('laser')) lasers.push(o); });
-  for (const l of lasers) laser(l.parent!, l.position.x, l.position.y, l.position.z, l.userData.len ?? 1);
+  // Beams keep their length and thickness on scaled-up infantry.
+  for (const l of lasers) laser(l, 0, 0, 0, (l.userData.len ?? 1) / scale, 0.025 / scale);
+  const laserParts = lasers.filter((l) => l.userData.part).map((l) => ({ l, part: model.getObjectByName(l.userData.part) }));
   const turret = model.getObjectByName('turret') ?? null;
   const muzzle = model.getObjectByName('muzzle') ?? new THREE.Object3D();
   if (!muzzle.parent) (turret ?? body).add(muzzle);
@@ -105,16 +121,61 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
   const armor = tiers('armor');
   const weapons = tiers('weapons');
   const extras = { rockets: model.getObjectByName('up_rockets'), nitro: model.getObjectByName('up_nitro'), harvest: model.getObjectByName('up_harvest') };
+  const additive = UNITS[type].infantry;
   const pick = (set: (THREE.Object3D[] | null)[], level: number) => {
     let shown = -1;
     for (let i = 0; i <= level; i++) if (set[i]) shown = i;
-    set.forEach((parts, i) => parts?.forEach((o) => { o.visible = i === shown; }));
+    set.forEach((parts, i) => parts?.forEach((o) => { o.visible = additive ? i <= level : i === shown; }));
   };
   const showUpgrades = (look: UpgradeLook) => {
     pick(armor, look.armor);
     pick(weapons, look.weapons);
     for (const k of ['rockets', 'nitro', 'harvest'] as const) if (extras[k]) extras[k]!.visible = look[k];
+    for (const { l, part } of laserParts) l.visible = part?.visible ?? true;
   };
   showUpgrades({ weapons: 0, armor: 0, rockets: false, nitro: false, harvest: false });
-  return { body, turret, muzzle, showUpgrades };
+  const actions = clips.get(`units/${type}.${faction}`);
+  return { body, turret, muzzle, showUpgrades, anim: actions ? animator(model, actions) : undefined };
+}
+
+/** Plays a skinned model's actions: one looping state at a time, cross-faded, and a one-off death. */
+function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnimator {
+  const mixer = new THREE.AnimationMixer(model);
+  const act = (name: string) => {
+    const clip = list.find((c) => c.name === name);
+    return clip ? mixer.clipAction(clip) : null;
+  };
+  const loops: Record<AnimState, THREE.AnimationAction | null> = { idle: act('idle'), walk: act('walk'), shoot: act('shoot') };
+  const death = act('die');
+  if (death) {
+    death.setLoop(THREE.LoopOnce, 1);
+    death.clampWhenFinished = true;
+  }
+  let state: AnimState = 'idle';
+  let current = loops.idle;
+  current?.play();
+  // Spread the idles so a squad doesn't breathe in step.
+  if (current) current.time = Math.random() * current.getClip().duration;
+  return {
+    set(next, fired, rate = 1) {
+      const a = loops[next];
+      if (!a) return;
+      a.timeScale = rate;
+      if (next === state && !(fired && next === 'shoot')) return;
+      a.reset().play();
+      if (current && current !== a) current.crossFadeTo(a, 0.12, false);
+      state = next;
+      current = a;
+    },
+    update(dt) {
+      mixer.update(dt);
+    },
+    die() {
+      if (!death) return 0;
+      death.reset().play();
+      if (current) current.crossFadeTo(death, 0.08, false);
+      current = death;
+      return death.getClip().duration;
+    },
+  };
 }

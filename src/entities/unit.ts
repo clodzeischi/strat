@@ -6,7 +6,7 @@ import {
 import type { Game } from '../game/game';
 import { findPath, type Point } from '../game/pathfinding';
 import { SAND, SPICE, type Cell } from '../map';
-import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit, type UpgradeLook } from '../models';
+import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit, type UnitAnimator, type UpgradeLook } from '../models';
 import { Building } from './building';
 import { distTo } from './distance';
 import { Entity } from './entity';
@@ -152,6 +152,10 @@ export class Unit extends Entity {
   private deployPose: ((t: number) => void) | null;
   /** Drawing only: the dig-in pose last drawn, to puff dust as the spades hit the ground. */
   private drawnDeploy = 0;
+  /** Animated (skinned) models: plays idle, walk, shoot and die. Drawing only. */
+  readonly anim: UnitAnimator | null;
+  /** Drawing only: where the last tick left the unit and its weapons' cooldowns, to tell walking and firing apart. */
+  private animLast = { x: 0, z: 0, cooldown: 0, cooldown2: 0, shooting: 0 };
   /** Seconds until the weapon can fire again (also counted down by a bunker the unit is in). */
   cooldown = 0;
   private scanTimer = 0;
@@ -207,6 +211,9 @@ export class Unit extends Entity {
     this.muzzle = model.muzzle;
     this.deployPose = model.deploy ?? null;
     this.showUpgrades = model.showUpgrades ?? null;
+    this.anim = model.anim ?? null;
+    this.animLast.x = x;
+    this.animLast.z = z;
     this.root.add(this.body);
   }
 
@@ -242,6 +249,28 @@ export class Unit extends Entity {
   }
 
   /** Draws the unit `alpha` of the way from the previous tick's pose to the latest one. */
+  /** Drawn frames: advances an animated model. */
+  animate(dt: number): void {
+    this.anim?.update(dt);
+  }
+
+  /** Per tick: picks the animated model's action from what the unit did since the last tick. */
+  private pickAnim(dt: number): void {
+    const a = this.animLast;
+    const moved = hypot(this.x - a.x, this.z - a.z);
+    // A fresh shot resets a weapon's cooldown upward.
+    const fired = this.cooldown > a.cooldown + 1e-6 || this.cooldown2 > a.cooldown2 + 1e-6;
+    a.x = this.x;
+    a.z = this.z;
+    a.cooldown = this.cooldown;
+    a.cooldown2 = this.cooldown2;
+    a.shooting = fired ? 0.8 : Math.max(0, a.shooting - dt);
+    const speed = dt > 0 ? moved / dt : 0;
+    if (speed > 0.3) this.anim!.set('walk', false, THREE.MathUtils.clamp(speed / this.def.speed, 0.6, 1.4));
+    else if (a.shooting > 0) this.anim!.set('shoot', fired);
+    else this.anim!.set('idle', false);
+  }
+
   interpolate(alpha: number): void {
     const p = this.pose;
     if (p.fresh) return;
@@ -1139,6 +1168,7 @@ export class Unit extends Entity {
 
   syncVisual(game: Game, dt: number): void {
     this.refreshKit(game);
+    if (this.anim && !this.falling) this.pickAnim(dt);
     if (this.falling?.top !== undefined) {
       // The canopy opens over the first stretch of the fall, so it never blooms inside the aircraft.
       const open = THREE.MathUtils.clamp((this.falling.top - this.y) / CHUTE_OPEN, 0.05, 1);

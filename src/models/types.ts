@@ -9,6 +9,20 @@ export interface UnitModel {
   deploy?: (t: number) => void;
   /** Blender models: shows the parts for these upgrades (instead of building an upgrade kit). */
   showUpgrades?: (look: UpgradeLook) => void;
+  /** Animated (skinned) models: plays their actions. Drawing only. */
+  anim?: UnitAnimator;
+}
+
+/** The looping actions of an animated unit. */
+export type AnimState = 'idle' | 'walk' | 'shoot';
+
+export interface UnitAnimator {
+  /** Plays a looping action (`rate` scales its speed); `fired` restarts `shoot` so each shot gets its kick. */
+  set(state: AnimState, fired: boolean, rate?: number): void;
+  /** Advances the animation by a drawn frame. */
+  update(dt: number): void;
+  /** Starts the death action; returns its length in seconds (0 without one). */
+  die(): number;
 }
 
 /** Extra parts showing upgrades; `turret` parts follow the turret's rotation. */

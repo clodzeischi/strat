@@ -19,6 +19,9 @@ import { Vision, VISION_EVERY } from './vision';
 import { hypot } from './hypot';
 import * as dm from './dmath';
 
+/** Fallen infantry: seconds lying after the death animation, then sinking at `sink` m/s for `sinkTime` seconds. */
+const CORPSE = { lie: 2.5, sink: 0.4, sinkTime: 1.5 };
+
 /** Running totals for the end-of-game screen. */
 export interface TeamStats {
   unitsBuilt: number;
@@ -210,6 +213,8 @@ export class Game {
   private lastDropAlert = -100;
   /** Set while a worm's bite is dealt out. */
   private wormBiting = false;
+  /** Drawing only: fallen animated infantry playing their death, then sinking into the sand. */
+  private corpses: { u: Unit; age: number; hold: number }[] = [];
   private victoryTimer = 0;
 
   constructor(
@@ -1113,6 +1118,7 @@ export class Game {
     e.setSelected(false);
     // The local player keeps seeing a structure they knew about until they look again.
     if (e instanceof Building && e.known && !this.shown(e)) this.ghosts.push(e);
+    else if (e instanceof Unit && e.anim && !this.wormBiting) this.layCorpse(e);
     else this.scene.remove(e.root);
     if (e instanceof Building) {
       this.clearFootprint(e);
@@ -1557,6 +1563,28 @@ export class Game {
     return u;
   }
 
+  /** Drawing only: an animated unit plays its death where it fell, lies there a moment, then sinks away. */
+  private layCorpse(u: Unit): void {
+    // The fallen don't get a health bar or selection ring back.
+    u.root.remove(u.bar);
+    u.setSelected(false);
+    this.corpses.push({ u, age: 0, hold: u.anim!.die() + CORPSE.lie });
+  }
+
+  private drawCorpses(dt: number): void {
+    const local = this.localTeam;
+    this.corpses = this.corpses.filter((c) => {
+      const r = c.u.root;
+      c.age += dt;
+      r.visible = this.revealAll || c.u.team === local || this.vision.seesAt(local, r.position.x, r.position.z);
+      c.u.animate(dt);
+      if (c.age > c.hold) r.position.y -= dt * CORPSE.sink;
+      if (c.age < c.hold + CORPSE.sinkTime) return true;
+      this.scene.remove(r);
+      return false;
+    });
+  }
+
   /** Takes a unit or structure off the map without it counting as lost (a crew becoming a camp, and back). */
   private remove(e: Unit | Building): void {
     e.dead = true;
@@ -1975,6 +2003,8 @@ export class Game {
    */
   frame(dt: number, alpha: number): void {
     for (const u of this.units) u.interpolate(alpha);
+    for (const u of this.units) if (u.root.visible) u.animate(dt);
+    this.drawCorpses(dt);
     for (const p of this.projectiles) {
       p.mesh.position.lerpVectors(p.from, p.to, alpha);
       p.mesh.visible = this.revealAll || this.vision.seesAt(this.localTeam, p.mesh.position.x, p.mesh.position.z);
