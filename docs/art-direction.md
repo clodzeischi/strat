@@ -74,6 +74,14 @@ A factory, not a temple: they really build vehicles here, and it poisons the gro
 
 Clutter (drums, crates) is built 1/0.707 larger so it ends up the refinery's size after the squash. Keep all of it on the slab and clear of the walls.
 
+### Tleilaxu Research (`tleilaxu`)
+
+A swarm of geodesic domes with Jetsons verticality. The 45° turn on a cross plan, kept to a few big shapes: an earlier pass with corner domes and antennas everywhere read as clutter.
+- **Hub:** a big geodesic dome (panels in two greys, a glowing cyan cap) on a drum with a team band.
+- **Arms:** four pods on splayed legs (saucer body with a team rim, small geodesic dome), joined to the hub by walkway tubes; a ramp at the front pod.
+- **Verticality:** a needle tower at the back on tripod legs, with two saucer decks and banners; its crown of antennas is the `spinner`. A column at the front left lifts a saucer deck with the data-relay dish.
+- **Bio:** glowing axlotl tanks (accent cyan) at the front right, a cyan bio-waste pool at the back left.
+
 ## Fremen
 
 To be defined.
