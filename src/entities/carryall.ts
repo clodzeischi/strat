@@ -59,7 +59,7 @@ export class Carryall extends Unit {
   private dropTimer = 0;
   private lastDropD = Infinity;
   private pitch = 0;
-  private shownTroops = 0;
+  private shownTroops = -1; // -1: sets the pod and seat lights on the first frame (a Blender model arrives with the pod showing)
   private dustDebt = 0;
   /** Engine nacelle angle: 0 pointing forward (cruise), PI/2 straight up (hover). */
   private tilt = Math.PI / 2;
