@@ -31,9 +31,22 @@ A huge tracked lander that has deployed into a base. The command vehicle sits al
 
 In Blender it is laid out square first: the nose points −X, the wings extend along ±Y, and the layout fills the 5.7 m slab. Then it is turned +45° and scaled 0.707 (see [model-spec.md](model-spec.md#buildings)), which puts the nose SW and the wings NW and SE.
 
-## Corrino
+## Corrino: imperial permanence
 
-To be defined.
+Monumental and vertical: the Emperor doesn't deploy, he builds to stay. Stepped pyramids, tapering spires with buttress fins, pinnacles on every corner, tower cranes still at work on them. Where Atreides bolt containers together, Corrino raise stone.
+
+- **Shapes:** sloped walls (ziggurat tiers), tapered spires, pointed pinnacles, slit windows. Symmetric around the front axis.
+- **Colors:**
+  - Walls: `515151`. Top surfaces: `9A9A9A`.
+  - Ledges and trim bands: `C8B7D6` (pale Corrino stone).
+  - Slits, doors, crane steel: `1D1616` near-black.
+- **Team color:** banners. They hang down the sloped faces rather than straight down, so the steep game camera sees them; swallowtail ends, a dark rod across the top.
+
+### Construction Yard (`conyard`)
+
+A regional palace that doubles as the command center: a two-tier ziggurat with a central spire (banners on all four faces), a gatehouse and ramp at the front, pinnacles on the tier corners. Three tower cranes: a tall one on the west corner (the `spinner`), one on the east corner reaching over the palace, and a derrick on the upper tier. Built by the `build.py` text block in the .blend.
+
+**Level 2** makes it the seat of power: two flanking spires with banners, a crown of pinnacles and a mast on the main spire, and a landing pad at the back.
 
 ## Fremen
 
