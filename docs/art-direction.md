@@ -44,9 +44,13 @@ Monumental and vertical: the Emperor doesn't deploy, he builds to stay. Stepped 
 
 ### Construction Yard (`conyard`)
 
-A regional palace that doubles as the command center: a two-tier ziggurat with a central spire (banners on all four faces), a gatehouse and ramp at the front, pinnacles on the tier corners. Three tower cranes: a tall one on the west corner (the `spinner`), one on the east corner reaching over the palace, and a derrick on the upper tier. Built by the `build.py` text block in the .blend.
+A regional palace that doubles as the command center. Unlike the other factions' buildings it isn't turned 45°: it sits square to the slab and fills it. On the slab, laid out like a keypad as seen from the game camera:
+- **Center:** a two-tier ziggurat with a central spire (banners on all four faces) and pinnacles on the tier corners. Two flanking spires frame the portal. The main spire has a crown of pinnacles and a mast on its tip.
+- **2 (front):** grand stairs from the slab edge up to a portal in the upper tier.
+- **4:** the tall tower crane, the `spinner`. Its jib is short and high enough to swing clear of the spires.
+- **9 and 3:** tower cranes with their jibs along the back and front edges.
 
-**Level 2** makes it the seat of power: two flanking spires with banners, a crown of pinnacles and a mast on the main spire, and a landing pad at the back.
+The Corrino conyard doesn't level up, so it has no `level2`. Built by the `build.py` text block in the .blend.
 
 ## Fremen
 
