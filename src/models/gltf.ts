@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { BuildingType, Faction, UnitType } from '../config';
+import { laser } from './parts';
 import type { UnitModel, UpgradeLook } from './types';
 
 /**
@@ -10,7 +11,7 @@ import type { UnitModel, UpgradeLook } from './types';
 const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
   'buildings/bunker.atreides', 'buildings/hitech.atreides',
-  'units/harvester.atreides', 'units/harvester.corrino',
+  'units/harvester.atreides', 'units/harvester.corrino', 'units/trike.atreides',
 ];
 
 const scenes = new Map<string, THREE.Object3D>();
@@ -80,12 +81,17 @@ export function cloneBuildingModel(type: BuildingType, faction: Faction, color: 
  * A unit's Blender model, facing +X. Armor and weapon tiers are whole alternative parts (`armor0`-`armor2`,
  * `weapons0`-`weapons2`): exactly one of each set shows, the highest researched one the model has. One-step upgrades
  * (`up_rockets`, `up_nitro`, `up_harvest`) show once researched.
+ * `laser` empties turn into fading laser-sight beams, shown with whatever part they belong to.
  */
 export function cloneUnitModel(type: UnitType, faction: Faction, color: number): UnitModel | null {
   const model = cloneModel(`units/${type}.${faction}`, color);
   if (!model) return null;
   const body = new THREE.Group();
   body.add(model);
+  // `laser` empties become the game's fading laser-sight beam, pointing forward (+X), `len` (custom property) long.
+  const lasers: THREE.Object3D[] = [];
+  model.traverse((o) => { if (o.name.startsWith('laser')) lasers.push(o); });
+  for (const l of lasers) laser(l.parent!, l.position.x, l.position.y, l.position.z, l.userData.len ?? 1);
   const turret = model.getObjectByName('turret') ?? null;
   const muzzle = model.getObjectByName('muzzle') ?? new THREE.Object3D();
   if (!muzzle.parent) (turret ?? body).add(muzzle);
