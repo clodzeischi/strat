@@ -63,7 +63,7 @@ Ecological disaster: an industrial cathedral that poisons the ground around it. 
 ### Barracks (`barracks`)
 
 A temple more than a barracks: worship first, berthing second. Back to the usual 45° turn, on a cross plan whose arms point at the slab's corners after the turn, so they can reach almost to them (inside |x| + |y| ≤ 3.7 m before the turn) and the building fills the slab. No baked-in plaza: it stands on the game's slab.
-- **Level 1:** a sloped nave front to back and two long wings across it, towers at the wing ends and along the nave, a crossing tower with pinnacles, and a grand stair up to a portal at the front corner. Banners on the nave sides and the wings.
+- **Level 1:** a sloped nave front to back and two long wings across it, towers at the wing ends and along the nave, a crossing tower with pinnacles, and a grand stair up to a portal at the front corner. Banners on the nave sides and the wings. Roofs are dark grey (`515151`) with purple only on the trim bands: purple roofs drowned out the banners.
 - **Level 2 (Imperial Barracks):** the indoctrination spire rises from the crossing tower (crown of pinnacles, a banner on each face), two hooded Sardaukar statues flank the stair, and six free-standing banner pylons stand between the arms.
 
 ## Fremen
