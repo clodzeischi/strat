@@ -10,7 +10,7 @@ import type { UnitModel, UpgradeLook } from './types';
 const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
   'buildings/bunker.atreides', 'buildings/hitech.atreides',
-  'units/harvester.atreides',
+  'units/harvester.atreides', 'units/harvester.corrino',
 ];
 
 const scenes = new Map<string, THREE.Object3D>();
