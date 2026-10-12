@@ -159,13 +159,15 @@ function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnima
   }
   let state: AnimState = 'idle';
   let current = loops.idle;
+  let dead = false;
   current?.play();
   // Spread the idles so a squad doesn't breathe in step.
   if (current) current.time = Math.random() * current.getClip().duration;
   return {
     set(next, fired, rate = 1) {
       const a = loops[next];
-      if (!a) return;
+      // Once dying, nothing fades the death back out.
+      if (!a || dead) return;
       a.timeScale = rate;
       if (next === state && !(fired && next === 'shoot')) return;
       a.reset().play();
@@ -178,6 +180,7 @@ function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnima
     },
     die() {
       if (!death) return 0;
+      dead = true;
       death.reset().play();
       if (current) current.crossFadeTo(death, 0.08, false);
       current = death;

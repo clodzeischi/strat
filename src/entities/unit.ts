@@ -1168,7 +1168,8 @@ export class Unit extends Entity {
 
   syncVisual(game: Game, dt: number): void {
     this.refreshKit(game);
-    if (this.anim && !this.falling) this.pickAnim(dt);
+    // Units killed earlier this tick are already playing their death.
+    if (this.anim && !this.falling && !this.dead) this.pickAnim(dt);
     if (this.falling?.top !== undefined) {
       // The canopy opens over the first stretch of the fall, so it never blooms inside the aircraft.
       const open = THREE.MathUtils.clamp((this.falling.top - this.y) / CHUTE_OPEN, 0.05, 1);
