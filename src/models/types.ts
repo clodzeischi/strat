@@ -7,6 +7,8 @@ export interface UnitModel {
   muzzle: THREE.Object3D;
   /** Units that deploy: poses the model from 0 (mobile) to 1 (dug in). Drawing only. */
   deploy?: (t: number) => void;
+  /** Units that deploy: where their spades bite into the ground, and how far into the deploy (0-1) they do. */
+  plant?: { at: number; spades: THREE.Object3D[] };
   /** Blender models: shows the parts for these upgrades (instead of building an upgrade kit). */
   showUpgrades?: (look: UpgradeLook) => void;
   /** Animated (skinned) models: plays their actions. Drawing only. */

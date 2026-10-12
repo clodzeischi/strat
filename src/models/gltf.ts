@@ -147,7 +147,16 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
     body, turret, muzzle, showUpgrades,
     anim: actions.length ? animator(model, actions) : undefined,
     deploy: deployClip ? deployPose(model, deployClip) : undefined,
+    plant: deployClip ? plantOf(model) : undefined,
   };
+}
+
+/** The `spade` empties on a deploying model's legs, and when they touch down (`plant` on `body`, 0-1). */
+function plantOf(model: THREE.Object3D): UnitModel['plant'] {
+  const spades: THREE.Object3D[] = [];
+  model.traverse((o) => { if (o.name.startsWith('spade')) spades.push(o); });
+  const at = model.getObjectByName('body')?.userData.plant;
+  return spades.length && typeof at === 'number' ? { at, spades } : undefined;
 }
 
 /** A `deploy` action played as a slider: 0 is its first frame (mobile), 1 its last (dug in). */

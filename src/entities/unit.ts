@@ -6,7 +6,7 @@ import {
 import type { Game } from '../game/game';
 import { findPath, type Point } from '../game/pathfinding';
 import { SAND, SPICE, type Cell } from '../map';
-import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit, type UnitAnimator, type UpgradeLook } from '../models';
+import { disposeParts, makeParachute, makePod, makeUnitModel, makeUpgradeKit, type UnitAnimator, type UnitModel, type UpgradeLook } from '../models';
 import { Building } from './building';
 import { distTo } from './distance';
 import { Entity } from './entity';
@@ -152,6 +152,8 @@ export class Unit extends Entity {
   private deployPose: ((t: number) => void) | null;
   /** Drawing only: the dig-in pose last drawn, to puff dust as the spades hit the ground. */
   private drawnDeploy = 0;
+  /** Where and when the model's spades touch down while deploying, if it says. */
+  private readonly plant: UnitModel['plant'] | null;
   /** Animated (skinned) models: plays idle, walk, shoot and die. Drawing only. */
   readonly anim: UnitAnimator | null;
   /** Drawing only: where the last tick left the unit and its weapons' cooldowns, to tell walking and firing apart. */
@@ -210,6 +212,7 @@ export class Unit extends Entity {
     this.turret = model.turret;
     this.muzzle = model.muzzle;
     this.deployPose = model.deploy ?? null;
+    this.plant = model.plant ?? null;
     this.showUpgrades = model.showUpgrades ?? null;
     this.anim = model.anim ?? null;
     this.animLast.x = x;
@@ -1217,11 +1220,20 @@ export class Unit extends Entity {
       if (t !== this.drawnDeploy) {
         this.deployPose(t);
         // The spades bite into the ground.
-        if (this.drawnDeploy < 0.42 && t >= 0.42) {
-          for (const [fx, fz] of [[0.75, 0.9], [-0.75, 0.9], [0.75, -0.9], [-0.75, -0.9]]) {
-            const c = dm.cos(this.heading);
-            const sn = dm.sin(this.heading);
-            game.effects.dust(new THREE.Vector3(this.x + fx * c - fz * sn, this.y + 0.1, this.z + fx * sn + fz * c), 0xc8b088, 0.6);
+        const at = this.plant?.at ?? 0.42;
+        if (this.drawnDeploy < at && t >= at) {
+          if (this.plant) {
+            this.root.updateMatrixWorld(true);
+            for (const s of this.plant.spades) {
+              const p = s.getWorldPosition(new THREE.Vector3());
+              game.effects.dust(p.setY(this.y + 0.1), 0xc8b088, 0.6);
+            }
+          } else {
+            for (const [fx, fz] of [[0.75, 0.9], [-0.75, 0.9], [0.75, -0.9], [-0.75, -0.9]]) {
+              const c = dm.cos(this.heading);
+              const sn = dm.sin(this.heading);
+              game.effects.dust(new THREE.Vector3(this.x + fx * c - fz * sn, this.y + 0.1, this.z + fx * sn + fz * c), 0xc8b088, 0.6);
+            }
           }
         }
         this.drawnDeploy = t;
