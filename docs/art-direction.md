@@ -89,6 +89,10 @@ Outer works: low and wide, the 45° turn on a cross plan (inside |x| + |y| ≤ 3
 - **Arms:** four fat, short vehicle ramps down to the slab, dark with light tread stripes between purple-topped curbs. (Damaged units park around the pad, not on it.)
 - **Between the ramps:** a workshop shed, a parts store, a fuel stand (tanks, pump, oil slick) and two banner pylons. Stadium lights (a bank of cyan lamps facing the deck) stand at the sides and back, never at the front, where they'd hide the deck.
 
+### Auto Turret (`turret`)
+
+A fortified plinth with sloped walls, turned 45°, with four buttress arms to the slab corners, a purple trim ledge and a banner on each face. The gun head (the `spinner`) is built at final size, facing +X and not turned, since the game sets its heading: four raised autocannon barrels in a mantlet between two tall missile pods (launch hatches on top, a team panel on each outer side), a sensor block at the back and a radar mast. The `muzzle` empty sits at the barrel tips.
+
 ## Fremen
 
 To be defined.
