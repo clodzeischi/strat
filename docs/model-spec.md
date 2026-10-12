@@ -171,7 +171,7 @@ Infantry upgrades are **add-ons**, not swap bodies (the game shows every tier up
 
 ### Rigid moving parts (vehicles, buildings)
 
-The game moves `turret` and `spinner` itself; don't animate them. A unit with a **deploy** pose (`artillery`) has an action named `deploy` that keys the transforms of named parts from mobile (first frame) to dug in (last frame). The game plays it as a 0–1 slider. Only key the objects listed under Named objects, plus any extra named child meshes the deploy needs (`leg_1`, `leg_2`, ...).
+The game moves `turret` and `spinner` itself; don't animate them. A unit with a **deploy** pose (`artillery`) has an action named `deploy` that keys the transforms of named parts from mobile (first frame) to dug in (last frame). The game plays it as a 0–1 slider. Only key the objects listed under Named objects, plus any extra named child meshes the deploy needs (`leg_1`, `leg_2`, ...). Each keyed object has its own action pushed onto an NLA track named `deploy`; export with Animation mode **NLA Tracks**, which merges them into one `deploy` animation. A part that moves with the deploy and carries tier parts (the Soulcrusher's `gun`, which raises its barrels and the `muzzle`) is a child of `turret`, and those tiers are its children.
 
 ## Export
 

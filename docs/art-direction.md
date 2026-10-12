@@ -100,6 +100,13 @@ An enclosed half-track: oppressive and effective, a little bigger than the Atrei
 - **`armor1`:** skirts over the tracks (with team panels), a dozer ram and cockpit cheek plates.
 - **Dreadflame:** one emitter centred on the glacis, since the flame comes from one `muzzle`. `weapons0` has two nozzles, a pilot light and two purple fuel tanks on the rear deck; `weapons1` has five nozzles and a third tank.
 
+### Soulcrusher (`artillery`)
+
+A long-range howitzer, purely: not a brawler like StarCraft's siege tank. The concept's Mk II "Brutalist" slab hull with Mk I touches, at the Atreides tank's footprint (about 2.5 × 1.5 m) with a long barrel (about 2.2 m from the trunnion).
+- **Hull (`armor0`):** slab sides with a chamfered top edge, sloped glacis and rear, purple inlay along the top, team panels on the flanks. `armor1` adds skirts over the tracks, a glacis plate, and spaced cheek plates on the turret (`armor1_turret`).
+- **Turret:** a big wedge casemate with a purple inlay, team panels, a team roof stripe, cupola and sight block. The `gun` (mantlet) raises the barrel: `weapons0` is plain with a box muzzle brake; `weapons1` is thicker with a fume extractor, plus an ammo bustle on the turret's back (`weapons1_rack`).
+- **Legs:** four stabilizer struts (`leg_1`–`leg_4`) with rams, purple strips and spiked spades. They don't hide: mobile, they lie along the flanks, the front pair folded back and the rear pair forward. The `deploy` action swings them out to the corners, drops them onto their spades, then raises the gun to about 45°.
+
 ## Fremen
 
 To be defined.

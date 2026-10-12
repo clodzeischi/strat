@@ -13,7 +13,7 @@ const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
   'buildings/bunker.atreides', 'buildings/hitech.atreides',
   'buildings/conyard.corrino', 'buildings/refinery.corrino', 'buildings/barracks.corrino', 'buildings/fab.corrino', 'buildings/tleilaxu.corrino', 'buildings/pad.corrino', 'buildings/turret.corrino',
-  'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
+  'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
   'units/infantry.atreides',
 ];
 
@@ -140,8 +140,33 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
     for (const { l, part } of laserParts) l.visible = part?.visible ?? true;
   };
   showUpgrades({ weapons: 0, armor: 0, rockets: false, nitro: false, harvest: false });
-  const actions = clips.get(`units/${type}.${faction}`);
-  return { body, turret, muzzle, showUpgrades, anim: actions ? animator(model, actions) : undefined };
+  const all = clips.get(`units/${type}.${faction}`) ?? [];
+  const deployClip = all.find((c) => c.name === 'deploy');
+  const actions = all.filter((c) => c !== deployClip);
+  return {
+    body, turret, muzzle, showUpgrades,
+    anim: actions.length ? animator(model, actions) : undefined,
+    deploy: deployClip ? deployPose(model, deployClip) : undefined,
+  };
+}
+
+/** A `deploy` action played as a slider: 0 is its first frame (mobile), 1 its last (dug in). */
+function deployPose(model: THREE.Object3D, clip: THREE.AnimationClip): (t: number) => void {
+  const mixer = new THREE.AnimationMixer(model);
+  const action = mixer.clipAction(clip);
+  action.setLoop(THREE.LoopOnce, 1);
+  action.clampWhenFinished = true;
+  action.play();
+  action.paused = true;
+  let last = -1;
+  const pose = (t: number) => {
+    if (t === last) return;
+    last = t;
+    action.time = THREE.MathUtils.clamp(t, 0, 1) * clip.duration;
+    mixer.update(0);
+  };
+  pose(0);
+  return pose;
 }
 
 /** Plays a skinned model's actions: one looping state at a time, cross-faded, and a one-off death. */
