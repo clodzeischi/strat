@@ -13,7 +13,7 @@ const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
   'buildings/bunker.atreides', 'buildings/hitech.atreides',
   'buildings/conyard.corrino', 'buildings/refinery.corrino', 'buildings/barracks.corrino', 'buildings/fab.corrino', 'buildings/tleilaxu.corrino', 'buildings/pad.corrino', 'buildings/turret.corrino',
-  'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/devastator.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
+  'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/devastator.corrino', 'units/raider.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
   'units/infantry.atreides',
 ];
 
@@ -147,10 +147,19 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
     body, turret, muzzle, showUpgrades,
     crow: model.getObjectByName('crow') ?? undefined,
     muzzle2: model.getObjectByName('muzzle2') ?? undefined,
+    wings: named(model, 'wing_'),
+    jets: named(model, 'jet_'),
     anim: actions.length ? animator(model, actions) : undefined,
     deploy: deployClip ? deployPose(model, deployClip) : undefined,
     plant: deployClip ? plantOf(model) : undefined,
   };
+}
+
+/** The model's objects whose names start with `prefix`, in name order; undefined if there are none. */
+function named(model: THREE.Object3D, prefix: string): THREE.Object3D[] | undefined {
+  const found: THREE.Object3D[] = [];
+  model.traverse((o) => { if (o.name.startsWith(prefix)) found.push(o); });
+  return found.length ? found.sort((a, b) => a.name.localeCompare(b.name)) : undefined;
 }
 
 /** The `spade` empties on a deploying model's legs, and when they touch down (`plant` on `body`, 0-1). */

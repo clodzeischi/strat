@@ -116,6 +116,16 @@ The scariest thing on the field, and rare: a Sardaukar siege engine about 1.5× 
 - **Turret:** an arrowhead casemate with angled cheeks to a nose round the mantlet, sloped sides with team panels, a lower bustle. One huge-bore gun (thermal sleeve, fume extractor, box muzzle brake); `weapons1` thickens it and adds recoil cylinders.
 - **CROW:** a remote weapon station on the roof (`crow`, with `muzzle2`) that the game turns onto infantry on its own.
 
+### Sky Raider (`raider`)
+
+The Skyraider Mk IV "Vulture's Talon": a wasp, not a dragonfly, about 3.1 m long with a 2.5 m wingspan.
+- **Head and thorax:** a wedge nose with a raised dark canopy, cyan sensor eyes and two dark mandible prongs; a chunky chamfered thorax with team panels, a purple inlay and a hump carrying the wing roots.
+- **Abdomen:** behind a narrow waist, six telescoping plates that droop a little toward the tail, each rising out of the one before it (no gaps to see the sand through), ending in twin nozzles with a pink glow. It is the jet: in fast flight the game flares the `jet_N` empties.
+- **Wings:** two pairs (`wing_1`–`wing_4`, fore pair first), swept back, light grey with dark spars. Hovering, the game beats them hard and the body drifts like a wasp's; in fast flight they lie back along the abdomen.
+- **Legs:** three pairs folded tight against the body, the front pair forward under the head.
+- **Missile racks:** exposed rails on pylons off the thorax flanks, pink warheads: `weapons0` two missiles a side, `weapons1` three and a purple rail.
+- **`armor1`:** a purple band at every plate joint (`armor0` has two), an armored spine ridge, cockpit cheek armor and flank plates.
+
 ## Fremen
 
 To be defined.

@@ -67,6 +67,12 @@ export class Effects {
     this.glow.spawn({ x: p.x, y: p.y, z: p.z, life: 0.07, size: [size, size * 0.6], color: [0xfff0a0, 0xffa040] });
   }
 
+  /** Jet exhaust: a hot pink flare blown back from a nozzle at (vx, vz). */
+  jet(p: THREE.Vector3, vx: number, vz: number): void {
+    if (!this.visibleAt(p.x, p.z)) return;
+    this.glow.spawn({ x: p.x, y: p.y, z: p.z, vx, vz, drag: 3, life: rand(0.1, 0.16), size: [0.12, 0.04], color: [0xff5cc8, 0x701040], alpha: [0.9, 0] });
+  }
+
   tracer(a: THREE.Vector3, b: THREE.Vector3): void {
     if (!this.visibleAt(a.x, a.z) && !this.visibleAt(b.x, b.z)) return;
     this.tracers.spawn(a, b);

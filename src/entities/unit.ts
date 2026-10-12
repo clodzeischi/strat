@@ -16,6 +16,7 @@ import * as dm from '../game/dmath';
 /** Steepest a vehicle leans to follow the ground, so cliff-foot slopes don't stand it on end. */
 const MAX_TILT = THREE.MathUtils.degToRad(25);
 const UP = new THREE.Vector3(0, 1, 0);
+const tmpJet = new THREE.Vector3();
 const tmpNormal = new THREE.Vector3();
 const tilt = new THREE.Quaternion();
 const yaw = new THREE.Quaternion();
@@ -157,6 +158,14 @@ export class Unit extends Entity {
   private crowBusyUntil = -1;
   /** Deploying units: poses the model from mobile (0) to dug in (1). */
   private deployPose: ((t: number) => void) | null;
+  /** Wasp-winged aircraft (drawing only): the wings (`s` the side sign, `fold` how far they sweep back in fast flight),
+   * the jet nozzles, where the last tick left the unit, how far it is into jet flight (0 hovering, 1 full jet) and
+   * the wing-beat clock. */
+  private readonly wings: { o: THREE.Object3D; s: number; fold: number }[];
+  private readonly jets: THREE.Object3D[];
+  private readonly flyLast = { x: 0, z: 0 };
+  private jet = 0;
+  private wingClock = 0;
   /** Drawing only: the dig-in pose last drawn, to puff dust as the spades hit the ground. */
   private drawnDeploy = 0;
   /** Where and when the model's spades touch down while deploying, if it says. */
@@ -222,6 +231,12 @@ export class Unit extends Entity {
     this.muzzle2 = model.muzzle2 ?? null;
     this.deployPose = model.deploy ?? null;
     this.plant = model.plant ?? null;
+    // Wings on the left (-Z) lift and sweep back with positive turns, the right ones with negative; the fore pair
+    // (wing_1, wing_2) sweeps further back to lie along the hind pair.
+    this.wings = (model.wings ?? []).map((o, i) => ({ o, s: o.position.z < 0 ? 1 : -1, fold: i < 2 ? 0.66 : 0.4 }));
+    this.jets = model.jets ?? [];
+    this.flyLast.x = x;
+    this.flyLast.z = z;
     this.showUpgrades = model.showUpgrades ?? null;
     this.anim = model.anim ?? null;
     this.animLast.x = x;
@@ -264,6 +279,24 @@ export class Unit extends Entity {
   /** Drawn frames: advances an animated model. */
   animate(dt: number): void {
     this.anim?.update(dt);
+    if (this.wings.length) this.beatWings(dt);
+  }
+
+  /** Hovering, the wings beat hard and the body drifts like a wasp's; in fast flight they lie back along the body. */
+  private beatWings(dt: number): void {
+    this.wingClock += dt;
+    const t = this.wingClock;
+    const hover = 1 - this.jet;
+    for (const [i, w] of this.wings.entries()) {
+      const beat = dm.sin(t * 2 * Math.PI * 9 + (i < 2 ? 0 : 0.9));
+      w.o.rotation.set(w.s * (hover * (0.2 + 0.55 * beat) + this.jet * 0.06), w.s * w.fold * this.jet, 0);
+    }
+    const k = hover * 0.22;
+    this.body.position.set(
+      (dm.sin(t * 0.9 + this.id) + 0.4 * dm.sin(t * 2.3 + this.id * 3)) * k,
+      dm.sin(t * 1.6 + this.id) * 0.3 * k + dm.sin(t * 18) * 0.012 * hover,
+      (dm.sin(t * 0.7 + this.id * 2) + 0.4 * dm.sin(t * 2.9 + this.id)) * k,
+    );
   }
 
   /** Per tick: picks the animated model's action from what the unit did since the last tick. */
@@ -1214,6 +1247,19 @@ export class Unit extends Entity {
       this.glideBank += (THREE.MathUtils.clamp(turn * 0.45, -0.6, 0.6) - this.glideBank) * Math.min(1, dt * 4);
       // Roll about its own nose (+X) first, then turn to its heading.
       this.body.rotation.set(this.glideBank + dm.sin(game.time * 1.7 + this.id) * 0.05, -this.heading, 0, 'YXZ');
+    } else if (this.wings.length && !this.falling) {
+      // Speeding up hands over from the wings to the jet: it noses down and the nozzles flare.
+      const v = dt > 0 ? hypot(this.x - this.flyLast.x, this.z - this.flyLast.z) / dt : 0;
+      this.flyLast.x = this.x;
+      this.flyLast.z = this.z;
+      const want = THREE.MathUtils.smoothstep(v / this.def.speed, 0.35, 0.75);
+      this.jet += (want - this.jet) * Math.min(1, dt * 3);
+      this.body.rotation.set(0, -this.heading, dm.sin(game.time * 2.3 + this.id) * 0.05 * (1 - this.jet) - 0.1 * this.jet);
+      if (this.jet > 0.3 && this.root.visible) {
+        const back = -6 * this.jet;
+        this.root.updateMatrixWorld(true);
+        for (const j of this.jets) game.effects.jet(j.getWorldPosition(tmpJet), dm.cos(this.heading) * back, dm.sin(this.heading) * back);
+      }
     } else if (this.falling || this.def.air) {
       this.body.rotation.set(0, -this.heading, dm.sin(game.time * 2.3 + this.id) * 0.08);
     } else if (this.def.infantry) {

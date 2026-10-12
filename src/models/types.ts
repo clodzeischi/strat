@@ -9,6 +9,10 @@ export interface UnitModel {
   crow?: THREE.Object3D;
   /** Where the secondary gun's shots start (on the `crow`). */
   muzzle2?: THREE.Object3D;
+  /** Wasp-winged aircraft: wings hinged at their roots (origin on the hinge), which the game beats while hovering. */
+  wings?: THREE.Object3D[];
+  /** Jet nozzles (empties pointing back) that glow in fast flight. */
+  jets?: THREE.Object3D[];
   /** Units that deploy: poses the model from 0 (mobile) to 1 (dug in). Drawing only. */
   deploy?: (t: number) => void;
   /** Units that deploy: where their spades bite into the ground, and how far into the deploy (0-1) they do. */

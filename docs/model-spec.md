@@ -42,7 +42,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 | `sardaukar` | Sardaukar | Corrino | 0.5 | | weapons, armor | animated |
 | `razor` | Razor | Corrino | 0.85 | | weapons, armor | |
 | `devastator` | Devastator | Corrino | 1.4 | yes | weapons, armor | `crow` with `muzzle2` for the secondary gun |
-| `raider` | Sky Raider | Corrino | 1.0 | | weapons, armor | aircraft |
+| `raider` | Sky Raider | Corrino | 1.0 | | weapons, armor | aircraft; `wing_N` and `jet_N` |
 | `artillery` | Soulcrusher | Corrino | 1.1 | yes | weapons, armor | deploy animation |
 | `warrior` | Fremen Warrior | Fremen | 0.45 | | weapons, armor | animated |
 | `fedaykin` | Fedaykin | Fremen | 0.5 | | weapons, armor | animated |
@@ -96,6 +96,8 @@ The loader finds parts by object name. Names are exact and lowercase.
 | `muzzle` | Empty | Where shots start. Child of `turret` if there is one, otherwise of `body`. Every armed unit, plus the Auto Turret. |
 | `crow` | mesh | A remote weapon station that aims the unit's secondary gun on its own (`devastator`). Origin on its axis, at rest facing +X. Child of `turret`. The game turns it. |
 | `muzzle2` | Empty | Where the secondary gun's shots start. Child of `crow`. |
+| `wing_1`, `wing_2`, ... | mesh | Wasp wings (`raider`), fore pair first. Origin on the root hinge, laid out at rest; the game beats them about the body's long axis while hovering and sweeps them back in fast flight. Child of `body`. |
+| `jet_1`, `jet_2`, ... | Empty | Jet nozzles (`raider`): the game blows a hot flare back from them in fast flight. Child of `body`. |
 | `spinner` | mesh | A building's moving piece. Origin on its rotation axis (Z). |
 | `level2` | mesh | Structure added at building level 2. Child of `body`. |
 | `armor0`, `armor1`, `armor2` | mesh | Armor tiers. On vehicles each is a complete, separate hull, not a bolt-on (infantry differ, see Infantry below): exactly one is shown, and `armor0` is hidden once `armor1` is researched. If a tier is missing, the highest one the model has below it shows (Corrino units only have `armor0` and `armor1`). Child of `body`. On a turreted unit, the turret's share of a tier is a second object named `armor1_turret` (etc.), child of `turret`; it shows and hides with `armor1`. |
