@@ -116,6 +116,14 @@ The scariest thing on the field, and rare: a Sardaukar siege engine about 1.5× 
 - **Turret:** an arrowhead casemate with angled cheeks to a nose round the mantlet, sloped sides with team panels, a lower bustle. One huge-bore gun (thermal sleeve, fume extractor, box muzzle brake); `weapons1` thickens it and adds recoil cylinders.
 - **CROW:** a remote weapon station on the roof (`crow`, with `muzzle2`) that the game turns onto infantry on its own.
 
+### Harkonnen Trooper (`trooper`)
+
+Former masters, now imperial levy: a slow, heavily armoured giant about 0.9 m tall (1.2× the Atreides trooper) and much broader, so he reads bigger at RTS zoom. Hand-shaped by the user over a generated block-out.
+- **Body:** dark power armour, a small helmet sunk into the shoulders with a team crest, a dark chest with a team stripe, purple on the arms and legs, a team-coloured banner hanging from the belt.
+- **`armor1`:** only the shoulder pads, in a subdued team colour.
+- **Weapons:** a fat hand-held rocket launcher carried two-handed at the waist (`weapons0`); `weapons1` adds a top housing and a cyan optic. Skinned to `hand.R`, `muzzle` at the tube tip.
+- **Animation:** a hunched idle, a heavy 10-frame stomp, a big kick on firing, and a death that drops him to his knees and onto his face. `fit.py` in the .blend refits the rig and weights after mesh edits; `anim.py` re-solves both hands onto the launcher wherever it sits.
+
 ### Sky Raider (`raider`)
 
 The Skyraider Mk IV "Vulture's Talon": a wasp, not a dragonfly, about 3.1 m long with a 2.5 m wingspan.
