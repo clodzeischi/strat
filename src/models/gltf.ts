@@ -33,6 +33,8 @@ export async function loadModels(): Promise<void> {
   palette.generateMipmaps = false;
   palette.flipY = false; // glTF UVs
   paletteMat = new THREE.MeshLambertMaterial({ map: palette, flatShading: true });
+  // Shadows come from back faces by default, and models have their undersides deleted: cast from both sides.
+  paletteMat.shadowSide = THREE.DoubleSide;
   const loader = new GLTFLoader();
   await Promise.all(
     FILES.map(async (f) => {
