@@ -13,7 +13,7 @@ const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
   'buildings/bunker.atreides', 'buildings/hitech.atreides',
   'buildings/conyard.corrino', 'buildings/refinery.corrino', 'buildings/barracks.corrino', 'buildings/fab.corrino', 'buildings/tleilaxu.corrino', 'buildings/pad.corrino', 'buildings/turret.corrino',
-  'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
+  'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/devastator.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
   'units/infantry.atreides',
 ];
 
@@ -145,6 +145,8 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
   const actions = all.filter((c) => c !== deployClip);
   return {
     body, turret, muzzle, showUpgrades,
+    crow: model.getObjectByName('crow') ?? undefined,
+    muzzle2: model.getObjectByName('muzzle2') ?? undefined,
     anim: actions.length ? animator(model, actions) : undefined,
     deploy: deployClip ? deployPose(model, deployClip) : undefined,
     plant: deployClip ? plantOf(model) : undefined,

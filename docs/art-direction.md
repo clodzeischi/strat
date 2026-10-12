@@ -107,6 +107,15 @@ A long-range howitzer, purely: not a brawler like StarCraft's siege tank. The co
 - **Turret:** a big wedge casemate with a purple inlay, team panels, a team roof stripe, cupola and sight block. The `gun` (mantlet) raises the barrel: `weapons0` is plain with a box muzzle brake; `weapons1` is thicker with a fume extractor, plus an ammo bustle on the turret's back (`weapons1_rack`).
 - **Legs:** four stabilizer struts (`leg_1`–`leg_4`) with rams, purple strips and spiked spades. They don't hide: mobile, they lie along the flanks, the front pair folded back and the rear pair forward. The `deploy` action swings them out to the corners, drops them onto their spades, then raises the gun to about 45°.
 
+### Devastator (`devastator`)
+
+The scariest thing on the field, and rare: a Sardaukar siege engine about 1.5× the Atreides tank each way (3.6 × 2.24 m), but low. Slick and angled, not boxy.
+- **Running gear:** four independent track pods, exposed on `armor0` (road wheels, sprocket or idler, mudguards).
+- **Hull:** flares out over the tracks, then the flanks slope in to the deck, with a long sloped glacis. Team panels on the sloped flanks, purple inlay along the deck edge. A massive turbine exhaust at the back (dark intake, pink-hot ring, steel core) between louvred vent stacks.
+- **`armor1`:** ERA bricks with purple tops over the track pods and on the glacis; ERA along the turret cheeks (`armor1_turret`).
+- **Turret:** an arrowhead casemate with angled cheeks to a nose round the mantlet, sloped sides with team panels, a lower bustle. One huge-bore gun (thermal sleeve, fume extractor, box muzzle brake); `weapons1` thickens it and adds recoil cylinders.
+- **CROW:** a remote weapon station on the roof (`crow`, with `muzzle2`) that the game turns onto infantry on its own.
+
 ## Fremen
 
 To be defined.

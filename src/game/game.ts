@@ -915,7 +915,8 @@ export class Game {
     return w;
   }
 
-  fire(u: Shooter, target: Entity, w: WeaponDef): void {
+  /** `secondary`: shot by a unit's second gun, which starts from its own muzzle if the model has one. */
+  fire(u: Shooter, target: Entity, w: WeaponDef, secondary = false): void {
     let mult = 1 + WEAPONS_BONUS * this.tier(u.team, 'weapons');
     if (u instanceof Unit && u.def.hides) {
       // Striking out of hiding: Ambush adds damage for a few seconds; either way the shooter comes out of the sand.
@@ -923,7 +924,7 @@ export class Game {
       if (this.time < u.ambushUntil) mult *= 1 + AMBUSH.bonus;
       this.unhide(u);
     }
-    const from = u.muzzleWorld();
+    const from = u instanceof Unit ? u.muzzleWorld(secondary) : u.muzzleWorld();
     const to = target.aimPoint();
     if (w.sound) this.onSound(w.sound, u.x, u.z);
     if (w.cone) {

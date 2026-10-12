@@ -41,7 +41,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 | `trooper` | Harkonnen Trooper | Corrino | 0.45 | | weapons, armor | animated |
 | `sardaukar` | Sardaukar | Corrino | 0.5 | | weapons, armor | animated |
 | `razor` | Razor | Corrino | 0.85 | | weapons, armor | |
-| `devastator` | Devastator | Corrino | 1.4 | yes | weapons, armor | |
+| `devastator` | Devastator | Corrino | 1.4 | yes | weapons, armor | `crow` with `muzzle2` for the secondary gun |
 | `raider` | Sky Raider | Corrino | 1.0 | | weapons, armor | aircraft |
 | `artillery` | Soulcrusher | Corrino | 1.1 | yes | weapons, armor | deploy animation |
 | `warrior` | Fremen Warrior | Fremen | 0.45 | | weapons, armor | animated |
@@ -94,6 +94,8 @@ The loader finds parts by object name. Names are exact and lowercase.
 | `body` | mesh | The main hull. Everything not listed below goes here (join it into one mesh). For units with armor tiers, only the parts every tier shares. |
 | `turret` | mesh | The part that rotates to aim (units marked "turret"). Origin on the rotation pivot, at rest facing +X. Child of `body`. |
 | `muzzle` | Empty | Where shots start. Child of `turret` if there is one, otherwise of `body`. Every armed unit, plus the Auto Turret. |
+| `crow` | mesh | A remote weapon station that aims the unit's secondary gun on its own (`devastator`). Origin on its axis, at rest facing +X. Child of `turret`. The game turns it. |
+| `muzzle2` | Empty | Where the secondary gun's shots start. Child of `crow`. |
 | `spinner` | mesh | A building's moving piece. Origin on its rotation axis (Z). |
 | `level2` | mesh | Structure added at building level 2. Child of `body`. |
 | `armor0`, `armor1`, `armor2` | mesh | Armor tiers. On vehicles each is a complete, separate hull, not a bolt-on (infantry differ, see Infantry below): exactly one is shown, and `armor0` is hidden once `armor1` is researched. If a tier is missing, the highest one the model has below it shows (Corrino units only have `armor0` and `armor1`). Child of `body`. On a turreted unit, the turret's share of a tier is a second object named `armor1_turret` (etc.), child of `turret`; it shows and hides with `armor1`. |

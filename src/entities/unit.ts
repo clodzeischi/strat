@@ -148,6 +148,13 @@ export class Unit extends Entity {
   private showUpgrades: ((look: UpgradeLook) => void) | null;
   private upgradeKey = '';
   private muzzle: THREE.Object3D;
+  /** The remote weapon station that turns to the secondary gun's target, and that gun's muzzle. Drawing only. */
+  private readonly crow: THREE.Object3D | null;
+  private readonly muzzle2: THREE.Object3D | null;
+  /** Drawing only: where the station points (world heading), where it wants to, and until when it keeps at it. */
+  private crowHeading = 0;
+  private crowAim = 0;
+  private crowBusyUntil = -1;
   /** Deploying units: poses the model from mobile (0) to dug in (1). */
   private deployPose: ((t: number) => void) | null;
   /** Drawing only: the dig-in pose last drawn, to puff dust as the spades hit the ground. */
@@ -211,6 +218,8 @@ export class Unit extends Entity {
     this.body = model.body;
     this.turret = model.turret;
     this.muzzle = model.muzzle;
+    this.crow = model.crow ?? null;
+    this.muzzle2 = model.muzzle2 ?? null;
     this.deployPose = model.deploy ?? null;
     this.plant = model.plant ?? null;
     this.showUpgrades = model.showUpgrades ?? null;
@@ -329,9 +338,19 @@ export class Unit extends Entity {
     return t === SAND || t === SPICE;
   }
 
-  muzzleWorld(): THREE.Vector3 {
+  /** Where shots start: the main gun's muzzle, or the secondary gun's (snapped onto its target first) if it has one. */
+  muzzleWorld(secondary = false): THREE.Vector3 {
+    const m = secondary && this.muzzle2 ? this.muzzle2 : this.muzzle;
+    if (m === this.muzzle2) {
+      this.crowHeading = this.crowAim;
+      this.poseCrow();
+    }
     this.root.updateMatrixWorld(true);
-    return this.muzzle.getWorldPosition(new THREE.Vector3());
+    return m.getWorldPosition(new THREE.Vector3());
+  }
+
+  private poseCrow(): void {
+    if (this.crow) this.crow.rotation.y = -(this.crowHeading - this.turretHeading);
   }
 
   // ---- Orders ---------------------------------------------------------------
@@ -670,7 +689,11 @@ export class Unit extends Entity {
       this.cooldown2 = 0.2;
       return;
     }
-    game.fire(this, t, w);
+    if (this.crow) {
+      this.crowAim = dm.atan2(t.z - this.z, t.x - this.x);
+      this.crowBusyUntil = game.time + 1.5;
+    }
+    game.fire(this, t, w, true);
     this.cooldown2 = w.cooldown * (0.9 + game.random() * 0.2);
   }
 
@@ -1215,6 +1238,12 @@ export class Unit extends Entity {
       this.body.quaternion.multiplyQuaternions(tilt, yaw);
     }
     if (this.turret) this.turret.rotation.y = -(this.turretHeading - this.heading);
+    if (this.crow) {
+      // The station tracks its last target for a moment, then swings back to the front of the turret.
+      const want = game.time < this.crowBusyUntil ? this.crowAim : this.turretHeading;
+      this.crowHeading = this.rotateToward(this.crowHeading, want, 6 * dt);
+      this.poseCrow();
+    }
     if (this.deployPose) {
       const t = this.deployProgress();
       if (t !== this.drawnDeploy) {
