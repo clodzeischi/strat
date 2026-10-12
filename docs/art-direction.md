@@ -93,6 +93,13 @@ Outer works: low and wide, the 45° turn on a cross plan (inside |x| + |y| ≤ 3
 
 A fortified plinth with sloped walls, turned 45°, with four buttress arms to the slab corners, a purple trim ledge and a banner on each face. The gun head (the `spinner`) is built at final size, facing +X and not turned, since the game sets its heading: four raised autocannon barrels in a mantlet between two tall missile pods (launch hatches on top, a team panel on each outer side), a sensor block at the back and a radar mast. The `muzzle` empty sits at the barrel tips.
 
+### Razor (`razor`)
+
+An enclosed half-track: oppressive and effective, a little bigger than the Atreides Trike (about 2.0 × 1.36 m). Big wheels up front, tracks with road wheels at the back.
+- **Hull (`armor0`):** slab-sided dark grey with a sloped glacis and a thin purple trim along the sponson edge (purple stands in for the concept's gold). Tops stay dark grey: light tops made it read Atreides. A dark grille with a team crest between purple bars, cyan headlamp slits. A raised armored cockpit with slit windows, a team stripe on the roof and team panels on its sides.
+- **`armor1`:** skirts over the tracks (with team panels), a dozer ram and cockpit cheek plates.
+- **Dreadflame:** one emitter centred on the glacis, since the flame comes from one `muzzle`. `weapons0` has two nozzles, a pilot light and two purple fuel tanks on the rear deck; `weapons1` has five nozzles and a third tank.
+
 ## Fremen
 
 To be defined.

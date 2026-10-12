@@ -13,7 +13,7 @@ const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
   'buildings/bunker.atreides', 'buildings/hitech.atreides',
   'buildings/conyard.corrino', 'buildings/refinery.corrino', 'buildings/barracks.corrino', 'buildings/fab.corrino', 'buildings/tleilaxu.corrino', 'buildings/pad.corrino', 'buildings/turret.corrino',
-  'units/harvester.atreides', 'units/harvester.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
+  'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
   'units/infantry.atreides',
 ];
 
