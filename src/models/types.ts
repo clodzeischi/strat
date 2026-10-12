@@ -54,6 +54,8 @@ export interface BuildingModel {
   level2: THREE.Object3D | null;
   /** Smokestack tops (`smoke` empties) that belch black smoke. */
   smoke: THREE.Object3D[];
+  /** Where a gun emplacement's shots start (`muzzle` empty on the spinner), if the model has one. */
+  muzzle: THREE.Object3D | null;
   /** A Blender model, drawn as it is: already turned, on a slab square to the map. Procedural ones get turned. */
   dropIn: boolean;
 }

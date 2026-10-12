@@ -51,6 +51,8 @@ export class Building extends Entity {
   private level2: THREE.Object3D | null;
   /** Smokestack tops that belch black smoke (drawing only). */
   readonly smoke: THREE.Object3D[];
+  /** The model's `muzzle` empty on the gun head, if it has one. */
+  private readonly muzzle: THREE.Object3D | null;
   /** Slewing spinners (see `slew`): seconds until the next heading, and the heading being turned to. */
   private slewWait = Math.random() * 10;
   private slewTo = 0;
@@ -95,6 +97,7 @@ export class Building extends Entity {
     this.spinner = model.spinner;
     this.level2 = model.level2;
     this.smoke = model.smoke;
+    this.muzzle = model.muzzle;
     if (!model.dropIn) {
       const k = diamondScale(def.size);
       this.model.scale.set(k, 1, k);
@@ -127,8 +130,15 @@ export class Building extends Entity {
     if (this.spinner) this.spinner.rotation.y = -this.aim - this.model.rotation.y;
   }
 
-  /** Where a gun emplacement's shots start: the top of the gun, a little toward its aim. */
+  /**
+   * Where a gun emplacement's shots start: the model's muzzle with the head turned to the current aim, or else the
+   * top of the gun, a little toward its aim. Only where shots are drawn from; hits don't depend on it.
+   */
   muzzleWorld(): THREE.Vector3 {
+    if (this.muzzle) {
+      this.aimGun();
+      return this.muzzle.getWorldPosition(new THREE.Vector3());
+    }
     return new THREE.Vector3(this.x + dm.cos(this.aim) * 0.6, this.y + 1.3, this.z + dm.sin(this.aim) * 0.6);
   }
 
