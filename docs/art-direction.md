@@ -124,6 +124,20 @@ Former masters, now imperial levy: a slow, heavily armoured giant about 0.9 m ta
 - **Weapons:** a fat hand-held rocket launcher carried two-handed at the waist (`weapons0`); `weapons1` adds a top housing and a cyan optic. Skinned to `hand.R`, `muzzle` at the tube tip.
 - **Animation:** a hunched idle, a heavy 10-frame stomp, a big kick on firing, and a death that drops him to his knees and onto his face. `fit.py` in the .blend refits the rig and weights after mesh edits; `anim.py` re-solves both hands onto the launcher wherever it sits.
 
+### Sardaukar (`sardaukar`)
+
+The Emperor's elite: tall and lean, about 0.82 m, between the Atreides and the Harkonnen trooper. Neutral and disciplined, never showy. The concept art gives him a blade; in game he's a close-range gunner that also shoots aircraft, so he carries a carbine and the blade stays sheathed. The first character built to [low-poly-style.md](low-poly-style.md) (about 410 tris with every tier): welded shells, then hand-tweaked by the user.
+- **Body:** battle-worn light plate over a dark undersuit, a tall helmet with a dark T visor and a purple crown, a scarf, short cape and ragged tabard in the dark team shade, a sheathed blade on the left hip.
+- **`armor1`:** layered pauldrons with a team rim, and knee guards.
+- **Weapons:** a compact carbine (`weapons0`); `weapons1` adds a cyan optic, a fore grip and a purple barrel shroud. Skinned to `hand.R`, `muzzle` at the barrel tip.
+- **Animation:** each action was directed by the user one at a time.
+  - Idle: an athletic stance with the carbine one-handed, muzzle up, the other arm at his side.
+  - Walk: an 8-frame range walk, carbine at low ready, torso forward.
+  - Shoot: bladed, with the carbine shouldered.
+  - Die: drops to his knees and leans on the planted carbine, holds a beat, then collapses.
+
+  The scripts are `idle.py`, `walk.py`, `shoot.py` and `die.py` in the .blend. Don't rerun them over hand edits.
+
 ### Sky Raider (`raider`)
 
 The Skyraider Mk IV "Vulture's Talon": a wasp, not a dragonfly, about 3.1 m long with a 2.5 m wingspan.
