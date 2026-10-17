@@ -46,9 +46,9 @@ place(C, 'tleilaxu');
 check(g.canTrain(C, 'raider') && g.canTrain(C, 'artillery') && !g.canTrain(C, 'devastator'), 'Tleilaxu Research unlocks Sky Raiders and Artillery');
 check(g.canLevelUp(C, 'fab') && g.canLevelUp(C, 'barracks') && !g.canLevelUp(C, 'conyard'), 'Corrino levels up Barracks and Fab, not the yard');
 applyCommand(g, C, { c: 'levelUp', type: 'fab' });
-run(BUILDINGS.fab.levelUp!.time + 1);
+run(BUILDINGS.fab.levels![0].time + 1);
 applyCommand(g, C, { c: 'levelUp', type: 'barracks' });
-run(BUILDINGS.barracks.levelUp!.time + 1);
+run(BUILDINGS.barracks.levels![0].time + 1);
 check(g.canTrain(C, 'devastator') && g.canTrain(C, 'sardaukar'), 'level-2 Fab and Barracks unlock Devastators and Sardaukar');
 
 applyCommand(g, C, { c: 'train', type: 'harvester' });

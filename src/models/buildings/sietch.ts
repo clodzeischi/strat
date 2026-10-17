@@ -20,8 +20,16 @@ export const sietch: BuildingBlueprint = {
     return null;
   },
 
-  /** Great Sietch: a windtrap tower beside the rock, catching water from the air. */
-  levelKit(g, color) {
+  /** Great Sietch: a windtrap tower beside the rock, catching water from the air. Sietch III (placeholder): a higher crag with a watch post. */
+  levelKit(g, color, level) {
+    if (level === 3) {
+      const rock = shade(SANDSTONE, 0.7);
+      box(g, 1.6, 1.4, 1.4, rock, -0.9, 3.0, -0.9);
+      box(g, 1.0, 0.9, 0.9, shade(rock, 1.1), -0.9, 4.1, -0.9);
+      box(g, 0.08, 1.2, 0.08, DARK, -0.9, 5.1, -0.9);
+      box(g, 0.7, 0.4, 0.04, color, -0.53, 5.5, -0.9);
+      return;
+    }
     cyl(g, 0.45, 3.0, SANDSTONE, -1.6, 1.8, 1.0, 8);
     for (let k = 0; k < 4; k++) box(g, 0.95, 0.12, 0.95, k % 2 ? DARK : color, -1.6, 0.9 + k * 0.7, 1.0);
     cyl(g, 0.6, 0.2, DARK, -1.6, 3.35, 1.0, 8);

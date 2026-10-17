@@ -19,10 +19,10 @@ export type BuildingType =
   | 'sietch' | 'thumper' | 'camp';
 /** Buildings that train units. Each one of a type adds a parallel production line for that type. */
 export type Producer = 'barracks' | 'factory' | 'hitech' | 'fab';
-/** Buildings that can be upgraded to level 2 to unlock more tech. */
+/** Buildings that level up (to level 2, the Sietch on to 3) to unlock more tech. */
 export type LevelUpType = 'conyard' | 'factory' | 'barracks' | 'fab' | 'sietch';
-/** A tech requirement: a building, or a level-2 one. */
-export type Req = BuildingType | `${LevelUpType}2`;
+/** A tech requirement: a building, or one at level 2 or 3. */
+export type Req = BuildingType | `${LevelUpType}${2 | 3}`;
 export type UpgradeType =
   | 'weapons1' | 'weapons2' | 'armor1' | 'armor2' | 'rockets' | 'nitro' | 'harvest'
   | 'cWeapons' | 'cArmor' | 'cShields' | 'cHarvest' | 'flame'
@@ -111,7 +111,8 @@ export interface BuildingDef {
   size: number; // footprint in tiles (square)
   requires: Req[];
   desc: string;
-  levelUp?: { name: string; short: string; cost: number; time: number; desc: string; requires?: Req[] };
+  /** The steps up: `levels[0]` to level 2, `levels[1]` (the Sietch) to level 3. */
+  levels?: LevelDef[];
   /** Infantry it can hold (a bunker); they shoot from it and can't be hit while inside. */
   garrison?: number;
   /** A gun of its own (Corrino's turret). */
@@ -124,6 +125,16 @@ export interface BuildingDef {
   onSand?: boolean;
   /** Only comes from a unit deploying (not built at the Construction Yard). */
   deployed?: boolean;
+}
+
+/** One step up a building's levels. */
+export interface LevelDef {
+  name: string;
+  short: string;
+  cost: number;
+  time: number;
+  desc: string;
+  requires?: Req[];
 }
 
 export interface UpgradeDef {

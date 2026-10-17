@@ -75,6 +75,8 @@ const ICONS: Record<BuildingType | UnitType | UpgradeType, string> = {
 
 /** Green chevrons over the building icon mark a level-2 upgrade. */
 const CHEVRON = `<polyline points="26,14 32,8 38,14" fill="none" stroke="#7cff7c" stroke-width="2.5"/><polyline points="26,20 32,14 38,20" fill="none" stroke="#7cff7c" stroke-width="2.5"/>`;
+/** Level 3: a third chevron under the two. */
+const CHEVRON3 = `${CHEVRON}<polyline points="26,26 32,20 38,26" fill="none" stroke="#7cff7c" stroke-width="2.5"/>`;
 /** Unit commands on the command card. */
 const COMMANDS = {
   attack: `<circle cx="20" cy="20" r="11" fill="none" stroke="#e05a40" stroke-width="3"/><circle cx="20" cy="20" r="2.5" fill="#e05a40"/><rect x="18.5" y="3" width="3" height="9" fill="#e05a40"/><rect x="18.5" y="28" width="3" height="9" fill="#e05a40"/><rect x="3" y="18.5" width="9" height="3" fill="#e05a40"/><rect x="28" y="18.5" width="9" height="3" fill="#e05a40"/>`,
@@ -94,13 +96,14 @@ const COMMANDS = {
   unload: `<rect x="3" y="28" width="34" height="6" fill="#9c968a"/><rect x="5" y="13" width="18" height="16" fill="${SAND}"/><rect x="4" y="10" width="20" height="4" fill="${C}"/><rect x="11" y="20" width="6" height="9" fill="${DARK}"/><rect x="24" y="18" width="7" height="5" fill="#e0b030"/><polygon points="30,13 38,20.5 30,28" fill="#e0b030"/>`,
 };
 
-/** Level-up icons: the building's icon with green chevrons. */
+/** Level-up icons: the building's icon with green chevrons (three for level 3). */
 const LEVEL_UPS: readonly string[] = ['conyard2', 'factory2', 'barracks2', 'fab2', 'sietch2'];
+const LEVEL_UPS3: readonly string[] = ['sietch3'];
 
 export const ALL_ICONS = {
   ...ICONS, ...COMMANDS,
   conyard2: ICONS.conyard + CHEVRON, factory2: ICONS.factory + CHEVRON, barracks2: ICONS.barracks + CHEVRON, fab2: ICONS.fab + CHEVRON,
-  sietch2: ICONS.sietch + CHEVRON,
+  sietch2: ICONS.sietch + CHEVRON, sietch3: ICONS.sietch + CHEVRON3,
 };
 export type IconKey = keyof typeof ALL_ICONS;
 
@@ -114,6 +117,6 @@ export function setModelIcons(urls: Map<IconKey, string>): void {
 /** A card icon as an SVG element string, in the player's team color. */
 export function icon(key: IconKey, team: Team): string {
   const url = rendered.get(key);
-  const body = url ? `<image href="${url}" width="40" height="40"/>${LEVEL_UPS.includes(key) ? CHEVRON : ''}` : ALL_ICONS[key];
+  const body = url ? `<image href="${url}" width="40" height="40"/>${LEVEL_UPS.includes(key) ? CHEVRON : LEVEL_UPS3.includes(key) ? CHEVRON3 : ''}` : ALL_ICONS[key];
   return `<svg viewBox="0 0 40 40" style="color:${TEAM_CSS[team]}">${body}</svg>`;
 }

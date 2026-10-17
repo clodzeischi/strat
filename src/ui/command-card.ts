@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, THUMPER, TILE, UPGRADES, WORM, reqName, shieldsFor,
+  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, THUMPER, TILE, UPGRADES, WORM, levelDef, maxLevel, reqName, shieldsFor,
   type BuildingType, type LevelUpType, type Req, type ResearchSlot, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
 import { Building, SALVAGE, Unit } from '../entities';
@@ -331,22 +331,28 @@ export class CommandCard {
   }
 
   private researchSlots(): (Slot | null)[] {
+    /** A building's next level (the Sietch goes on to 3); done once the top level stands. */
     const levelUp = (t: LevelUpType): Slot => {
-      const d = BUILDINGS[t].levelUp!;
+      const g = this.game;
+      const top = maxLevel(t);
+      const next = () => {
+        const l = this.ts.levelUps[t];
+        return l ? l.level : Math.min(Math.max(g.techLevel(g.localTeam, t), 1) + 1, top);
+      };
+      const d = () => levelDef(t, next());
       return {
-        icon: () => `${t}2`,
-        name: () => d.name,
-        cost: () => d.cost,
-        tip: () => `${d.desc}\nTakes ${d.time} s.${d.requires?.length ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to cancel.`,
+        icon: () => `${t}${next()}` as IconKey,
+        name: () => d().name,
+        cost: () => d().cost,
+        tip: () => `${d().desc}\nTakes ${d().time} s.${d().requires?.length ? `\nRequires: ${reqList(d().requires!)}` : ''}\nRight-click to cancel.`,
         view: () => {
-          const g = this.game;
           const l = this.ts.levelUps[t];
-          const done = !l && g.meets(g.localTeam, `${t}2`);
-          const locked = !l && !done && (!g.has(g.localTeam, t) || !g.requirementsMet(g.localTeam, d.requires ?? []));
+          const done = !l && g.techLevel(g.localTeam, t) >= top;
+          const locked = !l && !done && (!g.has(g.localTeam, t) || !g.requirementsMet(g.localTeam, d().requires ?? []));
           return { done, locked, progress: l ? l.progress : null, status: done ? 'DONE' : '' };
         },
         use: () => {
-          if (!this.ts.levelUps[t] && this.game.canLevelUp(this.game.localTeam, t)) this.input.issue({ c: 'levelUp', type: t });
+          if (!this.ts.levelUps[t] && g.canLevelUp(g.localTeam, t)) this.input.issue({ c: 'levelUp', type: t });
         },
         cancel: () => this.input.issue({ c: 'cancelLevelUp', type: t }),
       };

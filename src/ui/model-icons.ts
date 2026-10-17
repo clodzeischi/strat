@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDINGS, FACTIONS, TEAM_COLORS, type Faction, type Team, type UnitType } from '../config';
+import { BUILDINGS, FACTIONS, TEAM_COLORS, maxLevel, type Faction, type Team, type UnitType } from '../config';
 import { hasBuildingModel, hasUnitModel, makeBuildingModel, makeUnitModel, type UpgradeLook } from '../models';
 import { TO_SUN } from '../render/shadows';
 import { setModelIcons, type IconKey } from './icons';
@@ -47,14 +47,17 @@ export function renderModelIcons(faction: Faction, team: Team): void {
     if ('levelUp' in slot) {
       const t = slot.levelUp;
       if (!hasBuildingModel(t, faction)) continue;
-      shots.push({
-        key: `${t}2` as IconKey,
-        make: () => {
-          const m = makeBuildingModel(t, faction, color, BUILDINGS[t].size);
-          if (m.level2) m.level2.visible = true;
-          return m.group;
-        },
-      });
+      for (let level = 2; level <= maxLevel(t); level++) {
+        shots.push({
+          key: `${t}${level}` as IconKey,
+          make: () => {
+            const m = makeBuildingModel(t, faction, color, BUILDINGS[t].size);
+            if (m.level2) m.level2.visible = true;
+            if (m.level3 && level >= 3) m.level3.visible = true;
+            return m.group;
+          },
+        });
+      }
     } else {
       for (const u of slot.upgrades) {
         const s = UPGRADE_SHOTS[u];

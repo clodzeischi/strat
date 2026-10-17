@@ -68,14 +68,16 @@ export function makeBuildingModel(type: BuildingType, faction: Faction, color: n
   if (model) {
     group.add(model);
     const level2 = model.getObjectByName('level2') ?? null;
+    const level3 = model.getObjectByName('level3') ?? null;
     if (level2) level2.visible = false;
+    if (level3) level3.visible = false;
     const smoke: THREE.Object3D[] = [];
     model.traverse((o) => { if (o.name.startsWith('smoke')) smoke.push(o); });
     const muzzle = model.getObjectByName('muzzle') ?? null;
-    return { group, spinner: model.getObjectByName('spinner') ?? null, level2, smoke, muzzle, dropIn: true };
+    return { group, spinner: model.getObjectByName('spinner') ?? null, level2, level3, smoke, muzzle, dropIn: true };
   }
   const spinner = BUILDING_MODELS[type].build(group, color);
-  return { group, spinner, level2: null, smoke: [], muzzle: null, dropIn: false };
+  return { group, spinner, level2: null, level3: null, smoke: [], muzzle: null, dropIn: false };
 }
 
 /**
@@ -88,10 +90,10 @@ export function makeUpgradeKit(type: UnitType, look: UpgradeLook, color: number)
   return parts;
 }
 
-/** Extra structure added when a building reaches level 2. */
-export function makeLevelKit(type: BuildingType, color: number): THREE.Group {
+/** Extra structure added when a building reaches a level (2, or 3 for the Sietch). */
+export function makeLevelKit(type: BuildingType, color: number, level: number): THREE.Group {
   const g = new THREE.Group();
-  BUILDING_MODELS[type].levelKit?.(g, color);
+  BUILDING_MODELS[type].levelKit?.(g, color, level);
   return g;
 }
 

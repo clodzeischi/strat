@@ -30,7 +30,7 @@ check(!g.canBuild(F, 'refinery') && !g.canTrain(F, 'harvester') && !g.canBuild(A
 
 // A spot of a given ground near the team's yard.
 function place(team: Team, type: BuildingType, ground?: number): Building {
-  const yard = g.buildings.find((b) => b.team === team && b.type === 'conyard')!;
+  const yard = g.buildings.find((b) => b.team === team && b.type === FACTIONS[g.teams[team].faction].hub)!;
   for (let r = 2; r < 20; r++) {
     for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
       if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
@@ -56,18 +56,16 @@ for (let cz = 0; cz < m.size - 2 && !sandOk; cz++) for (let cx = 0; cx < m.size 
 check(sandOk, 'Fremen can build on open sand near their structures');
 check(sandNo && FACTIONS.atreides.buildOnSand === undefined, "Atreides can't build on sand");
 check(!g.canPlace('camp', F, bks.cx + 4, bks.cz), 'a Spice Camp is not built at the yard');
-check(g.canTrain(F, 'warrior') && g.canTrain(F, 'crew') && !g.canTrain(F, 'fedaykin'), 'Barracks trains Warriors and Crews; Fedaykin need a Sietch');
-check(g.thumpBlocked(F) === 'Thumpers need a Sietch.', 'no Thumpers before the Sietch');
-place(F, 'sietch');
+check(g.canTrain(F, 'warrior') && g.canTrain(F, 'crew'), 'Barracks trains Warriors and Crews');
 check(g.canTrain(F, 'fedaykin') && g.thumpBlocked(F) === null, 'the Sietch unlocks Fedaykin and Thumpers');
 check(!g.canBuild(F, 'thumper') && !g.canPlace('thumper', F, bks.cx + 4, bks.cz), 'Thumpers are planted by infantry, not built at the yard');
 applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
-run(BUILDINGS.sietch.levelUp!.time + 1);
+run(BUILDINGS.sietch.levels![0].time + 1);
 check(g.canResearch(F, 'ambush'), 'the Great Sietch unlocks Ambush');
 
 // ---- Spice Crew -> camp -> credits -> pack up ----
 const crew = g.units.find((u) => u.team === F && u.type === 'crew')!;
-const yard = g.buildings.find((b) => b.team === F && b.type === 'conyard')!;
+const yard = g.buildings.find((b) => b.team === F && b.type === 'sietch')!;
 const field = m.nearestCell(yard.cx, yard.cz, (x, z) => m.tile(x, z) === SPICE && g.spiceAround(m.center(x), m.center(z)) > 15, 40)!;
 crew.command(g, { kind: 'move', x: m.center(field.cx), z: m.center(field.cz) });
 run(60);
@@ -162,7 +160,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
     for (let k = 0; k < seconds * 20; k++) t.update(0.05);
   };
   t.teams[F].credits = 100000;
-  const fy = t.buildings.find((b) => b.team === F && b.type === 'conyard')!;
+  const fy = t.buildings.find((b) => b.team === F && b.type === 'sietch')!;
   const sietchSpot = tm.nearestCell(fy.cx, fy.cz, (x, z) => t.canPlace('sietch', F, x, z), 12)!;
   t.placeBuilding('sietch', F, sietchSpot.cx, sietchSpot.cz);
   const wormGround = (x: number, z: number) => tm.canEnter(tm.cellOf(x), tm.cellOf(z), 'worm');
@@ -364,7 +362,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
   const tm = t.map;
   for (const u of t.units) if (u.team === A) u.dead = true;
-  const ty = t.buildings.find((b) => b.team === F && b.type === 'conyard')!;
+  const ty = t.buildings.find((b) => b.team === F && b.type === 'sietch')!;
   const tick = (seconds: number) => {
     for (let k = 0; k < seconds * 20; k++) t.update(0.05);
   };

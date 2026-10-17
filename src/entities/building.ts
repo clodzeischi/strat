@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDING_TAGS, BUILDINGS, TEAM_COLORS, TILE, shieldsFor, type BuildingDef, type BuildingType, type Faction, type Team } from '../config';
+import { BUILDING_TAGS, BUILDINGS, TEAM_COLORS, TILE, levelDef, shieldsFor, type BuildingDef, type BuildingType, type Faction, type Team } from '../config';
 import type { Cell } from '../map';
 import type { Point } from '../game/pathfinding';
 import { makeBuildingModel, makeLevelKit } from '../models';
@@ -47,8 +47,9 @@ export class Building extends Entity {
   readonly radius: number;
   readonly size: number;
   readonly spinner: THREE.Object3D | null;
-  /** A Blender model's level-2 structure, shown at level 2. */
+  /** A Blender model's level-2 and level-3 structures, shown from that level on. */
   private level2: THREE.Object3D | null;
+  private level3: THREE.Object3D | null;
   /** Smokestack tops that belch black smoke (drawing only). */
   readonly smoke: THREE.Object3D[];
   /** The model's `muzzle` empty on the gun head, if it has one. */
@@ -96,6 +97,7 @@ export class Building extends Entity {
     const model = makeBuildingModel(type, faction, TEAM_COLORS[team], def.size);
     this.spinner = model.spinner;
     this.level2 = model.level2;
+    this.level3 = model.level3;
     this.smoke = model.smoke;
     this.muzzle = model.muzzle;
     if (!model.dropIn) {
@@ -149,14 +151,17 @@ export class Building extends Entity {
   }
 
   get name(): string {
-    return this.level >= 2 && this.def.levelUp ? this.def.levelUp.name : this.def.name;
+    return this.level >= 2 ? levelDef(this.type, this.level).name : this.def.name;
   }
 
+  /** Goes up to `level`, adding the structure of each level on the way. */
   setLevel(level: number): void {
-    this.level = level;
-    if (level < 2) return;
-    if (this.level2) this.level2.visible = true;
-    else this.model.add(makeLevelKit(this.type, TEAM_COLORS[this.team]));
+    for (let l = this.level + 1; l <= level; l++) {
+      const node = l === 2 ? this.level2 : l === 3 ? this.level3 : null;
+      if (node) node.visible = true;
+      else if (!this.level2) this.model.add(makeLevelKit(this.type, TEAM_COLORS[this.team], l));
+    }
+    this.level = Math.max(this.level, level);
   }
 
   /** One step out of the door, in cells. */

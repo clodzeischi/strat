@@ -60,8 +60,9 @@ export interface BuildingModel {
   group: THREE.Group;
   /** Optional piece that spins slowly (crane, radar). */
   spinner: THREE.Object3D | null;
-  /** Level-2 structure, hidden until the upgrade (Blender models only; procedural ones add a level kit). */
+  /** Level-2 and level-3 structures, hidden until the upgrade (Blender models only; procedural ones add a level kit). */
   level2: THREE.Object3D | null;
+  level3: THREE.Object3D | null;
   /** Smokestack tops (`smoke` empties) that belch black smoke. */
   smoke: THREE.Object3D[];
   /** Where a gun emplacement's shots start (`muzzle` empty on the spinner), if the model has one. */
@@ -72,11 +73,11 @@ export interface BuildingModel {
 
 /**
  * One building's model, built on the shared concrete slab (centered on the footprint, front facing +Z).
- * `build` adds the structure and returns its spinning piece, if any; `levelKit` adds the level-2 structure.
+ * `build` adds the structure and returns its spinning piece, if any; `levelKit` adds the structure of a level (2, or 3 for the Sietch).
  */
 export interface BuildingBlueprint {
   /** Stands on the bare ground, with no concrete slab (Fremen camps out in the desert). */
   bare?: boolean;
   build(g: THREE.Group, color: number): THREE.Object3D | null;
-  levelKit?(g: THREE.Group, color: number): void;
+  levelKit?(g: THREE.Group, color: number, level: number): void;
 }

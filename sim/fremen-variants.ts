@@ -13,7 +13,7 @@ export const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
 
   /** Balance candidates. */
   w90: { desc: 'Warriors 90 credits (not 80).', apply: () => { UNITS.warrior.cost = 90; } },
-  sietch: { desc: 'Great Sietch 1500 credits, 60 s (not 1200, 40).', apply: () => { Object.assign(BUILDINGS.sietch.levelUp!, { cost: 1500, time: 60 }); } },
+  sietch: { desc: 'Great Sietch 1500 credits, 60 s (not 1200, 40).', apply: () => { Object.assign(BUILDINGS.sietch.levels![0], { cost: 1500, time: 60 }); } },
   camp9: { desc: 'Spice Camps 9/s (not 10).', apply: () => { BUILDINGS.camp.extract!.rate = 9; } },
   upg: { desc: 'Fremen Weapons and Armor +1 1200 credits, 40 s (not 800, 30).', apply: () => { for (const u of [UPGRADES.fWeapons, UPGRADES.fArmor]) Object.assign(u, { cost: 1200, time: 40 }); } },
   combo: { desc: 'Spice Camps 9/s, Thumpers 250 every 60 s.', apply: () => { BUILDINGS.camp.extract!.rate = 9; Object.assign(THUMPER, { cost: 250, cooldown: 60 }); } },

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   AMBUSH, ARMOR_BONUS, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS,
-  TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, unitDef,
+  TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
   type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
@@ -62,7 +62,8 @@ export interface TeamState {
   queues: Record<Producer, { type: UnitType; progress: number }[]>;
   research: { type: UpgradeType; progress: number } | null;
   /** Building being upgraded to level 2, per upgradable type. */
-  levelUps: Partial<Record<LevelUpType, { building: Building; progress: number }>>;
+  /** Level-ups under way, each taking one building up to `level`. */
+  levelUps: Partial<Record<LevelUpType, { building: Building; level: number; progress: number }>>;
   /** Round-robin counter so units leave from each building of a type in turn. */
   spawnTurn: Record<Producer, number>;
   /** Fremen: game time the next Thumper can be planted. */
@@ -247,7 +248,7 @@ export class Game {
   private setupStart(): void {
     this.map.bases.forEach((b, i) => {
       const team = i as Team;
-      const yard = this.placeBuilding('conyard', team, b.cx - 1, b.cz - 1);
+      const yard = this.placeBuilding(FACTIONS[this.teams[team].faction].hub, team, b.cx - 1, b.cz - 1);
       const front = yard.frontCell();
       // Starting units gather a few tiles from the yard, toward the middle of the map, facing it.
       const mid = (this.map.size - 1) / 2;
@@ -281,13 +282,22 @@ export class Game {
     return n;
   }
 
-  /** Whether a requirement is satisfied: the building exists (at level 2 for 'conyard2', 'factory2' and so on). */
+  /** Whether a requirement is satisfied: the building exists (at level 2 or 3 for 'factory2', 'sietch3' and so on). */
   meets(team: Team, r: Req): boolean {
-    if (r.endsWith('2')) {
-      const type = r.slice(0, -1);
-      return this.buildings.some((b) => b.team === team && b.type === type && b.level >= 2 && !b.dead);
-    }
-    return this.has(team, r as BuildingType);
+    const { type, level } = parseReq(r);
+    return level > 1 ? this.techLevel(team, type) >= level : this.has(team, type);
+  }
+
+  /** The highest level among a team's buildings of a type (0 without any). */
+  techLevel(team: Team, type: BuildingType): number {
+    let level = 0;
+    for (const b of this.buildings) if (b.team === team && b.type === type && !b.dead) level = Math.max(level, b.level);
+    return level;
+  }
+
+  /** Whether a team has its faction's hub (Construction Yard, Sietch), without which it can't build. */
+  hasHub(team: Team): boolean {
+    return this.has(team, FACTIONS[this.teams[team].faction].hub);
   }
 
   /** A unit's stats as this team's faction fields it. */
@@ -299,15 +309,15 @@ export class Game {
     return reqs.every((r) => this.meets(team, r));
   }
 
-  /** A level-1 building of this type exists, nobody of that type is level 2, and none is mid-upgrade. */
+  /** A building of this type exists, none is at the top level yet, none is mid-upgrade, and the next step's needs are met. */
   canLevelUp(team: Team, type: LevelUpType): boolean {
-    const reqs = BUILDINGS[type].levelUp?.requires ?? [];
-    return factionLevelUps(this.teams[team].faction).has(type) && !this.teams[team].levelUps[type] && !this.meets(team, `${type}2`) &&
-      this.has(team, type) && this.requirementsMet(team, reqs);
+    const level = this.techLevel(team, type);
+    if (!factionLevelUps(this.teams[team].faction).has(type) || this.teams[team].levelUps[type] || level < 1 || level >= maxLevel(type)) return false;
+    return this.requirementsMet(team, levelDef(type, level + 1).requires ?? []);
   }
 
   canBuild(team: Team, type: BuildingType): boolean {
-    return FACTIONS[this.teams[team].faction].build.includes(type) && this.has(team, 'conyard') && this.requirementsMet(team, BUILDINGS[type].requires);
+    return FACTIONS[this.teams[team].faction].build.includes(type) && this.hasHub(team) && this.requirementsMet(team, BUILDINGS[type].requires);
   }
 
   canTrain(team: Team, type: UnitType): boolean {
@@ -828,22 +838,25 @@ export class Game {
 
   startLevelUp(team: Team, type: LevelUpType): boolean {
     const ts = this.teams[team];
-    const building = this.buildings.find((b) => b.team === team && b.type === type && b.level < 2 && !b.dead);
-    if (!building || !this.canLevelUp(team, type)) return false;
-    const cost = BUILDINGS[type].levelUp!.cost;
+    if (!this.canLevelUp(team, type)) return false;
+    // The leading building of the type goes up (the others are spares: a second Sietch starts again at level 1).
+    const level = this.techLevel(team, type);
+    const building = this.buildings.find((b) => b.team === team && b.type === type && b.level === level && !b.dead)!;
+    const cost = levelDef(type, level + 1).cost;
     if (ts.credits < cost) {
       this.notifyTeam(team, 'Insufficient funds.', 'insufficient_funds');
       return false;
     }
     this.spend(ts, cost);
-    ts.levelUps[type] = { building, progress: 0 };
+    ts.levelUps[type] = { building, level: level + 1, progress: 0 };
     return true;
   }
 
   cancelLevelUp(team: Team, type: LevelUpType): void {
     const ts = this.teams[team];
-    if (!ts.levelUps[type]) return;
-    this.refund(ts, BUILDINGS[type].levelUp!.cost);
+    const l = ts.levelUps[type];
+    if (!l) return;
+    this.refund(ts, levelDef(type, l.level).cost);
     delete ts.levelUps[type];
   }
 
@@ -885,10 +898,10 @@ export class Game {
         delete ts.levelUps[type]; // lost with the building
         continue;
       }
-      const up = BUILDINGS[type].levelUp!;
+      const up = levelDef(type, l.level);
       l.progress += dt / up.time;
       if (l.progress >= 1) {
-        l.building.setLevel(2);
+        l.building.setLevel(l.level);
         delete ts.levelUps[type];
         this.notifyTeam(ts.team, `${up.name} complete.`, 'upgrade_complete');
       }
@@ -1338,7 +1351,7 @@ export class Game {
   private updateSelfRepair(dt: number): void {
     for (const b of this.buildings) {
       if (!b.repairing || b.dead) continue;
-      if (b.hp >= b.maxHp || !this.has(b.team, 'conyard')) {
+      if (b.hp >= b.maxHp || !this.hasHub(b.team)) {
         b.repairing = false;
         continue;
       }
@@ -1349,7 +1362,7 @@ export class Game {
 
   /** Whether a structure can be told to repair itself now (Corrino, damaged, a Construction Yard standing). */
   canSelfRepair(b: Building): boolean {
-    return FACTIONS[this.teams[b.team].faction].selfRepair && !b.dead && b.hp < b.maxHp && this.has(b.team, 'conyard');
+    return FACTIONS[this.teams[b.team].faction].selfRepair && !b.dead && b.hp < b.maxHp && this.hasHub(b.team);
   }
 
   // ---- Fremen: hiding, healing, Spice Camps ------------------------------------------

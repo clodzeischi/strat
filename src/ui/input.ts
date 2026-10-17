@@ -820,7 +820,8 @@ export class Input {
       case ' ': {
         e.preventDefault();
         const alert = this.takeAlert();
-        const home = g.buildings.find((b) => b.team === this.team && b.type === 'conyard') ?? g.buildings.find((b) => b.team === this.team);
+        const hub = FACTIONS[g.teams[this.team].faction].hub;
+        const home = g.buildings.find((b) => b.team === this.team && b.type === hub) ?? g.buildings.find((b) => b.team === this.team);
         const to = alert ?? home;
         if (to) this.cam.lookAt(to.x, to.z);
         break;

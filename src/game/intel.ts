@@ -1,4 +1,4 @@
-import type { BuildingType, Team, UnitType } from '../config';
+import { FACTIONS, type BuildingType, type Team, type UnitType } from '../config';
 import type { Unit } from '../entities';
 import type { Game } from './game';
 import { hypot } from './hypot';
@@ -114,12 +114,13 @@ export class Intel {
   }
 
   /**
-   * Where the enemy base is, as far as we know: its construction yard, or the middle of the structures we've seen;
+   * Where the enemy base is, as far as we know: its hub (Construction Yard, Sietch), or the middle of the structures we've seen;
    * with none seen, the mirror image of our own start (maps are point-symmetric, which any player can work out).
    */
   enemyBase(): { x: number; z: number } {
     const known = [...this.buildings.values()];
-    const yard = known.find((s) => s.type === 'conyard');
+    const hub = FACTIONS[this.game.teams[(1 - this.team) as Team].faction].hub;
+    const yard = known.find((s) => s.type === hub);
     if (yard) return { x: yard.x, z: yard.z };
     if (known.length) return { x: known.reduce((a, s) => a + s.x, 0) / known.length, z: known.reduce((a, s) => a + s.z, 0) / known.length };
     const m = this.game.map;

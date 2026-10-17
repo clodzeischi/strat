@@ -6,6 +6,8 @@ export type ResearchSlot = { levelUp: LevelUpType } | { upgrades: UpgradeType[] 
 
 export interface FactionDef {
   name: string;
+  /** The structure each player starts with, which builds the others: lose them all and you can't build. */
+  hub: BuildingType;
   /** Command card layouts (8 slots each: the home row, then the bottom row). Also what the faction may use at all. */
   build: (BuildingType | null)[];
   train: (UnitType | null)[];
@@ -29,6 +31,7 @@ export interface FactionDef {
 export const FACTIONS: Record<Faction, FactionDef> = {
   atreides: {
     name: 'Atreides',
+    hub: 'conyard',
     build: ['refinery', 'barracks', 'factory', 'hitech', 'bunker', 'conyard', null, null],
     train: ['infantry', 'trike', 'tank', 'rocket', 'harvester', 'repair', 'carryall', null],
     research: [
@@ -41,6 +44,7 @@ export const FACTIONS: Record<Faction, FactionDef> = {
   },
   corrino: {
     name: 'Corrino',
+    hub: 'conyard',
     build: ['refinery', 'barracks', 'fab', 'tleilaxu', 'turret', 'pad', 'conyard', null],
     train: ['trooper', 'sardaukar', 'razor', 'devastator', 'harvester', 'raider', 'artillery', null],
     research: [
@@ -54,7 +58,8 @@ export const FACTIONS: Record<Faction, FactionDef> = {
   },
   fremen: {
     name: 'Fremen',
-    build: ['barracks', 'sietch', null, null, 'bunker', 'conyard', null, null],
+    hub: 'sietch',
+    build: ['barracks', null, null, null, 'bunker', 'sietch', null, null],
     train: ['warrior', 'fedaykin', 'mortar', null, 'crew', 'glider', null, null],
     research: [
       { levelUp: 'sietch' }, { upgrades: ['fWeapons'] }, { upgrades: ['fArmor'] }, { upgrades: ['ambush'] },

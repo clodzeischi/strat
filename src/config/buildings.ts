@@ -1,4 +1,4 @@
-import type { BuildingDef, BuildingType, Req, Tag } from './types';
+import type { BuildingDef, BuildingType, LevelDef, LevelUpType, Req, Tag } from './types';
 
 export const BUILDING_ORDER: BuildingType[] = [
   'conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech', 'fab', 'tleilaxu', 'pad', 'turret', 'sietch', 'thumper', 'camp',
@@ -8,7 +8,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   conyard: {
     name: 'Construction Yard', short: 'Const. Yard', cost: 2500, buildTime: 25, hp: 1600, size: 3, requires: [],
     desc: 'Builds structures, one at a time. Lose all of these and you cannot build.',
-    levelUp: { name: 'HQ Level 2', short: 'HQ Level 2', cost: 1500, time: 45, desc: 'Upgrades a Construction Yard. Unlocks Harvesting and Infantry Rockets.' },
+    levels: [{ name: 'HQ Level 2', short: 'HQ Level 2', cost: 1500, time: 45, desc: 'Upgrades a Construction Yard. Unlocks Harvesting and Infantry Rockets.' }],
   },
   refinery: {
     name: 'Refinery', short: 'Refinery', cost: 1200, buildTime: 14, hp: 1000, size: 3, requires: [],
@@ -18,10 +18,10 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     name: 'Barracks', short: 'Barracks', cost: 500, buildTime: 10, hp: 800, size: 2, requires: [],
     desc: 'Trains infantry. Each Barracks adds a production line.',
     // Corrino only (Atreides barracks don't level up).
-    levelUp: {
+    levels: [{
       name: 'Imperial Barracks', short: 'Imperial Bks', cost: 1000, time: 40, requires: ['tleilaxu'],
       desc: 'Upgrades a Barracks. Unlocks Sardaukar and drop pods: new infantry land by pod at the rally point, anywhere you can see.',
-    },
+    }],
   },
   bunker: {
     name: 'Bunker', short: 'Bunker', cost: 400, buildTime: 10, hp: 1400, size: 2, requires: ['barracks'], garrison: 3,
@@ -30,7 +30,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   factory: {
     name: 'Factory', short: 'Factory', cost: 1000, buildTime: 14, hp: 1100, size: 3, requires: ['refinery', 'barracks'],
     desc: 'Builds vehicles. Each Factory adds a production line.',
-    levelUp: { name: 'Factory Level 2', short: 'Factory Lv 2', cost: 1200, time: 40, desc: 'Upgrades a Factory. Unlocks MLRS, Weapons II and Armor II.' },
+    levels: [{ name: 'Factory Level 2', short: 'Factory Lv 2', cost: 1200, time: 40, desc: 'Upgrades a Factory. Unlocks MLRS, Weapons II and Armor II.' }],
   },
   hitech: {
     name: 'Hi-Tech Factory', short: 'Hi-Tech', cost: 1200, buildTime: 16, hp: 1000, size: 3, requires: ['factory'],
@@ -41,7 +41,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   fab: {
     name: 'Fab', short: 'Fab', cost: 1100, buildTime: 15, hp: 1200, size: 3, requires: ['refinery', 'barracks'],
     desc: 'Builds vehicles and aircraft. Each Fab adds a production line.',
-    levelUp: { name: 'Fab Level 2', short: 'Fab Lv 2', cost: 1200, time: 40, requires: ['tleilaxu'], desc: 'Upgrades a Fab. Unlocks Devastators.' },
+    levels: [{ name: 'Fab Level 2', short: 'Fab Lv 2', cost: 1200, time: 40, requires: ['tleilaxu'], desc: 'Upgrades a Fab. Unlocks Devastators.' }],
   },
   tleilaxu: {
     name: 'Tleilaxu Research', short: 'Tleilaxu', cost: 1300, buildTime: 18, hp: 1000, size: 3, requires: ['fab'],
@@ -59,9 +59,12 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
 
   // ---- Fremen (who also build on open sand) ----
   sietch: {
-    name: 'Sietch', short: 'Sietch', cost: 1000, buildTime: 15, hp: 1400, size: 3, requires: ['barracks'],
-    desc: 'A Fremen stronghold. Unlocks Fedaykin, Wind Gliders, Thumpers and research.',
-    levelUp: { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades the Sietch. Unlocks Fremen Mortars and Ambush.' },
+    name: 'Sietch', short: 'Sietch', cost: 2000, buildTime: 25, hp: 1600, size: 3, requires: [],
+    desc: 'A Fremen stronghold, and their hub: builds structures, one at a time. Lose all of these and you cannot build.',
+    levels: [
+      { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades a Sietch. Unlocks Fremen Mortars and Ambush.' },
+      { name: 'Sietch III', short: 'Sietch III', cost: 1500, time: 45, desc: 'Upgrades a Great Sietch. Unlocks the Sandrider.' },
+    ],
   },
   thumper: {
     name: 'Thumper', short: 'Thumper', cost: 250, buildTime: 0, hp: 150, size: 1, requires: ['sietch'], onSand: true, deployed: true,
@@ -75,7 +78,24 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
 
 export const BUILDING_TAGS: Tag[] = ['structure'];
 
+/** The step up to `level` (2 or 3) of a building that levels up. */
+export function levelDef(type: BuildingType, level: number): LevelDef {
+  return BUILDINGS[type].levels![level - 2];
+}
+
+/** The highest level a building type reaches (1 if it doesn't level up). */
+export function maxLevel(type: BuildingType): number {
+  return 1 + (BUILDINGS[type].levels?.length ?? 0);
+}
+
+/** A requirement split into the building and the level it needs (1 for just having one). */
+export function parseReq(r: Req): { type: BuildingType; level: number } {
+  const last = r[r.length - 1];
+  return last === '2' || last === '3' ? { type: r.slice(0, -1) as LevelUpType, level: +last } : { type: r as BuildingType, level: 1 };
+}
+
 /** Display name for a requirement. */
 export function reqName(r: Req): string {
-  return r.endsWith('2') ? BUILDINGS[r.slice(0, -1) as BuildingType].levelUp!.name : BUILDINGS[r as BuildingType].name;
+  const { type, level } = parseReq(r);
+  return level > 1 ? levelDef(type, level).name : BUILDINGS[type].name;
 }

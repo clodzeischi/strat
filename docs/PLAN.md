@@ -316,7 +316,7 @@ Warrior ─┬─ Fedaykin (Great Sietch) ── Sandrider (Sietch III)
 **Units:** Warrior, Spice Crew, Wind Glider, Fedaykin, Mortar, Sandrider. About 15 tech steps against Corrino's 13, and about 10-11k to max out against Corrino's 10.8k.
 
 **Stages** (each verified and committed on the branch):
-1. **Engine:** a hub per faction, Fremen start with a Sietch, three building levels, more Sietches allowed. Sim checks updated.
+1. **Engine:** a hub per faction, Fremen start with a Sietch, three building levels, more Sietches allowed. Sim checks updated. **Done:** `FactionDef.hub`, `BuildingDef.levels` (a list of steps; `sietch3` requirements), the Sietch as hub (2000, 25 s, 1600 HP; Sietch III a placeholder that unlocks nothing yet), a placeholder level-3 kit. Losing the leading Sietch drops the team to the best level still standing. Check: `npx tsx sim/sietch-check.ts`. Interim AI: Fremen open with two Barracks, and the AI skips level-ups that unlock nothing it uses. 8 Hard games each: Fremen 50% vs Corrino, 50% vs Atreides.
 2. **Tech tree:** new requirements and research; the Windtrap builds Gliders and heals; faster healing in the sand.
 3. **Rites:** a lockstep command, command-card buttons, dig-in and emerge, sim checks.
 4. **Sandrider:** zealot rush, the rider's Thumper, the ridden worm (segment chain, steering, irregular loop, wild on the rider's death). Placeholder art until approved.

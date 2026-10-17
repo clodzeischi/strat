@@ -1,6 +1,6 @@
 import {
-  BUILDINGS, FACTIONS, THUMPER, TILE, UNITS, UPGRADES, WORM,
-  type BuildingType, type Faction, type LevelUpType, type Producer, type Team, type UnitType, type UpgradeType,
+  BUILDINGS, FACTIONS, THUMPER, TILE, UNITS, UPGRADES, WORM, levelDef,
+  type BuildingType, type Faction, type LevelUpType, type Producer, type Req, type Team, type UnitType, type UpgradeType,
 } from '../config';
 import { Building, type Entity, type Unit } from '../entities';
 import type { Difficulty, Game } from './game';
@@ -46,9 +46,9 @@ const KITS: Record<Faction, FactionKit> = {
     levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'], fallback: 'trooper',
     siege: { unit: 'artillery', per: 10, max: 3 }, worker: 'harvester',
   },
-  // The Sietch stands in for the factory (the second step of the opening).
+  // A second Barracks stands in for the factory (the second step of the opening): the Sietch is there from the start.
   fremen: {
-    factory: 'sietch', defense: 'bunker', raider: 'warrior', scouts: ['glider', 'warrior'], mender: null, tech: [],
+    factory: 'barracks', defense: 'bunker', raider: 'warrior', scouts: ['glider', 'warrior'], mender: null, tech: [],
     levels: ['sietch'], research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush'], fallback: 'warrior',
     siege: { unit: 'mortar', per: 5, max: 5 }, worker: 'crew',
   },
@@ -248,12 +248,15 @@ export class AI {
 
   /** This faction's names for the AI's plans. */
   protected readonly kit: FactionKit;
+  /** The structure that builds the others (Construction Yard, Sietch). */
+  protected readonly hub: BuildingType;
 
   constructor(protected game: Game, protected team: Team, protected profile: AIProfile = NORMAL_PROFILE) {
     this.nextRaidTime = profile.raids.start;
     this.nextScoutTime = profile.scout.first;
     this.intel = new Intel(game, team);
     this.kit = KITS[game.teams[team].faction];
+    this.hub = FACTIONS[game.teams[team].faction].hub;
     this.camps = !!FACTIONS[game.teams[team].faction].camps;
     const flip = game.random() < 0.5;
     this.techOrder = flip ? [...this.kit.levels].reverse() : [...this.kit.levels];
@@ -321,16 +324,16 @@ export class AI {
     const g = this.game;
     if (this.camps) {
       // Fremen: crews come from the Barracks.
-      if (!g.has(this.team, 'barracks')) return g.has(this.team, 'conyard') && this.harvesterCount() === 0 ? { type: 'barracks', cost: BUILDINGS.barracks.cost } : null;
+      if (!g.has(this.team, 'barracks')) return g.hasHub(this.team) && this.harvesterCount() === 0 ? { type: 'barracks', cost: BUILDINGS.barracks.cost } : null;
       if (this.harvesterCount() >= Math.min(this.profile.minHarvesters, this.wantHarvesters())) return null;
       return { type: 'harvester', cost: UNITS[this.kit.worker].cost };
     }
     const refinery = { type: 'refinery' as const, cost: BUILDINGS.refinery.cost };
-    if (!g.has(this.team, 'refinery')) return g.has(this.team, 'conyard') ? refinery : null;
+    if (!g.has(this.team, 'refinery')) return g.hasHub(this.team) ? refinery : null;
     if (this.harvesterCount() >= Math.min(this.profile.minHarvesters, this.wantHarvesters())) return null;
     if (g.has(this.team, this.kit.factory)) return { type: 'harvester', cost: UNITS.harvester.cost };
     // Only once the opening is done: before that, the factory is on its way anyway.
-    return this.openingDone && g.has(this.team, 'conyard') ? refinery : null;
+    return this.openingDone && g.hasHub(this.team) ? refinery : null;
   }
 
   /** A structure lost since the opening was finished: rebuilt before units, so production comes back. */
@@ -361,14 +364,23 @@ export class AI {
     else this.game.startResearch(this.team, goal.type);
   }
 
+  /** Whether a building's next level unlocks a unit we train or research we do (Sietch III, before the Sandrider, doesn't). */
+  private levelUnlocks(type: LevelUpType, level: number): boolean {
+    const req = `${type}${level}`;
+    const f = FACTIONS[this.game.teams[this.team].faction];
+    return f.train.some((u) => u && this.game.unitDef(this.team, u).requires.includes(req as Req)) ||
+      this.kit.research.some((u) => UPGRADES[u].requires.includes(req as Req)) ||
+      Object.values(BUILDINGS).some((b) => b.levels?.some((l) => l.requires?.includes(req as Req)));
+  }
+
   /** The next tech step worth saving for: a level-up along our path (one at a time), else research. */
   private techGoal(): { kind: 'level'; type: LevelUpType; cost: number } | { kind: 'research'; type: UpgradeType; cost: number } | null {
     const g = this.game;
     const ts = this.ts;
     if (!g.has(this.team, this.kit.factory) || g.count(this.team, 'refinery') < this.wantRefineries() || this.econGoal() || this.rebuildStep()) return null;
     if (!this.kit.levels.some((t) => ts.levelUps[t])) {
-      const level = this.techOrder.find((t) => g.canLevelUp(this.team, t));
-      if (level) return { kind: 'level', type: level, cost: BUILDINGS[level].levelUp!.cost };
+      const level = this.techOrder.find((t) => g.canLevelUp(this.team, t) && this.levelUnlocks(t, g.techLevel(this.team, t) + 1));
+      if (level) return { kind: 'level', type: level, cost: levelDef(level, g.techLevel(this.team, level) + 1).cost };
     }
     if (!ts.research) {
       const research = this.kit.research.find((u) => g.canResearch(this.team, u));
@@ -406,7 +418,7 @@ export class AI {
       g.cancelBuilding(this.team);
       return;
     }
-    if (ts.building || !g.has(this.team, 'conyard')) return;
+    if (ts.building || !g.hasHub(this.team)) return;
 
     if (this.rushed() && !goal && g.has(this.team, this.incomeBase())) {
       // A bunker first (the infantry we're making anyway hold out far better in it), then more barracks.
@@ -436,7 +448,7 @@ export class AI {
     // Fremen train everything at the Barracks: they want more of them, and only one Sietch.
     else if (barracks < (this.camps ? 3 : 2) && ts.credits > this.profile.more.barracks) want = 'barracks';
     else if (!this.camps && factories < 2 && ts.credits > this.profile.more.factory) want = this.kit.factory;
-    else if (g.count(this.team, 'conyard') < 2 && ts.credits > 4000) want = 'conyard';
+    else if (g.count(this.team, this.hub) < 2 && ts.credits > 4000) want = this.hub;
     if (!want || ts.credits < BUILDINGS[want].cost || (this.noRoom.get(want) ?? -Infinity) > g.time) return;
     // Only start what there's room for: a cramped base would otherwise build, fail to place, refund and retry forever.
     if (this.findSpot(want)) g.startBuilding(this.team, want);
@@ -946,7 +958,7 @@ export class AI {
 
   protected home(): Building | null {
     const g = this.game;
-    return g.buildings.find((b) => b.team === this.team && b.type === 'conyard') ?? g.buildings.find((b) => b.team === this.team) ?? null;
+    return g.buildings.find((b) => b.team === this.team && b.type === this.hub) ?? g.buildings.find((b) => b.team === this.team) ?? null;
   }
 
   private updateRally(): void {
@@ -1528,9 +1540,9 @@ export class AI {
       ? g.buildings.some((b) => b.team === t && b.type === 'camp' && !b.dry) || g.count(t, 'crew') > 0
       : g.count(t, 'harvester') > 0 && g.has(t, 'refinery');
     const canBuyIncome = fremen
-      ? (g.has(t, 'barracks') && credits >= UNITS.crew.cost) || (g.has(t, 'conyard') && credits >= BUILDINGS.barracks.cost + UNITS.crew.cost)
-      : (g.has(t, 'refinery') && g.has(t, this.kit.factory) && credits >= UNITS.harvester.cost) || (g.has(t, 'conyard') && credits >= BUILDINGS.refinery.cost);
-    const canProduce = g.has(t, 'conyard') || g.has(t, 'barracks') || g.has(t, this.kit.factory);
+      ? (g.has(t, 'barracks') && credits >= UNITS.crew.cost) || (g.hasHub(t) && credits >= BUILDINGS.barracks.cost + UNITS.crew.cost)
+      : (g.has(t, 'refinery') && g.has(t, this.kit.factory) && credits >= UNITS.harvester.cost) || (g.hasHub(t) && credits >= BUILDINGS.refinery.cost);
+    const canProduce = g.hasHub(t) || g.has(t, 'barracks') || g.has(t, this.kit.factory);
     if ((income || canBuyIncome) && canProduce) {
       this.brokeSince = Infinity;
       return false;
