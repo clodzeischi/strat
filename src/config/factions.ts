@@ -11,6 +11,8 @@ export interface FactionDef {
   /** Command card layouts (8 slots each: the home row, then the bottom row). Also what the faction may use at all. */
   build: (BuildingType | null)[];
   train: (UnitType | null)[];
+  /** Units made by rites from others in the field (Fremen; see UnitDef.rite), in command-card order. */
+  rites?: UnitType[];
   research: (ResearchSlot | null)[];
   /** Units each player starts with, next to the Construction Yard. */
   start: UnitType[];
@@ -60,7 +62,8 @@ export const FACTIONS: Record<Faction, FactionDef> = {
     name: 'Fremen',
     hub: 'sietch',
     build: ['barracks', 'windtrap', null, null, 'bunker', 'sietch', null, null],
-    train: ['warrior', 'fedaykin', 'mortar', null, 'crew', 'glider', null, null],
+    train: ['warrior', null, null, null, 'crew', 'glider', null, null],
+    rites: ['fedaykin', 'mortar'],
     research: [
       { levelUp: 'sietch' }, { upgrades: ['fWeapons', 'fWeapons2'] }, { upgrades: ['fArmor', 'fArmor2'] }, { upgrades: ['ambush'] },
       { upgrades: ['stillsuit'] }, { upgrades: ['sandwalk'] }, { upgrades: ['fHarvest'] }, null,

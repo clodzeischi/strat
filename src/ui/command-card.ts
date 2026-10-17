@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, THUMPER, TILE, UPGRADES, WORM, levelDef, maxLevel, reqName, shieldsFor,
+  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, THUMPER, TILE, UNITS, UPGRADES, WORM, levelDef, maxLevel, reqName, shieldsFor,
   type BuildingType, type LevelUpType, type Req, type ResearchSlot, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
 import { Building, SALVAGE, Unit } from '../entities';
@@ -218,7 +218,40 @@ export class CommandCard {
     const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : u?.def.lockOn ? c.lock : u?.def.camp ? c.setup
       : u?.def.thumper ? c.thump : null;
     const hold = this.input.canHold() ? c.hold : null;
-    return [c.attack, c.stop, ability, hold, null, null, null, u?.def.detonate ? c.detonate : null];
+    // Bottom row: the rites this kind can go through (Fremen Warriors into Fedaykin or Mortars).
+    const rites = (FACTIONS[this.faction].rites ?? []).filter((t) => u && this.game.unitDef(u.team, t).rite?.from === u.type).map((t) => this.riteSlot(t));
+    return [c.attack, c.stop, ability, hold, rites[0] ?? null, rites[1] ?? null, rites[2] ?? null, u?.def.detonate ? c.detonate : null];
+  }
+
+  /** A rite on the Command tab: every selected unit of the lead kind that can, digs in and becomes `to`. */
+  private riteSlot(to: UnitType): Slot {
+    const g = this.game;
+    const d = g.unitDef(g.localTeam, to);
+    const r = d.rite!;
+    const from = () => this.input.ownUnits().filter((u) => u.type === r.from);
+    const busy = () => from().filter((u) => u.rite?.to === to);
+    return {
+      icon: () => to,
+      name: () => `Rite: ${d.name}`,
+      cost: () => r.cost,
+      tip: () => {
+        const sel = from().find((u) => !u.rite);
+        const why = sel ? g.riteBlocked(sel, to) : null;
+        return `${UNITS[r.from].name} digs into the sand where it stands and comes out ${r.time} s later as a ${d.name} (for good: rites can't be undone). ` +
+          `Only on sand; moving or Stop calls it off and refunds it.\n${d.desc}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}${why && why !== 'Busy.' ? `\n${why}` : ''}`;
+      },
+      view: () => {
+        const b = busy();
+        const locked = !g.requirementsMet(g.localTeam, d.requires);
+        const can = from().some((u) => !g.riteBlocked(u, to));
+        const progress = b.length ? Math.max(...b.map((u) => 1 - (u.rite!.until - g.time) / r.time)) : null;
+        return { locked, disabled: !can && !b.length, progress, status: b.length > 1 ? `${b.length}` : '' };
+      },
+      use: () => {
+        const units = from().filter((u) => !g.riteBlocked(u, to));
+        if (units.length) this.input.issue({ c: 'rite', units: units.map((u) => u.id), to });
+      },
+    };
   }
 
   private use(i: number): void {
@@ -423,14 +456,14 @@ export class CommandCard {
         icon: () => 'thump',
         name: () => 'Plant Thumper',
         cost: () => THUMPER.cost,
-        tip: () => `Then click open sand or spice: the nearest selected Warrior or Fedaykin goes there and plants a Thumper. ${THUMPER.delay} s later a wild Sandworm comes up there and for ${WORM.hunt} s swallows whatever moves on the sand within ${WORM.range} of it, harvesters even standing still, and structures on the sand. It eats your units too: get off the sand, or stand still (Hold Position). Enemies nearby hear it drumming; destroy it in time and no worm comes. One at a time, every ${THUMPER.cooldown} s. Needs a Sietch.`,
+        tip: () => `Then click open sand or spice: the nearest selected Warrior or Fedaykin goes there and plants a Thumper. ${THUMPER.delay} s later a wild Sandworm comes up there and for ${WORM.hunt} s swallows whatever moves on the sand within ${WORM.range} of it, harvesters even standing still, and structures on the sand. It eats your units too: get off the sand, or stand still (Hold Position). Enemies nearby hear it drumming; destroy it in time and no worm comes. One at a time, every ${THUMPER.cooldown} s. Needs a Great Sietch.`,
         view: () => {
           const g = this.game;
           const due = g.drumDue(g.localTeam);
           const wait = Math.max(0, this.ts.nextThumper - g.time);
           return {
-            disabled: !g.has(g.localTeam, 'sietch'),
-            locked: !g.has(g.localTeam, 'sietch'),
+            disabled: !g.meets(g.localTeam, 'sietch2'),
+            locked: !g.meets(g.localTeam, 'sietch2'),
             active: input.thumpMode || due !== null,
             status: due !== null ? `${Math.ceil(due)}` : wait > 0 ? `${Math.ceil(wait)}` : '',
           };

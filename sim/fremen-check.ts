@@ -58,13 +58,13 @@ check(sandNo && FACTIONS.atreides.buildOnSand === undefined, "Atreides can't bui
 check(!g.canPlace('camp', F, bks.cx + 4, bks.cz), 'a Spice Camp is not built at the yard');
 check(g.canTrain(F, 'warrior') && g.canTrain(F, 'crew'), 'Barracks trains Warriors and Crews');
 // The tree: a Sietch to start, then the Great Sietch and Sietch III.
-check(!g.canTrain(F, 'fedaykin') && !g.canTrain(F, 'mortar') && g.thumpBlocked(F) === 'Thumpers need a Great Sietch.', 'no Fedaykin, Mortars or Thumpers at level 1');
+check(!g.requirementsMet(F, UNITS.fedaykin.requires) && !g.requirementsMet(F, UNITS.mortar.requires) && g.thumpBlocked(F) === 'Thumpers need a Great Sietch.', 'no Fedaykin, Mortars or Thumpers at level 1');
 check(g.canResearch(F, 'fHarvest') && g.canResearch(F, 'sandwalk') && !g.canResearch(F, 'fWeapons') && !g.canResearch(F, 'stillsuit'), 'level 1 researches Spice Mining and Sandwalk');
 check(g.canBuild(F, 'windtrap') && !g.canTrain(F, 'glider'), 'the Windtrap can be built at once; Gliders need it');
 check(!g.canBuild(F, 'thumper') && !g.canPlace('thumper', F, bks.cx + 4, bks.cz), 'Thumpers are planted by infantry, not built at the yard');
 applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
 run(BUILDINGS.sietch.levels![0].time + 1);
-check(g.canTrain(F, 'fedaykin') && g.canTrain(F, 'mortar') && g.thumpBlocked(F) === null, 'the Great Sietch unlocks Fedaykin, Mortars and Thumpers');
+check(g.requirementsMet(F, UNITS.fedaykin.requires) && g.requirementsMet(F, UNITS.mortar.requires) && g.thumpBlocked(F) === null, 'the Great Sietch unlocks the Fedaykin and Mortar rites, and Thumpers');
 check(g.canResearch(F, 'fWeapons') && g.canResearch(F, 'fArmor') && g.canResearch(F, 'stillsuit') && !g.canResearch(F, 'ambush'), 'and Weapons +1, Armor +1, Stillsuits; not Ambush');
 g.teams[F].upgrades.add('fWeapons');
 check(!g.canResearch(F, 'fWeapons2'), 'Weapons +2 waits for Sietch III');
@@ -309,7 +309,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
 
 // ---- Fremen Mortar ----
 {
-  check(g.canTrain(F, 'mortar'), 'the Great Sietch unlocks the Fremen Mortar');
+  check(g.requirementsMet(F, UNITS.mortar.requires), 'the Great Sietch unlocks the Fremen Mortar rite');
   const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
   const tick = (seconds: number) => {
     for (let k = 0; k < seconds * 20; k++) t.update(0.05);
@@ -365,6 +365,64 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   t.teams[F].upgrades.add('stillsuit');
   for (let k = 0; k < 240; k++) t.update(0.05);
   check(a.hp - 50 > (h1 - 50) * 1.5, 'Stillsuits heal faster');
+}
+
+// ---- Rites: Warriors become Fedaykin or Mortars in the sand, for good ----
+{
+  const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
+  const tm = t.map;
+  for (const u of t.units) if (u.team === A) u.dead = true;
+  const tick = (seconds: number) => {
+    for (let k = 0; k < seconds * 20; k++) t.update(0.05);
+  };
+  t.teams[F].credits = 100000;
+  const y = t.buildings.find((b) => b.team === F)!;
+  const r = tm.nearestCell(y.cx, y.cz, (x, z) => tm.tile(x, z) === ROCK && tm.canEnter(x, z, 'foot'), 60)!;
+  const w1 = t.spawnUnit('warrior', F, sx, sz);
+  const onRock = t.spawnUnit('warrior', F, tm.center(r.cx), tm.center(r.cz));
+  check(!t.canTrain(F, 'fedaykin') && !t.canTrain(F, 'mortar') && !FACTIONS.fremen.train.includes('fedaykin'), 'Fedaykin and Mortars are never trained');
+  check(t.riteBlocked(w1, 'fedaykin') === 'Needs Great Sietch.', 'the Fedaykin rite needs a Great Sietch');
+  y.setLevel(2);
+  check(t.riteBlocked(w1, 'fedaykin') === null && t.riteBlocked(w1, 'mortar') === null, 'with it, a Warrior on the sand can become a Fedaykin or a Mortar');
+  check(t.riteBlocked(onRock, 'fedaykin') === 'Rites are held in the sand, not on rock.', 'not on rock');
+  w1.hp = w1.maxHp / 2;
+  w1.kills = 3;
+  const cr = t.teams[F].credits;
+  applyCommand(t, F, { c: 'rite', units: [w1.id], to: 'fedaykin' });
+  check(!!w1.rite && cr - t.teams[F].credits === UNITS.fedaykin.rite!.cost, 'the rite is paid up front');
+  tick(1);
+  check(w1.hidden, 'the Warrior digs straight into the sand');
+  const at = { x: w1.x, z: w1.z };
+  const foe = t.spawnUnit('infantry', A, w1.x + 3, w1.z);
+  tick(2);
+  check(foe.hp === foe.maxHp && hypot(w1.x - at.x, w1.z - at.z) < 0.01, 'in the rite it neither fights nor moves');
+  foe.dead = true;
+  tick(UNITS.fedaykin.rite!.time);
+  const f = w1.becomes as Unit | null;
+  check(w1.dead && !!f && f.type === 'fedaykin' && !f.dead, 'it comes out a Fedaykin');
+  // (It went in at half health, was shot at, and has healed a little since coming out.)
+  check(!!f && f.hp < f.maxHp * 0.5 && f.kills === 3, 'with its share of health and its kills');
+  tick(1);
+  check(!!f && f.hidden, 'still dug in');
+  check(!!f && t.riteBlocked(f, 'mortar') === 'No such rite.' && !UNITS.warrior.rite, 'one way: a Fedaykin cannot become a Mortar, nor go back');
+  // Called off: a move order, or Stop, gives the credits back.
+  const w2 = t.spawnUnit('warrior', F, sx + 3, sz);
+  const c2 = t.teams[F].credits;
+  applyCommand(t, F, { c: 'rite', units: [w2.id], to: 'mortar' });
+  tick(1);
+  applyCommand(t, F, { c: 'go', units: [w2.id], x: w2.x + 6, z: w2.z, target: null, attack: false });
+  tick(0.5);
+  check(!w2.rite && w2.type === 'warrior' && t.teams[F].credits === c2, 'told to move, the rite is called off and refunded');
+  tick(4);
+  applyCommand(t, F, { c: 'rite', units: [w2.id], to: 'mortar' });
+  check(!!w2.rite, 'it can start again');
+  applyCommand(t, F, { c: 'stop', units: [w2.id] });
+  check(!w2.rite && t.teams[F].credits === c2, 'Stop calls it off too');
+  applyCommand(t, F, { c: 'rite', units: [w2.id], to: 'mortar' });
+  tick(1);
+  while (!w2.dead) t.damage(w2, UNITS.tank.weapon!, 100, null);
+  tick(UNITS.mortar.rite!.time);
+  check(!w2.becomes && !t.units.some((u) => u.team === F && u.type === 'mortar'), 'killed in the rite, nothing comes out');
 }
 
 // ---- Healing faster: dug into the sand, and near a Windtrap ----

@@ -98,6 +98,11 @@ export interface UnitDef {
   glides?: { orbit: number };
   /** Can plant a Thumper on the sand to call a wild Sandworm (see THUMPER and WORM in rules.ts). */
   thumper?: boolean;
+  /**
+   * Fremen rites: not trained, but made from a unit of type `from` that digs into the sand for `time` s and comes
+   * out as this one, for `cost` credits. One way only.
+   */
+  rite?: { from: UnitType; cost: number; time: number };
   /** Deploys into this structure where it stands (a Spice Crew into a Spice Camp), and the structure packs back into it. */
   camp?: BuildingType;
 }

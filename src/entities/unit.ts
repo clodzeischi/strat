@@ -124,6 +124,8 @@ export class Unit extends Entity {
   hidden = false;
   /** Teams (bit per team) with something close enough to see it even while it's hidden. */
   detected = 0;
+  /** A Fremen rite under way: dug in, it becomes `to` at game time `until` (`cost` is refunded if it's called off). */
+  rite: { to: UnitType; until: number; cost: number } | null = null;
   /** When it last moved (more than a nudge), and from where: Sandworms only go after what moves. */
   movedAt = 0;
   moveX = 0;
@@ -556,6 +558,11 @@ export class Unit extends Entity {
     this.scanTimer -= dt;
     this.sideScanTimer -= dt;
     const weapon = this.def.weapon;
+    if (this.rite) {
+      // Dug in for a rite: it neither moves nor fights.
+      this.target = null;
+      return;
+    }
     if (this.deployState !== 'mobile') {
       this.updateDeployed(game, dt);
       return;

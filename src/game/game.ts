@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {
   AMBUSH, ARMOR_BONUS, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS,
-  TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, unitDef,
+  TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
   type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
@@ -1584,6 +1584,70 @@ export class Game {
     return u;
   }
 
+  // ---- Fremen rites: a unit dug into the sand comes out as another -------------------
+
+  /** Why a unit can't go through the rite that makes `to` now (null if it can), for the card's tooltip and the AI. */
+  riteBlocked(u: Unit, to: UnitType): string | null {
+    const d = this.unitDef(u.team, to);
+    if (!d.rite || d.rite.from !== u.type || !FACTIONS[this.teams[u.team].faction].rites?.includes(to)) return 'No such rite.';
+    if (u.dead || u.carrier || u.falling || u.rite) return 'Busy.';
+    if (!this.requirementsMet(u.team, d.requires)) return `Needs ${d.requires.map(reqName).join(', ')}.`;
+    if (!u.onSand(this)) return 'Rites are held in the sand, not on rock.';
+    if (this.teams[u.team].credits < d.rite.cost) return NO_FUNDS;
+    return null;
+  }
+
+  /** The unit digs in where it stands and starts the rite (paid now, refunded if it's called off). */
+  startRite(u: Unit, to: UnitType): boolean {
+    const why = this.riteBlocked(u, to);
+    if (why) {
+      if (why === NO_FUNDS) this.notifyTeam(u.team, 'Insufficient funds.', 'insufficient_funds');
+      return false;
+    }
+    const r = this.unitDef(u.team, to).rite!;
+    this.spend(this.teams[u.team], r.cost);
+    u.command(this, { kind: 'idle' });
+    u.queue = [];
+    u.rite = { to, until: this.time + r.time, cost: r.cost };
+    // Straight into the sand: hidden from the next vision tick, as if it had been still a while.
+    u.stillSince = Math.min(u.stillSince, this.time - HIDE.delay);
+    return true;
+  }
+
+  /** Calls a rite off: the unit comes out of the sand as it was, and the credits come back. */
+  cancelRite(u: Unit): void {
+    if (!u.rite || u.dead) return;
+    this.refund(this.teams[u.team], u.rite.cost);
+    u.rite = null;
+  }
+
+  /** Rites end: the unit is replaced by what it became, with the same share of health, its kills, still dug in. */
+  private updateRites(): void {
+    for (const u of [...this.units]) {
+      const r = u.rite;
+      if (!r || u.dead) continue;
+      // Told to go somewhere (or picked up) on the way: the rite is called off.
+      if (u.carrier || (u.order.kind !== 'idle' && u.order.kind !== 'hold')) {
+        this.cancelRite(u);
+        continue;
+      }
+      if (this.time < r.until) continue;
+      const frac = u.hp / u.maxHp;
+      this.remove(u);
+      const n = this.spawnUnit(r.to, u.team, u.x, u.z, u.heading);
+      n.hp = n.maxHp * frac;
+      n.kills = u.kills;
+      n.lastHurt = u.lastHurt;
+      n.stillSince = u.stillSince;
+      n.hideX = u.hideX;
+      n.hideZ = u.hideZ;
+      n.hidden = u.hidden;
+      u.becomes = n;
+      this.teams[u.team].stats.unitsBuilt++;
+      this.notifyTeam(u.team, `${n.def.name} ready.`, 'unit_ready');
+    }
+  }
+
   /** Drawing only: an animated unit plays its death where it fell, lies there a moment, then sinks away. */
   private layCorpse(u: Unit): void {
     // The fallen don't get a health bar or selection ring back.
@@ -1989,6 +2053,7 @@ export class Game {
     this.regenShields(dt);
     this.updateRegen(dt);
     this.updateCamps(dt);
+    this.updateRites();
     this.updateDetonations();
     this.updateMines();
     this.updateDrums();
@@ -2082,7 +2147,7 @@ export class Game {
     const h = new Hasher().int(this.ticks).int(this.nextId);
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
     for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading).num(u.movedAt);
-    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected).int(u.queue.length);
+    for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected).int(u.queue.length).num(u.rite?.until ?? -1);
     for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
     for (const d of this.drums) h.int(d.b.id).num(d.due);

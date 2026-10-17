@@ -6,7 +6,7 @@ import { Building, type Entity, type Unit } from '../entities';
 import type { Difficulty, Game } from './game';
 import { MATCHUP_TYPES, MATCHUPS, type Matchup } from './matchups';
 import { Intel, type Sighting } from './intel';
-import { SPICE, type Cell } from '../map';
+import { SAND, SPICE, type Cell } from '../map';
 import { hypot } from './hypot';
 import { cellsAround } from './pathfinding';
 import { distTo } from '../entities';
@@ -168,7 +168,10 @@ const DEFENSE_TIMEOUT = 4;
 /** 'garrison': on its way into one of our bunkers, or in it. */
 /** 'mend': pulled out of a fight to heal or be repaired; 'drop': on a Carryall operation (Brutal). */
 /** 'thump': gone to plant a Thumper by the enemy's economy (and getting clear of the worm). */
-export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop' | 'thump';
+export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop' | 'thump' | 'rite';
+
+/** Fremen: at most this many rites under way (or Warriors walking to the sand for one) at a time. */
+const MAX_RITES = 3;
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -215,6 +218,8 @@ export class AI {
   private harvesterIds = new Set<number>();
 
   protected roles = new Map<Unit, Role>();
+  /** Warriors walking to the sand to go through a rite there, and what they'll become. */
+  private riteWalks = new Map<Unit, UnitType>();
   protected defenses: Defense[] = [];
   /** An attack on the base is stronger than everything we could send against it (as of the last think). */
   private outgunned = false;
@@ -351,6 +356,7 @@ export class AI {
     this.trackHarvesterLosses();
     this.trackStrength();
     this.manageConstruction();
+    this.manageRites();
     this.manageProduction();
     this.manageTech();
     this.manageArmy();
@@ -492,20 +498,20 @@ export class AI {
       const def = this.kit.defense;
       const bunker = !g.has(this.team, def) && g.canBuild(this.team, def) ? BUILDINGS[def].cost : 0;
       const keepNow = this.outgunned ? 0 : bunker;
-      const options = this.counterWeights().filter(([t]) => g.canTrain(this.team, t) && !full(UNITS[t].producer) && ts.credits - UNITS[t].cost >= keepNow);
+      const options = this.counterWeights().filter(([t]) => this.canMake(t) && !this.lineFull(t) && ts.credits - this.makeCost(t) >= keepNow);
       options.sort((a, b) => b[1] - a[1]);
-      if (options.length) g.queueUnit(this.team, options[0][0]);
+      if (options.length) this.make(options[0][0]);
       this.nextUnit = null;
       return;
     }
     const keep = Math.max(reserve, this.fund());
     if (!this.nextUnit) this.nextUnit = this.chooseUnit();
     let next = this.nextUnit;
-    if (!g.canTrain(this.team, next)) {
+    if (!this.canMake(next)) {
       this.nextUnit = null;
       return;
     }
-    if (full(UNITS[next].producer)) {
+    if (this.lineFull(next)) {
       if (!this.profile.goodLinesOnly) {
         this.nextUnit = null; // that line is busy; pick again next think
         return;
@@ -515,11 +521,88 @@ export class AI {
       if (ts.credits - keep < 1500) return;
       const weights = this.counterWeights();
       const top = Math.max(...weights.map(([, w]) => w));
-      const alt = weights.filter(([t, w]) => w >= top * 0.4 && g.canTrain(this.team, t) && !full(UNITS[t].producer)).sort((a, b) => b[1] - a[1])[0];
+      const alt = weights.filter(([t, w]) => w >= top * 0.4 && this.canMake(t) && !this.lineFull(t)).sort((a, b) => b[1] - a[1])[0];
       if (!alt) return;
       next = alt[0];
     }
-    if (ts.credits - UNITS[next].cost >= keep && g.queueUnit(this.team, next) && next === this.nextUnit) this.nextUnit = null;
+    if (ts.credits - this.makeCost(next) >= keep && this.make(next) && next === this.nextUnit) this.nextUnit = null;
+  }
+
+  // ---- Making units: trained at a producer, or (Fremen) by a rite in the field --------
+
+  /** The rite that makes this unit for our faction, if that's how it's made. */
+  private riteOf(t: UnitType): { from: UnitType; cost: number; time: number } | null {
+    return FACTIONS[this.ts.faction].rites?.includes(t) ? this.game.unitDef(this.team, t).rite ?? null : null;
+  }
+
+  /** Rites under way, and Warriors on their way to the sand for one (of one kind, or all). */
+  private ritesUnderWay(to?: UnitType): number {
+    let n = 0;
+    for (const u of this.game.units) if (u.team === this.team && !u.dead && u.rite && (!to || u.rite.to === to)) n++;
+    for (const [u, t] of this.riteWalks) if (!u.dead && (!to || t === to)) n++;
+    return n;
+  }
+
+  /** A unit of the kind a rite starts from, idle at home and healthy: one already on the sand if there is one. */
+  private riteCandidate(from: UnitType): Unit | null {
+    const g = this.game;
+    const pool = g.units.filter((u) => u.team === this.team && u.type === from && !u.dead && !u.carrier && !u.rite && this.roles.get(u) === 'home'
+      && u.order.kind === 'idle' && u.hp > u.maxHp * 0.8);
+    return pool.find((u) => u.onSand(g)) ?? pool[0] ?? null;
+  }
+
+  private canMake(t: UnitType): boolean {
+    const r = this.riteOf(t);
+    if (!r) return this.game.canTrain(this.team, t);
+    return this.game.requirementsMet(this.team, this.game.unitDef(this.team, t).requires) && !!this.riteCandidate(r.from);
+  }
+
+  private makeCost(t: UnitType): number {
+    return this.riteOf(t)?.cost ?? UNITS[t].cost;
+  }
+
+  /** No room to start another: its production lines are full, or enough rites are under way. */
+  private lineFull(t: UnitType): boolean {
+    if (this.riteOf(t)) return this.ritesUnderWay() >= MAX_RITES;
+    const p = this.game.unitDef(this.team, t).producer;
+    return this.ts.queues[p].length >= this.game.activeLines(this.team, p) + 1;
+  }
+
+  /** Trains it, or starts its rite: where the unit stands if that's sand, else once it has walked to sand nearby. */
+  private make(t: UnitType): boolean {
+    const g = this.game;
+    const r = this.riteOf(t);
+    if (!r) return g.queueUnit(this.team, t);
+    const u = this.riteCandidate(r.from);
+    if (!u) return false;
+    if (u.onSand(g)) {
+      if (!g.startRite(u, t)) return false;
+      this.roles.set(u, 'rite');
+      return true;
+    }
+    const m = g.map;
+    const c = m.nearestCell(m.cellOf(u.x), m.cellOf(u.z), (x, z) => m.tile(x, z) === SAND && m.canEnter(x, z, 'foot'), 12);
+    if (!c) return false;
+    u.command(g, { kind: 'move', x: m.center(c.cx), z: m.center(c.cz) });
+    this.roles.set(u, 'rite');
+    this.riteWalks.set(u, t);
+    return true;
+  }
+
+  /** Warriors that have walked to the sand start their rite; ones that can't (any more) go back to the army. */
+  private manageRites(): void {
+    const g = this.game;
+    for (const [u, t] of this.riteWalks) {
+      if (u.dead) {
+        this.riteWalks.delete(u);
+        continue;
+      }
+      if (u.order.kind !== 'idle') continue;
+      this.riteWalks.delete(u);
+      if (!g.startRite(u, t)) this.roles.set(u, 'home');
+    }
+    // A rite called off (hit by the enemy and told to move, say): back to the army.
+    for (const [u, role] of this.roles) if (role === 'rite' && !u.dead && !u.rite && !this.riteWalks.has(u)) this.roles.set(u, 'home');
   }
 
   /**
@@ -600,9 +683,9 @@ export class AI {
   private siegeWanted(): boolean {
     const g = this.game;
     const s = this.kit.siege;
-    if (!s || !g.canTrain(this.team, s.unit)) return false;
+    if (!s || !this.canMake(s.unit)) return false;
     const army = g.units.filter((u) => u.team === this.team && u.def.weapon && u.type !== 'harvester').length;
-    const have = g.count(this.team, s.unit) + this.ts.queues[g.unitDef(this.team, s.unit).producer].filter((q) => q.type === s.unit).length;
+    const have = g.count(this.team, s.unit) + this.ts.queues[g.unitDef(this.team, s.unit).producer].filter((q) => q.type === s.unit).length + this.ritesUnderWay(s.unit);
     return have < Math.min(s.max, Math.floor(army / s.per));
   }
 
@@ -616,7 +699,7 @@ export class AI {
    */
   private counterWeights(): [UnitType, number][] {
     const g = this.game;
-    const roster = FACTIONS[this.ts.faction].train;
+    const roster = [...FACTIONS[this.ts.faction].train, ...(FACTIONS[this.ts.faction].rites ?? [])];
     const options = (MATCHUP_TYPES as Matchup[]).filter((t) => roster.includes(t) && g.requirementsMet(this.team, g.unitDef(this.team, t).requires));
     // The enemy army as we've seen it.
     const enemy = new Map<Matchup, number>();

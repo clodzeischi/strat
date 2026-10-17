@@ -29,6 +29,8 @@ export type Command =
   | { c: 'cancelSalvage'; buildings: number[] }
   /** Artillery sets up (`on`) or packs up; Spice Crews set up their camp. With `queue` (Shift), after their other orders. */
   | { c: 'deploy'; units: number[]; on: boolean; queue?: boolean }
+  /** Fremen: the units go through the rite that makes `to` (Warriors into Fedaykin, say), where they stand. */
+  | { c: 'rite'; units: number[]; to: UnitType }
   /** Spice Camps pack up into crews again. */
   | { c: 'pack'; buildings: number[] }
   /** Devastators self-destruct. */
@@ -92,6 +94,7 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
     }
     case 'stop':
       for (const u of own(game, team, cmd.units)) {
+        game.cancelRite(u);
         u.queue = [];
         u.command(game, { kind: 'idle' });
       }
@@ -132,6 +135,9 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       return;
     case 'pack':
       for (const b of ownBuildings(game, team, cmd.buildings)) game.packCamp(b);
+      return;
+    case 'rite':
+      for (const u of own(game, team, cmd.units)) if (!u.rite) game.startRite(u, cmd.to);
       return;
     case 'detonate':
       for (const u of own(game, team, cmd.units)) game.startDetonation(u);

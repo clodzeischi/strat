@@ -1,19 +1,20 @@
 // Lockstep needs the simulation to be deterministic: the same seed and the same commands must give the same game,
 // bit for bit. This plays Hard-vs-Hard AI games twice, one after the other and then side by side (two games
 // stepping in turn, which catches state shared between games), and compares state checksums every second.
-// Usage: npx tsx sim/determinism.ts [games] [minutes]
+// Usage: npx tsx sim/determinism.ts [games] [minutes]      other factions: FACTIONS=fremen,corrino npx tsx sim/determinism.ts
 import * as THREE from 'three';
 import { AI, HARD_PROFILE } from '../src/game/ai';
-import type { Team } from '../src/config';
+import type { Faction, Team } from '../src/config';
 import { Game } from '../src/game/game';
 import { TICK } from '../src/net/lockstep';
 
 const games = Number(process.argv[2] ?? 3);
 const minutes = Number(process.argv[3] ?? 8);
 const TICKS = Math.round((minutes * 60) / TICK);
+const factions = process.env.FACTIONS?.split(',') as Faction[] | undefined;
 
 function setup(seed: number) {
-  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, seed);
+  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, seed, factions);
   g.onSurrenderOffer = (t) => g.acceptSurrender(t);
   const ais = [0, 1].map((t) => new AI(g, t as Team, HARD_PROFILE));
   const hashes: number[] = [];
