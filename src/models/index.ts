@@ -6,6 +6,7 @@ import { bunker } from './buildings/bunker';
 import { conyard } from './buildings/conyard';
 import { factory } from './buildings/factory';
 import { hitech } from './buildings/hitech';
+import { windtrap } from './buildings/windtrap';
 import { refinery } from './buildings/refinery';
 import { fab } from './buildings/fab';
 import { pad } from './buildings/pad';
@@ -48,7 +49,7 @@ const UNIT_MODELS: Record<UnitType, UnitBlueprint> = {
   warrior, fedaykin, crew, glider, mortar,
 };
 const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = {
-  conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret, sietch, thumper, camp,
+  conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret, sietch, windtrap, thumper, camp,
 };
 
 /** Unit models face +X. A faction's Blender model replaces the procedural one when it has been loaded. */

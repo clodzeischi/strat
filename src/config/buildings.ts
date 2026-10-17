@@ -1,7 +1,7 @@
 import type { BuildingDef, BuildingType, LevelDef, LevelUpType, Req, Tag } from './types';
 
 export const BUILDING_ORDER: BuildingType[] = [
-  'conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech', 'fab', 'tleilaxu', 'pad', 'turret', 'sietch', 'thumper', 'camp',
+  'conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech', 'fab', 'tleilaxu', 'pad', 'turret', 'sietch', 'windtrap', 'thumper', 'camp',
 ];
 
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
@@ -62,12 +62,19 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     name: 'Sietch', short: 'Sietch', cost: 2000, buildTime: 25, hp: 1600, size: 3, requires: [],
     desc: 'A Fremen stronghold, and their hub: builds structures, one at a time. Lose all of these and you cannot build.',
     levels: [
-      { name: 'Great Sietch', short: 'Great Sietch', cost: 1200, time: 40, desc: 'Upgrades a Sietch. Unlocks Fremen Mortars and Ambush.' },
-      { name: 'Sietch III', short: 'Sietch III', cost: 1500, time: 45, desc: 'Upgrades a Great Sietch. Unlocks the Sandrider.' },
+      {
+        name: 'Great Sietch', short: 'Great Sietch', cost: 1000, time: 35, requires: ['barracks'],
+        desc: 'Upgrades a Sietch. Unlocks Fedaykin, Fremen Mortars, Thumpers, Weapons +1, Armor +1 and Stillsuits.',
+      },
+      { name: 'Sietch III', short: 'Sietch III', cost: 1500, time: 45, desc: 'Upgrades a Great Sietch. Unlocks the Sandrider, Weapons +2, Armor +2 and Ambush.' },
     ],
   },
+  windtrap: {
+    name: 'Windtrap', short: 'Windtrap', cost: 600, buildTime: 12, hp: 700, size: 2, requires: [], heals: { radius: 10, rate: 2 },
+    desc: 'A tower that wrings water from the desert air. Launches Wind Gliders (each Windtrap adds a production line), and Fremen units and structures near it heal twice as fast.',
+  },
   thumper: {
-    name: 'Thumper', short: 'Thumper', cost: 250, buildTime: 0, hp: 150, size: 1, requires: ['sietch'], onSand: true, deployed: true,
+    name: 'Thumper', short: 'Thumper', cost: 250, buildTime: 0, hp: 150, size: 1, requires: ['sietch2'], onSand: true, deployed: true,
     desc: 'Planted in the sand by a Warrior or Fedaykin, it drums until a wild Sandworm comes. The worm swallows whatever moves on the sand around it, whoever it belongs to, and harvesters even standing still. Destroy it before then and no worm comes.',
   },
   camp: {

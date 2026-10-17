@@ -236,8 +236,8 @@ export class Game {
         unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
         spiceHarvested: 0, creditsSpent: 0,
       },
-      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [] }, research: null,
-      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0 }, levelUps: {}, nextThumper: 0,
+      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [], windtrap: [] }, research: null,
+      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0, windtrap: 0 }, levelUps: {}, nextThumper: 0,
     }));
     this.vision = new Vision(this.map, this.teams.length);
     this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
@@ -1412,13 +1412,17 @@ export class Game {
       const still = ts.upgrades.has('stillsuit');
       const delay = still ? FREMEN_REGEN.quick : FREMEN_REGEN.delay;
       const k = still ? FREMEN_REGEN.stillsuit : 1;
+      const wells = this.buildings.filter((b) => b.team === ts.team && !b.dead && b.def.heals);
+      // Near a Windtrap: the best rate of any in reach.
+      const well = (e: Entity) => wells.reduce((r, b) => (distTo(b, e.x, e.z) <= b.def.heals!.radius ? Math.max(r, b.def.heals!.rate) : r), 1);
       for (const u of this.units) {
         if (u.team !== ts.team || u.hp >= u.maxHp || u.carrier || this.time - u.lastHurt <= delay) continue;
-        u.hp = Math.min(u.maxHp, u.hp + u.maxHp * FREMEN_REGEN.unit * k * dt);
+        const rate = k * (u.hidden ? FREMEN_REGEN.buried : 1) * (wells.length ? well(u) : 1);
+        u.hp = Math.min(u.maxHp, u.hp + u.maxHp * FREMEN_REGEN.unit * rate * dt);
       }
       for (const b of this.buildings) {
         if (b.team !== ts.team || b.hp >= b.maxHp || this.time - b.lastHurt <= delay) continue;
-        b.hp = Math.min(b.maxHp, b.hp + b.maxHp * FREMEN_REGEN.building * k * dt);
+        b.hp = Math.min(b.maxHp, b.hp + b.maxHp * FREMEN_REGEN.building * k * (wells.length ? well(b) : 1) * dt);
       }
     }
   }
@@ -1659,7 +1663,7 @@ export class Game {
   /** Why a team can't plant a Thumper now (no Sietch, still recharging, one already out, no credits), or null if it can. */
   thumpBlocked(team: Team): string | null {
     const ts = this.teams[team];
-    if (!this.has(team, 'sietch')) return 'Thumpers need a Sietch.';
+    if (!this.meets(team, 'sietch2')) return 'Thumpers need a Great Sietch.';
     if (this.drums.some((d) => d.b.team === team) || this.worms.some((w) => w.team === team)) return WORM_ABOUT;
     if (this.time < ts.nextThumper) return `Next Thumper in ${Math.ceil(ts.nextThumper - this.time)} s.`;
     if (ts.credits < THUMPER.cost) return NO_FUNDS;

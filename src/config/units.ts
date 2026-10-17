@@ -107,11 +107,11 @@ export const UNITS: Record<UnitType, UnitDef> = {
     name: 'Fremen Warrior', producer: 'barracks', cost: 80, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true, thumper: true,
     weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -2 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
-    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers. With a Sietch, plants Thumpers that call a Sandworm.',
+    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers. With a Great Sietch, plants Thumpers that call a Sandworm.',
   },
   fedaykin: {
     name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 230, speed: 3, turnRate: 12, radius: 0.5, sight: 11,
-    turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch'], hides: true, thumper: true,
+    turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch2'], hides: true, thumper: true,
     weapon: { range: 7, minRange: 0, damage: 10, bonus: { mechanical: 20, armored: 4, structure: 6, biological: -3 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, air: true, pierce: true, sound: 'small_laser' },
     desc: 'Elite fighters with weirding modules: sonic weapons that tear vehicles apart and pass straight through shields. Strong vs vehicles and structures, can shoot at aircraft. Weak vs infantry. Plants Thumpers that call a Sandworm.',
   },
@@ -131,8 +131,8 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the move he barely fights; set up (D, 1.5 s), he lobs guided rockets at anything your side can see out to 12: strong vs vehicles and structures. Can\'t fire up close, and in the sand he digs in like any Fremen.',
   },
   glider: {
-    name: 'Wind Glider', producer: 'barracks', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,
-    turret: false, infantry: false, tags: ['light', 'air'], weapon: null, requires: ['sietch'], air: true, glides: { orbit: 12 },
+    name: 'Wind Glider', producer: 'windtrap', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,
+    turret: false, infantry: false, tags: ['light', 'air'], weapon: null, requires: ['windtrap'], air: true, glides: { orbit: 12 },
     desc: 'A Fremen rider on a cloth wing, riding the desert winds. The fastest thing in the sky and sees far, but unarmed and frail. It can\'t hover: with nowhere to go, it circles.',
   },
 };

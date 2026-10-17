@@ -59,10 +59,10 @@ export const FACTIONS: Record<Faction, FactionDef> = {
   fremen: {
     name: 'Fremen',
     hub: 'sietch',
-    build: ['barracks', null, null, null, 'bunker', 'sietch', null, null],
+    build: ['barracks', 'windtrap', null, null, 'bunker', 'sietch', null, null],
     train: ['warrior', 'fedaykin', 'mortar', null, 'crew', 'glider', null, null],
     research: [
-      { levelUp: 'sietch' }, { upgrades: ['fWeapons'] }, { upgrades: ['fArmor'] }, { upgrades: ['ambush'] },
+      { levelUp: 'sietch' }, { upgrades: ['fWeapons', 'fWeapons2'] }, { upgrades: ['fArmor', 'fArmor2'] }, { upgrades: ['ambush'] },
       { upgrades: ['stillsuit'] }, { upgrades: ['sandwalk'] }, { upgrades: ['fHarvest'] }, null,
     ],
     start: ['warrior', 'warrior', 'warrior', 'crew'],

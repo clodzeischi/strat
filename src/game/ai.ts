@@ -46,10 +46,11 @@ const KITS: Record<Faction, FactionKit> = {
     levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'], fallback: 'trooper',
     siege: { unit: 'artillery', per: 10, max: 3 }, worker: 'harvester',
   },
-  // A second Barracks stands in for the factory (the second step of the opening): the Sietch is there from the start.
+  // The Windtrap stands in for the factory (the second step of the opening, after which tech starts): the Sietch is
+  // there from the start. (A second Barracks there instead had the AI teching from the first minute and seldom hiding.)
   fremen: {
-    factory: 'barracks', defense: 'bunker', raider: 'warrior', scouts: ['glider', 'warrior'], mender: null, tech: [],
-    levels: ['sietch'], research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush'], fallback: 'warrior',
+    factory: 'windtrap', defense: 'bunker', raider: 'warrior', scouts: ['glider', 'warrior'], mender: null, tech: [],
+    levels: ['sietch'], research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2'], fallback: 'warrior',
     siege: { unit: 'mortar', per: 5, max: 5 }, worker: 'crew',
   },
 };

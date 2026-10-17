@@ -14,7 +14,7 @@ export const TEAM_CSS = ['#3d7be0', '#d8402f'];
 
 export const START_CREDITS = 2500;
 
-export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab'];
+export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab', 'windtrap'];
 export const QUEUE_MAX = 5; // per producer type
 export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab', 'sietch'];
 
@@ -56,8 +56,11 @@ export const HIDE = { delay: 3, detect: 2 * 2 };
 export const SAND_SPEED = { base: 0.2, sandwalk: 0.25 };
 /** Ambush: units that strike out of hiding deal this much more damage for `time` seconds. */
 export const AMBUSH = { bonus: 0.5, time: 4 };
-/** Fremen healing: a share of health per second once unhurt for `delay` s (Stillsuits: x`stillsuit`, after `quick` s). */
-export const FREMEN_REGEN = { unit: 0.015, building: 0.006, delay: 6, stillsuit: 2, quick: 3 };
+/**
+ * Fremen healing: a share of health per second once unhurt for `delay` s (Stillsuits: x`stillsuit`, after `quick` s).
+ * Units dug into the sand heal x`buried`; near a Windtrap, units and structures heal faster too (BuildingDef.heals).
+ */
+export const FREMEN_REGEN = { unit: 0.015, building: 0.006, delay: 6, stillsuit: 2, quick: 3, buried: 2 };
 /**
  * Thumpers (Fremen Warriors and Fedaykin, once there's a Sietch): `cost` credits, one every `cooldown` s per side and
  * one at a time. A planted Thumper drums for `delay` s; then a wild Sandworm comes, unless the Thumper was destroyed.

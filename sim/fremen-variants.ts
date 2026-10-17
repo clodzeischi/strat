@@ -11,6 +11,10 @@ export const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
   noworm: { desc: 'No Thumpers (worms never come).', apply: () => { THUMPER.cooldown = 1e9; THUMPER.cost = 1e9; } },
   nomortar: { desc: 'No Fremen Mortars.', apply: () => { FACTIONS.fremen.train = FACTIONS.fremen.train.map((t) => (t === 'mortar' ? null : t)); } },
 
+  /** Sietch redesign: the third level and its research cut, or no Windtrap healing. */
+  nol3: { desc: 'No Sietch III (so no Weapons/Armor +2; Ambush back at the Great Sietch).', apply: () => { BUILDINGS.sietch.levels!.length = 1; UPGRADES.ambush.requires = ['sietch2']; } },
+  nowt: { desc: 'No Windtrap (Gliders from the Barracks again).', apply: () => { FACTIONS.fremen.build = FACTIONS.fremen.build.map((t) => (t === 'windtrap' ? null : t)); UNITS.glider.producer = 'barracks'; UNITS.glider.requires = ['barracks']; } },
+
   /** Balance candidates. */
   w90: { desc: 'Warriors 90 credits (not 80).', apply: () => { UNITS.warrior.cost = 90; } },
   sietch: { desc: 'Great Sietch 1500 credits, 60 s (not 1200, 40).', apply: () => { Object.assign(BUILDINGS.sietch.levels![0], { cost: 1500, time: 60 }); } },

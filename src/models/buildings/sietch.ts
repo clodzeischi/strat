@@ -20,7 +20,7 @@ export const sietch: BuildingBlueprint = {
     return null;
   },
 
-  /** Great Sietch: a windtrap tower beside the rock, catching water from the air. Sietch III (placeholder): a higher crag with a watch post. */
+  /** Great Sietch: a second outcrop with its own cave mouth and banner. Sietch III: a higher crag with a watch post. (Placeholders.) */
   levelKit(g, color, level) {
     if (level === 3) {
       const rock = shade(SANDSTONE, 0.7);
@@ -30,8 +30,11 @@ export const sietch: BuildingBlueprint = {
       box(g, 0.7, 0.4, 0.04, color, -0.53, 5.5, -0.9);
       return;
     }
-    cyl(g, 0.45, 3.0, SANDSTONE, -1.6, 1.8, 1.0, 8);
-    for (let k = 0; k < 4; k++) box(g, 0.95, 0.12, 0.95, k % 2 ? DARK : color, -1.6, 0.9 + k * 0.7, 1.0);
-    cyl(g, 0.6, 0.2, DARK, -1.6, 3.35, 1.0, 8);
+    const rock = shade(SANDSTONE, 0.84);
+    box(g, 1.5, 1.6, 1.8, rock, -1.6, 1.1, 0.4);
+    box(g, 1.0, 0.6, 1.2, shade(rock, 0.9), -1.6, 2.2, 0.2);
+    box(g, 0.7, 0.7, 0.12, DARK, -1.6, 0.7, 1.32); // second cave mouth
+    box(g, 0.08, 1.0, 0.08, DARK, -1.9, 2.9, 0.2);
+    box(g, 0.5, 0.3, 0.04, color, -1.63, 3.25, 0.2);
   },
 };

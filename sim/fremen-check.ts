@@ -57,11 +57,22 @@ check(sandOk, 'Fremen can build on open sand near their structures');
 check(sandNo && FACTIONS.atreides.buildOnSand === undefined, "Atreides can't build on sand");
 check(!g.canPlace('camp', F, bks.cx + 4, bks.cz), 'a Spice Camp is not built at the yard');
 check(g.canTrain(F, 'warrior') && g.canTrain(F, 'crew'), 'Barracks trains Warriors and Crews');
-check(g.canTrain(F, 'fedaykin') && g.thumpBlocked(F) === null, 'the Sietch unlocks Fedaykin and Thumpers');
+// The tree: a Sietch to start, then the Great Sietch and Sietch III.
+check(!g.canTrain(F, 'fedaykin') && !g.canTrain(F, 'mortar') && g.thumpBlocked(F) === 'Thumpers need a Great Sietch.', 'no Fedaykin, Mortars or Thumpers at level 1');
+check(g.canResearch(F, 'fHarvest') && g.canResearch(F, 'sandwalk') && !g.canResearch(F, 'fWeapons') && !g.canResearch(F, 'stillsuit'), 'level 1 researches Spice Mining and Sandwalk');
+check(g.canBuild(F, 'windtrap') && !g.canTrain(F, 'glider'), 'the Windtrap can be built at once; Gliders need it');
 check(!g.canBuild(F, 'thumper') && !g.canPlace('thumper', F, bks.cx + 4, bks.cz), 'Thumpers are planted by infantry, not built at the yard');
 applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
 run(BUILDINGS.sietch.levels![0].time + 1);
-check(g.canResearch(F, 'ambush'), 'the Great Sietch unlocks Ambush');
+check(g.canTrain(F, 'fedaykin') && g.canTrain(F, 'mortar') && g.thumpBlocked(F) === null, 'the Great Sietch unlocks Fedaykin, Mortars and Thumpers');
+check(g.canResearch(F, 'fWeapons') && g.canResearch(F, 'fArmor') && g.canResearch(F, 'stillsuit') && !g.canResearch(F, 'ambush'), 'and Weapons +1, Armor +1, Stillsuits; not Ambush');
+g.teams[F].upgrades.add('fWeapons');
+check(!g.canResearch(F, 'fWeapons2'), 'Weapons +2 waits for Sietch III');
+applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
+run(BUILDINGS.sietch.levels![1].time + 1);
+check(g.canResearch(F, 'ambush') && g.canResearch(F, 'fWeapons2') && !g.canResearch(F, 'fArmor2'), 'Sietch III unlocks Ambush and the second levels (after the first)');
+check(g.tier(F, 'weapons') === 1, 'Weapons +1 is tier 1');
+g.teams[F].upgrades.delete('fWeapons');
 
 // ---- Spice Crew -> camp -> credits -> pack up ----
 const crew = g.units.find((u) => u.team === F && u.type === 'crew')!;
@@ -161,8 +172,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   };
   t.teams[F].credits = 100000;
   const fy = t.buildings.find((b) => b.team === F && b.type === 'sietch')!;
-  const sietchSpot = tm.nearestCell(fy.cx, fy.cz, (x, z) => t.canPlace('sietch', F, x, z), 12)!;
-  t.placeBuilding('sietch', F, sietchSpot.cx, sietchSpot.cz);
+  fy.setLevel(2); // Thumpers need a Great Sietch
   const wormGround = (x: number, z: number) => tm.canEnter(tm.cellOf(x), tm.cellOf(z), 'worm');
   // The open patch of sand from the hiding checks; spots on it the worm can get to from there, for its prey.
   const reach = (x: number, z: number) => wormGround(x, z) && (() => {
@@ -272,7 +282,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   const tick = (seconds: number) => {
     for (let k = 0; k < seconds * 20; k++) t.update(0.05);
   };
-  check(!t.canTrain(F, 'glider'), 'no gliders before the Sietch');
+  check(!t.canTrain(F, 'glider'), 'no gliders before a Windtrap');
   const gl = t.spawnUnit('glider', F, sx, sz);
   const goal = { x: sx + 30, z: sz };
   applyCommand(t, F, { c: 'go', units: [gl.id], x: goal.x, z: goal.z, target: null, attack: false });
@@ -347,14 +357,41 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   a.hp = 50;
   const y = t.buildings.find((b) => b.team === F)!;
   y.hp = y.maxHp / 2;
-  for (let k = 0; k < 400; k++) t.update(0.05);
+  for (let k = 0; k < 240; k++) t.update(0.05);
   check(a.hp > 50 && y.hp > y.maxHp / 2, 'Fremen units and structures heal on their own');
   const h1 = a.hp;
   a.hp = 50;
   a.lastHurt = t.time;
   t.teams[F].upgrades.add('stillsuit');
-  for (let k = 0; k < 400; k++) t.update(0.05);
+  for (let k = 0; k < 240; k++) t.update(0.05);
   check(a.hp - 50 > (h1 - 50) * 1.5, 'Stillsuits heal faster');
+}
+
+// ---- Healing faster: dug into the sand, and near a Windtrap ----
+{
+  const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
+  const tm = t.map;
+  for (const u of t.units) if (u.team === A) u.dead = true;
+  const y = t.buildings.find((b) => b.team === F)!;
+  const rocks = (n: number, from: { cx: number; cz: number }) => tm.nearestCell(from.cx, from.cz, (x, z) => tm.tile(x, z) === ROCK && tm.canEnter(x, z, 'foot')
+    && hypot(x - from.cx, z - from.cz) >= n, 60)!;
+  const r1 = rocks(0, y);
+  const onRock = t.spawnUnit('fedaykin', F, tm.center(r1.cx), tm.center(r1.cz));
+  const onSand = t.spawnUnit('fedaykin', F, sx, sz);
+  for (const u of [onRock, onSand]) u.hp = 50;
+  for (let k = 0; k < 400; k++) t.update(0.05);
+  check(onSand.hidden && !onRock.hidden, 'one dug into the sand, one on rock');
+  check(onSand.hp - 50 > (onRock.hp - 50) * 1.7, 'dug into the sand, Fremen heal about twice as fast');
+  // A Windtrap next to a unit on rock.
+  const spot = tm.nearestCell(r1.cx, r1.cz, (x, z) => t.canPlace('windtrap', F, x, z), 10)!;
+  const wt = t.placeBuilding('windtrap', F, spot.cx, spot.cz);
+  const far = rocks(30, r1);
+  const away = t.spawnUnit('fedaykin', F, tm.center(far.cx), tm.center(far.cz));
+  onRock.hp = 50;
+  away.hp = 50;
+  for (let k = 0; k < 200; k++) t.update(0.05);
+  check(hypot(onRock.x - wt.x, onRock.z - wt.z) < 10 && hypot(away.x - wt.x, away.z - wt.z) > 20, 'one unit by the Windtrap, one away');
+  check(onRock.hp - 50 > (away.hp - 50) * 1.7, 'by a Windtrap, Fremen heal about twice as fast');
 }
 
 // ---- Setting up off the field, queued orders, dry camps moving on ----

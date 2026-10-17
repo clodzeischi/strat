@@ -47,6 +47,8 @@ check(g.canBuild(F, 'sietch'), 'Fremen can build another Sietch');
 // ---- Three levels ----
 g.teams[F].credits = 100000;
 const main = fremen[0];
+check(!g.canLevelUp(F, 'sietch'), 'the Great Sietch needs a Barracks');
+place(F, 'barracks');
 check(g.canLevelUp(F, 'sietch') && !g.meets(F, 'sietch2'), 'level 2 is open, not yet met');
 const before = g.teams[F].credits;
 applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
@@ -77,7 +79,7 @@ check(spare.level === 2 && g.meets(F, 'sietch2'), 'the spare becomes the Great S
 
 // ---- A level-up dies with its building ----
 applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
-const bks = place(F, 'barracks');
+const bks = g.buildings.find((b) => b.team === F && b.type === 'barracks')!;
 kill(spare);
 check(!g.teams[F].levelUps.sietch && !g.hasHub(F), 'losing the Sietch mid-upgrade loses the upgrade');
 check(!g.canBuild(F, 'barracks') && !g.canBuild(F, 'sietch'), 'with no Sietch, Fremen cannot build');

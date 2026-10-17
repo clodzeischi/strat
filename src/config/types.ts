@@ -16,9 +16,9 @@ export type UnitType =
   | 'warrior' | 'fedaykin' | 'crew' | 'glider' | 'mortar';
 export type BuildingType =
   | 'conyard' | 'refinery' | 'barracks' | 'bunker' | 'factory' | 'hitech' | 'fab' | 'tleilaxu' | 'pad' | 'turret'
-  | 'sietch' | 'thumper' | 'camp';
+  | 'sietch' | 'windtrap' | 'thumper' | 'camp';
 /** Buildings that train units. Each one of a type adds a parallel production line for that type. */
-export type Producer = 'barracks' | 'factory' | 'hitech' | 'fab';
+export type Producer = 'barracks' | 'factory' | 'hitech' | 'fab' | 'windtrap';
 /** Buildings that level up (to level 2, the Sietch on to 3) to unlock more tech. */
 export type LevelUpType = 'conyard' | 'factory' | 'barracks' | 'fab' | 'sietch';
 /** A tech requirement: a building, or one at level 2 or 3. */
@@ -26,7 +26,7 @@ export type Req = BuildingType | `${LevelUpType}${2 | 3}`;
 export type UpgradeType =
   | 'weapons1' | 'weapons2' | 'armor1' | 'armor2' | 'rockets' | 'nitro' | 'harvest'
   | 'cWeapons' | 'cArmor' | 'cShields' | 'cHarvest' | 'flame'
-  | 'fWeapons' | 'fArmor' | 'fHarvest' | 'stillsuit' | 'sandwalk' | 'ambush';
+  | 'fWeapons' | 'fWeapons2' | 'fArmor' | 'fArmor2' | 'fHarvest' | 'stillsuit' | 'sandwalk' | 'ambush';
 /** Upgrades that stack into a level: Weapons I and II, or Corrino's single Weapons +1. */
 export type UpgradeLine = 'weapons' | 'armor' | 'shields' | 'harvest';
 /** StarCraft-style attributes. Weapons deal bonus (or reduced) damage against specific tags. */
@@ -121,6 +121,8 @@ export interface BuildingDef {
   pad?: { slots: number; rate: number; range: number };
   /** Turns the spice within `radius` (world units) into credits, `rate` per second while there's enough of it (Spice Camp). */
   extract?: { rate: number; radius: number };
+  /** Its side's units and structures within `radius` (world units) heal `rate` times as fast (Fremen Windtrap). */
+  heals?: { radius: number; rate: number };
   /** Has to stand on open sand or spice (the Thumper). */
   onSand?: boolean;
   /** Only comes from a unit deploying (not built at the Construction Yard). */
