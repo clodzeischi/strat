@@ -15,12 +15,15 @@ import { FACTIONS, unitDef, type Faction, type Team, type UnitType } from '../sr
 
 const TYPES: UnitType[] = [
   'infantry', 'trike', 'tank', 'rocket', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery', 'warrior', 'fedaykin',
+  'mortar', 'sandrider',
 ];
 const BUDGET = 4000;
 const SEEDS = [1003, 1007, 1012];
 const KEYS = ['--', '-R', 'R-', 'RR'];
 
-const factionOf = (t: UnitType): Faction => (t === 'harvester' ? 'atreides' : FACTIONS.corrino.train.includes(t) ? 'corrino' : FACTIONS.fremen.train.includes(t) ? 'fremen' : 'atreides');
+// Trained or made by a rite (Fremen Fedaykin, Mortars, Sandriders).
+const fields = (f: Faction, t: UnitType) => FACTIONS[f].train.includes(t) || !!FACTIONS[f].rites?.includes(t);
+const factionOf = (t: UnitType): Faction => (t === 'harvester' ? 'atreides' : fields('corrino', t) ? 'corrino' : fields('fremen', t) ? 'fremen' : 'atreides');
 
 function duel(a: UnitType, b: UnitType, rocketsA: boolean, rocketsB: boolean, seed: number, swap: boolean): number {
   const [ta, tb]: Team[] = swap ? [1, 0] : [0, 1];

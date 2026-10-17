@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, FACTIONS, THUMPER, TILE, UNITS, UPGRADES, WORM, levelDef,
+  BUILDINGS, FACTIONS, RIDE, THUMPER, TILE, UNITS, UPGRADES, WORM, levelDef,
   type BuildingType, type Faction, type LevelUpType, type Producer, type Req, type Team, type UnitType, type UpgradeType,
 } from '../config';
 import { Building, type Entity, type Unit } from '../entities';
@@ -35,9 +35,11 @@ interface FactionKit {
   worker: UnitType;
   /** Units that call and ride worms (Fremen Sandriders): this many kept. */
   rider?: { unit: UnitType; max: number };
+  /** A third building level waits for an army this many times `techArmy` (the second level's units come first). */
+  topLevelArmy?: number;
 }
 
-const KITS: Record<Faction, FactionKit> = {
+export const KITS: Record<Faction, FactionKit> = {
   atreides: {
     factory: 'factory', defense: 'bunker', raider: 'trike', scouts: ['trike', 'infantry'], mender: { unit: 'repair' }, tech: [],
     levels: ['conyard', 'factory'], research: ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'], fallback: 'infantry',
@@ -126,6 +128,8 @@ const BASE_MIX: Record<Matchup, number> = {
   infantry: 0.7, trike: 0.4, tank: 1, rocket: 1,
   trooper: 0.8, sardaukar: 0.7, razor: 0.5, devastator: 1, raider: 0.5, artillery: 0.4,
   warrior: 1, fedaykin: 1,
+  // Made by their own rules (siegeWanted, riderWanted), not picked as counters.
+  mortar: 0, sandrider: 0,
 };
 
 export const NORMAL_PROFILE: AIProfile = {
@@ -173,7 +177,7 @@ const DEFENSE_TIMEOUT = 4;
 export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop' | 'thump' | 'rite';
 
 /** Fremen: at most this many rites under way (or Warriors walking to the sand for one) at a time. */
-const MAX_RITES = 3;
+const MAX_RITES = 4;
 
 /** One attack on our base or harvesters, and the units sent to meet it. */
 interface Defense {
@@ -222,6 +226,8 @@ export class AI {
   protected roles = new Map<Unit, Role>();
   /** Warriors walking to the sand to go through a rite there, and what they'll become. */
   private riteWalks = new Map<Unit, UnitType>();
+  /** Rites waiting for a unit being trained for them (Warriors queued at the Barracks to become Fedaykin, say). */
+  private riteOrders: UnitType[] = [];
   protected defenses: Defense[] = [];
   /** An attack on the base is stronger than everything we could send against it (as of the last think). */
   private outgunned = false;
@@ -391,7 +397,7 @@ export class AI {
       // A third level (Sietch III) waits for a real army: the units the second one unlocks come first.
       const army = g.units.filter((u) => u.team === this.team && u.def.weapon).length;
       const level = this.techOrder.find((t) => g.canLevelUp(this.team, t) && this.levelUnlocks(t, g.techLevel(this.team, t) + 1)
-        && (g.techLevel(this.team, t) < 2 || army >= 2 * this.profile.techArmy));
+        && (g.techLevel(this.team, t) < 2 || army >= (this.kit.topLevelArmy ?? 2) * this.profile.techArmy));
       if (level) return { kind: 'level', type: level, cost: levelDef(level, g.techLevel(this.team, level) + 1).cost };
     }
     if (!ts.research) {
@@ -509,7 +515,7 @@ export class AI {
       this.nextUnit = null;
       return;
     }
-    const keep = Math.max(reserve, this.fund());
+    const keep = Math.max(reserve, this.fund(), this.thumperFund());
     if (!this.nextUnit) this.nextUnit = this.chooseUnit();
     let next = this.nextUnit;
     if (!this.canMake(next)) {
@@ -540,11 +546,12 @@ export class AI {
     return FACTIONS[this.ts.faction].rites?.includes(t) ? this.game.unitDef(this.team, t).rite ?? null : null;
   }
 
-  /** Rites under way, and Warriors on their way to the sand for one (of one kind, or all). */
+  /** Rites under way, Warriors on their way to the sand for one, and ones in training for one (of one kind, or all). */
   private ritesUnderWay(to?: UnitType): number {
     let n = 0;
     for (const u of this.game.units) if (u.team === this.team && !u.dead && u.rite && (!to || u.rite.to === to)) n++;
     for (const [u, t] of this.riteWalks) if (!u.dead && (!to || t === to)) n++;
+    for (const t of this.riteOrders) if (!to || t === to) n++;
     return n;
   }
 
@@ -556,30 +563,51 @@ export class AI {
     return pool.find((u) => u.onSand(g)) ?? pool[0] ?? null;
   }
 
+  /** A rite unit can be made from one at home, or (for a trainable one, a Warrior) from one trained for it. */
   private canMake(t: UnitType): boolean {
     const r = this.riteOf(t);
     if (!r) return this.game.canTrain(this.team, t);
-    return this.game.requirementsMet(this.team, this.game.unitDef(this.team, t).requires) && !!this.riteCandidate(r.from);
+    return this.game.requirementsMet(this.team, this.game.unitDef(this.team, t).requires) && (!!this.riteCandidate(r.from) || this.game.canTrain(this.team, r.from));
   }
 
   private makeCost(t: UnitType): number {
-    return this.riteOf(t)?.cost ?? UNITS[t].cost;
+    const r = this.riteOf(t);
+    if (!r) return UNITS[t].cost;
+    return r.cost + (this.riteCandidate(r.from) ? 0 : UNITS[r.from].cost);
   }
 
-  /** No room to start another: its production lines are full, or enough rites are under way. */
-  private lineFull(t: UnitType): boolean {
-    if (this.riteOf(t)) return this.ritesUnderWay() >= MAX_RITES;
+  private producerFull(t: UnitType): boolean {
     const p = this.game.unitDef(this.team, t).producer;
     return this.ts.queues[p].length >= this.game.activeLines(this.team, p) + 1;
   }
 
-  /** Trains it, or starts its rite: where the unit stands if that's sand, else once it has walked to sand nearby. */
+  /** No room to start another: its production lines are full, or enough rites are under way. */
+  private lineFull(t: UnitType): boolean {
+    const r = this.riteOf(t);
+    if (r) return this.ritesUnderWay() >= MAX_RITES || (!this.riteCandidate(r.from) && this.producerFull(r.from));
+    return this.producerFull(t);
+  }
+
+  /**
+   * Trains it, or starts its rite: from a unit at home (where it stands if that's sand, else once it has walked to sand
+   * nearby), or with none spare, from one trained for it that starts the rite as soon as it comes out.
+   */
   private make(t: UnitType): boolean {
     const g = this.game;
     const r = this.riteOf(t);
     if (!r) return g.queueUnit(this.team, t);
     const u = this.riteCandidate(r.from);
-    if (!u) return false;
+    if (!u) {
+      if (!g.canTrain(this.team, r.from) || this.ts.credits < r.cost + UNITS[r.from].cost || !g.queueUnit(this.team, r.from)) return false;
+      this.riteOrders.push(t);
+      return true;
+    }
+    return this.beginRite(u, t);
+  }
+
+  /** The unit starts its rite where it stands on the sand, or walks to sand nearby first. */
+  private beginRite(u: Unit, t: UnitType): boolean {
+    const g = this.game;
     if (u.onSand(g)) {
       if (!g.startRite(u, t)) return false;
       this.roles.set(u, 'rite');
@@ -597,6 +625,19 @@ export class AI {
   /** Warriors that have walked to the sand start their rite; ones that can't (any more) go back to the army. */
   private manageRites(): void {
     const g = this.game;
+    // Warriors trained for a rite: new ones (no role yet) take up the orders waiting.
+    if (this.riteOrders.length) {
+      for (const u of g.units) {
+        if (u.team !== this.team || u.dead || u.carrier || u.falling || this.roles.has(u)) continue;
+        const k = this.riteOrders.findIndex((t) => this.riteOf(t)?.from === u.type);
+        if (k < 0) continue;
+        const t = this.riteOrders.splice(k, 1)[0];
+        if (!this.beginRite(u, t)) this.roles.set(u, 'home');
+      }
+      // Orders no line is training a unit for any more (the queue was cleared, the Barracks lost) are dropped.
+      const training = (from: UnitType) => this.ts.queues[g.unitDef(this.team, from).producer].filter((q) => q.type === from).length;
+      this.riteOrders = this.riteOrders.filter((t, i, all) => all.slice(0, i + 1).filter((o) => this.riteOf(o)!.from === this.riteOf(t)!.from).length <= training(this.riteOf(t)!.from));
+    }
     for (const [u, t] of this.riteWalks) {
       if (u.dead) {
         this.riteWalks.delete(u);
@@ -786,6 +827,7 @@ export class AI {
     this.manageCrews();
     this.manageWorms();
     this.manageThumper();
+    this.steerWorms();
     this.manageRepairs(army);
     this.managePads(army);
     this.manageAbilities(army);
@@ -907,6 +949,7 @@ export class AI {
   private evacuated = new Map<Unit, { x: number; z: number }>();
   /** The Thumper we're planting: who, where, since when; `away` once it's planted and the planter is getting clear. */
   private thumpJob: { u: Unit; x: number; z: number; since: number; away: boolean } | null = null;
+  private ticksSinceSteer = 0;
 
   /**
    * Any worm about (or one about to come): our units on the sand around it stand still, which it doesn't hear, and
@@ -1016,8 +1059,8 @@ export class AI {
     if (!this.camps || g.thumpBlocked(this.team) || this.rushed() || this.ts.credits < THUMPER.cost + 100) return;
     const spot = this.thumperSpot();
     if (!spot) return;
-    const planters = g.units.filter((u) => u.team === this.team && u.def.thumper && !u.dead && !u.carrier && !u.mount && !this.frozen.has(u)
-      && ['home', 'wave', 'raid'].includes(this.roles.get(u) ?? '') && u.hp > u.maxHp * 0.6 && !g.thumpBlocked(this.team, u));
+    const planters = g.units.filter((u) => u.team === this.team && u.def.thumper && !u.dead && !u.carrier && !u.mount && !u.rite && !this.frozen.has(u)
+      && ['home', 'wave', 'raid', 'defend', ''].includes(this.roles.get(u) ?? '') && u.hp > u.maxHp * 0.6 && !g.thumpBlocked(this.team, u));
     planters.sort((a, b) => hypot(a.x - spot.x, a.z - spot.z) - hypot(b.x - spot.x, b.z - spot.z));
     const u = planters[0];
     if (!u || !g.orderThumper(this.team, [u], spot.x, spot.z)) return;
@@ -1033,9 +1076,7 @@ export class AI {
   private thumperSpot(): { x: number; z: number } | null {
     const g = this.game;
     const m = g.map;
-    const prey: { x: number; z: number; value: number }[] = [];
-    for (const s of this.intel.placedUnits()) if (s.harvester && g.time - s.seen < 20) prey.push({ x: s.x, z: s.z, value: UNITS.harvester.cost });
-    for (const s of this.intel.structures('camp')) prey.push({ x: s.x, z: s.z, value: BUILDINGS.camp.cost });
+    const prey = this.wormPrey();
     const ownSand = g.buildings.filter((b) => b.team === this.team && !b.dead && b.type !== 'thumper' && g.onSandFootprint(b));
     let best: { x: number; z: number } | null = null;
     let bestValue = BUILDINGS.camp.cost - 1;
@@ -1045,13 +1086,77 @@ export class AI {
       const x = m.center(c.cx);
       const z = m.center(c.cz);
       if (ownSand.some((b) => hypot(b.x - x, b.z - z) < WORM.range + WORM.bite + 2 * TILE)) continue;
-      const value = prey.filter((q) => hypot(q.x - x, q.z - z) <= WORM.range).reduce((a, q) => a + q.value, 0);
+      // Not where the enemy has guns at hand: they'd destroy the Thumper before the worm comes.
+      if (this.guardedSpot(x, z)) continue;
+      const value = prey.filter((q) => hypot(q.x - x, q.z - z) <= RIDE.hunt).reduce((a, q) => a + q.value, 0);
       if (value > bestValue) {
         bestValue = value;
         best = { x, z };
       }
     }
     return best;
+  }
+
+  /**
+   * What a ridden worm could go after, as far as we know: harvesters seen lately, camps, the sand by refineries
+   * (where harvesters come and go), and enemy troops seen on the sand just now.
+   */
+  private wormPrey(): { x: number; z: number; value: number }[] {
+    const g = this.game;
+    const m = g.map;
+    const prey: { x: number; z: number; value: number }[] = [];
+    for (const s of this.intel.placedUnits()) {
+      if (s.harvester && g.time - s.seen < 20) prey.push({ x: s.x, z: s.z, value: UNITS.harvester.cost });
+      else if (!s.harvester && g.time - s.seen < 8 && m.canEnter(m.cellOf(s.x), m.cellOf(s.z), 'worm')) prey.push({ x: s.x, z: s.z, value: UNITS[s.type as UnitType].cost });
+    }
+    for (const s of this.intel.structures('camp')) prey.push({ x: s.x, z: s.z, value: BUILDINGS.camp.cost });
+    for (const s of this.intel.structures('refinery')) {
+      const c = m.nearestCell(m.cellOf(s.x), m.cellOf(s.z), (x, z) => m.canEnter(x, z, 'worm'), 6);
+      if (c) prey.push({ x: m.center(c.cx), z: m.center(c.cz), value: UNITS.harvester.cost * 0.75 });
+    }
+    return prey;
+  }
+
+  /** Enemy guns known near a spot: troops seen there lately, or a defensive structure. */
+  private guardedSpot(x: number, z: number): boolean {
+    const g = this.game;
+    const near = 15;
+    let power = 0;
+    for (const s of this.intel.placedUnits()) {
+      if (s.harvester || g.time - s.seen > 15 || hypot(s.x - x, s.z - z) > near) continue;
+      if (UNITS[s.type as UnitType].weapon) power += UNITS[s.type as UnitType].cost;
+    }
+    for (const t of ['turret', 'bunker'] as BuildingType[]) for (const s of this.intel.structures(t)) if (hypot(s.x - x, s.z - z) <= near) power += 500;
+    return power >= 400;
+  }
+
+  /** A Thumper's price (and a little), kept aside while a Sandrider is free to plant one and there's somewhere to put it. */
+  private thumperFund(): number {
+    const g = this.game;
+    if (!this.camps || this.thumpJob || this.rushed()) return 0;
+    const ready = g.units.some((u) => u.team === this.team && u.def.thumper && !u.dead && !u.mount && !u.rite && g.time >= u.nextThumper);
+    return ready && g.meets(this.team, 'sietch3') && this.thumperSpot() ? THUMPER.cost + 100 : 0;
+  }
+
+  /** Our ridden worms with nothing to do: off to the richest prey we know of within reach. */
+  private steerWorms(): void {
+    const g = this.game;
+    if (this.ticksSinceSteer++ % 4) return;
+    for (const w of g.ridden) {
+      if (w.team !== this.team || w.target || (w.rider.order.kind !== 'idle' && w.rider.order.kind !== 'hold')) continue;
+      let best: { x: number; z: number } | null = null;
+      let bestScore = 0;
+      for (const p of this.wormPrey()) {
+        const d = hypot(p.x - w.x, p.z - w.z);
+        if (d > 50 || d < RIDE.hunt / 2) continue;
+        const score = p.value / (10 + d);
+        if (score > bestScore) {
+          bestScore = score;
+          best = p;
+        }
+      }
+      if (best) w.rider.command(g, { kind: 'move', x: best.x, z: best.z });
+    }
   }
 
   protected home(): Building | null {

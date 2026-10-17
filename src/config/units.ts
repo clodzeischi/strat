@@ -106,13 +106,13 @@ export const UNITS: Record<UnitType, UnitDef> = {
   warrior: {
     name: 'Fremen Warrior', producer: 'barracks', cost: 80, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
-    weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -2 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
-    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers. Goes through rites to become a Fedaykin or a Fremen Mortar.',
+    weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -2 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, shieldBreak: 3, sound: 'light_mg' },
+    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. The pistol\'s slow spring-fired darts get through shields (x3 against them). Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers. Goes through rites to become a Fedaykin or a Fremen Mortar.',
   },
   fedaykin: {
     name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 230, speed: 3, turnRate: 12, radius: 0.5, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch2'], hides: true,
-    rite: { from: 'warrior', cost: 140, time: 8 },
+    rite: { from: 'warrior', cost: 115, time: 6.5 },
     weapon: { range: 7, minRange: 0, damage: 10, bonus: { mechanical: 20, armored: 4, structure: 6, biological: -3 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, air: true, pierce: true, sound: 'small_laser' },
     desc: 'Elite fighters with weirding modules: sonic weapons that tear vehicles apart and pass straight through shields. Strong vs vehicles and structures, can shoot at aircraft. Weak vs infantry. With Sietch III, can go through the rite of the Sandrider.',
   },
@@ -124,7 +124,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   mortar: {
     name: 'Fremen Mortar', producer: 'barracks', cost: 250, buildTime: 9, hp: 120, speed: 2.8, turnRate: 12, radius: 0.5, sight: 12,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch2'], hides: true,
-    rite: { from: 'warrior', cost: 190, time: 10 },
+    rite: { from: 'warrior', cost: 160, time: 8.5 },
     weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 3, armored: -4, structure: -3 }, cooldown: 0.8, projectile: 'bullet', speed: 0, splash: 0, sound: 'light_mg' },
     deploy: {
       time: 1.5,

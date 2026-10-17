@@ -48,6 +48,8 @@ export interface WeaponDef {
   unguided?: boolean;
   /** Flamethrower: hits every enemy within range inside this half-angle (radians) around the aim. */
   cone?: number;
+  /** Shields take this many times the damage (slow projectiles, like a maula pistol's darts, get through them). */
+  shieldBreak?: number;
   /** Can only hit targets with one of these tags (the Sandrider's crysknife: infantry). */
   only?: Tag[];
   /** Passes straight through shields to health (sound: the Fedaykin's weirding modules; a slow blade). */

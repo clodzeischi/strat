@@ -1,7 +1,8 @@
 // Alternative Fremen makeups, for comparing in AI-vs-AI games without touching the game's own numbers. Each variant
 // patches the config tables in place before any game is made (unit stats are cached per faction on first use).
 // Pick one with FREMEN_VARIANT=<name> for sim/faction-match.ts (and anything that imports this first).
-import { AMBUSH, BUILDINGS, FACTIONS, HIDE, SAND_SPEED, THUMPER, UNITS, UPGRADES, WORM } from '../src/config';
+import { AMBUSH, BUILDINGS, FACTIONS, HIDE, RIDE, SAND_SPEED, THUMPER, UNITS, UPGRADES, WORM } from '../src/config';
+import { KITS } from '../src/game/ai';
 
 export const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
   /** As built. */
@@ -14,6 +15,27 @@ export const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
   /** Sietch redesign: the third level and its research cut, or no Windtrap healing. */
   nol3: { desc: 'No Sietch III (so no Weapons/Armor +2; Ambush back at the Great Sietch).', apply: () => { BUILDINGS.sietch.levels!.length = 1; UPGRADES.ambush.requires = ['sietch2']; } },
   nowt: { desc: 'No Windtrap (Gliders from the Barracks again).', apply: () => { FACTIONS.fremen.build = FACTIONS.fremen.build.map((t) => (t === 'windtrap' ? null : t)); UNITS.glider.producer = 'barracks'; UNITS.glider.requires = ['barracks']; } },
+
+  /** Sietch redesign balance: the Sandrider sooner, rides worth more, cheaper rites. */
+  s3early: { desc: 'Sietch III 1000 / 35 s (not 1500 / 45); the AI goes for it with techArmy (not twice).', apply: () => { Object.assign(BUILDINGS.sietch.levels![1], { cost: 1000, time: 35 }); KITS.fremen.topLevelArmy = 1; } },
+  rider: { desc: 'Sandrider rite 150 / 8 s (not 300 / 12); the AI keeps 3.', apply: () => { Object.assign(UNITS.sandrider.rite!, { cost: 150, time: 8 }); KITS.fremen.rider!.max = 3; } },
+  ride: { desc: 'Rides 60 s (not 40), rest 40 s (not 60).', apply: () => { Object.assign(RIDE, { time: 60, cooldown: 40 }); } },
+  rites: { desc: 'Fedaykin rite 90 / 5 s, Mortar 130 / 7 s (not 140 / 8, 190 / 10).', apply: () => { Object.assign(UNITS.fedaykin.rite!, { cost: 90, time: 5 }); Object.assign(UNITS.mortar.rite!, { cost: 130, time: 7 }); } },
+  drum: { desc: 'Thumpers 300 HP, drum 5 s (not 150, 8).', apply: () => { BUILDINGS.thumper.hp = 300; THUMPER.delay = 5; } },
+  all2: { desc: 'all + drum.', apply: () => { for (const v of ['all', 'drum']) VARIANTS[v].apply(); } },
+  fedbio: { desc: 'Fedaykin no longer weak vs infantry (biological -3 -> 0).', apply: () => { UNITS.fedaykin.weapon!.bonus.biological = 0; } },
+  rs: { desc: 'rites + s3early.', apply: () => { for (const v of ['rites', 's3early']) VARIANTS[v].apply(); } },
+  rsd: { desc: 'rites + s3early + drum.', apply: () => { for (const v of ['rites', 's3early', 'drum']) VARIANTS[v].apply(); } },
+  rsf: { desc: 'rites + s3early + fedbio.', apply: () => { for (const v of ['rites', 's3early', 'fedbio']) VARIANTS[v].apply(); } },
+  maula15: { desc: 'rites + Warrior shots hit shields x1.5.', apply: () => { VARIANTS.rites.apply(); UNITS.warrior.weapon!.shieldBreak = 1.5; } },
+  maula2: { desc: 'rites + Warrior shots hit shields x2.', apply: () => { VARIANTS.rites.apply(); UNITS.warrior.weapon!.shieldBreak = 2; } },
+  maula3: { desc: 'rites + Warrior shots hit shields x3.', apply: () => { VARIANTS.rites.apply(); UNITS.warrior.weapon!.shieldBreak = 3; } },
+  m3n: { desc: 'Warrior shots hit shields x3 (rites as built).', apply: () => { UNITS.warrior.weapon!.shieldBreak = 3; } },
+  mid: { desc: 'Fedaykin rite 115 / 6.5 s, Mortar 160 / 8.5 s; Warrior shots hit shields x3.', apply: () => { Object.assign(UNITS.fedaykin.rite!, { cost: 115, time: 6.5 }); Object.assign(UNITS.mortar.rite!, { cost: 160, time: 8.5 }); UNITS.warrior.weapon!.shieldBreak = 3; } },
+  sb35: { desc: 'Warrior shots hit shields x3.5 (not 3).', apply: () => { UNITS.warrior.weapon!.shieldBreak = 3.5; } },
+  sb4: { desc: 'Warrior shots hit shields x4 (not 3).', apply: () => { UNITS.warrior.weapon!.shieldBreak = 4; } },
+  worms: { desc: 's3early + rider + ride.', apply: () => { for (const v of ['s3early', 'rider', 'ride']) VARIANTS[v].apply(); } },
+  all: { desc: 's3early + rider + ride + rites.', apply: () => { for (const v of ['s3early', 'rider', 'ride', 'rites']) VARIANTS[v].apply(); } },
 
   /** Balance candidates. */
   w90: { desc: 'Warriors 90 credits (not 80).', apply: () => { UNITS.warrior.cost = 90; } },

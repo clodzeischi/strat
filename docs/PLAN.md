@@ -324,6 +324,23 @@ Warrior ─┬─ Fedaykin (Great Sietch) ── Sandrider (Sietch III)
 6. **AI:** rites, the new research order, Windtrap, Sandriders and their worms.
 7. **Balance:** local AI-vs-AI sims, regenerate the counter table, update this section. Expect a dip at first: the wild worm was worth about 25 points of win rate, and the worm now waits for Sietch III.
 
+**Balance round 1 (2026-10-17), Hard AI vs Hard AI, the same maps from both sides:**
+
+| Fremen vs | Win rate | Games | Notes |
+|---|---|---|---|
+| Fremen | 50% (by construction) | 48 | No timeouts (26% on main), 17.8 min a game (Atreides mirror 13.6, Corrino 15.4); every unit used |
+| Atreides | 56% | 48 | main: about 60% |
+| Corrino | 41-45% (about 43% over 144 games) | 48 x 3 | main: 41% |
+
+What it took, in order:
+- **AI bug: rites starved.** A rite needs an idle Warrior at home, and Warriors rarely are: the AI couldn't start Fedaykin, fell back to training Warriors, and sent those out too. Now, with no Warrior spare, it trains one marked for the rite, which starts as soon as it comes out (up to four rites at once). vs Corrino 0-8% -> 29%.
+- **AI: Sandriders never planted.** Fremen spend every credit, so a ready rider never found 350 credits: the AI now keeps a Thumper's price aside while one is ready and there's a spot. Most Thumpers were destroyed before their worm came (11 of 16): the AI now plants only where it knows of no enemy guns within 15, and also by refineries and enemy troops on the sand; ridden worms with nothing to do are steered to the best prey known. Worms ridden: 3 of 16 Thumpers -> 8 of 12.
+- **Counter table:** `sim/matchups.ts` took Fedaykin for Atreides once they weren't trained (it looked at the Barracks list); fixed, and Mortars and Sandriders are in the table (weight 0 in the AI's counter picks: they come from `siegeWanted`/`riderWanted`).
+- **Numbers:** Fedaykin rite 140/8 s -> 115/6.5 s, Mortar 190/10 s -> 160/8.5 s; **Warrior maula pistols hit shields x3** (`WeaponDef.shieldBreak`: spring-fired darts are slow enough to pass a Holtzman shield). Fremen ran some 25 points better against Atreides than Corrino whatever else changed (cheaper rites, earlier Sietch III, longer rides, sturdier Thumpers: `sim/fremen-variants.ts`); shields are the only thing telling Corrino troops apart in a fight, so the fix had to go through them. x3.5 and x4 gain nothing more (saturated).
+- Tried and dropped: earlier/cheaper Sietch III, cheaper Sandriders, 60 s rides, 300 HP / 5 s Thumpers. Each lifted Atreides far more than Corrino (to 75-83% vs Atreides at 45-54% vs Corrino).
+
+Open: worms are still rare (about one ride a game, 0.7-1.0); the Sandrider rarely decides a game. Corrino is a few points under 50%. Tools: `OPP=corrino npx tsx sim/fremen-trace.ts` (a Fremen game every 30 s), `sim/kill-tally.ts`, variants as above.
+
 Later, separately: hand-to-hand fighting for the other Fremen and for the Sardaukar.
 
 ## AI difficulty plan

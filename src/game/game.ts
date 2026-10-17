@@ -1089,7 +1089,7 @@ export class Game {
     let dmg = weaponDamage(w, target) * mult;
     if (target.shields > 0 && !w.pierce) {
       // Shields take the hit first (less with Shields upgrades); whatever gets through goes on to health.
-      const onShields = dmg * (1 - SHIELDS_BONUS * this.tier(target.team, 'shields'));
+      const onShields = dmg * (w.shieldBreak ?? 1) * (1 - SHIELDS_BONUS * this.tier(target.team, 'shields'));
       const absorbed = Math.min(target.shields, onShields);
       target.shields -= absorbed;
       dmg *= 1 - absorbed / onShields;
