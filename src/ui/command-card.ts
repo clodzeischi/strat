@@ -238,7 +238,7 @@ export class CommandCard {
         const sel = from().find((u) => !u.rite);
         const why = sel ? g.riteBlocked(sel, to) : null;
         return `${UNITS[r.from].name} digs into the sand where it stands and comes out ${r.time} s later as a ${d.name} (for good: rites can't be undone). ` +
-          `Only on sand; moving or Stop calls it off and refunds it.\n${d.desc}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}${why && why !== 'Busy.' ? `\n${why}` : ''}`;
+          `Only on sand; moving or Stop calls it off and refunds it.\n${d.desc}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}${why && why !== 'Busy.' && !why.startsWith('Needs') ? `\n${why}` : ''}`;
       },
       view: () => {
         const b = busy();
