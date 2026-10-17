@@ -20,7 +20,7 @@ const PAN_SPEED = 45;
 const TIER: Record<UnitType, number> = {
   carryall: 6, rocket: 5, repair: 4, tank: 3, trike: 2, infantry: 1, harvester: 0,
   devastator: 6, artillery: 5, raider: 4, sardaukar: 3, razor: 2, trooper: 1,
-  mortar: 5, fedaykin: 4, glider: 3, warrior: 2, crew: 1,
+  sandrider: 6, mortar: 5, fedaykin: 4, glider: 3, warrior: 2, crew: 1,
 };
 
 /** One kind of thing in the selection: a unit type or a building type. */
@@ -363,7 +363,8 @@ export class Input {
   /** Arms Plant Thumper: the next left click is the spot (says why not, if the side can't plant one now). */
   armThump(): void {
     if (!this.hasThumpers()) return;
-    const why = this.game.thumpBlocked(this.team);
+    const riders = this.ownUnits().filter((u) => u.def.thumper);
+    const why = riders.some((u) => !this.game.thumpBlocked(this.team, u)) ? null : this.game.thumpBlocked(this.team, riders[0]);
     if (why) {
       this.game.onMessage(why, this.game.thumpVoice(why));
       return;

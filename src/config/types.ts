@@ -13,7 +13,7 @@ export type Faction = 'atreides' | 'corrino' | 'fremen';
 export type UnitType =
   | 'harvester' | 'infantry' | 'trike' | 'tank' | 'rocket' | 'repair' | 'carryall'
   | 'trooper' | 'sardaukar' | 'razor' | 'devastator' | 'raider' | 'artillery'
-  | 'warrior' | 'fedaykin' | 'crew' | 'glider' | 'mortar';
+  | 'warrior' | 'fedaykin' | 'crew' | 'glider' | 'mortar' | 'sandrider';
 export type BuildingType =
   | 'conyard' | 'refinery' | 'barracks' | 'bunker' | 'factory' | 'hitech' | 'fab' | 'tleilaxu' | 'pad' | 'turret'
   | 'sietch' | 'windtrap' | 'thumper' | 'camp';
@@ -48,7 +48,9 @@ export interface WeaponDef {
   unguided?: boolean;
   /** Flamethrower: hits every enemy within range inside this half-angle (radians) around the aim. */
   cone?: number;
-  /** Passes straight through shields to health (sound: the Fedaykin's weirding modules). */
+  /** Can only hit targets with one of these tags (the Sandrider's crysknife: infantry). */
+  only?: Tag[];
+  /** Passes straight through shields to health (sound: the Fedaykin's weirding modules; a slow blade). */
   pierce?: boolean;
   /** The sound of a shot (none for a flamethrower, or for blasts that aren't fired, like mines). */
   sound?: Sound;
@@ -96,7 +98,9 @@ export interface UnitDef {
   hides?: boolean;
   /** A glider: always on the move, it can't hover; with nowhere to go it circles this far (world units) around its spot. */
   glides?: { orbit: number };
-  /** Can plant a Thumper on the sand to call a wild Sandworm (see THUMPER and WORM in rules.ts). */
+  /** Zealot rush: closing on a target within `range`, it runs `speed` times as fast. */
+  charge?: { range: number; speed: number };
+  /** Can plant a Thumper on the sand to call a Sandworm, and rides it (see THUMPER, WORM and RIDE in rules.ts). */
   thumper?: boolean;
   /**
    * Fremen rites: not trained, but made from a unit of type `from` that digs into the sand for `time` s and comes

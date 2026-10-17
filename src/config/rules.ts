@@ -77,6 +77,14 @@ export const WORM = {
   range: 15, bite: 4, hunt: 20, biteEvery: 2.5, still: 1.5, speed: 9, reach: 2.5,
   weapon: { range: 0, minRange: 0, damage: 400, bonus: { mechanical: 400, structure: -100 }, cooldown: 0, projectile: 'bullet', speed: 0, splash: 4, pierce: true } as WeaponDef,
 };
+/**
+ * A Sandrider rides the worm its Thumper calls, if it's within `mount` when the worm comes: for `time` s the worm goes
+ * where the rider is sent, bites enemies within WORM.bite of its head (never its own side), and with nowhere to go
+ * wanders an irregular loop about `wander` across, going after enemy prey within `hunt` of it. Then it dives, leaves
+ * the rider on the sand, and that rider can't call again for `cooldown` s. Its rider killed, the worm goes wild for
+ * the rest of its time. Drawing: `segments` rings `spacing` apart follow the head; the rider stands on ring `seat`.
+ */
+export const RIDE = { mount: 14, time: 40, cooldown: 60, wander: 20, hunt: 16, segments: 10, spacing: 1.7, seat: 2, lift: 1.9 };
 /** A Spice Camp works at full rate with this many spice tiles in reach, proportionally less with fewer. */
 export const CAMP_FULL = 12;
 /** Spice Mining: Spice Camps' extra rate. */

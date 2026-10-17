@@ -70,3 +70,63 @@ export function makeSandworm(): SandwormModel {
   root.add(ridge);
   return { root, body, ridge };
 }
+
+export interface RiddenWormModel {
+  /** Holds the pieces; each is placed in world space every frame. */
+  root: THREE.Group;
+  /** The head (maw facing +X), the rings behind it, and the tail tip. Rigid pieces: no skeleton, no clips. */
+  pieces: THREE.Object3D[];
+  /** Radius of each piece, for how high it rides out of the sand. */
+  radii: number[];
+}
+
+/**
+ * A ridden Sandworm, surfaced: a head with its maw open forward, `segments` rings narrowing toward the tail, and a
+ * tail tip. The game lays each piece along the path the head has taken, so the body curves with its movement.
+ */
+export function makeRiddenWorm(segments: number): RiddenWormModel {
+  const root = new THREE.Group();
+  const hide = mat(WORM_HIDE);
+  const ring = mat(shade(WORM_HIDE, 0.72));
+  const pieces: THREE.Object3D[] = [];
+  const radii: number[] = [];
+  // Head: a short drum lying along +X, the maw ringed with teeth at its front.
+  const head = new THREE.Group();
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.7, 1.8, 16), hide);
+  drum.rotation.z = Math.PI / 2;
+  drum.castShadow = true;
+  head.add(drum);
+  const throat = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 0.08, 16), mat(0x3a120c));
+  throat.rotation.z = Math.PI / 2;
+  throat.position.x = 0.92;
+  head.add(throat);
+  const teeth = mat(TOOTH);
+  for (let k = 0; k < 14; k++) {
+    const a = (k / 14) * Math.PI * 2;
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.5, 4), teeth);
+    tooth.position.set(1.0, Math.sin(a) * 1.4, Math.cos(a) * 1.4);
+    tooth.lookAt(1.6, 0, 0);
+    tooth.rotateX(Math.PI / 2);
+    head.add(tooth);
+  }
+  pieces.push(head);
+  radii.push(1.7);
+  for (let i = 0; i < segments; i++) {
+    const r = 1.65 - (i / segments) * 0.8;
+    const seg = new THREE.Mesh(new THREE.CylinderGeometry(r, r, 1.5, 14), i % 2 ? ring : hide);
+    seg.rotation.z = Math.PI / 2;
+    seg.castShadow = true;
+    const holder = new THREE.Group();
+    holder.add(seg);
+    pieces.push(holder);
+    radii.push(r);
+  }
+  const tail = new THREE.Mesh(new THREE.ConeGeometry(0.8, 2.2, 12), hide);
+  tail.rotation.z = Math.PI / 2;
+  const tailHolder = new THREE.Group();
+  tailHolder.add(tail);
+  pieces.push(tailHolder);
+  radii.push(0.8);
+  for (const p of pieces) root.add(p);
+  return { root, pieces, radii };
+}

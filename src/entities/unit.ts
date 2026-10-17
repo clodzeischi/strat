@@ -80,6 +80,11 @@ export function repairable(e: Entity): boolean {
 
 type HarvestState = 'seek' | 'toSpice' | 'harvest' | 'toRefinery' | 'unload';
 
+/** What a unit rides on top of (a Sandrider's worm): how high above the sand it stands. */
+export interface Mount {
+  lift: number;
+}
+
 /** A harvester's spot at a refinery: a cell along one of its sides, and the way out from the wall. */
 export interface Dock {
   ref: Building;
@@ -124,6 +129,10 @@ export class Unit extends Entity {
   hidden = false;
   /** Teams (bit per team) with something close enough to see it even while it's hidden. */
   detected = 0;
+  /** A Sandrider on its worm: it goes where the worm takes it (the game moves it), and its orders steer the worm. */
+  mount: Mount | null = null;
+  /** Sandrider: game time it can plant its next Thumper. */
+  nextThumper = 0;
   /** A Fremen rite under way: dug in, it becomes `to` at game time `until` (`cost` is refunded if it's called off). */
   rite: { to: UnitType; until: number; cost: number } | null = null;
   /** When it last moved (more than a nudge), and from where: Sandworms only go after what moves. */
@@ -334,8 +343,11 @@ export class Unit extends Entity {
     if (this.type === 'harvester' && game.tier(this.team, 'harvest')) return this.def.speed * HARVEST_UPGRADE.speed;
     if (this.type === 'trike' && ups.has('nitro')) return this.def.speed * NITRO.speed;
     // Fremen infantry are quicker on sand and spice.
-    if (this.def.hides && this.def.infantry && this.onSand(game)) return this.def.speed * (1 + SAND_SPEED.base + (ups.has('sandwalk') ? SAND_SPEED.sandwalk : 0));
-    return this.def.speed;
+    // Zealot rush: closing on a target, it runs.
+    const c = this.def.charge;
+    const rush = c && this.target && !this.target.dead && distTo(this.target, this.x, this.z) <= c.range ? c.speed : 1;
+    if (this.def.hides && this.def.infantry && this.onSand(game)) return rush * this.def.speed * (1 + SAND_SPEED.base + (ups.has('sandwalk') ? SAND_SPEED.sandwalk : 0));
+    return rush * this.def.speed;
   }
 
   /**
@@ -1242,7 +1254,7 @@ export class Unit extends Entity {
       this.falling.chute.scale.setScalar(this.falling.chute.userData.full * open);
     }
     if (!this.falling) {
-      const groundY = game.map.surfaceAt(this.x, this.z) + (this.def.air ? AIR_HEIGHT : this.hidden ? -HIDDEN_SINK : 0);
+      const groundY = game.map.surfaceAt(this.x, this.z) + (this.def.air ? AIR_HEIGHT : this.mount ? this.mount.lift : this.hidden ? -HIDDEN_SINK : 0);
       this.y += (groundY - this.y) * Math.min(1, dt * (this.def.air ? 3 : 10));
     }
     this.root.position.set(this.x, this.y, this.z);

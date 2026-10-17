@@ -33,6 +33,7 @@ import { sardaukar } from './units/sardaukar';
 import { trooper } from './units/trooper';
 import { crew } from './units/crew';
 import { fedaykin } from './units/fedaykin';
+import { sandrider } from './units/sandrider';
 import { glider } from './units/glider';
 import { mortar } from './units/mortar';
 import { warrior } from './units/warrior';
@@ -41,12 +42,12 @@ export type { BuildingModel, UnitAnimator, UnitModel, UpgradeKit, UpgradeLook } 
 export { hasBuildingModel, hasUnitModel, loadModels } from './gltf';
 export { makeParachute } from './parachute';
 export { makePod } from './pod';
-export { makeSandworm, WORM_DEPTH, type SandwormModel } from './sandworm';
+export { makeRiddenWorm, makeSandworm, WORM_DEPTH, type RiddenWormModel, type SandwormModel } from './sandworm';
 export { CARRYALL_HOOK_Y, NACELLES, SEATS, SEAT_OFF, SEAT_ON } from './units/carryall';
 
 const UNIT_MODELS: Record<UnitType, UnitBlueprint> = {
   harvester, infantry, trike, tank, rocket, repair, carryall, trooper, sardaukar, razor, devastator, raider, artillery,
-  warrior, fedaykin, crew, glider, mortar,
+  warrior, fedaykin, crew, glider, mortar, sandrider,
 };
 const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = {
   conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret, sietch, windtrap, thumper, camp,

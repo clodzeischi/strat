@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
 import { applyCommand } from '../src/game/commands';
-import { BUILDINGS, FACTIONS, HIDE, THUMPER, TILE, UNITS, WORM, type BuildingType, type Team } from '../src/config';
+import { BUILDINGS, FACTIONS, HIDE, RIDE, THUMPER, TILE, UNITS, WORM, type BuildingType, type Team } from '../src/config';
 import { Building, Unit } from '../src/entities';
 import { hypot } from '../src/game/hypot';
 import { findPath } from '../src/game/pathfinding';
@@ -58,19 +58,20 @@ check(sandNo && FACTIONS.atreides.buildOnSand === undefined, "Atreides can't bui
 check(!g.canPlace('camp', F, bks.cx + 4, bks.cz), 'a Spice Camp is not built at the yard');
 check(g.canTrain(F, 'warrior') && g.canTrain(F, 'crew'), 'Barracks trains Warriors and Crews');
 // The tree: a Sietch to start, then the Great Sietch and Sietch III.
-check(!g.requirementsMet(F, UNITS.fedaykin.requires) && !g.requirementsMet(F, UNITS.mortar.requires) && g.thumpBlocked(F) === 'Thumpers need a Great Sietch.', 'no Fedaykin, Mortars or Thumpers at level 1');
+check(!g.requirementsMet(F, UNITS.fedaykin.requires) && !g.requirementsMet(F, UNITS.mortar.requires) && g.thumpBlocked(F) === 'Thumpers need Sietch III.', 'no Fedaykin, Mortars or Thumpers at level 1');
 check(g.canResearch(F, 'fHarvest') && g.canResearch(F, 'sandwalk') && !g.canResearch(F, 'fWeapons') && !g.canResearch(F, 'stillsuit'), 'level 1 researches Spice Mining and Sandwalk');
 check(g.canBuild(F, 'windtrap') && !g.canTrain(F, 'glider'), 'the Windtrap can be built at once; Gliders need it');
 check(!g.canBuild(F, 'thumper') && !g.canPlace('thumper', F, bks.cx + 4, bks.cz), 'Thumpers are planted by infantry, not built at the yard');
 applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
 run(BUILDINGS.sietch.levels![0].time + 1);
-check(g.requirementsMet(F, UNITS.fedaykin.requires) && g.requirementsMet(F, UNITS.mortar.requires) && g.thumpBlocked(F) === null, 'the Great Sietch unlocks the Fedaykin and Mortar rites, and Thumpers');
+check(g.requirementsMet(F, UNITS.fedaykin.requires) && g.requirementsMet(F, UNITS.mortar.requires) && g.thumpBlocked(F) !== null, 'the Great Sietch unlocks the Fedaykin and Mortar rites, not Thumpers yet');
 check(g.canResearch(F, 'fWeapons') && g.canResearch(F, 'fArmor') && g.canResearch(F, 'stillsuit') && !g.canResearch(F, 'ambush'), 'and Weapons +1, Armor +1, Stillsuits; not Ambush');
 g.teams[F].upgrades.add('fWeapons');
 check(!g.canResearch(F, 'fWeapons2'), 'Weapons +2 waits for Sietch III');
 applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
 run(BUILDINGS.sietch.levels![1].time + 1);
 check(g.canResearch(F, 'ambush') && g.canResearch(F, 'fWeapons2') && !g.canResearch(F, 'fArmor2'), 'Sietch III unlocks Ambush and the second levels (after the first)');
+check(g.thumpBlocked(F) === null && g.requirementsMet(F, UNITS.sandrider.requires), 'and the Sandrider rite, and Thumpers');
 check(g.tier(F, 'weapons') === 1, 'Weapons +1 is tier 1');
 g.teams[F].upgrades.delete('fWeapons');
 
@@ -172,7 +173,8 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   };
   t.teams[F].credits = 100000;
   const fy = t.buildings.find((b) => b.team === F && b.type === 'sietch')!;
-  fy.setLevel(2); // Thumpers need a Great Sietch
+  fy.setLevel(2);
+  fy.setLevel(3); // Thumpers need Sietch III (and a Sandrider)
   const wormGround = (x: number, z: number) => tm.canEnter(tm.cellOf(x), tm.cellOf(z), 'worm');
   // The open patch of sand from the hiding checks; spots on it the worm can get to from there, for its prey.
   const reach = (x: number, z: number) => wormGround(x, z) && (() => {
@@ -194,17 +196,17 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   t.localTeam = A;
   const alerts: { text: string; x: number; z: number; kind: string }[] = [];
   t.onAlert = (text, x, z, kind) => alerts.push({ text, x, z, kind });
-  const planter = t.spawnUnit('warrior', F, sx + 3, sz);
+  const planter = t.spawnUnit('sandrider', F, sx + 3, sz);
   const credits = t.teams[F].credits;
   applyCommand(t, F, { c: 'thump', units: [planter.id], x: sx, z: sz });
-  check(planter.order.kind === 'plant', 'Plant Thumper: the warrior walks to the spot');
+  check(planter.order.kind === 'plant', 'Plant Thumper: the Sandrider walks to the spot');
   tick(3);
   const thumper = t.buildings.find((b) => b.type === 'thumper' && !b.dead);
   check(!!thumper && hypot(thumper.x - sx, thumper.z - sz) < 2 * TILE && t.teams[F].credits === credits - THUMPER.cost, 'and plants a Thumper there, for its price');
-  check(t.thumpBlocked(F) !== null, 'one Thumper at a time');
+  check(t.thumpBlocked(F, planter) !== null, 'one Thumper at a time for a Sandrider');
   const heard = () => alerts.find((a) => a.text.startsWith('Thumper detected'));
   // Prey: an enemy tank driving to and fro, one parked, a harvester parked, our own warrior walking about, all on the
-  // sand within reach; the planter goes back to the rock by the yard and holds position there.
+  // sand within reach; the planter goes back to the rock by the yard (too far to ride it) and holds position there.
   const mover = t.spawnUnit('tank', A, p1.x, p1.z);
   const parked = t.spawnUnit('tank', A, p2.x, p2.z);
   const harv = t.spawnUnit('harvester', A, p3.x, p3.z);
@@ -234,23 +236,105 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   if (own) check(own.dead, 'and it eats our own units too, when they move on the sand');
   check(!planter.dead && planter.hp === planter.maxHp, 'off the sand, the planter is safe');
   check(t.worms.length === 0 && t.wormLog.length === 1 && t.wormLog[0].eatenEnemy >= UNITS.tank.cost + UNITS.harvester.cost, 'it goes back down after its hunt, and the log has what it ate');
-  check(t.thumpBlocked(F) === null || t.thumpBlocked(F)!.startsWith('Next Thumper'), 'the next Thumper waits for the cooldown');
+  check(t.thumpBlocked(F, planter)?.startsWith('Next Thumper') ?? true, 'the next Thumper waits for the cooldown');
   // A Thumper destroyed before the worm comes calls nothing.
-  t.teams[F].nextThumper = 0;
-  const p2b = t.spawnUnit('warrior', F, sx, sz);
+  const p2b = t.spawnUnit('sandrider', F, sx, sz);
   check(t.plantThumper(p2b, sx, sz), 'a second Thumper, once the cooldown is over');
   const th2 = t.buildings.find((b) => b.type === 'thumper' && !b.dead)!;
   t.damage(th2, UNITS.tank.weapon!, 100, null);
   tick(THUMPER.delay + 1);
   check(th2.dead && t.worms.length === 0, 'destroyed in time, its worm never comes');
   // Not on rock.
-  t.teams[F].nextThumper = 0;
   const rocky = tm.nearestCell(fy.cx, fy.cz, (x, z) => {
     for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (!tm.inBounds(x + dx, z + dz) || tm.tile(x + dx, z + dz) !== ROCK) return false;
     return true;
   }, 20)!;
-  const p3b = t.spawnUnit('warrior', F, tm.center(rocky.cx), tm.center(rocky.cz));
+  const p3b = t.spawnUnit('sandrider', F, tm.center(rocky.cx), tm.center(rocky.cz));
   check(!t.plantThumper(p3b, p3b.x, p3b.z), "no Thumper on rock");
+}
+
+// ---- The Sandrider: zealot rush, and riding the worm ----
+{
+  const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'corrino']);
+  const tm = t.map;
+  for (const u of t.units) if (u.team === A) u.dead = true;
+  const tick = (seconds: number) => {
+    for (let k = 0; k < seconds * 20; k++) t.update(0.05);
+  };
+  t.teams[F].credits = 100000;
+  const fy = t.buildings.find((b) => b.team === F && b.type === 'sietch')!;
+  check(!FACTIONS.fremen.train.includes('sandrider') && UNITS.sandrider.rite?.from === 'fedaykin', 'Sandriders come from Fedaykin, by a rite');
+  check(!UNITS.warrior.thumper && !UNITS.fedaykin.thumper && !!UNITS.sandrider.thumper, 'only Sandriders plant Thumpers');
+  const fed = t.spawnUnit('fedaykin', F, sx, sz);
+  fy.setLevel(2);
+  check(t.riteBlocked(fed, 'sandrider') === 'Needs Sietch III.', 'the rite needs Sietch III');
+  fy.setLevel(3);
+  check(t.riteBlocked(fed, 'sandrider') === null, 'with it, a Fedaykin can become a Sandrider');
+  fed.dead = true;
+  // On foot: one stroke kills a shielded Sardaukar; it can't touch a vehicle.
+  const r = t.spawnUnit('sandrider', F, sx, sz);
+  const sard = t.spawnUnit('sardaukar', A, sx + 5, sz);
+  const raz = t.spawnUnit('razor', A, sx - 5, sz);
+  check(!t.weaponFor(r, raz) && !!t.weaponFor(r, sard), 'the crysknife is for infantry only');
+  sard.command(t, { kind: 'hold' });
+  let rushed = 0;
+  for (let k = 0; k < 60 && !sard.dead; k++) {
+    t.update(0.05);
+    if (r.target === sard) rushed = Math.max(rushed, r.speed(t));
+  }
+  check(sard.dead, 'it rushes a Sardaukar and kills it with one stroke, through the shield');
+  check(rushed >= UNITS.sandrider.speed * UNITS.sandrider.charge!.speed, 'running at double speed as it closes in');
+  raz.dead = true;
+  // Riding: plant, stay close, climb on.
+  const pick = (d: number) => tm.nearestCell(tm.cellOf(sx + d), tm.cellOf(sz), (x, z) => tm.canEnter(x, z, 'worm'), 6)!;
+  const pt = (c: { cx: number; cz: number }) => ({ x: tm.center(c.cx), z: tm.center(c.cz) });
+  r.x = sx;
+  r.z = sz;
+  applyCommand(t, F, { c: 'thump', units: [r.id], x: sx + 2, z: sz });
+  tick(2);
+  r.command(t, { kind: 'hold' });
+  const ownW = t.spawnUnit('warrior', F, pt(pick(6)).x, pt(pick(6)).z);
+  tick(THUMPER.delay);
+  check(t.ridden.length === 1 && t.worms.length === 0 && r.mount === t.ridden[0], 'the worm comes, and the Sandrider is up on it');
+  const w = t.ridden[0];
+  check(hypot(r.x - w.x, r.z - w.z) < RIDE.seat * RIDE.spacing + 1, 'riding on its back');
+  // Left alone, it goes after an enemy moving on the sand nearby; our own warrior walking about is safe.
+  const prey = t.spawnUnit('razor', A, pt(pick(-8)).x, pt(pick(-8)).z);
+  for (let k = 0; k < 10 && !prey.dead; k++) {
+    prey.command(t, { kind: 'move', x: prey.x + (k % 2 ? 3 : -3), z: prey.z });
+    ownW.command(t, { kind: 'move', x: ownW.x + (k % 2 ? 2 : -2), z: ownW.z });
+    tick(1);
+  }
+  check(prey.dead, 'left alone it hunts: an enemy Razor moving on the sand is swallowed');
+  check(!ownW.dead && ownW.hp === ownW.maxHp, 'never its own side');
+  // Steered: right-click an enemy standing still, and the worm goes for it.
+  const sitter = t.spawnUnit('razor', A, pt(pick(10)).x, pt(pick(10)).z);
+  sitter.command(t, { kind: 'hold' });
+  applyCommand(t, F, { c: 'go', units: [r.id], x: sitter.x, z: sitter.z, target: sitter.id, attack: true });
+  tick(8);
+  check(sitter.dead, 'steered onto an enemy, it swallows it even standing still');
+  // Moving it somewhere: it goes, and wanders round there after.
+  const far = pt(pick(-12));
+  applyCommand(t, F, { c: 'go', units: [r.id], x: far.x, z: far.z, target: null, attack: false });
+  tick(6);
+  check(hypot(w.x - far.x, w.z - far.z) < 8, 'sent somewhere on the sand, it goes there');
+  const trail: number[] = [];
+  for (let k = 0; k < 20; k++) { tick(0.5); trail.push(hypot(w.x - w.lairX, w.z - w.lairZ)); }
+  check(Math.max(...trail) - Math.min(...trail) > 2 && Math.max(...trail) <= RIDE.wander, 'then wanders an irregular loop round there');
+  tick(RIDE.time);
+  check(t.ridden.length === 0 && !r.mount && !r.dead && tm.canEnter(tm.cellOf(r.x), tm.cellOf(r.z), 'foot'), 'its time up, the worm dives and leaves the rider on the sand');
+  check(t.thumpBlocked(F, r)?.startsWith('Next Thumper') ?? false, 'and the rider rests before calling again');
+  // Its rider shot off its back: the worm goes wild.
+  r.nextThumper = 0;
+  r.command(t, { kind: 'idle' });
+  applyCommand(t, F, { c: 'thump', units: [r.id], x: r.x + 2, z: r.z });
+  tick(2);
+  r.command(t, { kind: 'hold' });
+  tick(THUMPER.delay);
+  check(!!r.mount, 'up again on a second worm');
+  while (!r.dead) t.damage(r, UNITS.tank.weapon!, 100, null);
+  tick(0.5);
+  check(t.ridden.length === 0 && t.worms.length === 1, 'shot off its back, the rider falls and the worm goes wild');
 }
 
 // ---- Hold Position ----

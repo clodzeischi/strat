@@ -2,16 +2,16 @@ import * as THREE from 'three';
 import {
   AMBUSH, ARMOR_BONUS, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS,
-  TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
+  RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
   type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
 import { Effects } from '../render/effects/effects';
-import { Building, Carryall, distTo, facingToward, moveClassOf, repairable, SALVAGE, Unit, type Entity } from '../entities';
+import { Building, Carryall, distTo, facingToward, moveClassOf, repairable, SALVAGE, Unit, type Entity, type Mount } from '../entities';
 import { CLIFF, GameMap, ROCK, SAND, SPICE, type Cell, type MoveClass } from '../map';
 import { mat } from '../materials/lambert';
-import { makeSandworm, WORM_DEPTH, type SandwormModel } from '../models';
+import { makeRiddenWorm, makeSandworm, WORM_DEPTH, type RiddenWormModel, type SandwormModel } from '../models';
 import { cellsAround, findPath, type Point } from './pathfinding';
 import { Terrain } from '../render/terrain';
 import { Hasher, mulberry32 } from './rng';
@@ -66,8 +66,6 @@ export interface TeamState {
   levelUps: Partial<Record<LevelUpType, { building: Building; level: number; progress: number }>>;
   /** Round-robin counter so units leave from each building of a type in turn. */
   spawnTurn: Record<Producer, number>;
-  /** Fremen: game time the next Thumper can be planted. */
-  nextThumper: number;
 }
 
 /**
@@ -111,6 +109,8 @@ interface Mine {
 /** A planted Thumper drumming for a worm. */
 interface Drum {
   b: Building;
+  /** The Sandrider who planted it, to ride the worm it calls. */
+  rider: Unit | null;
   /** Game time the worm comes. */
   due: number;
   /** When its drumming next gives it away, and to which sides it already has (bit per team). */
@@ -148,6 +148,39 @@ export interface Sandworm {
   model: SandwormModel;
   from: THREE.Vector3;
   to: THREE.Vector3;
+  dustTimer: number;
+}
+
+/**
+ * A Sandworm ridden by the Sandrider who called it (see RIDE in rules.ts): it goes where its rider is sent, bites the
+ * rider's enemies near its head, and with nowhere to go wanders a loop around `lair`, going after prey near it.
+ */
+export interface RiddenWorm extends Mount {
+  rider: Unit;
+  team: Team;
+  x: number;
+  z: number;
+  heading: number;
+  until: number;
+  nextBite: number;
+  /** Where it wanders when idle, and how far along its loop it is (radians), with a per-worm wobble. */
+  lairX: number;
+  lairZ: number;
+  loop: number;
+  wobble: number;
+  target: Entity | null;
+  path: Point[];
+  goal: { x: number; z: number } | null;
+  repath: number;
+  unreachable: Set<number>;
+  /** Where the head has been, newest first (a point every so often): the body follows it. */
+  trail: Point[];
+  eatenEnemy: number;
+  /** Drawing only: each piece's position last tick and this tick. */
+  model: RiddenWormModel;
+  from: THREE.Vector3[];
+  to: THREE.Vector3[];
+  headings: { from: number; to: number }[];
   dustTimer: number;
 }
 
@@ -210,6 +243,8 @@ export class Game {
   /** Thumpers drumming for a worm, and the wild Sandworms they called. */
   private drums: Drum[] = [];
   worms: Sandworm[] = [];
+  /** Sandworms ridden by Sandriders. */
+  ridden: RiddenWorm[] = [];
   /** Worms that have gone back down, with what they ate (for the sims). */
   wormLog: { team: Team; eatenOwn: number; eatenEnemy: number }[] = [];
   /** Attack alerts for the local player, per kind of target: when and where the last one was (to keep them few). */
@@ -237,7 +272,7 @@ export class Game {
         spiceHarvested: 0, creditsSpent: 0,
       },
       building: null, queues: { barracks: [], factory: [], hitech: [], fab: [], windtrap: [] }, research: null,
-      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0, windtrap: 0 }, levelUps: {}, nextThumper: 0,
+      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0, windtrap: 0 }, levelUps: {},
     }));
     this.vision = new Vision(this.map, this.teams.length);
     this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
@@ -925,6 +960,7 @@ export class Game {
     let w = anti && target.tags.includes('armored') && this.teams[u.team].upgrades.has('rockets') ? anti : u.def.weapon ?? null;
     if (u instanceof Unit && u.deployState === 'deployed') w = u.def.deploy!.weapon;
     if (w && target.tags.includes('air') && !w.air) return null;
+    if (w?.only && !target.tags.some((t) => w!.only!.includes(t))) return null;
     return w;
   }
 
@@ -1724,13 +1760,17 @@ export class Game {
 
   // ---- Thumpers and wild Sandworms ---------------------------------------------------
 
-  /** Why a team can't plant a Thumper now (no Sietch, still recharging, one already out, no credits), or null if it can. */
-  thumpBlocked(team: Team): string | null {
-    const ts = this.teams[team];
-    if (!this.meets(team, 'sietch2')) return 'Thumpers need a Great Sietch.';
-    if (this.drums.some((d) => d.b.team === team) || this.worms.some((w) => w.team === team)) return WORM_ABOUT;
-    if (this.time < ts.nextThumper) return `Next Thumper in ${Math.ceil(ts.nextThumper - this.time)} s.`;
-    if (ts.credits < THUMPER.cost) return NO_FUNDS;
+  /**
+   * Why a Sandrider (or, without one, the team) can't plant a Thumper now: no Sietch III, its worm still about,
+   * still recharging, no credits. Null if it can.
+   */
+  thumpBlocked(team: Team, u?: Unit): string | null {
+    if (!this.meets(team, 'sietch3')) return 'Thumpers need Sietch III.';
+    if (u) {
+      if (u.mount || this.drums.some((d) => d.rider === u)) return WORM_ABOUT;
+      if (this.time < u.nextThumper) return `Next Thumper in ${Math.ceil(u.nextThumper - this.time)} s.`;
+    }
+    if (this.teams[team].credits < THUMPER.cost) return NO_FUNDS;
     return null;
   }
 
@@ -1739,19 +1779,19 @@ export class Game {
     return why === WORM_ABOUT ? 'the_worm_you_called_is_still_about' : why === NO_FUNDS ? 'insufficient_funds' : null;
   }
 
-  /** Tells the unit among these nearest to (x, z) that can plant a Thumper to go and plant one there. */
+  /** Tells the Sandrider among these nearest to (x, z) that can plant a Thumper to go and plant one there. */
   orderThumper(team: Team, units: Unit[], x: number, z: number): boolean {
-    const why = this.thumpBlocked(team);
-    if (why) {
-      this.notifyTeam(team, why, this.thumpVoice(why));
-      return false;
-    }
+    const riders = units.filter((u) => u.def.thumper && !u.dead && !u.carrier && !u.falling);
     let best: Unit | null = null;
-    for (const u of units) {
-      if (!u.def.thumper || u.dead || u.carrier || u.falling) continue;
+    for (const u of riders) {
+      if (this.thumpBlocked(team, u)) continue;
       if (!best || hypot(u.x - x, u.z - z) < hypot(best.x - x, best.z - z)) best = u;
     }
-    if (!best) return false;
+    if (!best) {
+      const why = this.thumpBlocked(team, riders[0]);
+      if (why) this.notifyTeam(team, why, this.thumpVoice(why));
+      return false;
+    }
     best.queue = [];
     best.command(this, { kind: 'plant', x, z });
     return true;
@@ -1764,22 +1804,27 @@ export class Game {
     return m.nearestCell(m.cellOf(x), m.cellOf(z), ok, 2);
   }
 
-  /** A unit that can (Warrior, Fedaykin) plants a Thumper by (x, z), paying for it. Says why if it can't. */
+  /** A Sandrider plants a Thumper by (x, z), paying for it. Says why if it can't. */
   plantThumper(u: Unit, x: number, z: number): boolean {
     if (!u.def.thumper || u.dead) return false;
-    const why = this.thumpBlocked(u.team);
+    const why = this.thumpBlocked(u.team, u);
     const spot = why ? null : this.thumperSpot(u, x, z);
     if (why || !spot) {
       this.notifyTeam(u.team, why ?? 'A Thumper needs open, level sand or spice.', why ? this.thumpVoice(why) : 'thumper_needs_open_level_sand');
       return false;
     }
-    const ts = this.teams[u.team];
-    this.spend(ts, THUMPER.cost);
-    ts.nextThumper = this.time + THUMPER.cooldown;
+    this.spend(this.teams[u.team], THUMPER.cost);
+    u.nextThumper = this.time + THUMPER.cooldown;
     const b = this.placeBuilding('thumper', u.team, spot.cx, spot.cz);
-    this.drums.push({ b, due: this.time + THUMPER.delay, nextReveal: this.time, heard: 0 });
-    this.notifyTeam(u.team, `Thumper planted. The worm comes in ${THUMPER.delay} s: get off the sand, or stand still.`, 'thumper_planted', b, 'worm');
+    this.drums.push({ b, rider: u, due: this.time + THUMPER.delay, nextReveal: this.time, heard: 0 });
+    this.notifyTeam(u.team, `Thumper planted. The worm comes in ${THUMPER.delay} s: keep the Sandrider close to ride it.`, 'thumper_planted', b, 'worm');
     return true;
+  }
+
+  /** Seconds until this Sandrider's Thumper brings its worm (null if it has none drumming). */
+  riderDrumDue(u: Unit): number | null {
+    const d = this.drums.find((d) => d.rider === u);
+    return d ? Math.max(0, d.due - this.time) : null;
   }
 
   /** Seconds until a team's Thumper brings its worm (null if none is drumming). */
@@ -1815,7 +1860,9 @@ export class Game {
       }
       if (this.time < d.due) continue;
       this.drums.splice(this.drums.indexOf(d), 1);
-      this.callWorm(b);
+      const r = d.rider;
+      if (r && !r.dead && !r.carrier && !r.falling && !r.mount && !r.rite && hypot(r.x - b.x, r.z - b.z) <= RIDE.mount) this.rideWorm(b, r);
+      else this.callWorm(b);
     }
   }
 
@@ -1868,7 +1915,7 @@ export class Game {
   private wormPrey(w: Sandworm, e: Entity | null): e is Entity {
     if (!e || e.dead || w.unreachable.has(e.id)) return false;
     if (e instanceof Unit) {
-      if (e.def.air || e.carrier || e.falling) return false;
+      if (e.def.air || e.carrier || e.falling || e.mount) return false;
       if (e.type !== 'harvester' && this.time - e.movedAt >= WORM.still) return false;
       if (!this.onWormGround(e.x, e.z)) return false;
       return hypot(e.x - w.lairX, e.z - w.lairZ) <= WORM.range;
@@ -1960,7 +2007,7 @@ export class Game {
     w.target = null;
     w.path = [];
     const victims: Entity[] = [
-      ...this.units.filter((u) => !u.dead && !u.def.air && !u.carrier && !u.falling && this.onWormGround(u.x, u.z) && distTo(u, x, z) <= WORM.bite),
+      ...this.units.filter((u) => !u.dead && !u.def.air && !u.carrier && !u.falling && !u.mount && this.onWormGround(u.x, u.z) && distTo(u, x, z) <= WORM.bite),
       ...this.buildings.filter((b) => !b.dead && this.onSandFootprint(b) && distTo(b, x, z) <= WORM.bite),
     ];
     for (const v of victims) {
@@ -2006,6 +2053,271 @@ export class Game {
     }
   }
 
+  // ---- Ridden Sandworms ---------------------------------------------------------------
+
+  /** The worm comes up where the Thumper stands, with its Sandrider climbing on, and bites the rider's enemies there. */
+  private rideWorm(b: Building, rider: Unit): void {
+    const model = makeRiddenWorm(RIDE.segments);
+    this.scene.add(model.root);
+    const n = model.pieces.length;
+    const heading = dm.atan2(rider.z - b.z, rider.x - b.x) + Math.PI;
+    const ground = this.map.surfaceAt(b.x, b.z);
+    const w: RiddenWorm = {
+      rider, team: rider.team, x: b.x, z: b.z, heading, until: this.time + RIDE.time, nextBite: 0,
+      lairX: b.x, lairZ: b.z, loop: this.random() * Math.PI * 2, wobble: this.random() * Math.PI * 2,
+      target: null, path: [], goal: null, repath: 0, unreachable: new Set(), trail: [{ x: b.x, z: b.z }], eatenEnemy: 0, lift: RIDE.lift,
+      model, from: [], to: [], headings: [], dustTimer: 0,
+    };
+    // The body starts coiled straight back from the head.
+    for (let k = 1; k <= n * 2; k++) w.trail.push({ x: b.x - dm.cos(heading) * k * RIDE.spacing * 0.5, z: b.z - dm.sin(heading) * k * RIDE.spacing * 0.5 });
+    for (let i = 0; i < n; i++) {
+      w.from.push(new THREE.Vector3(b.x, ground, b.z));
+      w.to.push(new THREE.Vector3(b.x, ground, b.z));
+      w.headings.push({ from: heading, to: heading });
+    }
+    this.ridden.push(w);
+    this.remove(b);
+    rider.mount = w;
+    rider.command(this, { kind: 'idle' });
+    rider.queue = [];
+    this.placeRider(w);
+    this.layBody(w);
+    for (const p of w.to.keys()) w.from[p].copy(w.to[p]);
+    for (const ts of this.teams) {
+      const near = (e: Entity) => e.team === ts.team && !e.dead && hypot(e.x - b.x, e.z - b.z) <= RIDE.wander + 10 * TILE;
+      if (ts.team === rider.team) this.notifyTeam(ts.team, 'Shai-Hulud has come. The Sandrider is up.', 'shaihulud_has_come', b, 'worm');
+      else if (this.units.some(near) || this.buildings.some(near)) this.notifyTeam(ts.team, 'Wormsign! Get off the sand!', 'worm_sign', b, 'worm');
+    }
+    this.riddenBite(w);
+  }
+
+  /** A point `along` world units back down the trail from the head (the trail runs newest first). */
+  private trailPoint(w: RiddenWorm, along: number): { x: number; z: number; heading: number } {
+    let left = along;
+    for (let i = 0; i + 1 < w.trail.length; i++) {
+      const a = w.trail[i];
+      const b = w.trail[i + 1];
+      const d = hypot(b.x - a.x, b.z - a.z);
+      if (d >= left && d > 0) return { x: a.x + ((b.x - a.x) * left) / d, z: a.z + ((b.z - a.z) * left) / d, heading: dm.atan2(a.z - b.z, a.x - b.x) };
+      left -= d;
+    }
+    const last = w.trail[w.trail.length - 1];
+    return { x: last.x, z: last.z, heading: w.heading };
+  }
+
+  /** The rider stands on its ring of the worm. */
+  private placeRider(w: RiddenWorm): void {
+    const p = this.trailPoint(w, RIDE.seat * RIDE.spacing);
+    w.rider.x = p.x;
+    w.rider.z = p.z;
+    w.rider.heading = p.heading;
+  }
+
+  /** Each piece's place this tick, along the trail (drawing). */
+  private layBody(w: RiddenWorm): void {
+    for (let i = 0; i < w.to.length; i++) {
+      const p = i === 0 ? { x: w.x, z: w.z, heading: w.heading } : this.trailPoint(w, i * RIDE.spacing);
+      w.from[i].copy(w.to[i]);
+      w.headings[i].from = w.headings[i].to;
+      w.to[i].set(p.x, this.map.surfaceAt(p.x, p.z), p.z);
+      w.headings[i].to = p.heading;
+    }
+  }
+
+  /** Whether the ridden worm goes after this on its own: an enemy on the sand within reach of it, and loud. */
+  private riddenPrey(w: RiddenWorm, e: Entity | null): e is Entity {
+    if (!e || e.dead || e.team === w.team || w.unreachable.has(e.id)) return false;
+    if (e instanceof Unit) {
+      if (e.def.air || e.carrier || e.falling || e.mount) return false;
+      if (e.type !== 'harvester' && this.time - e.movedAt >= WORM.still) return false;
+      return this.onWormGround(e.x, e.z) && hypot(e.x - w.x, e.z - w.z) <= RIDE.hunt;
+    }
+    return e instanceof Building && distTo(e, w.x, w.z) <= RIDE.hunt && this.onSandFootprint(e);
+  }
+
+  /** Ridden worms: steered by their riders' orders, hunting near them when idle, biting the enemy by their heads. */
+  private updateRidden(dt: number): void {
+    for (const w of [...this.ridden]) {
+      const r = w.rider;
+      if (r.dead) {
+        this.wormGoesWild(w);
+        continue;
+      }
+      if (this.time >= w.until) {
+        this.dismount(w);
+        continue;
+      }
+      // Where to: an order of its rider's, prey near it, or on round its loop.
+      let gx: number;
+      let gz: number;
+      const o = r.order;
+      if (o.kind === 'move' || o.kind === 'amove') {
+        gx = o.x;
+        gz = o.z;
+        w.target = null;
+        if (hypot(gx - w.x, gz - w.z) < 2 * TILE) {
+          // Arrived: it wanders here now.
+          r.command(this, { kind: 'idle' });
+          w.lairX = w.x;
+          w.lairZ = w.z;
+        }
+      } else if (o.kind === 'attack' && !o.target.dead && o.target.team !== w.team) {
+        gx = o.target.x;
+        gz = o.target.z;
+        w.target = o.target;
+      } else {
+        if (o.kind !== 'idle' && o.kind !== 'hold') r.command(this, { kind: 'idle' });
+        if (!this.riddenPrey(w, w.target) || this.ticks % 10 === 0) {
+          let best: Entity | null = null;
+          let bestD = Infinity;
+          for (const e of [...this.units, ...this.buildings]) {
+            if (!this.riddenPrey(w, e)) continue;
+            const d = distTo(e, w.x, w.z) + (e instanceof Unit && e.type === 'harvester' ? -8 : 0);
+            if (d < bestD) {
+              bestD = d;
+              best = e;
+            }
+          }
+          w.target = best;
+        }
+        if (w.target) {
+          gx = w.target.x;
+          gz = w.target.z;
+        } else {
+          // An irregular loop: round the lair, swinging in and out.
+          const rad = (RIDE.wander / 2) * (0.65 + 0.35 * dm.sin(3 * w.loop + w.wobble));
+          gx = w.lairX + dm.cos(w.loop) * rad;
+          gz = w.lairZ + dm.sin(w.loop) * rad;
+          if (hypot(gx - w.x, gz - w.z) < 3) w.loop += 0.9 + 0.5 * dm.sin(w.loop * 2.3 + w.wobble);
+        }
+      }
+      this.riddenBite(w);
+      w.repath -= dt;
+      if (w.repath <= 0 || !w.goal || hypot(w.goal.x - gx, w.goal.z - gz) > 2) {
+        w.repath = 0.5;
+        w.goal = { x: gx, z: gz };
+        w.path = findPath(this.map, w.x, w.z, gx, gz, 'worm');
+        const end = w.path[w.path.length - 1];
+        if (!end || hypot(end.x - gx, end.z - gz) > WORM.reach + TILE) {
+          // Rock in the way: a target is left alone; a spot on the loop is skipped; an order stops at the edge.
+          if (w.target && w.target === (o.kind === 'attack' ? o.target : w.target)) w.unreachable.add(w.target.id);
+          if (!w.target && o.kind === 'idle') w.loop += 1.2;
+        }
+      }
+      let step = WORM.speed * dt;
+      while (step > 0 && w.path.length) {
+        const p = w.path[0];
+        const d = hypot(p.x - w.x, p.z - w.z);
+        if (d <= step) {
+          w.x = p.x;
+          w.z = p.z;
+          step -= d;
+          w.path.shift();
+        } else {
+          w.heading = dm.atan2(p.z - w.z, p.x - w.x);
+          w.x += ((p.x - w.x) / d) * step;
+          w.z += ((p.z - w.z) / d) * step;
+          step = 0;
+        }
+      }
+      const last = w.trail[0];
+      if (hypot(w.x - last.x, w.z - last.z) >= 0.4) {
+        w.trail.unshift({ x: w.x, z: w.z });
+        const keep = Math.ceil(((RIDE.segments + 2) * RIDE.spacing) / 0.4) + 4;
+        if (w.trail.length > keep) w.trail.length = keep;
+      }
+      this.placeRider(w);
+      this.layBody(w);
+    }
+  }
+
+  /** The ridden worm's maw: every enemy on the sand within WORM.bite of its head, every WORM.biteEvery s. */
+  private riddenBite(w: RiddenWorm): void {
+    if (this.time < w.nextBite) return;
+    const near = (e: Entity) => !e.dead && e.team !== w.team && distTo(e, w.x, w.z) <= WORM.bite;
+    const victims: Entity[] = [
+      ...this.units.filter((u) => near(u) && !u.def.air && !u.carrier && !u.falling && !u.mount && this.onWormGround(u.x, u.z)),
+      ...this.buildings.filter((b) => near(b) && this.onSandFootprint(b)),
+    ];
+    if (!victims.length) return;
+    w.nextBite = this.time + WORM.biteEvery;
+    for (const v of victims) {
+      this.wormBiting = true;
+      this.damage(v, WORM.weapon, 1, w.rider);
+      this.wormBiting = false;
+      if (v.dead) w.eatenEnemy += v instanceof Unit ? v.def.cost : BUILDINGS[(v as Building).type].cost;
+    }
+    const ground = this.map.surfaceAt(w.x, w.z);
+    for (let k = 0; k < 4; k++) {
+      const a = (k / 4) * Math.PI * 2;
+      this.effects.dust(new THREE.Vector3(w.x + dm.cos(a) * 2, ground + 0.3, w.z + dm.sin(a) * 2), 0xd8b080, 1.4);
+    }
+  }
+
+  /** Its time up, the worm dives and leaves its rider on the sand by where it went down. */
+  private dismount(w: RiddenWorm): void {
+    this.endRide(w);
+    const r = w.rider;
+    const m = this.map;
+    const c = m.nearestCell(m.cellOf(r.x), m.cellOf(r.z), (x, z) => m.canEnter(x, z, 'foot'), 8);
+    if (c) {
+      r.x = m.center(c.cx);
+      r.z = m.center(c.cz);
+    }
+    r.mount = null;
+    r.nextThumper = this.time + RIDE.cooldown;
+    r.command(this, { kind: 'idle' });
+    r.path = [];
+    this.notifyTeam(r.team, 'The worm has gone down. The Sandrider is back on the sand.', null, r, 'worm');
+  }
+
+  /** Its rider killed, the worm goes wild where it is for the rest of its time, eating anyone. */
+  private wormGoesWild(w: RiddenWorm): void {
+    this.endRide(w);
+    const model = makeSandworm();
+    model.root.position.set(w.x, this.map.surfaceAt(w.x, w.z), w.z);
+    this.scene.add(model.root);
+    this.worms.push({
+      team: w.team, x: w.x, z: w.z, heading: w.heading, lairX: w.x, lairZ: w.z, until: w.until, bitAt: -Infinity, nextBite: this.time + 1,
+      target: null, path: [], repath: 0, unreachable: new Set(), eatenOwn: 0, eatenEnemy: 0,
+      model, from: model.root.position.clone(), to: model.root.position.clone(), dustTimer: 0,
+    });
+    this.notifyTeam(w.team, 'Our Sandrider has fallen. The worm is wild!', null, { x: w.x, z: w.z }, 'worm');
+  }
+
+  private endRide(w: RiddenWorm): void {
+    this.ridden.splice(this.ridden.indexOf(w), 1);
+    this.wormLog.push({ team: w.team, eatenOwn: 0, eatenEnemy: w.eatenEnemy });
+    this.scene.remove(w.model.root);
+    this.effects.dust(new THREE.Vector3(w.x, this.map.surfaceAt(w.x, w.z) + 0.2, w.z), 0xd8c49a, 2);
+  }
+
+  /** Drawing: each piece between ticks, riding high out of the sand and rolling in a slow wave down the body. */
+  private drawRidden(dt: number, alpha: number): void {
+    const now = this.time + alpha * 0.05;
+    for (const w of this.ridden) {
+      const { root, pieces, radii } = w.model;
+      root.visible = this.revealAll || this.vision.seesAt(this.localTeam, w.x, w.z);
+      for (let i = 0; i < pieces.length; i++) {
+        const p = pieces[i];
+        p.position.lerpVectors(w.from[i], w.to[i], alpha);
+        p.position.y += radii[i] * 0.45 + 0.35 * dm.sin(now * 3 - i * 0.8);
+        const h = w.headings[i];
+        let turn = h.to - h.from;
+        turn -= Math.round(turn / (2 * Math.PI)) * 2 * Math.PI;
+        p.rotation.y = -(h.from + turn * alpha);
+      }
+      if (root.visible) {
+        w.dustTimer -= dt;
+        if (w.dustTimer <= 0) {
+          w.dustTimer = 0.1;
+          const t = pieces[pieces.length - 1].position;
+          this.effects.dust(new THREE.Vector3(t.x, t.y, t.z), 0xd8c49a, 0.9);
+        }
+      }
+    }
+  }
+
   offerSurrender(team: Team): void {
     if (this.winner !== null) return;
     this.surrenderOffers.add(team);
@@ -2038,7 +2350,7 @@ export class Game {
     // Alternate the order units act in, so neither side always gets the first shot in a tick.
     const order = this.ticks % 2 ? this.units : [...this.units].reverse();
     for (const u of order) {
-      if (u.dead || u.carrier) continue;
+      if (u.dead || u.carrier || u.mount) continue;
       if (u.falling) u.updateFall(this, dt);
       else u.update(this, dt);
       // Atreides infantry patch themselves up; Corrino health only comes back at a Repair Pad; Fremen see updateRegen.
@@ -2047,7 +2359,7 @@ export class Game {
       }
     }
     for (const u of this.units) {
-      if (u.queue.length && !u.dead && !u.carrier && !u.falling && u.order.kind === 'idle' && u.deployState === 'mobile') this.nextQueued(u);
+      if (u.queue.length && !u.dead && !u.carrier && !u.falling && !u.mount && u.order.kind === 'idle' && u.deployState === 'mobile') this.nextQueued(u);
     }
     this.updateHiding(false);
     this.regenShields(dt);
@@ -2058,6 +2370,7 @@ export class Game {
     this.updateMines();
     this.updateDrums();
     this.updateWorms(dt);
+    this.updateRidden(dt);
     this.updateBunkers(dt);
     this.updateTurrets(dt);
     this.updatePads(dt);
@@ -2097,6 +2410,7 @@ export class Game {
     }
     this.drawFog(dt);
     this.drawWorms(dt, alpha);
+    this.drawRidden(dt, alpha);
     for (const b of this.buildings) {
       if (b.def.weapon) b.aimGun();
       else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + Math.abs(dm.sin(this.time * 5 + b.id)) * 0.35;
@@ -2152,7 +2466,8 @@ export class Game {
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
     for (const d of this.drums) h.int(d.b.id).num(d.due);
     for (const w of this.worms) h.num(w.x).num(w.z).num(w.nextBite).int(w.target?.id ?? -1);
-    for (const ts of this.teams) h.num(ts.nextThumper);
+    for (const u of this.units) if (u.def.thumper) h.num(u.nextThumper).int(+!!u.mount);
+    for (const w of this.ridden) h.num(w.x).num(w.z).num(w.until).num(w.nextBite).num(w.loop).int(w.rider.id).int(w.target?.id ?? -1);
     for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);
     return h.value;
   }

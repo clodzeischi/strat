@@ -33,6 +33,8 @@ interface FactionKit {
   siege: { unit: UnitType; per: number; max: number } | null;
   /** What earns the money: harvesters (with refineries), or Spice Crews setting up camps (Fremen). */
   worker: UnitType;
+  /** Units that call and ride worms (Fremen Sandriders): this many kept. */
+  rider?: { unit: UnitType; max: number };
 }
 
 const KITS: Record<Faction, FactionKit> = {
@@ -51,7 +53,7 @@ const KITS: Record<Faction, FactionKit> = {
   fremen: {
     factory: 'windtrap', defense: 'bunker', raider: 'warrior', scouts: ['glider', 'warrior'], mender: null, tech: [],
     levels: ['sietch'], research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2'], fallback: 'warrior',
-    siege: { unit: 'mortar', per: 5, max: 5 }, worker: 'crew',
+    siege: { unit: 'mortar', per: 5, max: 5 }, worker: 'crew', rider: { unit: 'sandrider', max: 2 },
   },
 };
 
@@ -386,7 +388,10 @@ export class AI {
     const ts = this.ts;
     if (!g.has(this.team, this.kit.factory) || g.count(this.team, 'refinery') < this.wantRefineries() || this.econGoal() || this.rebuildStep()) return null;
     if (!this.kit.levels.some((t) => ts.levelUps[t])) {
-      const level = this.techOrder.find((t) => g.canLevelUp(this.team, t) && this.levelUnlocks(t, g.techLevel(this.team, t) + 1));
+      // A third level (Sietch III) waits for a real army: the units the second one unlocks come first.
+      const army = g.units.filter((u) => u.team === this.team && u.def.weapon).length;
+      const level = this.techOrder.find((t) => g.canLevelUp(this.team, t) && this.levelUnlocks(t, g.techLevel(this.team, t) + 1)
+        && (g.techLevel(this.team, t) < 2 || army >= 2 * this.profile.techArmy));
       if (level) return { kind: 'level', type: level, cost: levelDef(level, g.techLevel(this.team, level) + 1).cost };
     }
     if (!ts.research) {
@@ -665,7 +670,7 @@ export class AI {
   /** The next unit to save up for and build. */
   protected chooseUnit(): UnitType {
     return this.raidTrikeWanted() ? this.kit.raider : this.repairWanted() ? 'repair' : this.scoutWanted() ? this.kit.scouts[0]
-      : this.siegeWanted() ? this.kit.siege!.unit : this.pickCounter();
+      : this.siegeWanted() ? this.kit.siege!.unit : this.riderWanted() ? this.kit.rider!.unit : this.pickCounter();
   }
 
   /** An unarmed scout (a Fremen glider) we can build and don't have: one is kept for looking around. */
@@ -674,6 +679,13 @@ export class AI {
     const t = this.kit.scouts[0];
     if (g.unitDef(this.team, t).weapon || !g.canTrain(this.team, t)) return false;
     return g.count(this.team, t) + this.ts.queues[g.unitDef(this.team, t).producer].filter((q) => q.type === t).length < 1;
+  }
+
+  /** A few worm riders (Fremen Sandriders), once we can make them. */
+  private riderWanted(): boolean {
+    const r = this.kit.rider;
+    if (!r || !this.canMake(r.unit)) return false;
+    return this.game.count(this.team, r.unit) + this.ritesUnderWay(r.unit) < r.max;
   }
 
   /**
@@ -904,7 +916,11 @@ export class AI {
   private manageWorms(): void {
     const g = this.game;
     const m = g.map;
-    const danger: { x: number; z: number }[] = g.worms.map((w) => ({ x: w.lairX, z: w.lairZ }));
+    const danger: { x: number; z: number }[] = [
+      ...g.worms.map((w) => ({ x: w.lairX, z: w.lairZ })),
+      // An enemy's ridden worm we can see (ours never eats us).
+      ...g.ridden.filter((w) => w.team !== this.team && g.sees(this.team, w.rider)).map((w) => ({ x: w.x, z: w.z })),
+    ];
     // Harvesters get going as soon as a Thumper is heard: they're slow, and the worm hears them however still.
     const drums: { x: number; z: number }[] = [...danger];
     for (const b of g.buildings) {
@@ -971,20 +987,18 @@ export class AI {
     const job = this.thumpJob;
     if (job) {
       const u = job.u;
-      const ours = g.drumDue(this.team) !== null || g.worms.some((w) => w.team === this.team);
+      // Its Thumper drumming, or its worm under it.
+      const ours = g.riderDrumDue(u) !== null || !!u.mount;
       if (u.dead || g.time - job.since > 120) {
         this.thumpJob = null;
-        if (!u.dead) this.sendHome(u);
+        if (!u.dead && !u.mount) this.sendHome(u);
         return;
       }
       if (!job.away) {
         if (ours) {
-          // Planted: walk off a little way toward home and stand still there.
+          // Planted: the Sandrider stands by its Thumper to climb on; then the worm hunts round about on its own.
           job.away = true;
-          const home = this.rally ?? u;
-          const len = hypot(home.x - job.x, home.z - job.z) || 1;
-          const out = WORM.bite + 3 * TILE;
-          u.command(g, { kind: 'move', x: job.x + ((home.x - job.x) / len) * out, z: job.z + ((home.z - job.z) / len) * out });
+          u.command(g, { kind: 'hold' });
         } else if (u.order.kind !== 'plant') {
           // Couldn't plant (the spot was taken, or we're short of credits): give up for now.
           this.thumpJob = null;
@@ -992,7 +1006,7 @@ export class AI {
         }
         return;
       }
-      if (u.order.kind === 'idle') u.command(g, { kind: 'hold' });
+      if (u.order.kind === 'idle' && !u.mount) u.command(g, { kind: 'hold' });
       if (!ours) {
         this.thumpJob = null;
         this.sendHome(u);
@@ -1002,8 +1016,8 @@ export class AI {
     if (!this.camps || g.thumpBlocked(this.team) || this.rushed() || this.ts.credits < THUMPER.cost + 100) return;
     const spot = this.thumperSpot();
     if (!spot) return;
-    const planters = g.units.filter((u) => u.team === this.team && u.def.thumper && !u.dead && !u.carrier && !this.frozen.has(u)
-      && ['home', 'wave', 'raid'].includes(this.roles.get(u) ?? '') && u.hp > u.maxHp * 0.6);
+    const planters = g.units.filter((u) => u.team === this.team && u.def.thumper && !u.dead && !u.carrier && !u.mount && !this.frozen.has(u)
+      && ['home', 'wave', 'raid'].includes(this.roles.get(u) ?? '') && u.hp > u.maxHp * 0.6 && !g.thumpBlocked(this.team, u));
     planters.sort((a, b) => hypot(a.x - spot.x, a.z - spot.z) - hypot(b.x - spot.x, b.z - spot.z));
     const u = planters[0];
     if (!u || !g.orderThumper(this.team, [u], spot.x, spot.z)) return;

@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, SELF_REPAIR_RATE, THUMPER, TILE, UNITS, UPGRADES, WORM, levelDef, maxLevel, reqName, shieldsFor,
+  BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, RIDE, SELF_REPAIR_RATE, THUMPER, TILE, UNITS, UPGRADES, levelDef, maxLevel, reqName, shieldsFor,
   type BuildingType, type LevelUpType, type Req, type ResearchSlot, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
 import { Building, SALVAGE, Unit } from '../entities';
@@ -456,14 +456,17 @@ export class CommandCard {
         icon: () => 'thump',
         name: () => 'Plant Thumper',
         cost: () => THUMPER.cost,
-        tip: () => `Then click open sand or spice: the nearest selected Warrior or Fedaykin goes there and plants a Thumper. ${THUMPER.delay} s later a wild Sandworm comes up there and for ${WORM.hunt} s swallows whatever moves on the sand within ${WORM.range} of it, harvesters even standing still, and structures on the sand. It eats your units too: get off the sand, or stand still (Hold Position). Enemies nearby hear it drumming; destroy it in time and no worm comes. One at a time, every ${THUMPER.cooldown} s. Needs a Great Sietch.`,
+        tip: () => `Then click open sand or spice: the nearest selected Sandrider goes there and plants a Thumper. ${THUMPER.delay} s later a Sandworm comes up there; a Sandrider within ${RIDE.mount} climbs on and rides it for ${RIDE.time} s. Right-click to steer it: it swallows the enemy on the sand by its head (vehicles most of all), never your own; left alone it wanders and hunts nearby. If the Sandrider is killed, the worm goes wild and eats anyone. Enemies nearby hear the drumming; destroy the Thumper in time and no worm comes. Each Sandrider: one worm at a time, then ${RIDE.cooldown} s to rest. Needs Sietch III.`,
         view: () => {
           const g = this.game;
-          const due = g.drumDue(g.localTeam);
-          const wait = Math.max(0, this.ts.nextThumper - g.time);
+          const riders = input.ownUnits().filter((u) => u.def.thumper);
+          const dues = riders.map((u) => g.riderDrumDue(u)).filter((d): d is number => d !== null);
+          const due = dues.length ? Math.min(...dues) : null;
+          const ready = riders.some((u) => !g.thumpBlocked(g.localTeam, u));
+          const wait = ready ? 0 : Math.min(...riders.map((u) => Math.max(0, u.nextThumper - g.time)));
           return {
-            disabled: !g.meets(g.localTeam, 'sietch2'),
-            locked: !g.meets(g.localTeam, 'sietch2'),
+            disabled: !ready,
+            locked: !g.meets(g.localTeam, 'sietch3'),
             active: input.thumpMode || due !== null,
             status: due !== null ? `${Math.ceil(due)}` : wait > 0 ? `${Math.ceil(wait)}` : '',
           };

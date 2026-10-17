@@ -57,6 +57,7 @@ const ICONS: Record<BuildingType | UnitType | UpgradeType, string> = {
   cHarvest: `<rect x="6" y="18" width="28" height="14" fill="#d08a3a"/><polygon points="20,4 30,16 24,16 24,22 16,22 16,16 10,16" fill="#7cff7c"/>`,
   // ---- Fremen ----
   warrior: FREMEN(ROBE) + `<rect x="22" y="17" width="14" height="2" fill="${DARK}"/><rect x="9" y="20" width="2" height="6" fill="#e8e0c8"/>`,
+  sandrider: FREMEN('#4a3a2c') + `<line x1="6" y1="4" x2="12" y2="30" stroke="${DARK}" stroke-width="2"/><line x1="10" y1="3" x2="5" y2="28" stroke="${DARK}" stroke-width="2"/><path d="M24 22 Q33 16 36 22 Q31 20 24 24 Z" fill="#eae0c8"/>`,
   fedaykin: FREMEN('#5c4a3a') + `<rect x="22" y="16" width="9" height="5" fill="#55504a"/><circle cx="33" cy="18.5" r="3" fill="#9ad8ff"/><path d="M36 14 Q39 18.5 36 23" stroke="#9ad8ff" stroke-width="1.5" fill="none"/>`,
   crew: FREMEN('#b08a5a') + `<rect x="4" y="13" width="9" height="5" rx="2" fill="#d88a3a"/><rect x="31" y="4" width="2" height="30" fill="${METAL}"/><rect x="29" y="31" width="6" height="4" fill="#d08a3a"/>`,
   mortar: FREMEN('#8a6a48') + `<g transform="rotate(-35 24 20)"><rect x="14" y="17" width="24" height="5" fill="${METAL}"/><rect x="12" y="16" width="4" height="7" fill="${DARK}"/><rect x="24" y="16" width="3" height="7" fill="${C}"/></g><line x1="30" y1="14" x2="34" y2="34" stroke="${DARK}" stroke-width="1.5"/><path d="M33 5 Q36 2 39 4" stroke="#e0902a" stroke-width="1.5" fill="none"/>`,
