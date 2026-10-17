@@ -273,6 +273,59 @@ Earlier rounds (Atreides and Corrino AIs then never faced a teching Fremen):
 
 `sim/fremen-variants.ts` (`FREMEN_VARIANT=<name>`) keeps the makeups compared: `noworm`, `nomortar`, `ghosts` (faster, harder-to-find hiding), `drums` (more worms), `host` (fewer, sturdier units) and the balance candidates above.
 
+### Fremen redesign: the Sietch, rites and the Sandrider **Plan, agreed 2026-10-16** (branch `fremen-sietch`)
+
+Why: Fremen came across as undercooked: three combat units against Corrino's six, and a tech tree that cost 2,700 to unlock everything against Corrino's 6,300. The goal is a tree at least as complex as Corrino's that still plays differently: Atreides research wide, Corrino climb a long chain of structures, Fremen climb **one hub through three levels** and grow their army **in the field** rather than in buildings.
+
+**The Sietch is the hub.** Fremen have no Construction Yard. They start with a Sietch, which builds their structures (one at a time, as a yard does) and levels up twice: Sietch → Great Sietch → Sietch III. More Sietches can be built (each starts at level 1) as backup hubs; tech counts if any Sietch has the level. Under the hood every faction gets a hub type (Construction Yard for Atreides and Corrino), and building levels go to three.
+
+**Structures**
+
+| Structure | Needs | Role |
+|---|---|---|
+| Sietch | (start) | Builds structures; three levels |
+| Barracks | Sietch | Trains Warriors and Spice Crews, nothing else |
+| Windtrap (new) | Sietch | Builds Wind Gliders; units and structures near it heal faster |
+| Bunker | Barracks | Unchanged |
+| Spice Camp, Thumper | (placed by units) | Camps unchanged; only Sandriders plant Thumpers |
+
+**Rites.** Every advanced Fremen starts as a Warrior. A selected Warrior (or Fedaykin) can go through a rite on the command card: it digs into the sand (only on sand, never rock), stays hidden like any dug-in Fremen for 8-12 s, and comes out as the new unit, keeping its share of health. It costs the difference in price plus a little. Rites go one way only: no going back, no switching branch.
+
+```
+Warrior ─┬─ Fedaykin (Great Sietch) ── Sandrider (Sietch III)
+         └─ Mortar   (Great Sietch)
+```
+
+**Tech by level**
+
+| Level | Cost / time | Unlocks |
+|---|---|---|
+| Sietch | start | Barracks, Windtrap, Bunker; Warriors, Spice Crews, Gliders; Spice Mining, Sandwalk |
+| Great Sietch | ~1,000 / 35 s | Fedaykin and Mortar rites; Weapons +1, Armor +1, Stillsuits |
+| Sietch III | ~1,500 / 45 s | Sandrider rite; Weapons +2, Armor +2, Ambush |
+
+**Healing.** No healer unit. Fremen buried in the sand heal twice as fast; this stacks with Stillsuits and the Windtrap.
+
+**The Sandrider.** The only Fremen who calls worms now (Warriors and Fedaykin no longer plant Thumpers).
+- On foot: **zealot rush**. It charges enemy infantry within about 6 at a burst of speed and kills it with the crysknife on contact; a slow blade, so it goes through shields. A short pause between kills. It can't hurt vehicles, structures or aircraft. (Against Sardaukar: to be decided with the Sardaukar's own melee, probably a coin toss.)
+- **Calling its worm:** it plants a Thumper, which drums for 8 s and is heard by enemies as now; destroyed in time, no worm comes. The worm surfaces and the rider climbs on.
+- **Riding:** commanding the Sandrider commands the worm. It travels on sand only (orders onto rock stop at the edge) and bites what is in front of its head with today's worm damage (400, +400 vs vehicles). It never eats its own side. Idle, it circles the spot in a wide, irregular loop (radius about 20; the Carryall's is 11). The ride lasts about 40 s; then the worm dives and leaves the rider on the sand, and that rider waits out a cooldown.
+- **Counterplay:** kill the Thumper, or shoot the rider; with its rider dead the worm goes wild for the rest of its time and eats anyone. The worm can't be hurt.
+- **Animation, built to survive the Blender migration:** the surfaced worm is a chain of rigid pieces (a head, one ring repeated and shrinking toward the tail, a tail tip), each following the path the head took. Curves come from the movement itself: no skeleton, no clips. In Blender that's three meshes in one .glb. The rider needs one riding pose on the Sandrider's own rig and is pinned to the second segment. The irregular loop uses the game's seeded random numbers, so lockstep stays in sync.
+
+**Units:** Warrior, Spice Crew, Wind Glider, Fedaykin, Mortar, Sandrider. About 15 tech steps against Corrino's 13, and about 10-11k to max out against Corrino's 10.8k.
+
+**Stages** (each verified and committed on the branch):
+1. **Engine:** a hub per faction, Fremen start with a Sietch, three building levels, more Sietches allowed. Sim checks updated.
+2. **Tech tree:** new requirements and research; the Windtrap builds Gliders and heals; faster healing in the sand.
+3. **Rites:** a lockstep command, command-card buttons, dig-in and emerge, sim checks.
+4. **Sandrider:** zealot rush, the rider's Thumper, the ridden worm (segment chain, steering, irregular loop, wild on the rider's death). Placeholder art until approved.
+5. **Art, each approved in Blender first:** Sietch level 3, Windtrap, Sandrider (with its riding pose), the surfaced worm.
+6. **AI:** rites, the new research order, Windtrap, Sandriders and their worms.
+7. **Balance:** local AI-vs-AI sims, regenerate the counter table, update this section. Expect a dip at first: the wild worm was worth about 25 points of win rate, and the worm now waits for Sietch III.
+
+Later, separately: hand-to-hand fighting for the other Fremen and for the Sardaukar.
+
 ## AI difficulty plan
 
 | Level | Intent |
