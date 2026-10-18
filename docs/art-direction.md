@@ -184,3 +184,10 @@ Where Fremen engineers build and launch Wind Gliders (it was the Windtrap; a win
 - **Wings:** two triangular rock shelves meet at a narrow waist and fan out toward the NE and SW. Over each, a Fremen-blue tarp hangar runs from the mast down to the open end, propped on poles, with a team valance hanging from the end. A glider is parked under each, nose out, with a workbench behind it.
 - **Waist:** a rock spur with a stone collar carries the tall dark mast and its team banner. Water cisterns stand at the front of the waist (their water is why Fremen heal faster near it), crates at the back.
 - Built at final size along X inside |x| + |y| ≤ 2.6, then turned +45° without the 0.707 squash, so heights stay as built.
+
+### Bunker (`bunker`)
+
+Hardened, not manufactured: dug in and piled up rather than built. Not turned (it's round); the entrance faces the camera (−Y).
+- **Mound:** a low, flattened dome of rock ringed with big fitted boulders; the gaps between them hold dark firing slits, all round but at the door.
+- **Top:** a squat stone vent with a dark mouth and two thin aerials. Six narrow tarps radiate from it to poles short of the rim, each with a team valance at its outer edge: from above it's a starburst, unlike the High Perch's bowtie, and the boulder rim still shows between and beyond them.
+- **Entrance:** a megalith portal (two standing stones and a rough lintel) with a dark door, a short ramp and a small awning; water jars beside it.
