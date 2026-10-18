@@ -65,8 +65,10 @@ export function makeUnitModel(type: UnitType, faction: Faction, color: number): 
 export function makeBuildingModel(type: BuildingType, faction: Faction, color: number, size: number): BuildingModel {
   const group = new THREE.Group();
   const w = size * TILE - 0.3;
-  if (!BUILDING_MODELS[type].bare) box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
   const model = cloneBuildingModel(type, faction, color);
+  // A Blender model that brings its own ground (a `bare` custom property on `body`) stands without a slab.
+  const bare = model ? !!model.getObjectByName('body')?.userData.bare : BUILDING_MODELS[type].bare;
+  if (!bare) box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
   if (model) {
     group.add(model);
     const level2 = model.getObjectByName('level2') ?? null;
