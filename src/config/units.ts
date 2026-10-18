@@ -141,8 +141,8 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls: for 40 s the worm goes where you send it and swallows the enemy (vehicles most of all), never your own. On foot, a zealot: rushes enemy infantry and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can\'t hurt vehicles, structures or aircraft on foot.',
   },
   glider: {
-    name: 'Wind Glider', producer: 'windtrap', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,
-    turret: false, infantry: false, tags: ['light', 'air'], weapon: null, requires: ['windtrap'], air: true, glides: { orbit: 12 },
+    name: 'Wind Glider', producer: 'perch', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,
+    turret: false, infantry: false, tags: ['light', 'air'], weapon: null, requires: ['perch'], air: true, glides: { orbit: 12 },
     desc: 'A Fremen rider on a cloth wing, riding the desert winds. The fastest thing in the sky and sees far, but unarmed and frail. It can\'t hover: with nowhere to go, it circles.',
   },
 };

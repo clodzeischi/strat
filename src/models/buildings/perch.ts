@@ -2,8 +2,8 @@ import { DARK, ROBE, SANDSTONE } from '../../materials/palette';
 import { box, cyl } from '../parts';
 import type { BuildingBlueprint } from '../types';
 
-/** Windtrap (Fremen): a banded tower that wrings water from the air, with a glider launch rail beside it. */
-export const windtrap: BuildingBlueprint = {
+/** High Perch (Fremen): a banded tower with a glider launch rail beside it (procedural stand-in for the Blender model). */
+export const perch: BuildingBlueprint = {
   build(g, color) {
     cyl(g, 0.55, 3.4, SANDSTONE, -0.5, 1.9, -0.3, 8);
     for (let k = 0; k < 4; k++) box(g, 1.15, 0.14, 1.15, k % 2 ? DARK : color, -0.5, 0.9 + k * 0.8, -0.3);

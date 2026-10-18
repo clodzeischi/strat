@@ -61,7 +61,7 @@ export const FACTIONS: Record<Faction, FactionDef> = {
   fremen: {
     name: 'Fremen',
     hub: 'sietch',
-    build: ['barracks', 'windtrap', null, null, 'bunker', 'sietch', null, null],
+    build: ['barracks', 'perch', null, null, 'bunker', 'sietch', null, null],
     train: ['warrior', null, null, null, 'crew', 'glider', null, null],
     rites: ['fedaykin', 'mortar', 'sandrider'],
     research: [

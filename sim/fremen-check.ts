@@ -60,7 +60,7 @@ check(g.canTrain(F, 'warrior') && g.canTrain(F, 'crew'), 'Barracks trains Warrio
 // The tree: a Sietch to start, then the Great Sietch and Sietch III.
 check(!g.requirementsMet(F, UNITS.fedaykin.requires) && !g.requirementsMet(F, UNITS.mortar.requires) && g.thumpBlocked(F) === 'Thumpers need Sietch III.', 'no Fedaykin, Mortars or Thumpers at level 1');
 check(g.canResearch(F, 'fHarvest') && g.canResearch(F, 'sandwalk') && !g.canResearch(F, 'fWeapons') && !g.canResearch(F, 'stillsuit'), 'level 1 researches Spice Mining and Sandwalk');
-check(g.canBuild(F, 'windtrap') && !g.canTrain(F, 'glider'), 'the Windtrap can be built at once; Gliders need it');
+check(g.canBuild(F, 'perch') && !g.canTrain(F, 'glider'), 'the High Perch can be built at once; Gliders need it');
 check(!g.canBuild(F, 'thumper') && !g.canPlace('thumper', F, bks.cx + 4, bks.cz), 'Thumpers are planted by infantry, not built at the yard');
 applyCommand(g, F, { c: 'levelUp', type: 'sietch' });
 run(BUILDINGS.sietch.levels![0].time + 1);
@@ -366,7 +366,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   const tick = (seconds: number) => {
     for (let k = 0; k < seconds * 20; k++) t.update(0.05);
   };
-  check(!t.canTrain(F, 'glider'), 'no gliders before a Windtrap');
+  check(!t.canTrain(F, 'glider'), 'no gliders before a High Perch');
   const gl = t.spawnUnit('glider', F, sx, sz);
   const goal = { x: sx + 30, z: sz };
   applyCommand(t, F, { c: 'go', units: [gl.id], x: goal.x, z: goal.z, target: null, attack: false });
@@ -509,7 +509,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   check(!w2.becomes && !t.units.some((u) => u.team === F && u.type === 'mortar'), 'killed in the rite, nothing comes out');
 }
 
-// ---- Healing faster: dug into the sand, and near a Windtrap ----
+// ---- Healing faster: dug into the sand, and near a High Perch ----
 {
   const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
   const tm = t.map;
@@ -524,16 +524,16 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   for (let k = 0; k < 400; k++) t.update(0.05);
   check(onSand.hidden && !onRock.hidden, 'one dug into the sand, one on rock');
   check(onSand.hp - 50 > (onRock.hp - 50) * 1.7, 'dug into the sand, Fremen heal about twice as fast');
-  // A Windtrap next to a unit on rock.
-  const spot = tm.nearestCell(r1.cx, r1.cz, (x, z) => t.canPlace('windtrap', F, x, z), 10)!;
-  const wt = t.placeBuilding('windtrap', F, spot.cx, spot.cz);
+  // A High Perch next to a unit on rock.
+  const spot = tm.nearestCell(r1.cx, r1.cz, (x, z) => t.canPlace('perch', F, x, z), 10)!;
+  const wt = t.placeBuilding('perch', F, spot.cx, spot.cz);
   const far = rocks(30, r1);
   const away = t.spawnUnit('fedaykin', F, tm.center(far.cx), tm.center(far.cz));
   onRock.hp = 50;
   away.hp = 50;
   for (let k = 0; k < 200; k++) t.update(0.05);
-  check(hypot(onRock.x - wt.x, onRock.z - wt.z) < 10 && hypot(away.x - wt.x, away.z - wt.z) > 20, 'one unit by the Windtrap, one away');
-  check(onRock.hp - 50 > (away.hp - 50) * 1.7, 'by a Windtrap, Fremen heal about twice as fast');
+  check(hypot(onRock.x - wt.x, onRock.z - wt.z) < 10 && hypot(away.x - wt.x, away.z - wt.z) > 20, 'one unit by the High Perch, one away');
+  check(onRock.hp - 50 > (away.hp - 50) * 1.7, 'by a High Perch, Fremen heal about twice as fast');
 }
 
 // ---- Setting up off the field, queued orders, dry camps moving on ----

@@ -12,9 +12,9 @@ export const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
   noworm: { desc: 'No Thumpers (worms never come).', apply: () => { THUMPER.cooldown = 1e9; THUMPER.cost = 1e9; } },
   nomortar: { desc: 'No Fremen Mortars.', apply: () => { FACTIONS.fremen.train = FACTIONS.fremen.train.map((t) => (t === 'mortar' ? null : t)); } },
 
-  /** Sietch redesign: the third level and its research cut, or no Windtrap healing. */
+  /** Sietch redesign: the third level and its research cut, or no High Perch healing. */
   nol3: { desc: 'No Sietch III (so no Weapons/Armor +2; Ambush back at the Great Sietch).', apply: () => { BUILDINGS.sietch.levels!.length = 1; UPGRADES.ambush.requires = ['sietch2']; } },
-  nowt: { desc: 'No Windtrap (Gliders from the Barracks again).', apply: () => { FACTIONS.fremen.build = FACTIONS.fremen.build.map((t) => (t === 'windtrap' ? null : t)); UNITS.glider.producer = 'barracks'; UNITS.glider.requires = ['barracks']; } },
+  nowt: { desc: 'No High Perch (Gliders from the Barracks again).', apply: () => { FACTIONS.fremen.build = FACTIONS.fremen.build.map((t) => (t === 'perch' ? null : t)); UNITS.glider.producer = 'barracks'; UNITS.glider.requires = ['barracks']; } },
 
   /** Sietch redesign balance: the Sandrider sooner, rides worth more, cheaper rites. */
   s3early: { desc: 'Sietch III 1000 / 35 s (not 1500 / 45); the AI goes for it with techArmy (not twice).', apply: () => { Object.assign(BUILDINGS.sietch.levels![1], { cost: 1000, time: 35 }); KITS.fremen.topLevelArmy = 1; } },

@@ -177,3 +177,10 @@ A training camp at the foot of a rock outcrop: no level-ups. Not turned; the cli
 - **Back:** a rounded outcrop with a cliff facing the yard, a cave mouth with a half-drawn curtain where the warriors come out, a team banner beside it and a flag on top; two boulders frame it.
 - **Front left:** a Bedouin tent, a long ridge raised on two poles that sags between them, open at the front with a team valance along the eave.
 - **Front right:** a sparring ring with two cloth-wrapped striking posts, a spear rack along the edge, water jars and crates.
+
+### High Perch (`perch`)
+
+Where Fremen engineers build and launch Wind Gliders (it was the Windtrap; a windtrap collects water and builds nothing). After the concept's Windrider Roost, kept to one idea: from above it is a **bowtie**, turned 45° like most buildings, so it's recognizable at a glance.
+- **Wings:** two triangular rock shelves meet at a narrow waist and fan out toward the NE and SW. Over each, a Fremen-blue tarp hangar runs from the mast down to the open end, propped on poles, with a team valance hanging from the end. A glider is parked under each, nose out, with a workbench behind it.
+- **Waist:** a rock spur with a stone collar carries the tall dark mast and its team banner. Water cisterns stand at the front of the waist (their water is why Fremen heal faster near it), crates at the back.
+- Built at final size along X inside |x| + |y| ≤ 2.6, then turned +45° without the 0.707 squash, so heights stay as built.

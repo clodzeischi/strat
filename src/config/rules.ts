@@ -14,7 +14,7 @@ export const TEAM_CSS = ['#3d7be0', '#d8402f'];
 
 export const START_CREDITS = 2500;
 
-export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab', 'windtrap'];
+export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab', 'perch'];
 export const QUEUE_MAX = 5; // per producer type
 export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab', 'sietch'];
 
@@ -58,7 +58,7 @@ export const SAND_SPEED = { base: 0.2, sandwalk: 0.25 };
 export const AMBUSH = { bonus: 0.5, time: 4 };
 /**
  * Fremen healing: a share of health per second once unhurt for `delay` s (Stillsuits: x`stillsuit`, after `quick` s).
- * Units dug into the sand heal x`buried`; near a Windtrap, units and structures heal faster too (BuildingDef.heals).
+ * Units dug into the sand heal x`buried`; near a High Perch, units and structures heal faster too (BuildingDef.heals).
  */
 export const FREMEN_REGEN = { unit: 0.015, building: 0.006, delay: 6, stillsuit: 2, quick: 3, buried: 2 };
 /**

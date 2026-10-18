@@ -271,8 +271,8 @@ export class Game {
         unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
         spiceHarvested: 0, creditsSpent: 0,
       },
-      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [], windtrap: [] }, research: null,
-      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0, windtrap: 0 }, levelUps: {},
+      building: null, queues: { barracks: [], factory: [], hitech: [], fab: [], perch: [] }, research: null,
+      spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0, perch: 0 }, levelUps: {},
     }));
     this.vision = new Vision(this.map, this.teams.length);
     this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
@@ -1469,7 +1469,7 @@ export class Game {
       const delay = still ? FREMEN_REGEN.quick : FREMEN_REGEN.delay;
       const k = still ? FREMEN_REGEN.stillsuit : 1;
       const wells = this.buildings.filter((b) => b.team === ts.team && !b.dead && b.def.heals);
-      // Near a Windtrap: the best rate of any in reach.
+      // Near a High Perch: the best rate of any in reach.
       const well = (e: Entity) => wells.reduce((r, b) => (distTo(b, e.x, e.z) <= b.def.heals!.radius ? Math.max(r, b.def.heals!.rate) : r), 1);
       for (const u of this.units) {
         if (u.team !== ts.team || u.hp >= u.maxHp || u.carrier || this.time - u.lastHurt <= delay) continue;

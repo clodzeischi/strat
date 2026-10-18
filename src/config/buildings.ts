@@ -1,7 +1,7 @@
 import type { BuildingDef, BuildingType, LevelDef, LevelUpType, Req, Tag } from './types';
 
 export const BUILDING_ORDER: BuildingType[] = [
-  'conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech', 'fab', 'tleilaxu', 'pad', 'turret', 'sietch', 'windtrap', 'thumper', 'camp',
+  'conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech', 'fab', 'tleilaxu', 'pad', 'turret', 'sietch', 'perch', 'thumper', 'camp',
 ];
 
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
@@ -69,9 +69,9 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
       { name: 'Sietch III', short: 'Sietch III', cost: 1500, time: 45, desc: 'Upgrades a Great Sietch. Unlocks the Sandrider, Weapons +2, Armor +2 and Ambush.' },
     ],
   },
-  windtrap: {
-    name: 'Windtrap', short: 'Windtrap', cost: 600, buildTime: 12, hp: 700, size: 2, requires: [], heals: { radius: 10, rate: 2 },
-    desc: 'A tower that wrings water from the desert air. Launches Wind Gliders (each Windtrap adds a production line), and Fremen units and structures near it heal twice as fast.',
+  perch: {
+    name: 'High Perch', short: 'High Perch', cost: 600, buildTime: 12, hp: 700, size: 2, requires: [], heals: { radius: 10, rate: 2 },
+    desc: 'A glider roost on a rock spur: Fremen engineers build and launch Wind Gliders here (each High Perch adds a production line). Its cisterns water the troops: Fremen units and structures near it heal twice as fast.',
   },
   thumper: {
     name: 'Thumper', short: 'Thumper', cost: 250, buildTime: 0, hp: 150, size: 1, requires: ['sietch2'], onSand: true, deployed: true,

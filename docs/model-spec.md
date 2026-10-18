@@ -82,6 +82,7 @@ After the turn, a front built facing −Y points SE on screen, and one built fac
 | `pad` | Repair Pad | Corrino | 2 | | | |
 | `turret` | Auto Turret | Corrino | 1 | gun head | | `spinner` aims at targets; add `muzzle` |
 | `sietch` | Sietch | Fremen | 3 | | yes | bare; also `level3` |
+| `perch` | High Perch | Fremen | 2 | | | bare; built at final size inside \|x\| + \|y\| ≤ 2.6, turned 45° without the squash |
 | `thumper` | Thumper | Fremen | 1 | piston | | bare |
 | `camp` | Spice Camp | Fremen | 2 | drill | | bare |
 
