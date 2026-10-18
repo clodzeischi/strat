@@ -148,6 +148,23 @@ The Skyraider Mk IV "Vulture's Talon": a wasp, not a dragonfly, about 3.1 m long
 - **Missile racks:** exposed rails on pylons off the thorax flanks, pink warheads: `weapons0` two missiles a side, `weapons1` three and a purple rail.
 - **`armor1`:** a purple band at every plate joint (`armor0` has two), an armored spine ridge, cockpit cheek armor and flank plates.
 
-## Fremen
+## Fremen: living off the land
 
-To be defined.
+The Fremen don't bring a base or raise one; they dig into what is already there. Their buildings are rock and sand first, with what they built tucked into it: cut stone, cave mouths, and cloth stretched over ledges. Where Atreides bolt containers together and Corrino raise monuments, a Fremen base could pass for an outcrop until you see the banners.
+
+- **Shapes:** faceted rock (convex hulls of jittered points: big hard facets, no smooth curves), sheer cliff faces leaning back, flat shelves. Built parts are few and small next to the rock.
+- **Colors:**
+  - Rock: Atreides earth tones, as the land rather than a faction surface. Sides `A0987D`, shaded sides `776A3B`, sand-covered tops `D1CBB6`.
+  - Cut stone (gates, balconies, towers): `D1CBB6`, tops `C5C5C5`.
+  - Cloth (tarps, awnings, jars): Fremen `555B63`. This is where the faction color lives.
+  - Openings and poles: `1D1616`; wood and crates `515151`.
+- **Team color:** banners hanging flat on the cliff faces, and flags on masts.
+
+### Sietch (`sietch`)
+
+A small mountain with a base carved into its cliff, after the concept's cliffside sietch. It is bare (no concrete slab: the rock is its own base) and isn't turned 45°; the cliff faces the camera (−Y).
+- **Level 1:** a massif behind a sheer cliff, framed by two rock shoulders so the face reads as a bay cut into the mountain; boulders soften the back into the sand. A rock shelf in front, with a ramp down to the sand, carries the yard: a tarp-roofed workshop, crates and water jars. In the cliff, a stone-framed cave gate with a balcony above it (parapet, doorways, a tarp), a stair cut up to the balcony, window slits higher up, and a team banner on the face.
+- **Level 2 (Great Sietch):** a round stone watchtower built into the right shoulder with a team banner, and a second cave mouth under a tarp on the left.
+- **Level 3 (Sietch III):** a higher two-tooth crag on the summit with a tarp-roofed watch post and a tall flag mast.
+
+Built by the `build.py` text block in the .blend.

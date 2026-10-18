@@ -4,9 +4,11 @@ import type { BuildingBlueprint } from '../types';
 
 /** Sietch: a rock outcrop hollowed into a stronghold, a dark cave mouth at the front and banners on top. */
 export const sietch: BuildingBlueprint = {
+  // A mountain brings its own rock base; a concrete slab under it would look wrong (Blender model too).
+  bare: true,
   build(g, color) {
     const rock = shade(SANDSTONE, 0.78);
-    box(g, 4.4, 1.2, 3.6, rock, 0, 0.9, -0.5);
+    box(g, 4.4, 1.5, 3.6, rock, 0, 0.75, -0.5); // bare: reaches down to the sand
     box(g, 3.2, 1.0, 2.8, shade(rock, 0.9), -0.4, 1.9, -0.8);
     box(g, 1.8, 0.8, 1.6, rock, 0.6, 2.7, -1.0);
     box(g, 1.4, 1.0, 0.2, DARK, 0, 0.8, 1.28); // cave mouth

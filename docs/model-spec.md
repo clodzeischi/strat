@@ -81,7 +81,7 @@ After the turn, a front built facing −Y points SE on screen, and one built fac
 | `tleilaxu` | Tleilaxu Research | Corrino | 3 | spire | | |
 | `pad` | Repair Pad | Corrino | 2 | | | |
 | `turret` | Auto Turret | Corrino | 1 | gun head | | `spinner` aims at targets; add `muzzle` |
-| `sietch` | Sietch | Fremen | 3 | | yes | |
+| `sietch` | Sietch | Fremen | 3 | | yes | bare; also `level3` |
 | `thumper` | Thumper | Fremen | 1 | piston | | bare |
 | `camp` | Spice Camp | Fremen | 2 | drill | | bare |
 
@@ -100,6 +100,7 @@ The loader finds parts by object name. Names are exact and lowercase.
 | `jet_1`, `jet_2`, ... | Empty | Jet nozzles (`raider`): the game blows a hot flare back from them in fast flight. Child of `body`. |
 | `spinner` | mesh | A building's moving piece. Origin on its rotation axis (Z). |
 | `level2` | mesh | Structure added at building level 2. Child of `body`. |
+| `level3` | mesh | Structure added at level 3 (the Sietch), shown with `level2`. Child of `body`. |
 | `armor0`, `armor1`, `armor2` | mesh | Armor tiers. On vehicles each is a complete, separate hull, not a bolt-on (infantry differ, see Infantry below): exactly one is shown, and `armor0` is hidden once `armor1` is researched. If a tier is missing, the highest one the model has below it shows (Corrino units only have `armor0` and `armor1`). Child of `body`. On a turreted unit, the turret's share of a tier is a second object named `armor1_turret` (etc.), child of `turret`; it shows and hides with `armor1`. |
 | `weapons0`, `weapons1`, `weapons2` | mesh | Weapon tiers, swapped the same way and independently of armor, so always separate objects. Child of `turret` if there is one, otherwise of `body`. On infantry they're add-ons (see Infantry below). |
 | `up_<upgrade>` | mesh | Parts added once a one-step upgrade is researched: `up_rockets`, `up_nitro`, `up_harvest`. Child of `turret` if it moves with it, otherwise of `body`. |
