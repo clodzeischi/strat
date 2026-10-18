@@ -191,3 +191,10 @@ Hardened, not manufactured: dug in and piled up rather than built. Not turned (i
 - **Mound:** a low, flattened dome of rock ringed with big fitted boulders; the gaps between them hold dark firing slits, all round but at the door.
 - **Top:** a squat stone vent with a dark mouth and two thin aerials. Six narrow tarps radiate from it to poles short of the rim, each with a team valance at its outer edge: from above it's a starburst, unlike the High Perch's bowtie, and the boulder rim still shows between and beyond them.
 - **Entrance:** a megalith portal (two standing stones and a rough lintel) with a dark door, a short ramp and a small awning; water jars beside it.
+
+### Spice Camp (`camp`)
+
+Hasty and light, but one contained unit, not a yard spread over the sand (a first pass with a big tent beside the collector read as a barn and a sprawl). No rock base: a Spice Crew pitches it where it stands, so it sits at its center's height and every pole and crate runs down below ground, pegged into the sand.
+- **Collector (center):** a light grid of cords staked over the spice, a tripod over it. The turning boom on top is the `spinner`: a sieve hanging from each end, a cyan sensor on the hub.
+- **Crescent canopy:** hugs the collector's back half, a lean-to sloping down and out on stakes, cloth walls behind, a dark sheltered interior, a team valance along the inner edge facing the camera, a flag at the back.
+- **Ends of the crescent:** the still (cloth-wrapped steel tanks, a cyan gauge, a pipe to the collector) on the left, sealed spice containers with team stripes on the right.
