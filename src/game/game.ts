@@ -588,13 +588,33 @@ export class Game {
     return u;
   }
 
+  /**
+   * Ground height a building stands at: its center's. On dunes (Fremen build on sand) it's the highest point of the
+   * footprint instead, so the dune never buries half of it; the model's rock skirt covers the low side. Structures
+   * a unit deploys (camps, thumpers) keep the center: they have no skirt.
+   */
+  private buildingY(type: BuildingType, cx: number, cz: number): number {
+    const size = BUILDINGS[type].size;
+    const center = this.map.surfaceAt((cx + size / 2) * TILE, (cz + size / 2) * TILE);
+    if (BUILDINGS[type].deployed) return center;
+    let sand = false;
+    for (let z = cz; z < cz + size; z++) for (let x = cx; x < cx + size; x++) if (this.map.tiles[this.map.idx(x, z)] === SAND) sand = true;
+    if (!sand) return center;
+    let top = center;
+    const n = size * 4; // every half unit
+    for (let j = 0; j <= n; j++) {
+      for (let i = 0; i <= n; i++) top = Math.max(top, this.map.surfaceAt((cx + (i / n) * size) * TILE, (cz + (j / n) * size) * TILE));
+    }
+    return top;
+  }
+
   placeBuilding(type: BuildingType, team: Team, cx: number, cz: number): Building {
     const size = BUILDINGS[type].size;
     const bx = (cx + size / 2) * TILE;
     const bz = (cz + size / 2) * TILE;
     // Doors face the middle of the map, so mirrored bases get mirrored exits and docks.
     const mid = this.map.worldSize() / 2;
-    const b = new Building(this.nextId++, team, type, cx, cz, this.map.surfaceAt(bx, bz), facingToward(bx, bz, mid, mid), this.teams[team].faction);
+    const b = new Building(this.nextId++, team, type, cx, cz, this.buildingY(type, cx, cz), facingToward(bx, bz, mid, mid), this.teams[team].faction);
     for (let z = cz; z < cz + b.size; z++) {
       for (let x = cx; x < cx + b.size; x++) this.map.occupied[this.map.idx(x, z)] = b.id;
     }

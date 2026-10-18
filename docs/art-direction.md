@@ -168,3 +168,12 @@ A small mountain with a base carved into its cliff, after the concept's cliffsid
 - **Level 3 (Sietch III):** a higher two-tooth crag on the summit with a tarp-roofed watch post and a tall flag mast.
 
 Built by the `build.py` text block in the .blend.
+
+Both Fremen .blend files share their rock and cloth helpers in a `fremen.py` text block. Fremen can build on dunes, and a building sits at the ground height of its center, so every Fremen building is bare and stands on a rock skirt: an irregular rounded shelf that flares out down to 1 m below ground. On a dune it shows as a rock flank rising out of the sand; on a flat plateau it's a low natural ledge. On sand the game stands a building at the highest point of its footprint, so the dune never buries the front of it; the skirt covers the low side.
+
+### Barracks (`barracks`)
+
+A training camp at the foot of a rock outcrop: no level-ups. Not turned; the cliff and the tent face the camera (−Y).
+- **Back:** a rounded outcrop with a cliff facing the yard, a cave mouth with a half-drawn curtain where the warriors come out, a team banner beside it and a flag on top; two boulders frame it.
+- **Front left:** a Bedouin tent, a long ridge raised on two poles that sags between them, open at the front with a team valance along the eave.
+- **Front right:** a sparring ring with two cloth-wrapped striking posts, a spear rack along the edge, water jars and crates.
