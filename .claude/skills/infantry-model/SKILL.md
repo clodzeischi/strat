@@ -99,7 +99,7 @@ The game's rules for actions:
 - **Weights wiped:** clearing vertex groups *after* `bm.to_mesh` wipes the weights. Create the groups first (`build_object` does).
 - **Material indices reset:** clearing materials after `to_mesh` resets every face's material index.
 - **Mirror test:** decide a shell's side by its centroid, not its minimum y (a leg's inner edge crosses y=0).
-- **Close the soles:** cap each boot's bottom ring (`cap(m, ring, sw, facing=(0, 0, -1))`). The "no camera sees a down-facing face" rule holds for buildings, not for animated infantry: a kneel, a toe-off or a fall points the sole at the camera, and an open boot shows as a hole (the Fremen Warrior's did; the Sardaukar's soles are still open).
+- **Close the soles:** cap each boot's bottom ring (`cap(m, ring, sw, facing=(0, 0, -1))`). The "no camera sees a down-facing face" rule holds for buildings, not for animated infantry: a kneel, a toe-off or a fall points the sole at the camera, and an open boot shows as a hole (the Fremen Warrior's and the Sardaukar's did, and were closed afterwards).
 - **Cap normals:** a cap's centre sits on its shell's axis, so the "face away from the axis" test can't orient it. `cap()` takes an explicit direction for this.
 - **Twist adds up:** `aim()` keeps a bone's inherited twist, so turns accumulate down the spine. `yaw()` each bone by its own extra turn only.
 - **Kneeling:** feet pointed down lift the knees off the ground. Tuck the feet flat behind.

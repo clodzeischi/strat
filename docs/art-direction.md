@@ -205,3 +205,18 @@ As in the films: a stake you drive into the sand, with a weight that winds up an
 - **Stake:** a spike into a small heap of sand, three fins splayed for footing, a steel sleeve with a team band and a cyan light, a dark strike plate on top.
 - **Rod:** a guide rod with a carry handle across the top and a team pennant streaming off it.
 - **Weight:** a heavy drum with a team band, the `spinner` (origin on the ground on its axis). The game winds it up the rod, holds it a beat and slams it onto the plate, once a second.
+
+### Fremen Warrior (`warrior`)
+
+The stealthy desert fighter, after the concept's Fremen infantry: lean and a little shorter than the Sardaukar (about 0.78 m), in a form-fitting stillsuit. No hood and no robe. About 370 tris for the body, 500 with every tier shown.
+- **Body:** the stillsuit in Fremen slate with paler ribbing on the chest, belly, knees, shins and forearms; leather boots, gloves and belt with two pouches; a fitted head cover with dark goggle lenses (steel rims) and a face mask below them; a scarf in the dark team shade round the neck; a team armband on each upper arm; a short front flap in the dark team shade; a crysknife with a milk-white grip on the left hip.
+- **Backpack:** the stillsuit pack with a bedroll across its top. Seen from above it's what says Fremen.
+- **`armor1`:** pale scavenged shoulder pads with a team-shade rim, and knee guards.
+- **Weapons:** a chunky maula pistol with its spring housing on top (`weapons0`); Weapons +1 swaps it for a long, thin maula rifle with a wooden stock (`weapons1`, a `swap` tier with its own muzzle); Weapons +2 adds a scope with a cyan lens, a cloth-wrapped fore-end and a muzzle brake (`weapons2`).
+- **Animation:** stealth and control, each action directed by the user.
+  - Idle: down on his right knee, gun at the ready, one slow breath and a glance to the left (2 s).
+  - Walk: a brisk, cautious stalk on a 6-frame cycle, low and leaning in, head up, the gun at low ready across the body.
+  - Shoot: from the same kneel, the gun shouldered and level, a small controlled kick (the 0.55 s cooldown).
+  - Die: jolted on his knee, he sags over and slumps onto his right side, curled.
+
+  The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py` and `die.py` in the .blend. Don't rerun them over hand edits. The soles were closed by hand afterwards (and in `build.py`).
