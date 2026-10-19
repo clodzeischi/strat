@@ -109,7 +109,8 @@ const rollEnemy = (c: EnemyChoice): Faction => (c === 'random' ? FACTION_LIST[Ma
 const enemyFaction = autostart?.enemy ?? rollEnemy(loadEnemy());
 const factions: Faction[] = match?.factions ?? watching?.factions ?? [playerFaction, enemyFaction];
 
-// Blender models must be in before the first building is made; anything that fails keeps its procedural model.
+// Blender models must be in before the first building is made. A unit model that fails keeps its procedural one; a
+// building that fails is drawn empty.
 await loadModels();
 
 const rts = new RTSCamera(mapSize * TILE);

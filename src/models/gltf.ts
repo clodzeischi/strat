@@ -6,8 +6,8 @@ import { laser } from './parts';
 import type { AnimState, UnitAnimator, UnitModel, UpgradeLook } from './types';
 
 /**
- * Blender-made models in src/public/models/ (see docs/model-spec.md), as `<kind>/<type>.<faction>`. Anything not
- * listed keeps its procedural model.
+ * Blender-made models in src/public/models/ (see docs/model-spec.md), as `<kind>/<type>.<faction>`. Every building
+ * has one; a unit not listed keeps its procedural model.
  */
 const FILES = [
   'buildings/conyard.atreides', 'buildings/barracks.atreides', 'buildings/refinery.atreides', 'buildings/factory.atreides',
@@ -54,7 +54,7 @@ export async function loadModels(): Promise<void> {
         scenes.set(f, gltf.scene);
         if (gltf.animations.length) clips.set(f, gltf.animations);
       } catch (e) {
-        console.warn(`model ${f} failed to load, using the procedural one`, e);
+        console.warn(`model ${f} failed to load`, e);
       }
     }),
   );

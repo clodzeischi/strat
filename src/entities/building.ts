@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { BUILDING_TAGS, BUILDINGS, TEAM_COLORS, TILE, levelDef, shieldsFor, type BuildingDef, type BuildingType, type Faction, type Team } from '../config';
 import type { Cell } from '../map';
 import type { Point } from '../game/pathfinding';
-import { makeBuildingModel, makeLevelKit } from '../models';
+import { makeBuildingModel } from '../models';
 import { Entity } from './entity';
 import type { Unit } from './unit';
 import * as dm from '../game/dmath';
@@ -12,19 +12,6 @@ import * as dm from '../game/dmath';
  * to match, they always face south (+z).
  */
 export type Facing = 'south' | 'east' | 'north' | 'west';
-
-/**
- * Buildings are drawn turned 45 degrees, the way StarCraft's look on its diagonal grid, though they occupy the
- * square, camera-aligned tiles of their footprint. Purely cosmetic: the model is shrunk to the diamond that fits
- * inside the footprint, so nothing pokes into the tiles around it.
- */
-export const BUILDING_TURN = Math.PI / 4;
-
-/** Scale (across the ground) that fits a building's turned slab inside its square footprint. */
-export function diamondScale(size: number): number {
-  const slab = size * TILE - 0.3;
-  return (size * TILE) / (slab * Math.SQRT2);
-}
 
 /** Seconds a structure takes to salvage, and the share of its price that comes back. */
 export const SALVAGE = { time: 5, refund: 0.75 };
@@ -79,7 +66,7 @@ export class Building extends Entity {
   /** Spice Camps: map cells within reach, nearest first (worked in this order), and whether they've all run dry. */
   reach: number[] = [];
   dry = false;
-  /** Holder of the model (turned and squashed for procedural models), so level-2 parts line up with it. */
+  /** Holder of the model. */
   private model = new THREE.Group();
 
   constructor(
@@ -100,11 +87,6 @@ export class Building extends Entity {
     this.level3 = model.level3;
     this.smoke = model.smoke;
     this.muzzle = model.muzzle;
-    if (!model.dropIn) {
-      const k = diamondScale(def.size);
-      this.model.scale.set(k, 1, k);
-      this.model.rotation.y = BUILDING_TURN;
-    }
     this.model.add(model.group);
     this.root.add(this.model);
     this.root.position.set(this.x, this.y, this.z);
@@ -159,7 +141,6 @@ export class Building extends Entity {
     for (let l = this.level + 1; l <= level; l++) {
       const node = l === 2 ? this.level2 : l === 3 ? this.level3 : null;
       if (node) node.visible = true;
-      else if (!this.level2) this.model.add(makeLevelKit(this.type, TEAM_COLORS[this.team], l));
     }
     this.level = Math.max(this.level, level);
   }

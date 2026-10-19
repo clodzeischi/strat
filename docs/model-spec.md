@@ -1,6 +1,6 @@
 # Model and material spec
 
-How to build a unit or building model in Blender so it drops into the game as a `.glb`. Models are migrated one at a time; anything not yet migrated keeps its procedural model from `src/models/`.
+How to build a unit or building model in Blender so it drops into the game as a `.glb`. Every building is a Blender model. Units are migrated one at a time; a unit not yet migrated keeps its procedural model from `src/models/units/`.
 
 ## Files
 
@@ -52,7 +52,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 
 ### Buildings
 
-A building fills a square of `size × 2 m`. Unless it is **bare**, the game adds a plain 0.3 m concrete slab, `size × 2 − 0.3` m wide, square to the map (N-S). The slab has no team color, so the structure must carry readable team markings. **Start the structure at Z = 0.3 and leave the slab out of the model.** Bare buildings stand on the sand and include their own base. A Blender model is bare when its `body` has a custom property `bare` (any non-zero value; export with Custom Properties on), whatever the procedural model does. Fremen buildings are bare: Fremen can build on dunes, and a building sits at the ground height of its center, so a bare base reaches about 1 m below Z = 0 as a skirt and never floats over a dip.
+A building fills a square of `size × 2 m`. Unless it is **bare**, the game adds a plain 0.3 m concrete slab, `size × 2 − 0.3` m wide, square to the map (N-S). The slab has no team color, so the structure must carry readable team markings. **Start the structure at Z = 0.3 and leave the slab out of the model.** Bare buildings stand on the sand and include their own base. A Blender model is bare when its `body` has a custom property `bare` (any non-zero value; export with Custom Properties on). Fremen buildings are bare: Fremen can build on dunes, and a building sits at the ground height of its center, so a bare base reaches about 1 m below Z = 0 as a skirt and never floats over a dip.
 
 **The model is a drop-in: the game doesn't turn or scale it.** Buildings look turned 45° on the map, as in StarCraft, but only the structure is turned, and that turn is baked in Blender:
 

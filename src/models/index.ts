@@ -1,23 +1,9 @@
 import * as THREE from 'three';
 import { TILE, type BuildingType, type Faction, type UnitType } from '../config';
 import { CONCRETE } from '../materials/palette';
-import { barracks } from './buildings/barracks';
-import { bunker } from './buildings/bunker';
-import { conyard } from './buildings/conyard';
-import { factory } from './buildings/factory';
-import { hitech } from './buildings/hitech';
-import { perch } from './buildings/perch';
-import { refinery } from './buildings/refinery';
-import { fab } from './buildings/fab';
-import { pad } from './buildings/pad';
-import { tleilaxu } from './buildings/tleilaxu';
-import { turret } from './buildings/turret';
-import { camp } from './buildings/camp';
-import { sietch } from './buildings/sietch';
-import { thumper } from './buildings/thumper';
 import { cloneBuildingModel, cloneUnitModel } from './gltf';
 import { box } from './parts';
-import type { BuildingBlueprint, BuildingModel, UnitBlueprint, UnitModel, UpgradeKit, UpgradeLook } from './types';
+import type { BuildingModel, UnitBlueprint, UnitModel, UpgradeKit, UpgradeLook } from './types';
 import { carryall } from './units/carryall';
 import { harvester } from './units/harvester';
 import { infantry } from './units/infantry';
@@ -49,9 +35,6 @@ const UNIT_MODELS: Record<UnitType, UnitBlueprint> = {
   harvester, infantry, trike, tank, rocket, repair, carryall, trooper, sardaukar, razor, devastator, raider, artillery,
   warrior, fedaykin, crew, glider, mortar, sandrider,
 };
-const BUILDING_MODELS: Record<BuildingType, BuildingBlueprint> = {
-  conyard, refinery, barracks, bunker, factory, hitech, fab, tleilaxu, pad, turret, sietch, perch, thumper, camp,
-};
 
 /** Unit models face +X. A faction's Blender model replaces the procedural one when it has been loaded. */
 export function makeUnitModel(type: UnitType, faction: Faction, color: number): UnitModel {
@@ -59,32 +42,29 @@ export function makeUnitModel(type: UnitType, faction: Faction, color: number): 
 }
 
 /**
- * Buildings are centered on their footprint, standing on a concrete slab; front faces +Z. Team color is on the
- * structure. A faction's Blender model replaces the procedural one when it has been loaded.
+ * A building's Blender model (docs/model-spec.md): centered on its footprint, already turned and sized, so it is
+ * drawn as it is. Unless the model is bare (a `bare` property on `body`: Fremen bring their own ground), it stands
+ * on a concrete slab. Without a loaded model (headless sims and the server, or a file that failed to load) the
+ * building is an empty node.
  */
 export function makeBuildingModel(type: BuildingType, faction: Faction, color: number, size: number): BuildingModel {
   const group = new THREE.Group();
-  const w = size * TILE - 0.3;
   const model = cloneBuildingModel(type, faction, color);
-  // A Blender model that brings its own ground (a `bare` custom property on `body`) stands without a slab.
-  const bare = model ? !!model.getObjectByName('body')?.userData.bare : BUILDING_MODELS[type].bare;
-  if (!bare) box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
-  if (model) {
-    group.add(model);
-    const level2 = model.getObjectByName('level2') ?? null;
-    const level3 = model.getObjectByName('level3') ?? null;
-    if (level2) level2.visible = false;
-    if (level3) level3.visible = false;
-    const smoke: THREE.Object3D[] = [];
-    model.traverse((o) => { if (o.name.startsWith('smoke')) smoke.push(o); });
-    const muzzle = model.getObjectByName('muzzle') ?? null;
-    const spinner = model.getObjectByName('spinner') ?? null;
-    // A spinner the game moves up and down (the Thumper's weight) bobs from where the model puts it.
-    if (spinner) spinner.userData.y0 ??= spinner.position.y;
-    return { group, spinner, level2, level3, smoke, muzzle, dropIn: true };
-  }
-  const spinner = BUILDING_MODELS[type].build(group, color);
-  return { group, spinner, level2: null, level3: null, smoke: [], muzzle: null, dropIn: false };
+  if (!model) return { group, spinner: null, level2: null, level3: null, smoke: [], muzzle: null };
+  const w = size * TILE - 0.3;
+  if (!model.getObjectByName('body')?.userData.bare) box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
+  group.add(model);
+  const level2 = model.getObjectByName('level2') ?? null;
+  const level3 = model.getObjectByName('level3') ?? null;
+  if (level2) level2.visible = false;
+  if (level3) level3.visible = false;
+  const smoke: THREE.Object3D[] = [];
+  model.traverse((o) => { if (o.name.startsWith('smoke')) smoke.push(o); });
+  const muzzle = model.getObjectByName('muzzle') ?? null;
+  const spinner = model.getObjectByName('spinner') ?? null;
+  // A spinner the game moves up and down (the Thumper's weight) bobs from where the model puts it.
+  if (spinner) spinner.userData.y0 ??= spinner.position.y;
+  return { group, spinner, level2, level3, smoke, muzzle };
 }
 
 /**
@@ -95,13 +75,6 @@ export function makeUpgradeKit(type: UnitType, look: UpgradeLook, color: number)
   const parts = { body: new THREE.Group(), turret: new THREE.Group() };
   UNIT_MODELS[type].kit(look, color, parts);
   return parts;
-}
-
-/** Extra structure added when a building reaches a level (2, or 3 for the Sietch). */
-export function makeLevelKit(type: BuildingType, color: number, level: number): THREE.Group {
-  const g = new THREE.Group();
-  BUILDING_MODELS[type].levelKit?.(g, color, level);
-  return g;
 }
 
 /** Frees the geometry of a generated part group (materials are shared). */
