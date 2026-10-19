@@ -78,7 +78,10 @@ export function makeBuildingModel(type: BuildingType, faction: Faction, color: n
     const smoke: THREE.Object3D[] = [];
     model.traverse((o) => { if (o.name.startsWith('smoke')) smoke.push(o); });
     const muzzle = model.getObjectByName('muzzle') ?? null;
-    return { group, spinner: model.getObjectByName('spinner') ?? null, level2, level3, smoke, muzzle, dropIn: true };
+    const spinner = model.getObjectByName('spinner') ?? null;
+    // A spinner the game moves up and down (the Thumper's weight) bobs from where the model puts it.
+    if (spinner) spinner.userData.y0 ??= spinner.position.y;
+    return { group, spinner, level2, level3, smoke, muzzle, dropIn: true };
   }
   const spinner = BUILDING_MODELS[type].build(group, color);
   return { group, spinner, level2: null, level3: null, smoke: [], muzzle: null, dropIn: false };

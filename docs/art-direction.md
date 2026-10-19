@@ -198,3 +198,10 @@ Hasty and light, but one contained unit, not a yard spread over the sand (a firs
 - **Collector (center):** a light grid of cords staked over the spice, a tripod over it. The turning boom on top is the `spinner`: a sieve hanging from each end, a cyan sensor on the hub.
 - **Crescent canopy:** hugs the collector's back half, a lean-to sloping down and out on stakes, cloth walls behind, a dark sheltered interior, a team valance along the inner edge facing the camera, a flag at the back.
 - **Ends of the crescent:** the still (cloth-wrapped steel tanks, a cyan gauge, a pipe to the collector) on the left, sealed spice containers with team stripes on the right.
+
+### Thumper (`thumper`)
+
+As in the films: a stake you drive into the sand, with a weight that winds up and slams down. About 1.7 m tall, taller than infantry so it's spotted, slim enough for a Sandrider to carry.
+- **Stake:** a spike into a small heap of sand, three fins splayed for footing, a steel sleeve with a team band and a cyan light, a dark strike plate on top.
+- **Rod:** a guide rod with a carry handle across the top and a team pennant streaming off it.
+- **Weight:** a heavy drum with a team band, the `spinner` (origin on the ground on its axis). The game winds it up the rod, holds it a beat and slams it onto the plate, once a second.

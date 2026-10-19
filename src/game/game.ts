@@ -2433,7 +2433,7 @@ export class Game {
     this.drawRidden(dt, alpha);
     for (const b of this.buildings) {
       if (b.def.weapon) b.aimGun();
-      else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + Math.abs(dm.sin(this.time * 5 + b.id)) * 0.35;
+      else if (b.type === 'thumper' && b.spinner) b.spinner.position.y = b.spinner.userData.y0 + thumpLift(this.time + b.id * 0.37) * 0.4;
       else if (b.type === 'conyard' || b.type === 'factory') b.slew(dt, b.type === 'factory' ? 1.8 : 0.5);
       else if (b.spinner && !(b.def.extract && b.dry)) b.spinner.rotation.y += dt * (b.type === 'camp' ? 1.5 : 0.25);
     }
@@ -2557,3 +2557,17 @@ export function weaponDamage(w: WeaponDef, target: Entity): number {
   for (const t of target.tags) dmg += w.bonus[t] ?? 0;
   return Math.max(1, dmg);
 }
+
+/**
+ * Height of a Thumper's weight (0 resting on the strike plate, 1 cocked) at time t: it winds up slowly, hangs for a
+ * beat, then slams down. One thump every THUMP_PERIOD seconds. Drawing only.
+ */
+const THUMP_PERIOD = 0.95;
+function thumpLift(t: number): number {
+  const p = (t / THUMP_PERIOD) % 1;
+  if (p < 0.72) { const k = p / 0.72; return 1 - (1 - k) * (1 - k); } // ease out on the way up
+  if (p < 0.85) return 1;
+  const k = (p - 0.85) / 0.15;
+  return Math.max(0, 1 - k * k * 1.15); // accelerates down, hits the plate early and stays there
+}
+
