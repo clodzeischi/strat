@@ -220,3 +220,12 @@ The stealthy desert fighter, after the concept's Fremen infantry: lean and a lit
   - Die: jolted on his knee, he sags over and slumps onto his right side, curled.
 
   The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py` and `die.py` in the .blend. Don't rerun them over hand edits. The soles were closed by hand afterwards (and in `build.py`).
+
+### Wind Glider (`glider`)
+
+A cloth wing, not a machine: after the concept's Fremen wind glider, about 2.1 m span and 1.4 m long, 418 tris. No moving parts, one `body`; the game banks it in turns.
+- **Wings:** a big swept delta of Fremen slate cloth stretched on a tan composite frame: a thick leading-edge spar, a mid spar and battens out to a scalloped trailing edge, a slight dihedral.
+- **Fuselage:** slim and faceted in tan, a dark canopy with a cyan glint, two small jets tucked under the wing roots.
+- **Team colour:** the canted winglets and the swept tail fin (where the concept carries the Fremen mark).
+- Built by `build.py` in the .blend; closed everywhere, undersides kept, since it rolls.
+
