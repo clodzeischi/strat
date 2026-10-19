@@ -3,6 +3,7 @@
 // Usage: npx tsx sim/air-repair-check.ts
 import * as THREE from 'three';
 import type { UnitType } from '../src/config';
+import { CARRYALL } from '../src/config/rules';
 import { Carryall, type Unit } from '../src/entities';
 import { Game } from '../src/game/game';
 import { ROCK, SAND, SPICE } from '../src/map';
@@ -73,6 +74,16 @@ const at = (g: Game, cx: number) => g.map.center(cx);
 }
 
 // ---- Carryall: heavy pickup and touch-and-go drop -----------------------------
+/** Back home: holding over the spot it was ordered from, so on its circle (radius CARRYALL.orbit) round that spot. */
+function isHome(c: Carryall, back: { x: number; z: number }): boolean {
+  const t = c.task;
+  return t.kind === 'orbit' && Math.hypot(t.x - back.x, t.z - back.z) < 2 && Math.hypot(c.x - back.x, c.z - back.z) < CARRYALL.orbit + 2;
+}
+function homeNote(c: Carryall, back: { x: number; z: number }): string {
+  const t = c.task;
+  const centre = t.kind === 'orbit' ? `circling ${Math.hypot(t.x - back.x, t.z - back.z).toFixed(1)} from it` : t.kind;
+  return `${centre}, ${Math.hypot(c.x - back.x, c.z - back.z).toFixed(1)} away`;
+}
 for (const type of ['tank', 'harvester', 'rocket'] as UnitType[]) {
   const g = flatGame();
   const c = g.spawnUnit('carryall', 0, at(g, 10), at(g, 10)) as Carryall;
@@ -93,7 +104,7 @@ for (const type of ['tank', 'harvester', 'rocket'] as UnitType[]) {
     run(g, 2);
     check(`  ...landed ${type} is on the ground and can drive`, Math.abs(u.y - g.map.surfaceAt(u.x, u.z)) < 0.2 && u.order.kind === 'idle');
     run(g, 25);
-    check(`  ...carryall flies back to where it was ordered`, Math.hypot(c.x - back.x, c.z - back.z) < 8, `${Math.hypot(c.x - back.x, c.z - back.z).toFixed(1)} away`);
+    check(`  ...carryall flies back to where it was ordered`, isHome(c, back), homeNote(c, back));
   }
 }
 
@@ -173,7 +184,7 @@ for (const type of ['tank', 'harvester', 'rocket'] as UnitType[]) {
   const spread = Math.max(...landed.map((u) => Math.hypot(u.x - at(g, 45), u.z - at(g, 45))));
   check('  ...troopers parachute down near the point', sawFalling && landed.length === 6 && spread < 11, `${td.toFixed(1)}s, furthest ${spread.toFixed(1)}`);
   run(g, 30);
-  check('  ...carryall returns to where it was ordered', Math.hypot(c.x - back.x, c.z - back.z) < 8);
+  check('  ...carryall returns to where it was ordered', isHome(c, back), homeNote(c, back));
   const trikes = [g.spawnUnit('trike', 0, at(g, 20), at(g, 30)), g.spawnUnit('trike', 0, at(g, 21), at(g, 30)), g.spawnUnit('trike', 0, at(g, 22), at(g, 30))];
   const tt = c.orderPickup(g, trikes);
   run(g, 30, () => c.load.length === 2);
