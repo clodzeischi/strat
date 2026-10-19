@@ -170,6 +170,7 @@ Infantry upgrades are **add-ons**, not swap bodies (the game shows every tier up
 - `body`: the bare soldier, always shown. There is no `armor0`.
 - `armor1`, `armor2`: armor pieces worn over `body`; tier 2 shows both, so `armor2` holds only what it adds (Atreides: `armor1` is helmet and shoulder pads, `armor2` the chest plate).
 - `weapons0`: the base gun, skinned 100% to `hand.R` with its barrel along the hand bone. `weapons1`, `weapons2` hold only what each tier adds (Atreides: optic, then laser module plus the `laser` empty).
+- A tier that changes the gun rather than adding to it gets a custom property `swap` (any non-zero value) on its object: it hides the tiers below it (Fremen Warrior: `weapons0` a pistol, `weapons1` a rifle with `swap`, `weapons2` the rifle's accessories). It brings its own muzzle, an Empty named `muzzle_w1` (or `muzzle_w2`) on the same bone as `muzzle`; the shots start there once the tier is researched.
 - `up_rockets`: stays slung on the back (skinned to `chest`), also while firing.
 - Every mesh is skinned to the one shared armature, so all parts follow every action.
 - `muzzle` is an Empty parented to the `hand.R` bone at the base gun's barrel tip. `muzzle_rockets` (same idea, on the rocket tube) is reserved; the game doesn't read it yet.

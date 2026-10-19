@@ -99,7 +99,8 @@ export function cloneBuildingModel(type: BuildingType, faction: Faction, color: 
 /**
  * A unit's Blender model, facing +X. Armor and weapon tiers (`armor0`-`armor2`, `weapons0`-`weapons2`) are whole
  * alternative parts on vehicles: exactly one of each set shows, the highest researched one the model has. On infantry
- * they're add-ons: every tier up to the researched one shows on top of `body`. One-step upgrades (`up_rockets`,
+ * they're add-ons: every tier up to the researched one shows on top of `body`, except that a tier with a `swap` custom
+ * property replaces the ones below it (the Fremen Warrior's rifle replaces his pistol). One-step upgrades (`up_rockets`,
  * `up_nitro`, `up_harvest`) show once researched.
  * `laser` empties turn into fading laser-sight beams, shown with whatever part they belong to.
  */
@@ -120,6 +121,9 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
   const turret = model.getObjectByName('turret') ?? null;
   const muzzle = model.getObjectByName('muzzle') ?? new THREE.Object3D();
   if (!muzzle.parent) (turret ?? body).add(muzzle);
+  // A weapon tier that changes the gun (a `swap` tier) brings its own muzzle, `muzzle_w1` / `muzzle_w2`, on the same
+  // parent: the muzzle moves there once that tier is researched.
+  const muzzleAt = [muzzle.position.clone(), ...[1, 2].map((i) => model.getObjectByName(`muzzle_w${i}`)?.position.clone() ?? null)];
   // A tier can be split across hull and turret (`armor1` on the hull, `armor1_turret` turning with the turret).
   const tiers = (prefix: string) => [0, 1, 2].map((i) => {
     const re = new RegExp(`^${prefix}${i}(_[a-z]+)?$`);
@@ -133,12 +137,18 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
   const additive = UNITS[type].infantry;
   const pick = (set: (THREE.Object3D[] | null)[], level: number) => {
     let shown = -1;
-    for (let i = 0; i <= level; i++) if (set[i]) shown = i;
-    set.forEach((parts, i) => parts?.forEach((o) => { o.visible = additive ? i <= level : i === shown; }));
+    let from = 0; // add-ons: the lowest tier still shown (a `swap` tier hides the ones below it)
+    for (let i = 0; i <= level; i++) {
+      if (!set[i]) continue;
+      shown = i;
+      if (set[i]!.some((o) => o.userData.swap)) from = i;
+    }
+    set.forEach((parts, i) => parts?.forEach((o) => { o.visible = additive ? i >= from && i <= level : i === shown; }));
   };
   const showUpgrades = (look: UpgradeLook) => {
     pick(armor, look.armor);
     pick(weapons, look.weapons);
+    for (let i = Math.min(look.weapons, 2); i >= 0; i--) if (muzzleAt[i]) { muzzle.position.copy(muzzleAt[i]!); break; }
     for (const k of ['rockets', 'nitro', 'harvest'] as const) if (extras[k]) extras[k]!.visible = look[k];
     for (const { l, part } of laserParts) l.visible = part?.visible ?? true;
   };
