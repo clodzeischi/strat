@@ -55,6 +55,8 @@ export interface TeamState {
   /** This team's unit with the most kills so far (may be dead). */
   hero: Unit | null;
   credits: number;
+  /** Played by a person (set by the match; a computer player otherwise). The same on every peer, so the AI may use it. */
+  human: boolean;
   upgrades: Set<UpgradeType>;
   /** The one structure being built at the Construction Yard. */
   building: { type: BuildingType; progress: number; ready: boolean } | null;
@@ -273,7 +275,7 @@ export class Game {
     scene.add(this.terrain.mesh);
     this.effects = new Effects(scene);
     this.teams = ([0, 1] as Team[]).map((team) => ({
-      team, faction: factions[team] ?? 'atreides', credits: START_CREDITS, upgrades: new Set<UpgradeType>(), hero: null,
+      team, faction: factions[team] ?? 'atreides', credits: START_CREDITS, human: false, upgrades: new Set<UpgradeType>(), hero: null,
       stats: {
         unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
         spiceHarvested: 0, creditsSpent: 0,

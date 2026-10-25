@@ -54,6 +54,7 @@ export class Match {
   constructor(readonly game: Game, readonly ai: (Difficulty | null)[], team: Team = 0, net: ConstructorParameters<typeof Lockstep>[2] = null) {
     this.lockstep = new Lockstep(game, team, net);
     this.ais = ai.map((d, t) => (d ? createAI(game, t as Team, d) : null));
+    ai.forEach((d, t) => (game.teams[t].human = !d));
     // When a computer player offers to surrender to another computer player, it's accepted (a person answers with
     // the 'acceptSurrender' command instead).
     const offer = game.onSurrenderOffer;

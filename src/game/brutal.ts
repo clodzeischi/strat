@@ -41,6 +41,11 @@ export interface BrutalOptions {
   sniper: 'rocket' | 'tank';
   /** Paratrooper strikes on enemy harvesters. */
   para: boolean;
+  /**
+   * Snipes and paratroopers against computer players too, not only against people. Off: another AI barely notices a
+   * drop (it doesn't split its attention or protect its harvesters), so they cost more than they win there (sims).
+   */
+  dropsVsAI: boolean;
   /** Troop strikes wait for a wave closing on the enemy base, so they open a second front. */
   paraWithWave: boolean;
   /** Carryalls with no operation ferry harvesters. */
@@ -66,7 +71,7 @@ export interface BrutalOptions {
 }
 
 export const BRUTAL_OPTIONS: BrutalOptions = {
-  micro: true, mend: 0.35, harvesterRetreat: true, carryalls: 2, snipe: true, sniper: 'rocket', para: true, paraWithWave: false, ferry: true, lift: true, march: true, flank: true, think: 0.5,
+  micro: true, mend: 0.35, harvesterRetreat: true, carryalls: 2, snipe: true, sniper: 'rocket', para: true, dropsVsAI: false, paraWithWave: false, ferry: true, lift: true, march: true, flank: true, think: 0.5,
   hitechAt: 600, hitechAtLarge: 360, hitechArmy: 10, hitechLead: 1.2, hitechSpare: 400,
 };
 
@@ -375,6 +380,7 @@ export class BrutalAI extends AI {
     this.carryallIds = alive;
     // Not while the base is under attack: the cargo is needed at home, and loading up in a fight gets it shot.
     const busy = this.defenses.some((d) => d.base);
+    const drops = this.opts.dropsVsAI || g.teams.some((t) => t.team !== this.team && t.human);
     for (const c of this.carryalls()) {
       if (this.ops.has(c) || c.load.length) continue;
       if (busy) {
@@ -382,7 +388,7 @@ export class BrutalAI extends AI {
         continue;
       }
       const home = this.homeUnits();
-      if (this.opts.snipe) {
+      if (this.opts.snipe && drops) {
         const fit = (t: UnitType) => home.find((u) => u.type === t && u.hp > u.maxHp * 0.8);
         // Only a launcher outranges a harvester's escort; a tank set down by one mostly waits about (sims).
         const shooter = this.opts.sniper === 'tank' ? fit('tank') ?? fit('rocket') : fit('rocket');
@@ -400,7 +406,7 @@ export class BrutalAI extends AI {
           continue;
         }
       }
-      if (this.opts.para && g.time >= this.nextPara && (!this.opts.paraWithWave || this.waveClosing())) {
+      if (this.opts.para && drops && g.time >= this.nextPara && (!this.opts.paraWithWave || this.waveClosing())) {
         const troops = home.filter((u) => u.type === 'infantry' && u.hp > u.maxHp * 0.8).slice(0, 6);
         if (troops.length >= 4 && this.paraTarget(c, troops.length * UNITS.infantry.cost)) {
           this.launch(c, 'para', troops);

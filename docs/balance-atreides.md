@@ -337,6 +337,15 @@ rescues) isn't something these sims measure.
 Mirror round robin (r18) is the same as r17 within noise (avg: std 56, rush 44, bio 55, mech 65, trike 43, tech 56,
 turtle 31; triangle 55 / 90 / 59): every plan gets its Carryalls late. Checks, smoke and determinism pass.
 
+### 18. Brutal drops only on people
+
+Another AI barely notices a drop: it doesn't protect its harvesters or split its attention between a drop and the main
+attack, so snipes and paratroopers do little against it (round 17), while against a person they're the point.
+`TeamState.human` (set by the match from its AI list, so it's the same on every peer and in replays) now gates them:
+Brutal snipes and drops paratroopers only when an enemy is a person (`BrutalOptions.dropsVsAI` turns them on against
+AIs; `sim/brutal-match.ts` does, as that's where drops are tuned). Ferrying and troop lifts are unchanged. Check: early
+Hi-Tech Brutal vs Hard, 4 games: 13 drops with the enemy marked human, none without. Checks, smoke, determinism pass.
+
 ## Summary of changes (vs main)
 
 | | main | branch |
@@ -358,7 +367,7 @@ turtle 31; triangle 55 / 90 / 59): every plan gets its Carryalls late. Checks, s
 | Carryall | 700, 12 s; ferries trips from 10 tiles | 400, 8 s; from 6 tiles |
 | Atreides AI research | Rockets first, Harvesting 5th | Harvesting first |
 | Ferried harvester under fire | stops and waits for its Carryall on the first hit | flown out below 2/3 health, keeps driving |
-| Brutal's Carryalls | ferry 12+ tile trips; snipe with MLRS or tank | ferry 6+; snipe with MLRS only; troop lifts to waves |
+| Brutal's Carryalls | ferry 12+ tile trips; snipe with MLRS or tank, at anyone | ferry 6+; snipe (MLRS only) and paradrop only on people; troop lifts to waves |
 
 Open / not done:
 - Carryalls are about neutral in the AI's hands (round 17); an earlier Hi-Tech costs ~5 points whatever its price.
