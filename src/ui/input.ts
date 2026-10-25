@@ -354,9 +354,32 @@ export class Input {
     if (this.canHold()) this.issue({ c: 'hold', units: this.ownUnits().map((u) => u.id) });
   }
 
+  /** Whether the selection has Fremen that can dig in. */
+  canDig(): boolean {
+    return this.ownUnits().some((u) => !!u.def.hides && !u.mount);
+  }
+
+  /** Fremen Dig In: the selected ones on the sand go under at once and hold their fire. */
+  digIn(): void {
+    const units = this.ownUnits().filter((u) => u.def.hides);
+    if (units.length) this.issue({ c: 'dig', units: units.map((u) => u.id) });
+  }
+
   /** Whether the selection has units that plant Thumpers. */
   hasThumpers(): boolean {
     return this.ownUnits().some((u) => !!u.def.thumper);
+  }
+
+  /** Whether every Sandrider selected is up on its worm (its card button lets the worms go). */
+  ridersMounted(): boolean {
+    const riders = this.ownUnits().filter((u) => u.def.thumper);
+    return riders.length > 0 && riders.every((u) => !!u.mount);
+  }
+
+  /** The selected Sandriders let their worms go. */
+  releaseWorms(): void {
+    const riders = this.ownUnits().filter((u) => u.def.thumper && u.mount);
+    if (riders.length) this.issue({ c: 'release', units: riders.map((u) => u.id) });
   }
 
   /** Arms Plant Thumper: the next left click is the spot (says why not, if the side can't plant one now). */

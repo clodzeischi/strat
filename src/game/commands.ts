@@ -21,8 +21,12 @@ export type Command =
   | { c: 'stop'; units: number[] }
   /** Hold Position: stay put and shoot only what comes within reach. */
   | { c: 'hold'; units: number[] }
+  /** Fremen Dig In: under the sand at once, holding fire. */
+  | { c: 'dig'; units: number[] }
   /** Fremen: the nearest of these that can goes to (x, z) and plants a Thumper there. */
   | { c: 'thump'; units: number[]; x: number; z: number }
+  /** Fremen: these Sandriders let their worms go. */
+  | { c: 'release'; units: number[] }
   | { c: 'unload'; buildings: number[] }
   | { c: 'rally'; buildings: number[]; x: number; z: number }
   | { c: 'salvage'; buildings: number[] }
@@ -108,6 +112,12 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
       return;
     case 'thump':
       game.orderThumper(team, own(game, team, cmd.units), cmd.x, cmd.z);
+      return;
+    case 'dig':
+      for (const u of own(game, team, cmd.units)) game.digIn(u);
+      return;
+    case 'release':
+      for (const u of own(game, team, cmd.units)) game.releaseWorm(u);
       return;
     case 'unload':
       for (const id of cmd.buildings) {

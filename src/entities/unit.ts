@@ -42,7 +42,9 @@ export type Order =
   | { kind: 'enter'; target: Building }
   /** Hold Position: stay put, shooting only what comes within reach (no chasing, no backing off). */
   | { kind: 'hold' }
-  /** Walk to (x, z) and plant a Thumper there (Fremen Warriors and Fedaykin). */
+  /** Fremen Dig In: under the sand where it stands at once, holding its fire so it doesn't give itself away. */
+  | { kind: 'dig' }
+  /** Walk to (x, z) and plant a Thumper there (Fremen Sandriders). */
   | { kind: 'plant'; x: number; z: number };
 
 /** An order waiting its turn (Shift+click): taken up once the unit has nothing else to do. */
@@ -135,10 +137,6 @@ export class Unit extends Entity {
   nextThumper = 0;
   /** A Fremen rite under way: dug in, it becomes `to` at game time `until` (`cost` is refunded if it's called off). */
   rite: { to: UnitType; until: number; cost: number } | null = null;
-  /** When it last moved (more than a nudge), and from where: Sandworms only go after what moves. */
-  movedAt = 0;
-  moveX = 0;
-  moveZ = 0;
   /** Ambush: game time until which it deals the bonus damage of having struck out of hiding. */
   ambushUntil = 0;
   /** Gliders: the spot they circle while they have nowhere to go (null: wherever they are when they next need one). */
@@ -230,8 +228,6 @@ export class Unit extends Entity {
     this.z = z;
     this.hideX = x;
     this.hideZ = z;
-    this.moveX = x;
-    this.moveZ = z;
     this.lastX = x;
     this.lastZ = z;
     this.heading = heading;
@@ -409,8 +405,8 @@ export class Unit extends Entity {
   // ---- Orders ---------------------------------------------------------------
 
   command(game: Game, order: Order): void {
-    // Deployed Artillery stays put: it only takes targets and stop until it packs up.
-    if (this.deployState !== 'mobile' && order.kind !== 'attack' && order.kind !== 'idle') return;
+    // Deployed Artillery stays put: it only takes targets, stop and (Fremen) Dig In until it packs up.
+    if (this.deployState !== 'mobile' && order.kind !== 'attack' && order.kind !== 'idle' && order.kind !== 'dig') return;
     this.order = order;
     this.target = null;
     this.chasing = false;
@@ -676,6 +672,7 @@ export class Unit extends Entity {
           break;
         case 'attack':
         case 'hold':
+        case 'dig':
           break;
       }
     }
@@ -799,6 +796,11 @@ export class Unit extends Entity {
         this.deployState = this.deployState === 'deploying' ? 'deployed' : 'mobile';
         this.order = { kind: 'idle' };
       }
+      return;
+    }
+    if (this.order.kind === 'dig') {
+      // Dug in (a Fremen Mortar): it holds its fire.
+      this.target = null;
       return;
     }
     const w = this.def.deploy!.weapon;

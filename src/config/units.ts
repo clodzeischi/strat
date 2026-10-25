@@ -138,7 +138,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     rite: { from: 'fedaykin', cost: 300, time: 12 },
     weapon: { range: 0.9, minRange: 0, damage: 400, bonus: {}, cooldown: 1.6, projectile: 'bullet', speed: 0, splash: 0, only: ['biological'], pierce: true },
     charge: { range: 6, speed: 2 },
-    desc: 'A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls: for 40 s the worm goes where you send it and swallows the enemy (vehicles most of all), never your own. On foot, a zealot: rushes enemy infantry and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can\'t hurt vehicles, structures or aircraft on foot.',
+    desc: 'A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls until you let it go: the worm goes where you send it and swallows the enemy on the sand (vehicles most of all), never your own. On foot, a zealot: rushes enemy infantry and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can\'t hurt vehicles, structures or aircraft on foot.',
   },
   glider: {
     name: 'Wind Glider', producer: 'perch', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,

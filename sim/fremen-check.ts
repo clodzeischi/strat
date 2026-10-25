@@ -132,6 +132,25 @@ gunner.command(g, { kind: 'move', x: sx + 4, z: sz });
 run(0.8);
 check(!w.hidden && g.sees(A, w), 'firing at what walks into range brings it out of hiding');
 g.damage(gunner, UNITS.tank.weapon!, 100, null);
+// Dig In: under at once, and it holds its fire (on its own patch of sand, in a game of its own).
+{
+  const t = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['fremen', 'atreides']);
+  const tick = (seconds: number) => {
+    for (let k = 0; k < seconds * 20; k++) t.update(0.05);
+  };
+  const d = t.spawnUnit('warrior', F, sx, sz);
+  applyCommand(t, F, { c: 'dig', units: [d.id] });
+  tick(0.6);
+  check(d.hidden && d.order.kind === 'dig', 'Dig In: under the sand at once');
+  // Unarmed (an armed one this close would find it and shoot it out of the sand).
+  const walker = t.spawnUnit('harvester', A, sx + UNITS.warrior.weapon!.range, sz);
+  walker.command(t, { kind: 'hold' });
+  tick(3);
+  check(d.hidden && d.target === null && walker.hp === walker.maxHp, 'dug in, it holds its fire at an enemy in range');
+  applyCommand(t, F, { c: 'stop', units: [d.id] });
+  tick(1.5);
+  check(walker.hp < walker.maxHp || walker.dead, 'any other order and it fights again');
+}
 const wr = g.spawnUnit('warrior', F, m.center(yard.cx - 1), m.center(yard.cz - 1));
 run(HIDE.delay + 0.5);
 check(!wr.hidden, "Fremen don't hide on rock");
@@ -211,6 +230,10 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   const parked = t.spawnUnit('tank', A, p2.x, p2.z);
   const harv = t.spawnUnit('harvester', A, p3.x, p3.z);
   const own = p4 ? t.spawnUnit('warrior', F, p4.x, p4.z) : null;
+  // Ours, dug in right by our own warrior walking about (an enemy that close would find it and shoot it out of the
+  // sand): the bites that take the walker leave it alone.
+  const dug = p4 ? t.spawnUnit('warrior', F, p4.x, p4.z + 1.5) : null;
+  if (dug) applyCommand(t, F, { c: 'dig', units: [dug.id] });
   planter.x = fy.x;
   planter.z = fy.z + 3 * TILE;
   planter.command(t, { kind: 'hold' });
@@ -231,11 +254,12 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   for (let k = 0; k < WORM.hunt + 2; k++) { shuttle(); tick(1); }
   console.log(`      after the hunt: moving tank ${mover.dead ? 'eaten' : mover.hp.toFixed(0)}, parked tank ${parked.dead ? 'eaten' : parked.hp.toFixed(0)}, harvester ${harv.dead ? 'eaten' : harv.hp.toFixed(0)}, own warrior ${own ? (own.dead ? 'eaten' : own.hp.toFixed(0)) : '-'}`);
   check(mover.dead, 'it swallows an enemy tank that keeps moving');
-  check(harv.dead, 'and a harvester, even standing still');
-  check(!parked.dead && parked.hp === parked.maxHp, 'but leaves a unit that stands still alone');
-  if (own) check(own.dead, 'and it eats our own units too, when they move on the sand');
+  check(harv.dead, 'and a harvester');
+  check(parked.dead, 'and a tank that stands still: keeping still does not hide anything on the sand');
+  if (own) check(own.dead, 'and it eats our own units too');
+  if (dug) check(dug.hidden && !dug.dead && dug.hp === dug.maxHp, 'but not Fremen dug into the sand: no worm hears them');
   check(!planter.dead && planter.hp === planter.maxHp, 'off the sand, the planter is safe');
-  check(t.worms.length === 0 && t.wormLog.length === 1 && t.wormLog[0].eatenEnemy >= UNITS.tank.cost + UNITS.harvester.cost, 'it goes back down after its hunt, and the log has what it ate');
+  check(t.worms.length === 0 && t.wormLog.length === 1 && t.wormLog[0].eatenEnemy >= 2 * UNITS.tank.cost + UNITS.harvester.cost, 'it goes back down after its hunt, and the log has what it ate');
   check(t.thumpBlocked(F, planter)?.startsWith('Next Thumper') ?? true, 'the next Thumper waits for the cooldown');
   // A Thumper destroyed before the worm comes calls nothing.
   const p2b = t.spawnUnit('sandrider', F, sx, sz);
@@ -298,14 +322,14 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   check(t.ridden.length === 1 && t.worms.length === 0 && r.mount === t.ridden[0], 'the worm comes, and the Sandrider is up on it');
   const w = t.ridden[0];
   check(hypot(r.x - w.x, r.z - w.z) < RIDE.seat * RIDE.spacing + 1, 'riding on its back');
-  // Left alone, it goes after an enemy moving on the sand nearby; our own warrior walking about is safe.
+  // Left alone, it goes after an enemy on the sand nearby, even one standing still; our own warrior walking about is safe.
   const prey = t.spawnUnit('razor', A, pt(pick(-8)).x, pt(pick(-8)).z);
+  prey.command(t, { kind: 'hold' });
   for (let k = 0; k < 10 && !prey.dead; k++) {
-    prey.command(t, { kind: 'move', x: prey.x + (k % 2 ? 3 : -3), z: prey.z });
     ownW.command(t, { kind: 'move', x: ownW.x + (k % 2 ? 2 : -2), z: ownW.z });
     tick(1);
   }
-  check(prey.dead, 'left alone it hunts: an enemy Razor moving on the sand is swallowed');
+  check(prey.dead, 'left alone it hunts: an enemy Razor holding still on the sand is swallowed');
   check(!ownW.dead && ownW.hp === ownW.maxHp, 'never its own side');
   // Steered: right-click an enemy standing still, and the worm goes for it.
   const sitter = t.spawnUnit('razor', A, pt(pick(10)).x, pt(pick(10)).z);
@@ -321,8 +345,11 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   const trail: number[] = [];
   for (let k = 0; k < 20; k++) { tick(0.5); trail.push(hypot(w.x - w.lairX, w.z - w.lairZ)); }
   check(Math.max(...trail) - Math.min(...trail) > 2 && Math.max(...trail) <= RIDE.wander, 'then wanders an irregular loop round there');
-  tick(RIDE.time);
-  check(t.ridden.length === 0 && !r.mount && !r.dead && tm.canEnter(tm.cellOf(r.x), tm.cellOf(r.z), 'foot'), 'its time up, the worm dives and leaves the rider on the sand');
+  tick(90);
+  check(t.ridden.length === 1 && r.mount === w, 'it stays up as long as the rider keeps it');
+  applyCommand(t, F, { c: 'release', units: [r.id] });
+  tick(0.5);
+  check(t.ridden.length === 0 && !r.mount && !r.dead && tm.canEnter(tm.cellOf(r.x), tm.cellOf(r.z), 'foot'), 'released, the worm dives and leaves the rider on the sand');
   check(t.thumpBlocked(F, r)?.startsWith('Next Thumper') ?? false, 'and the rider rests before calling again');
   // Its rider shot off its back: the worm goes wild.
   r.nextThumper = 0;
@@ -335,6 +362,8 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   while (!r.dead) t.damage(r, UNITS.tank.weapon!, 100, null);
   tick(0.5);
   check(t.ridden.length === 0 && t.worms.length === 1, 'shot off its back, the rider falls and the worm goes wild');
+  tick(WORM.hunt + 2);
+  check(t.worms.length === 0, 'for a wild worm\'s hunt, then it goes down');
 }
 
 // ---- Hold Position ----
