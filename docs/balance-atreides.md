@@ -346,6 +346,37 @@ Brutal snipes and drops paratroopers only when an enemy is a person (`BrutalOpti
 AIs; `sim/brutal-match.ts` does, as that's where drops are tuned). Ferrying and troop lifts are unchanged. Check: early
 Hi-Tech Brutal vs Hard, 4 games: 13 drops with the enemy marked human, none without. Checks, smoke, determinism pass.
 
+### 19. Nitro trike death squads (measurement only)
+
+Does Trike Nitro make trikes the economy wreckers they're meant to be? First, Brutal with the AI's own hunting raids
+(six trikes, every 15 s; `nitrosquad`, and `trikesquad` without Nitro): about 4 raids a game, ~10 s each, under half a
+harvester per raid, 35-45 s of raiding a game in all. The AI's raids are hit-and-run probes, not a death squad.
+
+So `deathsquad` scripts one (`SquadAI` in `sim/ava-strats.ts`): from Nitro on (~6:10-7:15), six trikes leave the AI's
+hands and only hunt harvesters: drive to the least guarded one known, shoot every harvester in sight, on to the next,
+home when outgunned or down to three, out again once topped up to six. `slowsquad` is the same without Nitro, from 6:15.
+60 games per row, small maps unless noted; per game:
+
+| squad vs | win % | out (driving + shooting) | harvesters killed | trikes lost out raiding | trikes lost per harvester |
+|---|---|---|---|---|---|
+| Nitro vs Brutal | 42 | 29 s | 1.4 | 2.2 | 1.6 (~210 credits per 800) |
+| no Nitro vs Brutal | 46 | 76 s | 0.9 | 4.2 | 4.6 (~600 per 800) |
+| Nitro vs Hard | 45 | 75 s | 1.9 | 3.8 | 2.0 (~260 per 800) |
+| no Nitro vs Hard | 67 | 97 s | 1.6 | 6.0 | 3.8 (~490 per 800) |
+
+(Win %, harvesters and time from the 60-game batches; trike losses and where they died from 12-game traces. Medium
+maps, vs Brutal: Nitro 44%, no Nitro 46%.)
+
+- **Out raiding, Nitro does its job**: 1.5-2.9 harvesters a minute out against 0.7-1.0 without, trading 3-4 to 1 in
+  credits against 1.3-1.6 to 1.
+- **But the squad is hardly ever out**: 30-100 s a game. Most of its time goes to waiting at home to be topped up to six,
+  and most of its losses (43-67 of 90-125 trikes over 12 games) are there, caught in fights at its own base. AIs keep
+  their armies between the bases and by their harvesters, and Brutal runs its harvesters home, so there's little open
+  economy to hunt.
+- Overall it doesn't win more games (Nitro 42-45% vs Brutal; the no-Nitro squad's 67% against Hard is a bigger army at
+  home more than raiding). Against a person whose army is out of position it should hit much harder; these sims can't
+  show that. No change made.
+
 ## Summary of changes (vs main)
 
 | | main | branch |

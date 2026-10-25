@@ -68,6 +68,6 @@ for (let k = 0; k < games; k++) {
     a, b, seed, side, result: g.winner === null ? 'timeout' : g.winner === side ? 'win' : 'loss', time: Math.round(g.time),
     spice: [Math.round(g.teams[side].stats.spiceHarvested), Math.round(g.teams[o].stats.spiceHarvested)],
     built: [built[side], built[o]], kills: [kills[side], kills[o]], deaths: [deaths[side], deaths[o]], tech: [tech[side], tech[o]], kv,
-    stats: [ais[side].stats, ais[o].stats], air: [air[side], air[o]], hdeaths: [hdeaths[side], hdeaths[o]],
+    stats: [(ais[side] as any).stats, (ais[o] as any).stats], air: [air[side], air[o]], hdeaths: [hdeaths[side], hdeaths[o]],
   }));
 }
