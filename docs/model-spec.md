@@ -46,6 +46,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 | `artillery` | Soulcrusher | Corrino | 1.1 | yes | weapons, armor | deploy animation |
 | `warrior` | Fremen Warrior | Fremen | 0.45 | | weapons, armor | animated |
 | `fedaykin` | Fedaykin | Fremen | 0.5 | | weapons, armor | animated |
+| `sandrider` | Sandrider | Fremen | 0.5 | | | animated; `ride` on his worm |
 | `mortar` | Fremen Mortar | Fremen | 0.5 | | | animated; sets up (`deploy`, `shoot_set`, `muzzle_deploy`) |
 | `crew` | Spice Crew | Fremen | 0.45 | | | animated; no `shoot` (unarmed) |
 | `glider` | Wind Glider | Fremen | 0.9 | | | aircraft; the game rolls it in turns |
@@ -170,7 +171,7 @@ Delete faces pointing more than 45° down (normal Z < −0.7): no camera ever se
 
 Rig with an armature and animate as usual. A build step samples each frame and bakes the result into a vertex animation texture, so the armature doesn't ship.
 
-- Actions, named exactly: `idle`, `walk`, `shoot`, `die`. An unarmed unit (`crew`) has no `shoot`. A unit that sets up (`mortar`) also has `deploy` and `shoot_set`, below.
+- Actions, named exactly: `idle`, `walk`, `shoot`, `die`. An unarmed unit (`crew`) has no `shoot`. A unit that rides (`sandrider`) also has a looping `ride`, played while mounted, standing on the mount's top at z = 0. A unit that sets up (`mortar`) also has `deploy` and `shoot_set`, below.
 - Animate at **15 fps** (scene frame rate). `idle`, `walk` and `shoot` must loop: the first and last frames match.
 - Keep each action short. `walk` is one stride cycle of about 0.6–0.8 s at walking speed (2.4–3 m/s, see `speed` in `units.ts`). Total across all actions ≤ 90 frames.
 - The rig moves on the spot: no root motion. The game moves the unit.

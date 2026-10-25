@@ -15,7 +15,7 @@ const FILES = [
   'buildings/conyard.corrino', 'buildings/refinery.corrino', 'buildings/barracks.corrino', 'buildings/fab.corrino', 'buildings/tleilaxu.corrino', 'buildings/pad.corrino', 'buildings/turret.corrino',
   'buildings/sietch.fremen', 'buildings/barracks.fremen', 'buildings/perch.fremen', 'buildings/bunker.fremen', 'buildings/camp.fremen', 'buildings/thumper.fremen',
   'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/devastator.corrino', 'units/raider.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
-  'units/infantry.atreides', 'units/trooper.corrino', 'units/sardaukar.corrino', 'units/warrior.fremen', 'units/fedaykin.fremen', 'units/crew.fremen', 'units/mortar.fremen', 'units/glider.fremen',
+  'units/infantry.atreides', 'units/trooper.corrino', 'units/sardaukar.corrino', 'units/warrior.fremen', 'units/fedaykin.fremen', 'units/crew.fremen', 'units/mortar.fremen', 'units/sandrider.fremen', 'units/glider.fremen',
 ];
 
 const scenes = new Map<string, THREE.Object3D>();
@@ -225,7 +225,7 @@ function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnima
     const clip = list.find((c) => c.name === name);
     return clip ? mixer.clipAction(clip) : null;
   };
-  const loops: Record<AnimState, THREE.AnimationAction | null> = { idle: act('idle'), walk: act('walk'), shoot: act('shoot') };
+  const loops: Record<AnimState, THREE.AnimationAction | null> = { idle: act('idle'), walk: act('walk'), shoot: act('shoot'), ride: act('ride') };
   const death = act('die');
   if (death) {
     death.setLoop(THREE.LoopOnce, 1);
@@ -256,6 +256,7 @@ function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnima
   };
   // The action for a looping state: set up, the set-up versions; in between, `deploy` held where it is.
   const pick = (next: AnimState): THREE.AnimationAction | null => {
+    if (next === 'ride') return loops.ride ?? loops.idle;
     if (!deploy || setUp <= 0) return loops[next];
     if (setUp < 1) return deploy;
     if (next === 'shoot' && shootSet) return shootSet;
