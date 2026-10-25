@@ -83,9 +83,10 @@ export const WORM = {
  * wanders an irregular loop about `wander` across, going after enemy prey within `hunt` of it. Then it dives, leaves
  * the rider on the sand, and that rider can't call again for `cooldown` s. Its rider killed, the worm goes wild for
  * the rest of its time. Drawing: `segments` rings `spacing` apart follow the head, sunk `sink` of their radius into
- * the sand so only their backs show; the rider stands on ring `seat`, about `lift` above the sand.
+ * the sand so only their backs show; the rider stands on ring `seat`, about `lift` above the sand. Biting, the head
+ * rears up out of the sand, the first `rear` pieces lifting with it.
  */
-export const RIDE = { mount: 14, time: 40, cooldown: 60, wander: 20, hunt: 16, segments: 10, spacing: 1.7, seat: 2, lift: 0.6, sink: 0.62 };
+export const RIDE = { mount: 14, time: 40, cooldown: 60, wander: 20, hunt: 16, segments: 10, spacing: 1.7, seat: 2, lift: 0.45, sink: 0.75, rear: 3 };
 /** A Spice Camp works at full rate with this many spice tiles in reach, proportionally less with fewer. */
 export const CAMP_FULL = 12;
 /** Spice Mining: Spice Camps' extra rate. */

@@ -15,6 +15,7 @@ const FILES = [
   'buildings/conyard.corrino', 'buildings/refinery.corrino', 'buildings/barracks.corrino', 'buildings/fab.corrino', 'buildings/tleilaxu.corrino', 'buildings/pad.corrino', 'buildings/turret.corrino',
   'buildings/sietch.fremen', 'buildings/barracks.fremen', 'buildings/perch.fremen', 'buildings/bunker.fremen', 'buildings/camp.fremen', 'buildings/thumper.fremen',
   'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/devastator.corrino', 'units/raider.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
+  'units/sandworm',
   'units/infantry.atreides', 'units/trooper.corrino', 'units/sardaukar.corrino', 'units/warrior.fremen', 'units/fedaykin.fremen', 'units/crew.fremen', 'units/mortar.fremen', 'units/sandrider.fremen', 'units/glider.fremen',
 ];
 
@@ -95,11 +96,60 @@ function cloneModel(key: string, color: number): THREE.Object3D | null {
   const src = scenes.get(key);
   if (!src) return null;
   // Skinned meshes need their own skeleton per copy; plain models share everything but transforms.
-  const copy = clips.has(key) ? cloneSkinned(src) : src.clone(true);
+  let skinned = clips.has(key);
+  if (!skinned) src.traverse((o) => { if (o instanceof THREE.SkinnedMesh) skinned = true; });
+  const copy = skinned ? cloneSkinned(src) : src.clone(true);
   copy.traverse((o) => {
     if (o instanceof THREE.Mesh) o.material = o.userData.team ? teamMat(color) : o.userData.palette2 ? palette2Mat! : paletteMat!;
   });
   return copy;
+}
+
+/** The ridden Sandworm's Blender model: one skinned body on `seg_0` (the head) to `seg_11` (the tail), and the maw's petals. */
+export interface WormRig {
+  root: THREE.Object3D;
+  /** Puts bone `i` at a world point, facing `heading` (radians, the game's: 0 is +X, turning toward +Z), its nose
+   * raised by `pitch` (radians). */
+  place(i: number, at: THREE.Vector3, heading: number, pitch?: number): void;
+  /** Opens the maw: 0 closed, 1 the petals peeled right back. */
+  open(t: number): void;
+}
+
+/** A copy of the ridden Sandworm, or null without its model. Its bones are placed by the game every frame. */
+export function cloneWormModel(): WormRig | null {
+  const root = cloneModel('units/sandworm', 0xffffff);
+  if (!root) return null;
+  root.traverse((o) => { if (o instanceof THREE.Mesh) o.frustumCulled = false; }); // it bends far from its rest pose
+  root.updateMatrixWorld(true);
+  const segs = Array.from({ length: 12 }, (_, i) => root.getObjectByName(`seg_${i}`)!);
+  // Rest: each bone's world turn, and the world-to-parent matrix it's placed through (the model stays at the origin).
+  const restQ = segs.map((b) => b.getWorldQuaternion(new THREE.Quaternion()));
+  const toParent = segs.map((b) => b.parent!.matrixWorld.clone().invert());
+  const petals = [0, 1, 2].map((k) => root.getObjectByName(`petal_${k}`)!);
+  // Each petal turns about its hinge (its origin, on the rim) toward the outside, about X x radial in the head's frame.
+  const headInv = restQ[0].clone().invert();
+  const petalRest = petals.map((p) => p.quaternion.clone());
+  const petalAxis = petals.map((p) => {
+    const w = p.getWorldPosition(new THREE.Vector3());
+    const radial = new THREE.Vector3(0, w.y, w.z).normalize();
+    return new THREE.Vector3(1, 0, 0).cross(radial).normalize().applyQuaternion(headInv);
+  });
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), yaw = new THREE.Quaternion(), tilt = new THREE.Quaternion();
+  const one = new THREE.Vector3(1, 1, 1), UP = new THREE.Vector3(0, 1, 0), SIDE = new THREE.Vector3(0, 0, 1);
+  let opened = -1;
+  return {
+    root,
+    place(i, at, heading, pitch = 0) {
+      q.copy(yaw.setFromAxisAngle(UP, -heading)).multiply(tilt.setFromAxisAngle(SIDE, pitch)).multiply(restQ[i]);
+      m.compose(at, q, one).premultiply(toParent[i]);
+      m.decompose(segs[i].position, segs[i].quaternion, segs[i].scale);
+    },
+    open(t) {
+      if (t === opened) return;
+      opened = t;
+      for (let k = 0; k < 3; k++) petals[k].quaternion.setFromAxisAngle(petalAxis[k], 1.9 * t).multiply(petalRest[k]);
+    },
+  };
 }
 
 export function cloneBuildingModel(type: BuildingType, faction: Faction, color: number): THREE.Object3D | null {

@@ -197,6 +197,10 @@ Infantry upgrades are **add-ons**, not swap bodies (the game shows every tier up
 - **`spade_N` empties and `plant` on `body`** work as for rigid units below. The Mortar's are on the breech and the bipod's feet.
 - **`die` starts from the mobile stance.** A unit killed while set up blends into it over 0.08 s.
 
+### Bones placed by the game (`sandworm`)
+
+The ridden Sandworm is skinned like infantry but has no actions: the game sets its bones every frame. `seg_0` (the head, at the origin) to `seg_11` (the tail) sit `RIDE.spacing` (1.7) apart along -X, none parented, each laid on the head's trail facing its way; `petal_0`–`petal_2` are children of `seg_0` with their origins on the rim, and the game turns each outward about X × its radial to open the maw. It's built in game units (no infantry scale); radii by bone are in `BONE_RADII` in `src/models/sandworm.ts`, which must match `build.py`.
+
 ### Rigid moving parts (vehicles, buildings)
 
 The game moves `turret` and `spinner` itself; don't animate them. A unit with a **deploy** pose (`artillery`) has an action named `deploy` that keys the transforms of named parts from mobile (first frame) to dug in (last frame). The game plays it as a 0–1 slider. Only key the objects listed under Named objects, plus any extra named child meshes the deploy needs (`leg_1`, `leg_2`, ...). Each keyed object has its own action pushed onto an NLA track named `deploy`; export with Animation mode **NLA Tracks**, which merges them into one `deploy` animation. A part that moves with the deploy and carries tier parts (the Soulcrusher's `gun`, which raises its barrels and the `muzzle`) is a child of `turret`, and those tiers are its children. Put a `spade` empty (`spade_1`, ...) where each leg bites the ground and a custom property `plant` on `body` with how far into the deploy (0–1) they touch down: the game kicks up dust there.

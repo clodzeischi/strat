@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mat } from '../materials/lambert';
 import { TOOTH, WORM_HIDE, shade } from '../materials/palette';
+import { cloneWormModel } from './gltf';
 
 /** How far under the ground the worm's maw sits while it travels (the body is drawn this far down). */
 export const WORM_DEPTH = 10;
@@ -72,19 +73,35 @@ export function makeSandworm(): SandwormModel {
 }
 
 export interface RiddenWormModel {
-  /** Holds the pieces; each is placed in world space every frame. */
+  /** Holds the worm; its pieces are placed in world space every frame. */
   root: THREE.Group;
-  /** The head (maw facing +X), the rings behind it, and the tail tip. Rigid pieces: no skeleton, no clips. */
-  pieces: THREE.Object3D[];
-  /** Radius of each piece, for how high it rides out of the sand. */
+  /** How many pieces (or bones) run from the head (0) to the tail tip. */
+  count: number;
+  /** Radius of each piece, for how deep it sits in the sand and where the rider stands. */
   radii: number[];
+  /** Puts piece `i` at a world point, facing `heading` (radians, the game's), its nose raised by `pitch`. */
+  place(i: number, at: THREE.Vector3, heading: number, pitch?: number): void;
+  /** Opens the maw (0 closed .. 1 open), if the model has one that opens. */
+  open(t: number): void;
 }
 
+/** The Blender worm's radius at each bone, from the head to the tail (see sandworm.blend's build.py). */
+const BONE_RADII = Array.from({ length: 12 }, (_, i) => (i <= 1 ? 1.68 : i <= 10 ? 1.65 - ((i - 1) / 9) * 0.8 : 0.6));
+
 /**
- * A ridden Sandworm, surfaced: a head with its maw open forward, `segments` rings narrowing toward the tail, and a
- * tail tip. The game lays each piece along the path the head has taken, so the body curves with its movement.
+ * A ridden Sandworm, surfaced. The Blender model if it's loaded: one skinned body whose bones the game lays along
+ * the path the head has taken, so it bends with its movement, and a three-petal maw that opens to bite. Otherwise
+ * the procedural one below, a chain of rigid pieces laid the same way.
  */
 export function makeRiddenWorm(segments: number): RiddenWormModel {
+  const rig = cloneWormModel();
+  if (!rig) return proceduralRiddenWorm(segments);
+  const root = new THREE.Group();
+  root.add(rig.root);
+  return { root, count: BONE_RADII.length, radii: BONE_RADII, place: rig.place, open: rig.open };
+}
+
+function proceduralRiddenWorm(segments: number): RiddenWormModel {
   const root = new THREE.Group();
   const hide = mat(WORM_HIDE);
   const ring = mat(shade(WORM_HIDE, 0.72));
@@ -128,5 +145,12 @@ export function makeRiddenWorm(segments: number): RiddenWormModel {
   pieces.push(tailHolder);
   radii.push(0.8);
   for (const p of pieces) root.add(p);
-  return { root, pieces, radii };
+  return {
+    root, count: pieces.length, radii,
+    place(i, at, heading, pitch = 0) {
+      pieces[i].position.copy(at);
+      pieces[i].rotation.set(0, -heading, pitch, 'YXZ');
+    },
+    open() {},
+  };
 }
