@@ -160,11 +160,18 @@ export const CORRINO_STRATS: Record<string, Strat> = {
 
 /** Variants for single tests, not in the round robin. */
 export const CORRINO_EXTRA: Record<string, Strat> = {
+  // An early razor rush off two Fabs, troopers alongside, no tech.
+  razorrush: {
+    profile: plan({ opening: ['refinery', 'barracks', 'factory', 'factory'], harvesters: 3, extraRefinery: 'never', techArmy: 40, mix: cmix({ razor: 3, trooper: 1 }), initiative: 1 }),
+    firstWave: 150,
+  },
   // Stock Brutal that never attacks below its full wave gate, however long it's waited.
   stdp: { profile: { ...BRUTAL_PROFILE, patience: 1 } },
   // Stock Brutal that only attacks clearly stronger (1.3x what it knows of the enemy, and no initiative attacks), and not
   // before 8:00.
   stdlate: { profile: { ...BRUTAL_PROFILE, waveGate: 1.3, patience: 1, initiative: 0 }, firstWave: 480 },
+  // Stock Brutal with a heavier Soulcrusher share in its picks.
+  stdart: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, artillery: 1.5 } } },
   // Stock Brutal's army and counter-picking, waiting like the turtle until 14:00 (no raids, no flanks).
   stdpassive: { profile: { ...BRUTAL_PROFILE, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity } }, opts: { flank: false }, firstWave: 840 },
   // The turtle's army (Devastators, Soulcrushers, Sardaukar, troopers, everything researched) attacking as usual.

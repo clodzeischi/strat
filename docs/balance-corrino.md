@@ -151,3 +151,22 @@ lose ~51k credits to its ~30k on the same income. 80 games per test, turtle vs s
 stock Brutal's own army waiting until 14:00 (`stdpassive`) beats std 64% but loses to passive 88%. So: waiting helps
 any army, and Devastators + Soulcrushers + Sardaukar + troopers, maxed out, beat the other armies late. Not the
 defenses, not Corrino's healing.
+
+### 5. More turtle and rush tests (no change kept)
+
+Turtle, 80 games per cell: Soulcrushers without their +20 vs infantry: turtle vs std / sard / dev 68 / 84 / 70; with
+splash 2 (not 3): 69 / 88 / 62. Stock Brutal with a heavier Soulcrusher share (`stdart`) beats the turtle 40%, the
+passive plan 38%, std 50%: siege helps break it, but the AI keeps few (the siege rule, max 3).
+
+Rush, 60 games per cell (rush vs std / air / sard): as is 20 / 18 / 22; turrets behind the Fab 15 / 13 / 13; troopers
+85 credits, 4.5 s 7 / 7 / 13 (every plan gets them); a razor rush off two Fabs (`razorrush`) 5 / 3 / 8. Corrino
+structures carry shields and repair themselves, and early Corrino units barely scratch them (troopers 5 damage,
+razors 2), so a rush can't finish a base: it has to win on harvesters, and loses its economy trying.
+
+### 6. Effect of the AI fix elsewhere, and cross-faction (Hard, both sides)
+
+Atreides mirror with the fix (r19): std 62, rush 46, bio 44, mech 53, trike 46, tech 50, turtle 49 (was 43-65, turtle
+31): tighter. Triangle bio > mech 73, mech > trike 88, trike > bio 55.
+
+Fremen vs Atreides 51% (100 games; 49% before). Fremen vs Corrino 28% (main: 34%). Atreides vs Corrino 1% (main after
+round 20 of the Atreides log: 5%).
