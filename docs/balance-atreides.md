@@ -250,6 +250,57 @@ Checks: all `sim/*-check.ts` and `sim/smoke.ts` pass; `FACTIONS=atreides,atreide
 deterministic. Two checks encoded the old ranges and were updated: `bunker-check` (a tank no longer outranges a
 rocket bunker; an MLRS 12 out still does) and `mlrs-check` (the crossing target sits inside the new range 15).
 
+### 16. Economy: slower harvesting, a Harvesting upgrade worth getting, cheaper Carryalls
+
+Measured first with a scratch income sim: one Refinery placed as the AI places it, 1 or 3 harvesters, no enemy, 15 min,
+6 maps per size. Before: a harvester brings ~1,000/min (an 800 harvester pays back in under a minute); Harvesting
+(+20% load and speed) adds ~20% and pays its 600 back in 1.3-3 min (3.8-5 min counting HQ Lv 2); a Carryall adds 7-12%
+at 15 min and almost nothing in the first 3 min (it skips trips under 10 tiles), paying back in 4.5-10 min (8.5-13
+counting the Hi-Tech).
+
+- Pickup rate 60 → 51 (the literal -15%) cut income only 4-7% early, 2% late: driving and unloading are most of a trip.
+  **60 → 38** cuts it 13-17% at 3 min, 8-12% at 10 min.
+- **Harvesting: +25% load, +25% speed, +50% pickup rate** (new `HARVEST_UPGRADE.rate`). It now adds 34-41%; an
+  upgraded economy is about where the old upgraded one was. Pays back in under a minute with 3 harvesters, ~2.5 min
+  counting HQ Lv 2. (Tried: +20/20/0 adds ~20%; +30/30/60 adds ~45%; +25/20/30 adds ~30%.)
+- **Hi-Tech 1,200 / 16 s → 800 / 11 s; Carryall 700 / 12 s → 400 / 8 s; ferry trips from 6 tiles (was 10).** One Carryall
+  then adds 6-10% at 15 min and pays back in ~4.5 min (~8 min with the Hi-Tech).
+
+Against stock Brutal, 100 games each (win % of the plan; "old" is the pre-round economy):
+
+| plan | small new | small old | medium new | medium old |
+|---|---|---|---|---|
+| eco: HQ Lv 2 and Harvesting first | 55 | 51 | 63 | 62 |
+| air: Hi-Tech at 2:30, 2 Carryalls (Carryall 500) | 40 | 24 | 40 | 38 |
+| air, Carryall 400 | 30 | | 46 | |
+| nocarry: never builds Carryalls | 53 | | 51 | |
+
+Carryalls as the AI uses them are worth about nothing (nocarry ~52%), and an early Hi-Tech still loses whatever the
+price; the air plan also loses more harvesters (4.1 vs 3.2 a game on small maps). That's the AI's use of them (mostly
+harvester snipes and troop drops; it only ferries trips over 12 tiles), not the price.
+
+Cross-faction (Hard, both sides): Atreides vs Corrino fell to 23% (200 games) and Fremen vs Atreides rose to 75% (100):
+Corrino's Harvesting needs no HQ Lv 2, so they get the much stronger upgrade sooner, and Spice Camps weren't slowed.
+Fixed with **the Atreides AI researching Harvesting first** (as the eco plan, which beats stock) — Atreides 31% vs
+Corrino — and **Spice Camps 8.5 → 7.2** — Fremen 49%.
+
+Mirror round robin, 40 games per pair (r17):
+
+| row vs col | std | rush | bio | mech | trike | tech | turtle | avg |
+|---|---|---|---|---|---|---|---|---|
+| std | . | 58 | 58 | 48 | 51 | 43 | 78 | 56 |
+| rush | 43 | . | 48 | 40 | 50 | 40 | 45 | 44 |
+| bio | 43 | 53 | . | 58 | 40 | 60 | 81 | 56 |
+| mech | 53 | 60 | 43 | . | 88 | 53 | 85 | 63 |
+| trike | 49 | 50 | 60 | 13 | . | 40 | 55 | 44 |
+| tech | 58 | 60 | 40 | 48 | 60 | . | 76 | 57 |
+| turtle | 23 | 55 | 19 | 15 | 45 | 24 | . | 30 |
+
+Spread 44-63 except the turtle (30), from 21-61: the rush is back (21 → 44) on the slower start. Triangle bio > mech 58,
+mech > trike 88, trike > bio 60 (it was 43 in r16, before the Harvesting-first order). Games 12.1 min (were 11.7).
+Kill ratios unchanged: tank 1.38, MLRS 2.97, infantry 0.89, trike 0.81. A minute+ ahead on tech wins: Weapons II 86%,
+Rockets 74%, HQ Lv 2 67%, Factory Lv 2 66%, Nitro 66%. Checks, smoke and determinism pass.
+
 ## Summary of changes (vs main)
 
 | | main | branch |
@@ -264,9 +315,16 @@ rocket bunker; an MLRS 12 out still does) and `mlrs-check` (the crossing target 
 | Factory Level 2 | 1,200: MLRS, Weapons II, Armor II | 1,500: MLRS only |
 | HQ Level 2 | Harvesting, Infantry Rockets | Harvesting, **Weapons II, Armor II** |
 | Atreides weapons vs shields | x1 | x2 |
+| Harvester pickup rate (all factions) | 60/s | 38/s |
+| Harvesting (Atreides and Corrino) | +20% load, +20% speed | +25% load, +25% speed, +50% pickup |
+| Spice Camp (Fremen) | 8.5/s | 7.2/s |
+| Hi-Tech Factory | 1,200, 16 s | 800, 11 s |
+| Carryall | 700, 12 s; ferries trips from 10 tiles | 400, 8 s; from 6 tiles |
+| Atreides AI research | Rockets first, Harvesting 5th | Harvesting first |
 
 Open / not done:
-- The infantry rush is the weak plan (21% small maps, 5% medium): every opening has trikes now, its counter.
+- Carryalls: cheap now, but the AI's use of them adds nothing (round 16); its ferry still waits for 12-tile trips.
+- The infantry rush was the weak plan (21% small maps, 5% medium) until the slower economy (44%, round 16); the turtle is now the weakest (30%).
   Cheaper infantry (80) didn't help it and broke the trike > bio leg (round 12).
 - Turtling loses (41%) — wanted — but nothing in the rules punishes a big army as such (no upkeep); the AI's waves
   cap at 16 units. A supply/upkeep rule would be a design decision.

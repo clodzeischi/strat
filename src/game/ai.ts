@@ -42,7 +42,7 @@ interface FactionKit {
 export const KITS: Record<Faction, FactionKit> = {
   atreides: {
     factory: 'factory', defense: 'bunker', raider: 'trike', scouts: ['trike', 'infantry'], mender: { unit: 'repair' }, tech: [],
-    levels: ['conyard', 'factory'], research: ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'], fallback: 'infantry',
+    levels: ['conyard', 'factory'], research: ['harvest', 'rockets', 'weapons1', 'armor1', 'nitro', 'weapons2', 'armor2'], fallback: 'infantry',
     siege: null, worker: 'harvester',
   },
   corrino: {

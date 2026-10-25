@@ -25,14 +25,14 @@ export const SHIELDS_BONUS = 0.2; // damage reduction to shields per Shields lev
 /** Razor Flame Range upgrade: extra reach, in world units. */
 export const FLAME_RANGE = 2;
 export const NITRO = { speed: 1.5, cooldown: 1 / 1.5 };
-export const HARVEST_UPGRADE = { capacity: 1.2, speed: 1.2 };
+export const HARVEST_UPGRADE = { capacity: 1.25, speed: 1.25, rate: 1.5 }; // rate: spice picked up per second
 
 /** Range bonus for shooting down from high ground, and penalty for shooting up at it. */
 export const HIGH_GROUND_RANGE = 0.1;
 
 export const HARVESTER = {
   capacity: 500,
-  rate: 60, // spice per second while harvesting
+  rate: 38, // spice per second while harvesting
   unloadRate: 250, // credits per second while unloading
 };
 
@@ -102,5 +102,5 @@ export const CARRYALL = {
   altitude: 8, // cruising height above y = 0
   clearance: 4.2, // least height over the ground under and just ahead (climbs over cliffs with a vehicle hanging)
   orbit: 11, // radius of the holding circle
-  ferryMin: 10, // tiles: harvester trips shorter than this aren't worth a lift
+  ferryMin: 6, // tiles: harvester trips shorter than this aren't worth a lift
 };

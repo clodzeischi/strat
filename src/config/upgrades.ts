@@ -12,13 +12,13 @@ export const UPGRADES: Record<UpgradeType, UpgradeDef> = {
   armor2: { line: 'armor', name: 'Armor II', short: 'Armor II', cost: 1200, time: 45, requires: ['conyard2'], after: 'armor1', desc: 'Units and buildings take 30% less damage (total).' },
   rockets: { name: 'Infantry Rockets', short: 'Inf. Rockets', cost: 800, time: 25, requires: ['barracks', 'factory'], desc: 'Infantry switch to rocket launchers against Armored targets.' },
   nitro: { name: 'Trike Nitro', short: 'Trike Nitro', cost: 500, time: 20, requires: ['factory'], desc: 'Trikes move 50% faster and fire 50% faster.' },
-  harvest: { line: 'harvest', name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['conyard2', 'refinery'], desc: 'Harvesters carry 20% more and move 20% faster.' },
+  harvest: { line: 'harvest', name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['conyard2', 'refinery'], desc: 'Harvesters carry 25% more, move 25% faster and pick up spice 50% faster.' },
 
   // ---- Corrino: one level each ----
   cWeapons: { line: 'weapons', name: 'Weapons +1', short: 'Weapons +1', cost: 900, time: 35, requires: ['fab'], desc: '+20% damage for all units.' },
   cArmor: { line: 'armor', name: 'Armor +1', short: 'Armor +1', cost: 900, time: 35, requires: ['fab'], desc: 'Units and buildings take 15% less damage to health.' },
   cShields: { line: 'shields', name: 'Shields +1', short: 'Shields +1', cost: 900, time: 35, requires: ['tleilaxu'], desc: 'Shields take 20% less damage.' },
-  cHarvest: { line: 'harvest', name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['refinery', 'fab'], desc: 'Harvesters carry 20% more and move 20% faster.' },
+  cHarvest: { line: 'harvest', name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['refinery', 'fab'], desc: 'Harvesters carry 25% more, move 25% faster and pick up spice 50% faster.' },
   flame: { name: 'Razor Flame Range', short: 'Flame Range', cost: 500, time: 20, requires: ['fab'], desc: 'Razor flamethrowers reach one tile further.' },
 
   // ---- Fremen: two levels of Weapons and Armor, one per Sietch level after the first ----

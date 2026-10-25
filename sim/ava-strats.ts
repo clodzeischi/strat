@@ -45,6 +45,12 @@ export const STRATS: Record<string, Strat> = {
 /** Not in the round robin: stock Brutal without its micro (kiting, focus fire), to see what control is worth. */
 export const EXTRA: Record<string, Strat> = {
   nomicro: { profile: BRUTAL_PROFILE, opts: { micro: false } },
+  // Stock Brutal that goes for the economy: HQ Level 2 first and Harvesting before anything else.
+  eco: { profile: { ...BRUTAL_PROFILE, kit: { levels: ['conyard', 'factory'], research: ['harvest', 'rockets', 'weapons1', 'armor1', 'nitro', 'weapons2', 'armor2'] } } },
+  // Stock Brutal with an early Hi-Tech Factory, so its two Carryalls ferry harvesters from the first minutes.
+  air: { profile: BRUTAL_PROFILE, opts: { hitechAt: 150, hitechAtLarge: 150, hitechArmy: 0, hitechLead: 0, hitechSpare: 0 } },
+  // Stock Brutal that never builds Carryalls: what its usual (late) Carryalls are worth.
+  nocarry: { profile: BRUTAL_PROFILE, opts: { carryalls: 0 } },
 };
 
 export function makeStrat(g: Game, team: Team, name: string): BrutalAI {

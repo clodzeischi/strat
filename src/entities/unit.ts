@@ -1145,7 +1145,7 @@ export class Unit extends Entity {
           break;
         }
         this.lastSpice = c;
-        this.cargo += map.takeSpice(c.cx, c.cz, HARVESTER.rate * dt);
+        this.cargo += map.takeSpice(c.cx, c.cz, HARVESTER.rate * (game.tier(this.team, 'harvest') ? HARVEST_UPGRADE.rate : 1) * dt);
         game.terrain.refreshTile(c.cx, c.cz);
         this.heading += dm.sin(game.time * 1.5) * dt * 0.5;
         this.puffTimer -= dt;
