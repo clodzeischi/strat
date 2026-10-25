@@ -236,6 +236,22 @@ The Warrior promoted by the rite: the elite, "the knife in the dark". Built to s
 
   The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py` and `die.py` in the .blend. Don't rerun them over hand edits.
 
+### Fremen Mortar (`mortar`)
+
+The Warrior by another rite: a patient spotter who sits still for long stretches, dressed to vanish into the dunes, so he's the light-tan Fremen. The Warrior's rig and scale plus three bones (`pistol`, `tube`, `bipod`). 512 tris for the body, 556 with the pistol.
+- **Body:** the Warrior's stillsuit under a sand-coloured cowl and mantle with a ragged hem, a sand head cover, and sand wraps on the forearms and shins. The goggles and mask stay, and a monocular sight with a cyan lens sits over his right eye for the guided rockets.
+- **The tube** (the top-down read): slung diagonally across his back from the right hip to over the left shoulder, the longest straight line on any infantry. It has a dark breech and muzzle, a sand-wrapped body and a team band, with the bipod folded along it. A rack of three rockets with team-coloured noses sits on the left of the small of his back.
+- **`weapons0`** (the only tier): the Warrior's maula pistol, for close quarters, with a holster on his right thigh.
+- **Animation:** a patient spotter, each action directed by the user.
+  - Idle: standing easy, pistol low, the head and monocle slowly sweeping the horizon, one easy breath (2 s).
+  - Walk: steady and upright on a 6-frame cycle, the pistol low and swinging a little.
+  - Shoot (pistol): side-on, the right arm straight out at the target, a sharp small kick (the 0.8 s cooldown).
+  - Deploy (12 frames, played over the 1.5 s set-up): the pistol goes into the holster; he reaches back for the tube and drops to his right knee; the tube swings off his back round his left side; the breech plants between his knees and the bipod swings down to the sand; his hands settle on the tube.
+  - Shoot set (8 frames): unflinching. The breech shoves back along the sand and the muzzle lifts a hair, his hands riding it.
+  - Die: the hit spins him a quarter turn to his right; he drops to his knee and topples onto his left side, the tube across his back.
+
+  The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py`, `deploy.py`, `shoot_set.py` and `die.py` in the .blend, with `mortar_keys.py` (keying that includes the travelling bones). Don't rerun them over hand edits. The 90-frame budget is used to the frame.
+
 ### Spice Crew (`crew`)
 
 A spice hunter, a little gone on it: a weary pack mule under a frame ruck that dwarfs him. The Warrior's rig and scale. 448 tris for the body, 480 with the probe. The only unit in spice orange (`palette2.png`), so a crew is easy to find on the field.

@@ -46,8 +46,8 @@ How to build a unit or building model in Blender so it drops into the game as a 
 | `artillery` | Soulcrusher | Corrino | 1.1 | yes | weapons, armor | deploy animation |
 | `warrior` | Fremen Warrior | Fremen | 0.45 | | weapons, armor | animated |
 | `fedaykin` | Fedaykin | Fremen | 0.5 | | weapons, armor | animated |
-| `mortar` | Fremen Mortar | Fremen | 0.5 | | | animated; deploy animation |
-| `crew` | Spice Crew | Fremen | 0.45 | | | animated |
+| `mortar` | Fremen Mortar | Fremen | 0.5 | | | animated; sets up (`deploy`, `shoot_set`, `muzzle_deploy`) |
+| `crew` | Spice Crew | Fremen | 0.45 | | | animated; no `shoot` (unarmed) |
 | `glider` | Wind Glider | Fremen | 0.9 | | | aircraft; the game rolls it in turns |
 
 ### Buildings
@@ -170,7 +170,7 @@ Delete faces pointing more than 45° down (normal Z < −0.7): no camera ever se
 
 Rig with an armature and animate as usual. A build step samples each frame and bakes the result into a vertex animation texture, so the armature doesn't ship.
 
-- Actions, named exactly: `idle`, `walk`, `shoot`, `die`. `deploy` is also needed for `mortar` and `crew`.
+- Actions, named exactly: `idle`, `walk`, `shoot`, `die`. An unarmed unit (`crew`) has no `shoot`. A unit that sets up (`mortar`) also has `deploy` and `shoot_set`, below.
 - Animate at **15 fps** (scene frame rate). `idle`, `walk` and `shoot` must loop: the first and last frames match.
 - Keep each action short. `walk` is one stride cycle of about 0.6–0.8 s at walking speed (2.4–3 m/s, see `speed` in `units.ts`). Total across all actions ≤ 90 frames.
 - The rig moves on the spot: no root motion. The game moves the unit.
@@ -186,6 +186,15 @@ Infantry upgrades are **add-ons**, not swap bodies (the game shows every tier up
 - Every mesh is skinned to the one shared armature, so all parts follow every action.
 - `muzzle` is an Empty parented to the `hand.R` bone at the base gun's barrel tip. `muzzle_rockets` (same idea, on the rocket tube) is reserved; the game doesn't read it yet.
 - Count the triangle budget with every add-on shown.
+
+### Animated units that set up (`mortar`)
+
+- **`deploy`:** from the mobile stance (first frame) to set up (last frame). The game plays it as a slider over the unit's set-up time, and backwards when it packs up. So its frames are poses at even steps, not timing: about 12 is plenty.
+- **`shoot_set`:** the shot once set up. It starts and ends on `deploy`'s last frame. Between shots the game holds that last frame. An optional `idle_set` loop replaces the held frame.
+- **`muzzle_deploy`:** an Empty on the bone of the set-up weapon (the Mortar's `tube`). Set-up shots leave from here, and `muzzle` is used on the move.
+- **Parts that travel**, like a gun that leaves the hand for a holster or a tube that comes off the back, get their own bones: the Mortar has `pistol` (child of `hand.R`), `tube` (child of `chest`) and `bipod` (child of `tube`). Key their location as well as their rotation in every action.
+- **`spade_N` empties and `plant` on `body`** work as for rigid units below. The Mortar's are on the breech and the bipod's feet.
+- **`die` starts from the mobile stance.** A unit killed while set up blends into it over 0.08 s.
 
 ### Rigid moving parts (vehicles, buildings)
 
