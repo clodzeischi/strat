@@ -143,13 +143,13 @@ Hex values are sRGB, as in Blender's color picker. Blender models don't use the 
 
 `src/public/models/palette2.png` has the same layout and rules, on the `palette2` material (an Image Texture of it, **Closest**). Unused swatches are magenta, so a stray UV shows at once.
 
-| Row | Col 0 | Col 1 | Cols 2–3 |
-|---|---|---|---|
-| 1 | `8C3B10` spice, dark | `4A2C1A` leather, dark | unused |
-| 2 | `D2691E` spice | `7A4A2A` leather | unused |
-| 3 | `F4A259` spice, light | `A8774B` leather, light | unused |
+| Row | Col 0 | Col 1 | Col 2 | Col 3 |
+|---|---|---|---|---|
+| 1 | `8C3B10` spice, dark | `4A2C1A` leather, dark | `3A0F0C` flesh, dark | unused |
+| 2 | `D2691E` spice | `7A4A2A` leather | `7A2A20` flesh | unused |
+| 3 | `F4A259` spice, light | `A8774B` leather, light | `B0584A` flesh, light | unused |
 
-In the infantry skill's `shells.py` these are `SPICE['O' / 'H' / 'L']` and `BROWN['O' / 'H' / 'L']`; `build_object` puts them on material index 2, so pass `[palette, team, palette2]`.
+In the infantry skill's `shells.py` these are `SPICE['O' / 'H' / 'L']`, `BROWN[…]` and `FLESH[…]`; `build_object` puts them on material index 2, so pass `[palette, team, palette2]`.
 
 ## Budgets
 
