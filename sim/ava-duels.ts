@@ -2,19 +2,22 @@
 // (kiting, focus fire), on a few maps with the sides swapped. Score: (value A has left - value B has left) / value
 // at the start, from -1 to +1, averaged with the mirrored fight. Done early (no upgrades) and late (both sides with
 // everything: Weapons/Armor cancel out, Infantry Rockets and Trike Nitro don't). Usage: npx tsx sim/ava-duels.ts [budget]
+// FACTION=corrino for Corrino units; PAIRS=trooper:raider,sardaukar:trooper for just those fights; STATE=early or late.
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
 import './tune';
 import { Micro } from '../src/game/micro';
-import { UNITS, type Team, type UnitType, type UpgradeType } from '../src/config';
+import { UNITS, type Faction, type Team, type UnitType, type UpgradeType } from '../src/config';
 
-const TYPES: UnitType[] = ['infantry', 'trike', 'tank', 'rocket'];
+const FACTION = (process.env.FACTION ?? 'atreides') as Faction;
+const TYPES: UnitType[] = FACTION === 'corrino' ? ['trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery'] : ['infantry', 'trike', 'tank', 'rocket'];
 const BUDGET = Number(process.argv[2] ?? 3000);
 const SEEDS = [1003, 1007, 1012, 1020];
-const STATES: [string, UpgradeType[]][] = [['early', []], ['late', ['rockets', 'nitro', 'weapons1', 'weapons2', 'armor1', 'armor2']]];
+const LATE: UpgradeType[] = FACTION === 'corrino' ? ['cWeapons', 'cArmor', 'cShields', 'flame'] : ['rockets', 'nitro', 'weapons1', 'weapons2', 'armor1', 'armor2'];
+const STATES: [string, UpgradeType[]][] = [['early', []], ['late', LATE]];
 
 function fight(a: UnitType, b: UnitType, ups: UpgradeType[], seed: number, swap: boolean): number {
-  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, seed, ['atreides', 'atreides']);
+  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, seed, [FACTION, FACTION]);
   for (const u of [...g.units]) { u.hp = 0; (g as any).kill(u, null); }
   const [ta, tb]: Team[] = swap ? [1, 0] : [0, 1];
   for (const t of [0, 1] as Team[]) for (const up of ups) g.teams[t].upgrades.add(up);
@@ -45,7 +48,17 @@ function fight(a: UnitType, b: UnitType, ups: UpgradeType[], seed: number, swap:
   return (value(ta) - value(tb)) / start;
 }
 
+const PAIRS = process.env.PAIRS?.split(',').map((p) => p.split(':') as [UnitType, UnitType]);
 for (const [name, ups] of STATES) {
+  if (process.env.STATE && process.env.STATE !== name) continue;
+  if (PAIRS) {
+    for (const [a, b] of PAIRS) {
+      let s = 0, n = 0;
+      for (const seed of SEEDS) for (const swap of [false, true]) { s += fight(a, b, ups, seed, swap) - fight(b, a, ups, seed, !swap); n += 2; }
+      console.log(`${name} ${a} vs ${b}: ${(s / n).toFixed(2)}`);
+    }
+    continue;
+  }
   console.log(`${name} (budget ${BUDGET})`.padEnd(18) + TYPES.map((t) => t.padStart(9)).join(''));
   for (const a of TYPES) {
     const cells = TYPES.map((b) => {

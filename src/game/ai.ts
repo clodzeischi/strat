@@ -96,6 +96,8 @@ export interface AIProfile {
    * The share it waits for shrinks the longer a wave has been due.
    */
   waveGate: number;
+  /** The least share of `waveGate` a long-overdue wave settles for (default 0.5; see manageWaves). */
+  patience?: number;
   /** How closely unit picks follow the best counter to the enemy army (see `counterWeights`; higher: more strictly). */
   counterFocus: number;
   /**
@@ -497,9 +499,11 @@ export class AI {
     const goal = this.econGoal();
     const army = g.units.filter((u) => u.team === this.team && u.def.weapon).length;
     const step = this.rebuildStep() ?? (this.profile.saveForOpening && !ts.building ? this.openingStep() : null);
+    // A tech step is bought with the fund still left over (manageTech), so saving for one keeps both back.
+    const tech = army >= this.profile.techArmy ? this.techGoal()?.cost ?? 0 : 0;
     const reserve = goal ? goal.cost
       : step ? BUILDINGS[step].cost
-      : refineries < this.wantRefineries() ? 800 : army >= this.profile.techArmy ? (this.techGoal()?.cost ?? 0) : 0;
+      : refineries < this.wantRefineries() ? 800 : tech ? tech + this.fund() : 0;
     // Falling well behind the enemy's army (an early rush, say): only getting income back still comes first.
     const behind = this.behindFor >= 5;
 
@@ -1550,7 +1554,7 @@ export class AI {
     if (!seize) {
       // The longer it's been since a wave was due, the less of an edge it waits for (down to half after five
       // minutes), so two evenly matched armies don't just stare at each other all game.
-      const patience = Math.max(0.5, 1 - (g.time - this.nextWaveTime) / 600);
+      const patience = Math.max(this.profile.patience ?? 0.5, 1 - (g.time - this.nextWaveTime) / 600);
       if (g.time < this.nextWaveTime || strength < enemy * this.profile.waveGate * patience) return;
       // A full-size wave, or a smaller one if it's been a long while, so the pressure keeps up after heavy losses.
       const overdue = g.time >= this.nextWaveTime + 90;
