@@ -15,6 +15,8 @@ export interface UnitModel {
   jets?: THREE.Object3D[];
   /** Units that deploy: poses the model from 0 (mobile) to 1 (dug in). Drawing only. */
   deploy?: (t: number) => void;
+  /** Units that deploy: where shots start once dug in, if not at `muzzle` (a Fremen Mortar's tube, not his pistol). */
+  muzzleDeploy?: THREE.Object3D;
   /** Units that deploy: where their spades bite into the ground, and how far into the deploy (0-1) they do. */
   plant?: { at: number; spades: THREE.Object3D[] };
   /** Blender models: shows the parts for these upgrades (instead of building an upgrade kit). */
@@ -33,6 +35,11 @@ export interface UnitAnimator {
   update(dt: number): void;
   /** Starts the death action; returns its length in seconds (0 without one). */
   die(): number;
+  /**
+   * Units that deploy: how far set up (0 mobile, 1 set up). In between, the `deploy` action is held at that point;
+   * set up, `idle` and `shoot` play as `idle_set` and `shoot_set` (the end of `deploy` if there's no `idle_set`).
+   */
+  deploy(t: number): void;
 }
 
 /** Extra parts showing upgrades; `turret` parts follow the turret's rotation. */
