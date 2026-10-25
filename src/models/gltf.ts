@@ -24,6 +24,7 @@ const INFANTRY_SCALE = 1.6;
 /** Animated (skinned) models' actions by name: `idle`, `walk`, `shoot`, `die`. */
 const clips = new Map<string, THREE.AnimationClip[]>();
 let paletteMat: THREE.MeshLambertMaterial | null = null;
+let palette2Mat: THREE.MeshLambertMaterial | null = null;
 const teamMats = new Map<number, THREE.MeshLambertMaterial>();
 
 /** Loads the shared palette and every listed model. Call once before the first building or unit is made. */
@@ -36,6 +37,14 @@ export async function loadModels(): Promise<void> {
   paletteMat = new THREE.MeshLambertMaterial({ map: palette, flatShading: true });
   // Shadows come from back faces by default, and models have their undersides deleted: cast from both sides.
   paletteMat.shadowSide = THREE.DoubleSide;
+  // The second palette (same layout) for colours the first has no room for, on a material named `palette2`.
+  const palette2 = await new THREE.TextureLoader().loadAsync('models/palette2.png');
+  palette2.colorSpace = THREE.SRGBColorSpace;
+  palette2.magFilter = palette2.minFilter = THREE.NearestFilter;
+  palette2.generateMipmaps = false;
+  palette2.flipY = false;
+  palette2Mat = paletteMat.clone();
+  palette2Mat.map = palette2;
   const loader = new GLTFLoader();
   await Promise.all(
     FILES.map(async (f) => {
@@ -46,6 +55,7 @@ export async function loadModels(): Promise<void> {
           // Exported without normals; flat shading doesn't need them, but shadows' normal bias does.
           if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
           o.userData.team = (o.material as THREE.Material).name === 'team';
+          o.userData.palette2 = (o.material as THREE.Material).name === 'palette2';
           o.castShadow = true;
           o.receiveShadow = true;
           // Skinned parts move far from their rest pose (lying down when dying): cull them by a generous sphere.
@@ -87,7 +97,7 @@ function cloneModel(key: string, color: number): THREE.Object3D | null {
   // Skinned meshes need their own skeleton per copy; plain models share everything but transforms.
   const copy = clips.has(key) ? cloneSkinned(src) : src.clone(true);
   copy.traverse((o) => {
-    if (o instanceof THREE.Mesh) o.material = o.userData.team ? teamMat(color) : paletteMat!;
+    if (o instanceof THREE.Mesh) o.material = o.userData.team ? teamMat(color) : o.userData.palette2 ? palette2Mat! : paletteMat!;
   });
   return copy;
 }

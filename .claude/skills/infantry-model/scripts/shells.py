@@ -10,6 +10,7 @@ from mathutils.geometry import intersect_point_line
 
 H = 0.75 / 1.8
 CLOTH = 'CLOTH'     # the darker team shade, (1, 0) on the team material
+SPICE = dict(O=('P2', 0, 1), H=('P2', 0, 2), L=('P2', 0, 3))   # spice oranges on palette2.png, darkest first
 
 class Mesh:
     """Plain lists: verts (co, weights), faces (vert ids, swatch), shells (face ids, axis polyline or None = closed),
@@ -99,6 +100,7 @@ def build_object(m, name, coll, rig, mats, M=None):
         mat, s = 0, sw
         if sw == CLOTH: mat, s = 1, (1, 0)
         elif sw == 'TEAM': mat, s = 1, TEAM
+        elif sw[0] == 'P2': mat, s = 2, sw[1:]          # palette2.png swatch: needs mats[2] = the palette2 material
         f.material_index = mat; f.smooth = False
         for l in f.loops: l[uv].uv = uv_of(s)
     bm.normal_update()
