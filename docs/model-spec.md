@@ -143,13 +143,13 @@ Hex values are sRGB, as in Blender's color picker. Blender models don't use the 
 
 `src/public/models/palette2.png` has the same layout and rules, on the `palette2` material (an Image Texture of it, **Closest**). Unused swatches are magenta, so a stray UV shows at once.
 
-| Row | Col 0 | Col 1 | Cols 2–3 |
-|---|---|---|---|
-| 1 | `8C3B10` spice, dark | `4A2C1A` leather, dark | unused |
-| 2 | `D2691E` spice | `7A4A2A` leather | unused |
-| 3 | `F4A259` spice, light | `A8774B` leather, light | unused |
+| Row | Col 0 | Col 1 | Col 2 | Col 3 |
+|---|---|---|---|---|
+| 1 | `8C3B10` spice, dark | `4A2C1A` leather, dark | `3A0F0C` flesh, dark | unused |
+| 2 | `D2691E` spice | `7A4A2A` leather | `7A2A20` flesh | unused |
+| 3 | `F4A259` spice, light | `A8774B` leather, light | `B0584A` flesh, light | unused |
 
-In the infantry skill's `shells.py` these are `SPICE['O' / 'H' / 'L']` and `BROWN['O' / 'H' / 'L']`; `build_object` puts them on material index 2, so pass `[palette, team, palette2]`.
+In the infantry skill's `shells.py` these are `SPICE['O' / 'H' / 'L']`, `BROWN[…]` and `FLESH[…]`; `build_object` puts them on material index 2, so pass `[palette, team, palette2]`.
 
 ## Budgets
 
@@ -196,6 +196,10 @@ Infantry upgrades are **add-ons**, not swap bodies (the game shows every tier up
 - **Parts that travel**, like a gun that leaves the hand for a holster or a tube that comes off the back, get their own bones: the Mortar has `pistol` (child of `hand.R`), `tube` (child of `chest`) and `bipod` (child of `tube`). Key their location as well as their rotation in every action.
 - **`spade_N` empties and `plant` on `body`** work as for rigid units below. The Mortar's are on the breech and the bipod's feet.
 - **`die` starts from the mobile stance.** A unit killed while set up blends into it over 0.08 s.
+
+### Bones placed by the game (`sandworm`)
+
+The ridden Sandworm is skinned like infantry but has no actions: the game sets its bones every frame. `seg_0` (the head, at the origin) to `seg_11` (the tail) sit `RIDE.spacing` (1.7) apart along -X, none parented, each laid on the head's trail facing its way; `petal_0`–`petal_2` are children of `seg_0` with their origins on the rim, and the game turns each outward about X × its radial to open the maw. It's built in game units (no infantry scale); radii by bone are in `BONE_RADII` in `src/models/sandworm.ts`, which must match `build.py`.
 
 ### Rigid moving parts (vehicles, buildings)
 

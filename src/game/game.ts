@@ -176,6 +176,8 @@ export interface RiddenWorm extends Mount {
   /** Where the head has been, newest first (a point every so often): the body follows it. */
   trail: Point[];
   eatenEnemy: number;
+  /** When it last bit (it opens its maw), from when it surfaced. */
+  bitAt: number;
   /** Drawing only: each piece's position last tick and this tick. */
   model: RiddenWormModel;
   from: THREE.Vector3[];
@@ -2079,11 +2081,11 @@ export class Game {
   private rideWorm(b: Building, rider: Unit): void {
     const model = makeRiddenWorm(RIDE.segments);
     this.scene.add(model.root);
-    const n = model.pieces.length;
+    const n = model.count;
     const heading = dm.atan2(rider.z - b.z, rider.x - b.x) + Math.PI;
     const ground = this.map.surfaceAt(b.x, b.z);
     const w: RiddenWorm = {
-      rider, team: rider.team, x: b.x, z: b.z, heading, until: this.time + RIDE.time, nextBite: 0,
+      rider, team: rider.team, x: b.x, z: b.z, heading, until: this.time + RIDE.time, nextBite: 0, bitAt: this.time,
       lairX: b.x, lairZ: b.z, loop: this.random() * Math.PI * 2, wobble: this.random() * Math.PI * 2,
       target: null, path: [], goal: null, repath: 0, unreachable: new Set(), trail: [{ x: b.x, z: b.z }], eatenEnemy: 0, lift: RIDE.lift,
       model, from: [], to: [], headings: [], dustTimer: 0,
@@ -2261,6 +2263,7 @@ export class Game {
     ];
     if (!victims.length) return;
     w.nextBite = this.time + WORM.biteEvery;
+    w.bitAt = this.time;
     for (const v of victims) {
       this.wormBiting = true;
       this.damage(v, WORM.weapon, 1, w.rider);
@@ -2318,27 +2321,34 @@ export class Game {
    */
   private drawRidden(dt: number, alpha: number): void {
     const now = this.time + alpha * 0.05;
+    const at = new THREE.Vector3();
     for (const w of this.ridden) {
-      const { root, pieces, radii } = w.model;
+      const { root, radii } = w.model;
       root.visible = this.revealAll || this.vision.seesAt(this.localTeam, w.x, w.z);
-      for (let i = 0; i < pieces.length; i++) {
-        const p = pieces[i];
-        p.position.lerpVectors(w.from[i], w.to[i], alpha);
-        p.position.y += -radii[i] * RIDE.sink + 0.12 * dm.sin(now * 3 - i * 0.8);
+      // The maw opens as it surfaces and for each bite (fast open, a beat held, slower close), and the head rears up
+      // out of the sand with it, the first few pieces following.
+      const since = now - w.bitAt;
+      const open = since < 0.15 ? since / 0.15 : since < 0.55 ? 1 : Math.max(0, 1 - (since - 0.55) / 0.55);
+      w.model.open(open);
+      let seat: THREE.Vector3 | null = null;
+      for (let i = 0; i < w.model.count; i++) {
+        at.lerpVectors(w.from[i], w.to[i], alpha);
+        at.y += -radii[i] * RIDE.sink + 0.1 * dm.sin(now * 3 - i * 0.8);
+        const rear = open * Math.max(0, 1 - i / RIDE.rear);
+        at.y += rear * 1.6;
         const h = w.headings[i];
         let turn = h.to - h.from;
         turn -= Math.round(turn / (2 * Math.PI)) * 2 * Math.PI;
-        p.rotation.y = -(h.from + turn * alpha);
+        w.model.place(i, at, h.from + turn * alpha, rear * 0.5);
+        if (i === RIDE.seat) seat = at.clone();
       }
       // The rider on his ring's back, moving with it (drawn after the units, so this wins over his own pose).
-      const seat = pieces[RIDE.seat];
-      w.rider.root.position.set(seat.position.x, seat.position.y + radii[RIDE.seat], seat.position.z);
+      w.rider.root.position.set(seat!.x, seat!.y + radii[RIDE.seat], seat!.z);
       if (root.visible) {
         w.dustTimer -= dt;
         if (w.dustTimer <= 0) {
           w.dustTimer = 0.1;
-          const t = pieces[pieces.length - 1].position;
-          this.effects.dust(new THREE.Vector3(t.x, t.y, t.z), 0xd8c49a, 0.9);
+          this.effects.dust(at.clone(), 0xd8c49a, 0.9);   // the tail tip, the last piece placed
         }
       }
     }

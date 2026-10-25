@@ -268,6 +268,15 @@ The elite melee Fremen, the one who rides the worm. After the concept, pushed aw
 
   The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py`, `die.py` and `ride.py` in the .blend. Don't rerun them over hand edits.
 
+### Sandworm, ridden (`sandworm`)
+
+Shai-Hulud under a Sandrider: kept mostly under the sand, so what shows is a long plated back cutting through the dunes, and the head rearing up to bite. One continuous skinned body (884 tris) on 12 bones the game lays along the head's trail every frame, so it bends with its path. No clips.
+- **Body:** overlapping armour plates like a lobster's tail, each rising sharply at its front edge and sloping down to the next; sand-coloured, the ridge of the back sun-bleached, the steps dark; tapering to a pointed tail.
+- **Head:** a steel-grey armour collar with dark seams, a rim of 12 raked teeth round a dark flesh throat.
+- **Maw:** three petals (`petal_0`–`petal_2`) hinged on the rim. Closed, they meet in a pointed beak, steel outside with a dark seam; open, they peel back about 110°, flesh inside.
+- **In game:** each section sits three quarters of its radius under the sand, on a slow wave down the body; the rider stands on the back of the third bone (the worm's second ring) and rides the wave. The maw opens as he surfaces and for every bite (open in 0.15 s, held, closed by 1.1 s), and the head rears 1.6 up out of the sand with it, the first three bones following.
+- Built by `build.py` in `art/models/units/sandworm.blend`. The wild worm a Thumper calls without a rider still uses the procedural column.
+
 ### Spice Crew (`crew`)
 
 A spice hunter, a little gone on it: a weary pack mule under a frame ruck that dwarfs him. The Warrior's rig and scale. 448 tris for the body, 480 with the probe. The only unit in spice orange (`palette2.png`), so a crew is easy to find on the field.
