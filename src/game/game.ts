@@ -1429,6 +1429,19 @@ export class Game {
 
   // ---- Fremen: hiding, healing, Spice Camps ------------------------------------------
 
+  /**
+   * Fremen Dig In: a unit on sand or spice goes under at once (hidden from the next vision tick) and holds its fire
+   * until it's given another order. Hit, it comes out as usual and digs in again HIDE.delay s later.
+   */
+  digIn(u: Unit): void {
+    if (!u.def.hides || u.dead || u.carrier || u.falling || u.mount || u.rite || !u.onSand(this)) return;
+    u.queue = [];
+    u.command(this, { kind: 'dig' });
+    u.hideX = u.x;
+    u.hideZ = u.z;
+    u.stillSince = Math.min(u.stillSince, this.time - HIDE.delay);
+  }
+
   /** Brings a hidden unit out of the sand (it fired, or was hit), and starts its wait to hide again. */
   unhide(u: Unit): void {
     u.hidden = false;
@@ -1926,11 +1939,11 @@ export class Game {
     return false;
   }
 
-  /** Whether the worm goes after this: within its hunting ground and on the sand, moving or not. */
+  /** Whether the worm goes after this: within its hunting ground and on the sand, moving or not (not dug-in Fremen). */
   private wormPrey(w: Sandworm, e: Entity | null): e is Entity {
     if (!e || e.dead || w.unreachable.has(e.id)) return false;
     if (e instanceof Unit) {
-      if (e.def.air || e.carrier || e.falling || e.mount) return false;
+      if (e.def.air || e.carrier || e.falling || e.mount || e.hidden) return false;
       if (!this.onWormGround(e.x, e.z)) return false;
       return hypot(e.x - w.lairX, e.z - w.lairZ) <= WORM.range;
     }
@@ -2023,7 +2036,7 @@ export class Game {
     w.target = null;
     w.path = [];
     const victims: Entity[] = [
-      ...this.units.filter((u) => !u.dead && !u.def.air && !u.carrier && !u.falling && !u.mount && this.onWormGround(u.x, u.z) && distTo(u, x, z) <= WORM.bite),
+      ...this.units.filter((u) => !u.dead && !u.def.air && !u.carrier && !u.falling && !u.mount && !u.hidden && this.onWormGround(u.x, u.z) && distTo(u, x, z) <= WORM.bite),
       ...this.buildings.filter((b) => !b.dead && this.onSandFootprint(b) && distTo(b, x, z) <= WORM.bite),
     ];
     for (const v of victims) {
@@ -2182,11 +2195,11 @@ export class Game {
     }
   }
 
-  /** Whether the ridden worm goes after this on its own: an enemy on the sand within reach of it, moving or not. */
+  /** Whether the ridden worm goes after this on its own: an enemy on the sand within reach of it, moving or not (not dug in). */
   private riddenPrey(w: RiddenWorm, e: Entity | null): e is Entity {
     if (!e || e.dead || e.team === w.team || w.unreachable.has(e.id)) return false;
     if (e instanceof Unit) {
-      if (e.def.air || e.carrier || e.falling || e.mount) return false;
+      if (e.def.air || e.carrier || e.falling || e.mount || e.hidden) return false;
       return this.onWormGround(e.x, e.z) && hypot(e.x - w.x, e.z - w.z) <= RIDE.hunt;
     }
     return e instanceof Building && distTo(e, w.x, w.z) <= RIDE.hunt && this.onSandFootprint(e);
@@ -2284,7 +2297,7 @@ export class Game {
     if (this.time < w.nextBite) return;
     const near = (e: Entity) => !e.dead && e.team !== w.team && distTo(e, w.x, w.z) <= WORM.bite;
     const victims: Entity[] = [
-      ...this.units.filter((u) => near(u) && !u.def.air && !u.carrier && !u.falling && !u.mount && this.onWormGround(u.x, u.z)),
+      ...this.units.filter((u) => near(u) && !u.def.air && !u.carrier && !u.falling && !u.mount && !u.hidden && this.onWormGround(u.x, u.z)),
       ...this.buildings.filter((b) => near(b) && this.onSandFootprint(b)),
     ];
     if (!victims.length) return;
@@ -2537,8 +2550,8 @@ export class Game {
         const b = us[j];
         if (a.team === b.team && (walksThrough(a, b) || walksThrough(b, a))) continue;
         // Dug-in units (deployed Soulcrushers) and units holding position don't budge: whoever bumps into them moves aside.
-        const aFixed = a.deployState !== 'mobile' || a.order.kind === 'hold';
-        const bFixed = b.deployState !== 'mobile' || b.order.kind === 'hold';
+        const aFixed = a.deployState !== 'mobile' || a.order.kind === 'hold' || a.order.kind === 'dig';
+        const bFixed = b.deployState !== 'mobile' || b.order.kind === 'hold' || b.order.kind === 'dig';
         if (aFixed && bFixed) continue;
         const minD = a.radius + b.radius;
         let dx = b.x - a.x;

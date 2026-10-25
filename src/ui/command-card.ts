@@ -87,7 +87,7 @@ export class CommandCard {
   /** The selection's lead kind last frame, to follow Tab. */
   private lead: string | null = null;
   /** Command tab buttons by name, laid out per selection in `commandLayout`. */
-  private commands: Record<'attack' | 'stop' | 'hold' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine' | 'lock' | 'setup' | 'pack' | 'thump', Slot>;
+  private commands: Record<'attack' | 'stop' | 'hold' | 'drop' | 'unload' | 'rally' | 'salvage' | 'mend' | 'deploy' | 'detonate' | 'mine' | 'lock' | 'setup' | 'pack' | 'thump' | 'dig', Slot>;
   private tabEls: { el: HTMLElement; key: HTMLElement; bar: HTMLElement; badge: HTMLElement; state: string }[] = [];
   private cells: CardEl[] = [];
   private slots: Record<Tab, (Slot | null)[]>;
@@ -214,13 +214,14 @@ export class CommandCard {
     if (!this.input.ownUnits().length) return [];
     const u = lead instanceof Unit ? lead : null;
     // D: the kind's ability (Carryall drop, Artillery deploy, Sky Raider mine, Plant Thumper). F: Hold Position. V,
-    // out of the way: self-destruct.
+    // out of the way: self-destruct, or (Fremen) Dig In.
     const ability = u?.type === 'carryall' ? c.drop : u?.def.deploy ? c.deploy : u?.def.mines ? c.mine : u?.def.lockOn ? c.lock : u?.def.camp ? c.setup
       : u?.def.thumper ? c.thump : null;
     const hold = this.input.canHold() ? c.hold : null;
     // Bottom row: the rites this kind can go through (Fremen Warriors into Fedaykin or Mortars).
     const rites = (FACTIONS[this.faction].rites ?? []).filter((t) => u && this.game.unitDef(u.team, t).rite?.from === u.type).map((t) => this.riteSlot(t));
-    return [c.attack, c.stop, ability, hold, rites[0] ?? null, rites[1] ?? null, rites[2] ?? null, u?.def.detonate ? c.detonate : null];
+    const last = u?.def.detonate ? c.detonate : this.input.canDig() ? c.dig : null;
+    return [c.attack, c.stop, ability, hold, rites[0] ?? null, rites[1] ?? null, rites[2] ?? null, last];
   }
 
   /** A rite on the Command tab: every selected unit of the lead kind that can, digs in and becomes `to`. */
@@ -452,6 +453,9 @@ export class CommandCard {
       hold: command('hold', 'Hold Position',
         "Selected units stay where they are and shoot only what comes within reach: they don't chase or back off.",
         () => input.canHold(), () => input.ownUnits().some((u) => u.order.kind === 'hold'), () => input.hold()),
+      dig: command('dig', 'Dig In',
+        "Selected Fremen on sand or spice go under at once and hold their fire, so they don't give themselves away: the enemy can't see them unless it comes right up to them, and no Sandworm hears them. Any other order brings them out.",
+        () => input.canDig(), () => input.ownUnits().some((u) => u.order.kind === 'dig'), () => input.digIn()),
       // Plant Thumper; once every selected Sandrider is up on its worm, Release Worm.
       thump: {
         icon: () => (input.ridersMounted() ? 'release' : 'thump'),

@@ -943,7 +943,7 @@ export class AI {
 
   // ---- Sandworms and Thumpers -------------------------------------------------
 
-  /** Our units sent off the sand while a worm is about (they go back to the army once it's gone). */
+  /** Our units sent off the sand (or, Fremen, dug in) while a worm is about: back to the army once it's gone. */
   private fled = new Set<Unit>();
   /** Harvesters waiting at a refinery for a worm to leave their field, and where they were working. */
   private evacuated = new Map<Unit, { x: number; z: number }>();
@@ -952,8 +952,8 @@ export class AI {
   private ticksSinceSteer = 0;
 
   /**
-   * Any worm about (or one about to come): our units on the sand around it run for the nearest rock, and harvesters
-   * for the refinery. Once it's gone, they carry on. Units on rock by an enemy's ridden worm shoot its rider. Enemy
+   * Any worm about (or one about to come): our units on the sand around it run for the nearest rock (Fremen dig in,
+   * which no worm hears), and harvesters for the refinery. Once it's gone, they carry on. Units on rock by an enemy's ridden worm shoot its rider. Enemy
    * Thumpers we can see near our things get a few units sent to destroy them before their worm comes.
    */
   private manageWorms(): void {
@@ -996,6 +996,13 @@ export class AI {
     }
     for (const u of g.units) {
       if (u.team !== this.team || u.dead || u.carrier || u.falling || u.mount || u.rite || u.def.air || u.type === 'harvester' || !onSand(u) || !near(u)) continue;
+      if (u.def.hides) {
+        if (u.order.kind !== 'dig') {
+          this.fled.add(u);
+          g.digIn(u);
+        }
+        continue;
+      }
       // Set up, it packs first; it runs once it can move.
       if (u.deployState === 'deployed') u.setDeployed(false);
       if (u.deployState !== 'mobile' || (this.fled.has(u) && u.order.kind === 'move')) continue;
@@ -1015,7 +1022,7 @@ export class AI {
       if (u.dead) this.fled.delete(u);
       else if (!near(u) || !onSand(u)) {
         this.fled.delete(u);
-        if (u.order.kind === 'move') u.command(g, { kind: 'idle' });
+        if (u.order.kind === 'move' || u.order.kind === 'dig') u.command(g, { kind: 'idle' });
       }
     }
     // An enemy's rider we can see, up on its worm: shoot it off from the rock.

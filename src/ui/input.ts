@@ -354,6 +354,17 @@ export class Input {
     if (this.canHold()) this.issue({ c: 'hold', units: this.ownUnits().map((u) => u.id) });
   }
 
+  /** Whether the selection has Fremen that can dig in. */
+  canDig(): boolean {
+    return this.ownUnits().some((u) => !!u.def.hides && !u.mount);
+  }
+
+  /** Fremen Dig In: the selected ones on the sand go under at once and hold their fire. */
+  digIn(): void {
+    const units = this.ownUnits().filter((u) => u.def.hides);
+    if (units.length) this.issue({ c: 'dig', units: units.map((u) => u.id) });
+  }
+
   /** Whether the selection has units that plant Thumpers. */
   hasThumpers(): boolean {
     return this.ownUnits().some((u) => !!u.def.thumper);

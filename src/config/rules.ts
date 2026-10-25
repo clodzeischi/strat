@@ -50,6 +50,7 @@ export const SELF_REPAIR_RATE = 12;
 /**
  * Fremen hiding: a unit that `hides` and has stood still on sand or spice for `delay` s is out of the enemy's sight,
  * unless an enemy unit or structure is within `detect` (world units) of it. Firing or being hit brings it out.
+ * Dug in, no Sandworm hears it. Told to Dig In, it goes under at once and holds its fire.
  */
 export const HIDE = { delay: 3, detect: 2 * 2 };
 /** Fremen infantry speed on sand and spice: the bonus, and the Sandwalk upgrade's on top. */
