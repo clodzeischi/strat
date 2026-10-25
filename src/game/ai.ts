@@ -943,8 +943,8 @@ export class AI {
 
   // ---- Sandworms and Thumpers -------------------------------------------------
 
-  /** Our units told to stand still while a worm is about (they go back to what they were doing once it's gone). */
-  private frozen = new Set<Unit>();
+  /** Our units sent off the sand while a worm is about (they go back to the army once it's gone). */
+  private fled = new Set<Unit>();
   /** Harvesters waiting at a refinery for a worm to leave their field, and where they were working. */
   private evacuated = new Map<Unit, { x: number; z: number }>();
   /** The Thumper we're planting: who, where, since when; `away` once it's planted and the planter is getting clear. */
@@ -952,9 +952,9 @@ export class AI {
   private ticksSinceSteer = 0;
 
   /**
-   * Any worm about (or one about to come): our units on the sand around it stand still, which it doesn't hear, and
-   * harvesters (which it always hears) run for the refinery. Once it's gone, they carry on. Enemy Thumpers we can
-   * see near our things get a few units sent to destroy them before their worm comes.
+   * Any worm about (or one about to come): our units on the sand around it run for the nearest rock, and harvesters
+   * for the refinery. Once it's gone, they carry on. Units on rock by an enemy's ridden worm shoot its rider. Enemy
+   * Thumpers we can see near our things get a few units sent to destroy them before their worm comes.
    */
   private manageWorms(): void {
     const g = this.game;
@@ -995,24 +995,41 @@ export class AI {
       }
     }
     for (const u of g.units) {
-      if (u.team !== this.team || u.dead || u.carrier || u.falling || u.def.air || u.type === 'harvester' || !onSand(u) || !near(u)) continue;
-      // (Again, if something else has given it an order since.)
-      if (u.deployState !== 'mobile' || u.order.kind === 'hold') continue;
-      this.frozen.add(u);
+      if (u.team !== this.team || u.dead || u.carrier || u.falling || u.mount || u.rite || u.def.air || u.type === 'harvester' || !onSand(u) || !near(u)) continue;
+      // Set up, it packs first; it runs once it can move.
+      if (u.deployState === 'deployed') u.setDeployed(false);
+      if (u.deployState !== 'mobile' || (this.fled.has(u) && u.order.kind === 'move')) continue;
+      const rock = m.nearestCell(m.cellOf(u.x), m.cellOf(u.z), (x, z) => !m.canEnter(x, z, 'worm') && m.canEnter(x, z, u.def.infantry ? 'foot' : 'vehicle'), 14);
+      let to = rock ? { x: m.center(rock.cx), z: m.center(rock.cz) } : null;
+      if (!to) {
+        // No rock near: away from the nearest danger.
+        const d = danger.reduce((a, b) => (hypot(u.x - a.x, u.z - a.z) < hypot(u.x - b.x, u.z - b.z) ? a : b));
+        const len = hypot(u.x - d.x, u.z - d.z) || 1;
+        to = { x: u.x + ((u.x - d.x) / len) * reach, z: u.z + ((u.z - d.z) / len) * reach };
+      }
+      this.fled.add(u);
       u.queue = [];
-      u.command(g, { kind: 'hold' });
+      u.command(g, { kind: 'move', x: to.x, z: to.z });
     }
-    for (const u of [...this.frozen]) {
-      if (u.dead) this.frozen.delete(u);
-      else if (!near(u)) {
-        this.frozen.delete(u);
-        if (u.order.kind === 'hold') u.command(g, { kind: 'idle' });
+    for (const u of [...this.fled]) {
+      if (u.dead) this.fled.delete(u);
+      else if (!near(u) || !onSand(u)) {
+        this.fled.delete(u);
+        if (u.order.kind === 'move') u.command(g, { kind: 'idle' });
+      }
+    }
+    // An enemy's rider we can see, up on its worm: shoot it off from the rock.
+    for (const w of g.ridden) {
+      if (w.team === this.team || !g.sees(this.team, w.rider)) continue;
+      for (const u of g.units) {
+        if (u.team !== this.team || u.dead || u.carrier || onSand(u) || u.order.kind === 'attack' || !g.weaponFor(u, w.rider)) continue;
+        if (hypot(u.x - w.x, u.z - w.z) <= (u.def.weapon?.range ?? 0) + 4) u.command(g, { kind: 'attack', target: w.rider });
       }
     }
     // Enemy Thumpers in sight near our structures or units: kill them in time.
     for (const b of g.buildings) {
       if (b.type !== 'thumper' || b.team === this.team || b.dead || !g.sees(this.team, b)) continue;
-      const hunters = g.units.filter((u) => u.team === this.team && !u.dead && !u.carrier && u.def.weapon && !this.frozen.has(u)
+      const hunters = g.units.filter((u) => u.team === this.team && !u.dead && !u.carrier && u.def.weapon && !this.fled.has(u)
         && u.order.kind !== 'attack' && hypot(u.x - b.x, u.z - b.z) < 20 * TILE && ['home', 'defend', 'wave'].includes(this.roles.get(u) ?? '') && g.weaponFor(u, b));
       hunters.sort((a, c) => hypot(a.x - b.x, a.z - b.z) - hypot(c.x - b.x, c.z - b.z));
       const already = g.units.filter((u) => u.team === this.team && u.order.kind === 'attack' && u.order.target === b).length;
@@ -1022,19 +1039,25 @@ export class AI {
 
   /**
    * Fremen: a Warrior or Fedaykin goes to plant a Thumper where it will catch the most of the enemy's economy we
-   * know of (harvesters and camps out on the sand), away from our own; once it's planted, the planter gets clear
-   * and stands still until the worm is gone.
+   * know of (harvesters and camps out on the sand), away from our own; once it's planted, the planter waits by it to
+   * climb on. Up on its worm, it keeps it (steerWorms sends it after prey), and another Sandrider can go and plant.
    */
   private manageThumper(): void {
     const g = this.game;
+    // A rider off its worm with nothing to do: back to the army.
+    for (const [u, role] of this.roles) if (role === 'thump' && !u.dead && !u.mount && u !== this.thumpJob?.u) this.sendHome(u);
     const job = this.thumpJob;
     if (job) {
       const u = job.u;
-      // Its Thumper drumming, or its worm under it.
-      const ours = g.riderDrumDue(u) !== null || !!u.mount;
+      if (u.mount) {
+        this.thumpJob = null;
+        return;
+      }
+      // Its Thumper drumming.
+      const ours = g.riderDrumDue(u) !== null;
       if (u.dead || g.time - job.since > 120) {
         this.thumpJob = null;
-        if (!u.dead && !u.mount) this.sendHome(u);
+        if (!u.dead) this.sendHome(u);
         return;
       }
       if (!job.away) {
@@ -1049,7 +1072,7 @@ export class AI {
         }
         return;
       }
-      if (u.order.kind === 'idle' && !u.mount) u.command(g, { kind: 'hold' });
+      if (u.order.kind === 'idle') u.command(g, { kind: 'hold' });
       if (!ours) {
         this.thumpJob = null;
         this.sendHome(u);
@@ -1059,7 +1082,7 @@ export class AI {
     if (!this.camps || g.thumpBlocked(this.team) || this.rushed() || this.ts.credits < THUMPER.cost + 100) return;
     const spot = this.thumperSpot();
     if (!spot) return;
-    const planters = g.units.filter((u) => u.team === this.team && u.def.thumper && !u.dead && !u.carrier && !u.mount && !u.rite && !this.frozen.has(u)
+    const planters = g.units.filter((u) => u.team === this.team && u.def.thumper && !u.dead && !u.carrier && !u.mount && !u.rite && !this.fled.has(u)
       && ['home', 'wave', 'raid', 'defend', ''].includes(this.roles.get(u) ?? '') && u.hp > u.maxHp * 0.6 && !g.thumpBlocked(this.team, u));
     planters.sort((a, b) => hypot(a.x - spot.x, a.z - spot.z) - hypot(b.x - spot.x, b.z - spot.z));
     const u = planters[0];

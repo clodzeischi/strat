@@ -135,10 +135,6 @@ export class Unit extends Entity {
   nextThumper = 0;
   /** A Fremen rite under way: dug in, it becomes `to` at game time `until` (`cost` is refunded if it's called off). */
   rite: { to: UnitType; until: number; cost: number } | null = null;
-  /** When it last moved (more than a nudge), and from where: Sandworms only go after what moves. */
-  movedAt = 0;
-  moveX = 0;
-  moveZ = 0;
   /** Ambush: game time until which it deals the bonus damage of having struck out of hiding. */
   ambushUntil = 0;
   /** Gliders: the spot they circle while they have nowhere to go (null: wherever they are when they next need one). */
@@ -230,8 +226,6 @@ export class Unit extends Entity {
     this.z = z;
     this.hideX = x;
     this.hideZ = z;
-    this.moveX = x;
-    this.moveZ = z;
     this.lastX = x;
     this.lastZ = z;
     this.heading = heading;

@@ -165,7 +165,8 @@ export interface Sandworm extends WormBody {
 
 /**
  * A Sandworm ridden by the Sandrider who called it (see RIDE in rules.ts): it goes where its rider is sent, bites the
- * rider's enemies near its head, and with nowhere to go wanders a loop around `lair`, going after prey near it.
+ * rider's enemies near its head, and with nowhere to go wanders a loop around `lair`, going after prey near it. It
+ * stays up until its rider lets it go or is killed.
  */
 export interface RiddenWorm extends Mount, WormBody {
   rider: Unit;
@@ -173,7 +174,6 @@ export interface RiddenWorm extends Mount, WormBody {
   x: number;
   z: number;
   heading: number;
-  until: number;
   nextBite: number;
   /** Where it wanders when idle, and how far along its loop it is (radians), with a per-worm wobble. */
   lairX: number;
@@ -587,7 +587,6 @@ export class Game {
     const u = type === 'carryall' ? new Carryall(this.nextId++, team, x, z, heading) : new Unit(this.nextId++, team, type, x, z, heading, faction);
     u.y = this.map.surfaceAt(x, z);
     u.stillSince = this.time;
-    u.movedAt = this.time;
     u.stagger(this.random);
     u.syncVisual(this, 0);
     this.scene.add(u.root);
@@ -1442,12 +1441,6 @@ export class Game {
    */
   private updateHiding(visionTick: boolean): void {
     for (const u of this.units) {
-      // Anyone: when it last moved (Sandworms only go after what moves).
-      if (u.carrier || u.falling || hypot(u.x - u.moveX, u.z - u.moveZ) > 0.3) {
-        u.moveX = u.x;
-        u.moveZ = u.z;
-        u.movedAt = this.time;
-      }
       if (!u.def.hides) continue;
       if (u.carrier || u.falling || hypot(u.x - u.hideX, u.z - u.hideZ) > 0.3) {
         u.hideX = u.x;
@@ -1933,15 +1926,11 @@ export class Game {
     return false;
   }
 
-  /**
-   * Whether the worm goes after this: within its hunting ground, on the sand, and loud. Units are loud while they
-   * move (harvesters always: their machinery never stops); structures on the sand always are.
-   */
+  /** Whether the worm goes after this: within its hunting ground and on the sand, moving or not. */
   private wormPrey(w: Sandworm, e: Entity | null): e is Entity {
     if (!e || e.dead || w.unreachable.has(e.id)) return false;
     if (e instanceof Unit) {
       if (e.def.air || e.carrier || e.falling || e.mount) return false;
-      if (e.type !== 'harvester' && this.time - e.movedAt >= WORM.still) return false;
       if (!this.onWormGround(e.x, e.z)) return false;
       return hypot(e.x - w.lairX, e.z - w.lairZ) <= WORM.range;
     }
@@ -2141,7 +2130,7 @@ export class Game {
   private rideWorm(b: Building, rider: Unit): void {
     const heading = dm.atan2(rider.z - b.z, rider.x - b.x) + Math.PI;
     const w: RiddenWorm = {
-      rider, team: rider.team, until: this.time + RIDE.time, nextBite: 0, bitAt: this.time,
+      rider, team: rider.team, nextBite: 0, bitAt: this.time,
       lairX: b.x, lairZ: b.z, loop: this.random() * Math.PI * 2, wobble: this.random() * Math.PI * 2,
       target: null, path: [], goal: null, repath: 0, unreachable: new Set(), eatenEnemy: 0, lift: RIDE.lift, dustTimer: 0,
       ...this.wormBody(b.x, b.z, heading),
@@ -2193,12 +2182,11 @@ export class Game {
     }
   }
 
-  /** Whether the ridden worm goes after this on its own: an enemy on the sand within reach of it, and loud. */
+  /** Whether the ridden worm goes after this on its own: an enemy on the sand within reach of it, moving or not. */
   private riddenPrey(w: RiddenWorm, e: Entity | null): e is Entity {
     if (!e || e.dead || e.team === w.team || w.unreachable.has(e.id)) return false;
     if (e instanceof Unit) {
       if (e.def.air || e.carrier || e.falling || e.mount) return false;
-      if (e.type !== 'harvester' && this.time - e.movedAt >= WORM.still) return false;
       return this.onWormGround(e.x, e.z) && hypot(e.x - w.x, e.z - w.z) <= RIDE.hunt;
     }
     return e instanceof Building && distTo(e, w.x, w.z) <= RIDE.hunt && this.onSandFootprint(e);
@@ -2210,10 +2198,6 @@ export class Game {
       const r = w.rider;
       if (r.dead) {
         this.wormGoesWild(w);
-        continue;
-      }
-      if (this.time >= w.until) {
-        this.dismount(w);
         continue;
       }
       // Where to: an order of its rider's, prey near it, or on round its loop.
@@ -2319,7 +2303,13 @@ export class Game {
     }
   }
 
-  /** Its time up, the worm dives and leaves its rider on the sand by where it went down. */
+  /** A Sandrider lets its worm go: it dives, and the rider rests before it can call another. */
+  releaseWorm(u: Unit): void {
+    const w = this.ridden.find((w) => w.rider === u);
+    if (w) this.dismount(w);
+  }
+
+  /** Let go, the worm dives and leaves its rider on the sand by where it went down. */
   private dismount(w: RiddenWorm): void {
     this.endRide(w);
     const r = w.rider;
@@ -2336,11 +2326,11 @@ export class Game {
     this.notifyTeam(r.team, 'The worm has gone down. The Sandrider is back on the sand.', null, r, 'worm');
   }
 
-  /** Its rider killed, the worm goes wild where it is for the rest of its time, eating anyone. */
+  /** Its rider killed, the worm goes wild where it is for a wild worm's hunt, eating anyone. */
   private wormGoesWild(w: RiddenWorm): void {
     this.endRide(w, true);
     this.worms.push({
-      team: w.team, lairX: w.x, lairZ: w.z, until: w.until, bitAt: -Infinity, nextBite: this.time + 1,
+      team: w.team, lairX: w.x, lairZ: w.z, until: this.time + WORM.hunt, bitAt: -Infinity, nextBite: this.time + 1,
       target: null, path: [], repath: 0, unreachable: new Set(), eatenOwn: 0, eatenEnemy: 0, dustTimer: 0,
       x: w.x, z: w.z, heading: w.heading, trail: w.trail, model: w.model, from: w.from, to: w.to, headings: w.headings,
     });
@@ -2526,14 +2516,14 @@ export class Game {
   hash(): number {
     const h = new Hasher().int(this.ticks).int(this.nextId);
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
-    for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading).num(u.movedAt);
+    for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading);
     for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected).int(u.queue.length).num(u.rite?.until ?? -1);
     for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
     for (const d of this.drums) h.int(d.b.id).num(d.due);
     for (const w of this.worms) h.num(w.x).num(w.z).num(w.nextBite).int(w.target?.id ?? -1);
     for (const u of this.units) if (u.def.thumper) h.num(u.nextThumper).int(+!!u.mount);
-    for (const w of this.ridden) h.num(w.x).num(w.z).num(w.until).num(w.nextBite).num(w.loop).int(w.rider.id).int(w.target?.id ?? -1);
+    for (const w of this.ridden) h.num(w.x).num(w.z).num(w.nextBite).num(w.loop).int(w.rider.id).int(w.target?.id ?? -1);
     for (const p of this.projectiles) h.num(p.t).num(p.x).num(p.z);
     return h.value;
   }

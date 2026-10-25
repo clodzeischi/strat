@@ -62,34 +62,33 @@ export const AMBUSH = { bonus: 0.5, time: 4 };
  */
 export const FREMEN_REGEN = { unit: 0.015, building: 0.006, delay: 6, stillsuit: 2, quick: 3, buried: 2 };
 /**
- * Thumpers (Fremen Warriors and Fedaykin, once there's a Sietch): `cost` credits, one every `cooldown` s per side and
- * one at a time. A planted Thumper drums for `delay` s; then a wild Sandworm comes, unless the Thumper was destroyed.
+ * Thumpers (Fremen Sandriders, with Sietch III): `cost` credits, then `cooldown` s before that rider can plant
+ * another. A planted Thumper drums for `delay` s; then a wild Sandworm comes, unless the Thumper was destroyed.
  * Every `revealEvery` s its drumming gives it away to sides with anything within `hear` of it.
  */
 export const THUMPER = { cost: 250, cooldown: 60, delay: 8, hear: 30, revealEvery: 1 };
 /**
  * The wild Sandworm a Thumper calls: nobody's, and it can't be hurt. It surfaces where the Thumper stands (swallowing
- * it), then for `hunt` s goes after whatever moves on sand or spice within `range` of that spot, harvesters even
- * standing still, and structures there: a bite every `biteEvery` s, everything within `bite` of it. Units still for
- * `still` s don't draw it. It travels under the sand at `speed` and can't cross rock. Distances in world units.
+ * it), then for `hunt` s goes after anything on sand or spice within `range` of that spot, moving or not, and
+ * structures there: a bite every `biteEvery` s, everything within `bite` of it. It travels under the sand at `speed` and can't cross rock. Distances in world units.
  * Drawing: it shares the ridden worm's body, sunk deeper (`sink` of each piece's radius) so only the ridge of its back
  * shows; to bite, its first `rear` pieces burst up, the head `rearHeight` out of the sand.
  */
 export const WORM = {
-  range: 15, bite: 4, hunt: 20, biteEvery: 2.5, still: 1.5, speed: 9, reach: 2.5,
+  range: 15, bite: 4, hunt: 20, biteEvery: 2.5, speed: 9, reach: 2.5,
   sink: 0.88, rear: 5, rearHeight: 4.5,
   weapon: { range: 0, minRange: 0, damage: 400, bonus: { mechanical: 400, structure: -100 }, cooldown: 0, projectile: 'bullet', speed: 0, splash: 4, pierce: true } as WeaponDef,
 };
 /**
- * A Sandrider rides the worm its Thumper calls, if it's within `mount` when the worm comes: for `time` s the worm goes
- * where the rider is sent, bites enemies within WORM.bite of its head (never its own side), and with nowhere to go
- * wanders an irregular loop about `wander` across, going after enemy prey within `hunt` of it. Then it dives, leaves
- * the rider on the sand, and that rider can't call again for `cooldown` s. Its rider killed, the worm goes wild for
- * the rest of its time. Drawing: `segments` rings `spacing` apart follow the head, sunk `sink` of their radius into
+ * A Sandrider rides the worm its Thumper calls, if it's within `mount` when the worm comes, and keeps it until it lets it
+ * go or is killed: the worm goes where the rider is sent, bites enemies within WORM.bite of its head (never its own
+ * side), and with nowhere to go wanders an irregular loop about `wander` across, going after enemy prey within `hunt`
+ * of it. Let go, it dives, leaves the rider on the sand, and that rider can't call again for `cooldown` s. Its rider
+ * killed, the worm goes wild for WORM.hunt s. Drawing: `segments` rings `spacing` apart follow the head, sunk `sink` of their radius into
  * the sand so only their backs show; the rider stands on ring `seat`, about `lift` above the sand. Biting, the head
  * rears up out of the sand, the first `rear` pieces lifting with it.
  */
-export const RIDE = { mount: 14, time: 40, cooldown: 60, wander: 20, hunt: 16, segments: 10, spacing: 1.7, seat: 2, lift: 0.45, sink: 0.75, rear: 3 };
+export const RIDE = { mount: 14, cooldown: 60, wander: 20, hunt: 16, segments: 10, spacing: 1.7, seat: 2, lift: 0.45, sink: 0.75, rear: 3 };
 /** A Spice Camp works at full rate with this many spice tiles in reach, proportionally less with fewer. */
 export const CAMP_FULL = 12;
 /** Spice Mining: Spice Camps' extra rate. */

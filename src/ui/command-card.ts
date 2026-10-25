@@ -450,15 +450,19 @@ export class CommandCard {
         () => input.canAttackMove(), () => input.attackMode, () => input.attackMove()),
       stop: command('stop', 'Stop', 'Selected units stop what they are doing.', () => input.canStop(), () => false, () => input.stop()),
       hold: command('hold', 'Hold Position',
-        "Selected units stay where they are and shoot only what comes within reach: they don't chase or back off. Standing still, they don't draw Sandworms either.",
+        "Selected units stay where they are and shoot only what comes within reach: they don't chase or back off.",
         () => input.canHold(), () => input.ownUnits().some((u) => u.order.kind === 'hold'), () => input.hold()),
+      // Plant Thumper; once every selected Sandrider is up on its worm, Release Worm.
       thump: {
-        icon: () => 'thump',
-        name: () => 'Plant Thumper',
-        cost: () => THUMPER.cost,
-        tip: () => `Then click open sand or spice: the nearest selected Sandrider goes there and plants a Thumper. ${THUMPER.delay} s later a Sandworm comes up there; a Sandrider within ${RIDE.mount} climbs on and rides it for ${RIDE.time} s. Right-click to steer it: it swallows the enemy on the sand by its head (vehicles most of all), never your own; left alone it wanders and hunts nearby. If the Sandrider is killed, the worm goes wild and eats anyone. Enemies nearby hear the drumming; destroy the Thumper in time and no worm comes. Each Sandrider: one worm at a time, then ${RIDE.cooldown} s to rest. Needs Sietch III.`,
+        icon: () => (input.ridersMounted() ? 'release' : 'thump'),
+        name: () => (input.ridersMounted() ? 'Release Worm' : 'Plant Thumper'),
+        cost: () => (input.ridersMounted() ? 0 : THUMPER.cost),
+        tip: () => input.ridersMounted()
+          ? `The selected Sandriders let their worms go: each worm dives and leaves its rider on the sand, who rests ${RIDE.cooldown} s before calling another.`
+          : `Then click open sand or spice: the nearest selected Sandrider goes there and plants a Thumper. ${THUMPER.delay} s later a Sandworm comes up there; a Sandrider within ${RIDE.mount} climbs on and keeps it until you release it. Right-click to steer it: it swallows the enemy on the sand by its head (vehicles most of all), never your own; left alone it wanders and hunts nearby. If the Sandrider is killed, the worm goes wild and eats anyone. Enemies nearby hear the drumming; destroy the Thumper in time and no worm comes. Released, a worm dives and its rider rests ${RIDE.cooldown} s. Needs Sietch III.`,
         view: () => {
           const g = this.game;
+          if (input.ridersMounted()) return {};
           const riders = input.ownUnits().filter((u) => u.def.thumper);
           const dues = riders.map((u) => g.riderDrumDue(u)).filter((d): d is number => d !== null);
           const due = dues.length ? Math.min(...dues) : null;
@@ -471,7 +475,7 @@ export class CommandCard {
             status: due !== null ? `${Math.ceil(due)}` : wait > 0 ? `${Math.ceil(wait)}` : '',
           };
         },
-        use: () => input.armThump(),
+        use: () => (input.ridersMounted() ? input.releaseWorms() : input.armThump()),
       },
       drop: command('drop', 'Drop', 'Selected Carryalls: then click where to set down their load (or the minimap). Infantry jump on a fly-by.',
         () => input.canDrop(), () => input.dropMode, () => input.drop()),

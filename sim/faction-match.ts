@@ -63,8 +63,8 @@ for (let k = 0; k < games; k++) {
     void before;
   }
   const s = g.teams[corrino].stats;
-  // Sandworms this side called, and the value of what they ate: the enemy's, and its own.
-  const worms = [...g.wormLog, ...g.worms].filter((w) => w.team === corrino);
+  // Sandworms this side called (ridden ones still up included), and the value of what they ate: the enemy's, and its own.
+  const worms = [...g.wormLog, ...g.worms, ...g.ridden.map((w) => ({ team: w.team, eatenEnemy: w.eatenEnemy, eatenOwn: 0 }))].filter((w) => w.team === corrino);
   console.log(JSON.stringify({
     corrino: cLevel, atreides: aLevel, side: corrino, seed, result: g.winner === null ? 'timeout' : g.winner === corrino ? 'win' : 'loss', time: Math.round(g.time),
     killed: s.unitsKilled, lost: s.unitsLost, spice: Math.round(s.spiceHarvested), oppSpice: Math.round(g.teams[1 - corrino].stats.spiceHarvested),

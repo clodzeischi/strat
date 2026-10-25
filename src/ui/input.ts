@@ -359,6 +359,18 @@ export class Input {
     return this.ownUnits().some((u) => !!u.def.thumper);
   }
 
+  /** Whether every Sandrider selected is up on its worm (its card button lets the worms go). */
+  ridersMounted(): boolean {
+    const riders = this.ownUnits().filter((u) => u.def.thumper);
+    return riders.length > 0 && riders.every((u) => !!u.mount);
+  }
+
+  /** The selected Sandriders let their worms go. */
+  releaseWorms(): void {
+    const riders = this.ownUnits().filter((u) => u.def.thumper && u.mount);
+    if (riders.length) this.issue({ c: 'release', units: riders.map((u) => u.id) });
+  }
+
   /** Arms Plant Thumper: the next left click is the spot (says why not, if the side can't plant one now). */
   armThump(): void {
     if (!this.hasThumpers()) return;
