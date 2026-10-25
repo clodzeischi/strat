@@ -268,14 +268,15 @@ The elite melee Fremen, the one who rides the worm. After the concept, pushed aw
 
   The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py`, `die.py` and `ride.py` in the .blend. Don't rerun them over hand edits.
 
-### Sandworm, ridden (`sandworm`)
+### Sandworm (`sandworm`)
 
 Shai-Hulud under a Sandrider: kept mostly under the sand, so what shows is a long plated back cutting through the dunes, and the head rearing up to bite. One continuous skinned body (884 tris) on 12 bones the game lays along the head's trail every frame, so it bends with its path. No clips.
 - **Body:** overlapping armour plates like a lobster's tail, each rising sharply at its front edge and sloping down to the next; sand-coloured, the ridge of the back sun-bleached, the steps dark; tapering to a pointed tail.
 - **Head:** a steel-grey armour collar with dark seams, a rim of 12 raked teeth round a dark flesh throat.
 - **Maw:** three petals (`petal_0`–`petal_2`) hinged on the rim. Closed, they meet in a pointed beak, steel outside with a dark seam; open, they peel back about 110°, flesh inside.
 - **In game:** each section sits three quarters of its radius under the sand, on a slow wave down the body; the rider stands on the back of the third bone (the worm's second ring) and rides the wave. The maw opens as he surfaces and for every bite (open in 0.15 s, held, closed by 1.1 s), and the head rears 1.6 up out of the sand with it, the first three bones following.
-- Built by `build.py` in `art/models/units/sandworm.blend`. The wild worm a Thumper calls without a rider still uses the procedural column.
+- **Wild** (its rider killed, or a Thumper's worm without one): the same body, deeper still (88% of each section's radius), so only the edges of its plates break the sand like a wormsign. To bite, the first five bones burst up, the head 4.5 out of the sand with the maw open, and it crashes back down. Each bone tips to the slope of the body, so the skin bends smoothly. A ridden worm that goes wild keeps its body.
+- Built by `build.py` in `art/models/units/sandworm.blend`.
 
 ### Spice Crew (`crew`)
 

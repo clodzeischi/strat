@@ -11,7 +11,7 @@ import { Effects } from '../render/effects/effects';
 import { Building, Carryall, distTo, facingToward, moveClassOf, repairable, SALVAGE, Unit, type Entity, type Mount } from '../entities';
 import { CLIFF, GameMap, ROCK, SAND, SPICE, type Cell, type MoveClass } from '../map';
 import { mat } from '../materials/lambert';
-import { makeRiddenWorm, makeSandworm, WORM_DEPTH, type RiddenWormModel, type SandwormModel } from '../models';
+import { makeRiddenWorm, type RiddenWormModel } from '../models';
 import { cellsAround, findPath, type Point } from './pathfinding';
 import { Terrain } from '../render/terrain';
 import { Hasher, mulberry32 } from './rng';
@@ -119,10 +119,26 @@ interface Drum {
 }
 
 /**
+ * A surfaced worm's body, wild or ridden: the head at (x, z) facing `heading`, the rest following the trail the head
+ * has left (newest first, a point every 0.4), and the drawing that lays the model's pieces along it.
+ */
+export interface WormBody {
+  x: number;
+  z: number;
+  heading: number;
+  trail: Point[];
+  /** Drawing only: the model, and each piece's place and heading last tick and this tick. */
+  model: RiddenWormModel;
+  from: THREE.Vector3[];
+  to: THREE.Vector3[];
+  headings: { from: number; to: number }[];
+}
+
+/**
  * A wild Sandworm called by a Thumper (see WORM in rules.ts): nobody's, it can't be hurt, and it eats anyone on the
  * sand. It travels under the sand toward its prey and bites when it's right under it.
  */
-export interface Sandworm {
+export interface Sandworm extends WormBody {
   /** The side whose Thumper called it (it eats them too). */
   team: Team;
   x: number;
@@ -144,10 +160,6 @@ export interface Sandworm {
   /** Value of what it swallowed: the caller's own, and everyone else's. */
   eatenOwn: number;
   eatenEnemy: number;
-  /** Drawing only. */
-  model: SandwormModel;
-  from: THREE.Vector3;
-  to: THREE.Vector3;
   dustTimer: number;
 }
 
@@ -155,7 +167,7 @@ export interface Sandworm {
  * A Sandworm ridden by the Sandrider who called it (see RIDE in rules.ts): it goes where its rider is sent, bites the
  * rider's enemies near its head, and with nowhere to go wanders a loop around `lair`, going after prey near it.
  */
-export interface RiddenWorm extends Mount {
+export interface RiddenWorm extends Mount, WormBody {
   rider: Unit;
   team: Team;
   x: number;
@@ -173,16 +185,9 @@ export interface RiddenWorm extends Mount {
   goal: { x: number; z: number } | null;
   repath: number;
   unreachable: Set<number>;
-  /** Where the head has been, newest first (a point every so often): the body follows it. */
-  trail: Point[];
   eatenEnemy: number;
   /** When it last bit (it opens its maw), from when it surfaced. */
   bitAt: number;
-  /** Drawing only: each piece's position last tick and this tick. */
-  model: RiddenWormModel;
-  from: THREE.Vector3[];
-  to: THREE.Vector3[];
-  headings: { from: number; to: number }[];
   dustTimer: number;
 }
 
@@ -1890,13 +1895,11 @@ export class Game {
 
   /** The worm comes up where the Thumper stands, swallowing it and whatever is around it, and starts its hunt. */
   private callWorm(b: Building): void {
-    const model = makeSandworm();
-    model.root.position.set(b.x, this.map.surfaceAt(b.x, b.z), b.z);
-    this.scene.add(model.root);
+    const heading = 0;   // it turns to its first prey; no random draw, so the game plays as before
     const w: Sandworm = {
-      team: b.team, x: b.x, z: b.z, heading: 0, lairX: b.x, lairZ: b.z, until: this.time + WORM.hunt, bitAt: -Infinity, nextBite: 0,
-      target: null, path: [], repath: 0, unreachable: new Set(), eatenOwn: 0, eatenEnemy: 0,
-      model, from: model.root.position.clone(), to: model.root.position.clone(), dustTimer: 0,
+      team: b.team, lairX: b.x, lairZ: b.z, until: this.time + WORM.hunt, bitAt: -Infinity, nextBite: 0,
+      target: null, path: [], repath: 0, unreachable: new Set(), eatenOwn: 0, eatenEnemy: 0, dustTimer: 0,
+      ...this.wormBody(b.x, b.z, heading),
     };
     this.worms.push(w);
     this.remove(b);
@@ -1965,7 +1968,6 @@ export class Game {
   /** Worms hunt: under the sand toward their prey, biting when they're under it, until their time is up. */
   private updateWorms(dt: number): void {
     for (const w of [...this.worms]) {
-      w.from.copy(w.to);
       const resting = this.time < w.bitAt + 1.2;
       if (this.time >= w.until && !resting) {
         // Back down into the deep desert.
@@ -2017,7 +2019,10 @@ export class Game {
         }
       }
     }
-    for (const w of this.worms) w.to.set(w.x, this.map.surfaceAt(w.x, w.z), w.z);
+    for (const w of this.worms) {
+      this.extendTrail(w);
+      this.layBody(w);
+    }
   }
 
   /** The worm surges up at (x, z): everything on the sand within WORM.bite of it takes the bite, whoever's it is. */
@@ -2048,63 +2053,105 @@ export class Game {
     }
   }
 
-  /** Drawing: worms between ticks, rearing up out of the sand when they bite, a ridge of sand while they travel. */
+  /**
+   * Drawing: wild worms between ticks, deep in the sand with only the ridge of their back showing as they hunt, and
+   * bursting up to bite: the head rears high out of the sand, maw open, and crashes back down.
+   */
   private drawWorms(dt: number, alpha: number): void {
     const now = this.time + alpha * 0.05;
     for (const w of this.worms) {
-      const { root, body, ridge } = w.model;
-      root.position.lerpVectors(w.from, w.to, alpha);
-      root.rotation.y = -w.heading;
       // Rears up fast, holds a moment with its maw open, then sinks back.
       const since = now - w.bitAt;
       const up = since < 0.3 ? since / 0.3 : since < 0.7 ? 1 : since < 1.5 ? 1 - (since - 0.7) / 0.8 : 0;
-      body.position.y = -WORM_DEPTH + (WORM_DEPTH + 1.2) * up * (2 - up);
-      body.visible = up > 0;
-      const travelling = w.path.length > 0 && up === 0;
-      ridge.visible = up === 0;
-      ridge.scale.y = travelling ? 0.6 + dm.sin(now * 9) * 0.08 : 0.35;
-      root.visible = this.revealAll || this.vision.seesAt(this.localTeam, root.position.x, root.position.z);
-      if (travelling && root.visible) {
+      const rise = up * (2 - up);
+      w.model.open(up);
+      const head = this.drawBody(w, alpha, now, WORM.sink, rise * WORM.rearHeight, WORM.rear);
+      const root = w.model.root;
+      root.visible = this.revealAll || this.vision.seesAt(this.localTeam, head.x, head.z);
+      if (w.path.length > 0 && up === 0 && root.visible) {
         w.dustTimer -= dt;
         if (w.dustTimer <= 0) {
           w.dustTimer = 0.12;
-          const back = new THREE.Vector3(root.position.x - dm.cos(w.heading) * 2.5, root.position.y + 0.2, root.position.z - dm.sin(w.heading) * 2.5);
-          this.effects.dust(back, 0xd8c49a, 0.8);
+          this.effects.dust(new THREE.Vector3(head.x, this.map.surfaceAt(head.x, head.z) + 0.2, head.z), 0xd8c49a, 0.8);
         }
       }
     }
+  }
+
+  /**
+   * Drawing: lays a worm's pieces between ticks, each sunk `sink` of its radius into the sand on a slow wave down the
+   * body; the first `rearN` pieces rear up, the head by `rearY`, easing off down the body. Each piece tips to the
+   * slope between it and the next, so the skin bends smoothly. Returns where the head is drawn (reused: copy it).
+   */
+  private drawBody(w: WormBody, alpha: number, now: number, sink: number, rearY: number, rearN: number): THREE.Vector3 {
+    const at = this.bodyAt;
+    const n = w.model.count;
+    for (let i = 0; i < n; i++) {
+      if (!at[i]) at[i] = new THREE.Vector3();
+      const p = at[i].lerpVectors(w.from[i], w.to[i], alpha);
+      p.y += -w.model.radii[i] * sink + 0.1 * dm.sin(now * 3 - i * 0.8);
+      if (i < rearN) p.y += rearY * (0.5 + 0.5 * dm.cos((Math.PI * i) / rearN));
+    }
+    for (let i = 0; i < n; i++) {
+      const a = at[Math.min(i, n - 2)], b = at[Math.min(i, n - 2) + 1];
+      const h = w.headings[i];
+      let turn = h.to - h.from;
+      turn -= Math.round(turn / (2 * Math.PI)) * 2 * Math.PI;
+      w.model.place(i, at[i], h.from + turn * alpha, dm.atan2(a.y - b.y, hypot(a.x - b.x, a.z - b.z)));
+    }
+    this.bodyLast = n - 1;
+    return at[0];
+  }
+
+  /** Scratch for drawBody: each piece's drawn place. */
+  private readonly bodyAt: THREE.Vector3[] = [];
+  private bodyLast = 0;
+
+  /** Before a worm's head moves on: where it is now becomes the newest point of its trail. */
+  private extendTrail(w: WormBody): void {
+    const last = w.trail[0];
+    if (hypot(w.x - last.x, w.z - last.z) >= 0.4) {
+      w.trail.unshift({ x: w.x, z: w.z });
+      const keep = Math.ceil(((RIDE.segments + 2) * RIDE.spacing) / 0.4) + 4;
+      if (w.trail.length > keep) w.trail.length = keep;
+    }
+  }
+
+  /** A new worm body at (x, z) facing `heading`, coiled straight back from the head, its model in the scene. */
+  private wormBody(x: number, z: number, heading: number): WormBody {
+    const model = makeRiddenWorm(RIDE.segments);
+    this.scene.add(model.root);
+    const n = model.count;
+    const ground = this.map.surfaceAt(x, z);
+    const w: WormBody = { x, z, heading, trail: [{ x, z }], model, from: [], to: [], headings: [] };
+    for (let k = 1; k <= n * 2; k++) w.trail.push({ x: x - dm.cos(heading) * k * RIDE.spacing * 0.5, z: z - dm.sin(heading) * k * RIDE.spacing * 0.5 });
+    for (let i = 0; i < n; i++) {
+      w.from.push(new THREE.Vector3(x, ground, z));
+      w.to.push(new THREE.Vector3(x, ground, z));
+      w.headings.push({ from: heading, to: heading });
+    }
+    this.layBody(w);
+    for (let i = 0; i < n; i++) w.from[i].copy(w.to[i]);
+    return w;
   }
 
   // ---- Ridden Sandworms ---------------------------------------------------------------
 
   /** The worm comes up where the Thumper stands, with its Sandrider climbing on, and bites the rider's enemies there. */
   private rideWorm(b: Building, rider: Unit): void {
-    const model = makeRiddenWorm(RIDE.segments);
-    this.scene.add(model.root);
-    const n = model.count;
     const heading = dm.atan2(rider.z - b.z, rider.x - b.x) + Math.PI;
-    const ground = this.map.surfaceAt(b.x, b.z);
     const w: RiddenWorm = {
-      rider, team: rider.team, x: b.x, z: b.z, heading, until: this.time + RIDE.time, nextBite: 0, bitAt: this.time,
+      rider, team: rider.team, until: this.time + RIDE.time, nextBite: 0, bitAt: this.time,
       lairX: b.x, lairZ: b.z, loop: this.random() * Math.PI * 2, wobble: this.random() * Math.PI * 2,
-      target: null, path: [], goal: null, repath: 0, unreachable: new Set(), trail: [{ x: b.x, z: b.z }], eatenEnemy: 0, lift: RIDE.lift,
-      model, from: [], to: [], headings: [], dustTimer: 0,
+      target: null, path: [], goal: null, repath: 0, unreachable: new Set(), eatenEnemy: 0, lift: RIDE.lift, dustTimer: 0,
+      ...this.wormBody(b.x, b.z, heading),
     };
-    // The body starts coiled straight back from the head.
-    for (let k = 1; k <= n * 2; k++) w.trail.push({ x: b.x - dm.cos(heading) * k * RIDE.spacing * 0.5, z: b.z - dm.sin(heading) * k * RIDE.spacing * 0.5 });
-    for (let i = 0; i < n; i++) {
-      w.from.push(new THREE.Vector3(b.x, ground, b.z));
-      w.to.push(new THREE.Vector3(b.x, ground, b.z));
-      w.headings.push({ from: heading, to: heading });
-    }
     this.ridden.push(w);
     this.remove(b);
     rider.mount = w;
     rider.command(this, { kind: 'idle' });
     rider.queue = [];
     this.placeRider(w);
-    this.layBody(w);
-    for (const p of w.to.keys()) w.from[p].copy(w.to[p]);
     for (const ts of this.teams) {
       const near = (e: Entity) => e.team === ts.team && !e.dead && hypot(e.x - b.x, e.z - b.z) <= RIDE.wander + 10 * TILE;
       if (ts.team === rider.team) this.notifyTeam(ts.team, 'Shai-Hulud has come. The Sandrider is up.', 'shaihulud_has_come', b, 'worm');
@@ -2114,7 +2161,7 @@ export class Game {
   }
 
   /** A point `along` world units back down the trail from the head (the trail runs newest first). */
-  private trailPoint(w: RiddenWorm, along: number): { x: number; z: number; heading: number } {
+  private trailPoint(w: WormBody, along: number): { x: number; z: number; heading: number } {
     let left = along;
     for (let i = 0; i + 1 < w.trail.length; i++) {
       const a = w.trail[i];
@@ -2136,7 +2183,7 @@ export class Game {
   }
 
   /** Each piece's place this tick, along the trail (drawing). */
-  private layBody(w: RiddenWorm): void {
+  private layBody(w: WormBody): void {
     for (let i = 0; i < w.to.length; i++) {
       const p = i === 0 ? { x: w.x, z: w.z, heading: w.heading } : this.trailPoint(w, i * RIDE.spacing);
       w.from[i].copy(w.to[i]);
@@ -2242,12 +2289,7 @@ export class Game {
           step = 0;
         }
       }
-      const last = w.trail[0];
-      if (hypot(w.x - last.x, w.z - last.z) >= 0.4) {
-        w.trail.unshift({ x: w.x, z: w.z });
-        const keep = Math.ceil(((RIDE.segments + 2) * RIDE.spacing) / 0.4) + 4;
-        if (w.trail.length > keep) w.trail.length = keep;
-      }
+      this.extendTrail(w);
       this.placeRider(w);
       this.layBody(w);
     }
@@ -2296,21 +2338,20 @@ export class Game {
 
   /** Its rider killed, the worm goes wild where it is for the rest of its time, eating anyone. */
   private wormGoesWild(w: RiddenWorm): void {
-    this.endRide(w);
-    const model = makeSandworm();
-    model.root.position.set(w.x, this.map.surfaceAt(w.x, w.z), w.z);
-    this.scene.add(model.root);
+    this.endRide(w, true);
     this.worms.push({
-      team: w.team, x: w.x, z: w.z, heading: w.heading, lairX: w.x, lairZ: w.z, until: w.until, bitAt: -Infinity, nextBite: this.time + 1,
-      target: null, path: [], repath: 0, unreachable: new Set(), eatenOwn: 0, eatenEnemy: 0,
-      model, from: model.root.position.clone(), to: model.root.position.clone(), dustTimer: 0,
+      team: w.team, lairX: w.x, lairZ: w.z, until: w.until, bitAt: -Infinity, nextBite: this.time + 1,
+      target: null, path: [], repath: 0, unreachable: new Set(), eatenOwn: 0, eatenEnemy: 0, dustTimer: 0,
+      x: w.x, z: w.z, heading: w.heading, trail: w.trail, model: w.model, from: w.from, to: w.to, headings: w.headings,
     });
     this.notifyTeam(w.team, 'Our Sandrider has fallen. The worm is wild!', null, { x: w.x, z: w.z }, 'worm');
   }
 
-  private endRide(w: RiddenWorm): void {
+  /** `keepBody`: the worm stays up (it goes wild), so its model stays in the scene. */
+  private endRide(w: RiddenWorm, keepBody = false): void {
     this.ridden.splice(this.ridden.indexOf(w), 1);
     this.wormLog.push({ team: w.team, eatenOwn: 0, eatenEnemy: w.eatenEnemy });
+    if (keepBody) return;
     this.scene.remove(w.model.root);
     this.effects.dust(new THREE.Vector3(w.x, this.map.surfaceAt(w.x, w.z) + 0.2, w.z), 0xd8c49a, 2);
   }
@@ -2321,7 +2362,6 @@ export class Game {
    */
   private drawRidden(dt: number, alpha: number): void {
     const now = this.time + alpha * 0.05;
-    const at = new THREE.Vector3();
     for (const w of this.ridden) {
       const { root, radii } = w.model;
       root.visible = this.revealAll || this.vision.seesAt(this.localTeam, w.x, w.z);
@@ -2330,25 +2370,15 @@ export class Game {
       const since = now - w.bitAt;
       const open = since < 0.15 ? since / 0.15 : since < 0.55 ? 1 : Math.max(0, 1 - (since - 0.55) / 0.55);
       w.model.open(open);
-      let seat: THREE.Vector3 | null = null;
-      for (let i = 0; i < w.model.count; i++) {
-        at.lerpVectors(w.from[i], w.to[i], alpha);
-        at.y += -radii[i] * RIDE.sink + 0.1 * dm.sin(now * 3 - i * 0.8);
-        const rear = open * Math.max(0, 1 - i / RIDE.rear);
-        at.y += rear * 1.6;
-        const h = w.headings[i];
-        let turn = h.to - h.from;
-        turn -= Math.round(turn / (2 * Math.PI)) * 2 * Math.PI;
-        w.model.place(i, at, h.from + turn * alpha, rear * 0.5);
-        if (i === RIDE.seat) seat = at.clone();
-      }
+      this.drawBody(w, alpha, now, RIDE.sink, open * 1.6, RIDE.rear);
+      const seat = this.bodyAt[RIDE.seat];
       // The rider on his ring's back, moving with it (drawn after the units, so this wins over his own pose).
-      w.rider.root.position.set(seat!.x, seat!.y + radii[RIDE.seat], seat!.z);
+      w.rider.root.position.set(seat.x, seat.y + radii[RIDE.seat], seat.z);
       if (root.visible) {
         w.dustTimer -= dt;
         if (w.dustTimer <= 0) {
           w.dustTimer = 0.1;
-          this.effects.dust(at.clone(), 0xd8c49a, 0.9);   // the tail tip, the last piece placed
+          this.effects.dust(this.bodyAt[this.bodyLast].clone(), 0xd8c49a, 0.9);   // the tail tip
         }
       }
     }

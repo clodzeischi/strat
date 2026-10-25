@@ -72,9 +72,12 @@ export const THUMPER = { cost: 250, cooldown: 60, delay: 8, hear: 30, revealEver
  * it), then for `hunt` s goes after whatever moves on sand or spice within `range` of that spot, harvesters even
  * standing still, and structures there: a bite every `biteEvery` s, everything within `bite` of it. Units still for
  * `still` s don't draw it. It travels under the sand at `speed` and can't cross rock. Distances in world units.
+ * Drawing: it shares the ridden worm's body, sunk deeper (`sink` of each piece's radius) so only the ridge of its back
+ * shows; to bite, its first `rear` pieces burst up, the head `rearHeight` out of the sand.
  */
 export const WORM = {
   range: 15, bite: 4, hunt: 20, biteEvery: 2.5, still: 1.5, speed: 9, reach: 2.5,
+  sink: 0.88, rear: 5, rearHeight: 4.5,
   weapon: { range: 0, minRange: 0, damage: 400, bonus: { mechanical: 400, structure: -100 }, cooldown: 0, projectile: 'bullet', speed: 0, splash: 4, pierce: true } as WeaponDef,
 };
 /**
