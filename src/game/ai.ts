@@ -42,7 +42,7 @@ interface FactionKit {
 export const KITS: Record<Faction, FactionKit> = {
   atreides: {
     factory: 'factory', defense: 'bunker', raider: 'trike', scouts: ['trike', 'infantry'], mender: { unit: 'repair' }, tech: [],
-    levels: ['conyard', 'factory'], research: ['rockets', 'weapons1', 'armor1', 'nitro', 'harvest', 'weapons2', 'armor2'], fallback: 'infantry',
+    levels: ['conyard', 'factory'], research: ['harvest', 'rockets', 'weapons1', 'armor1', 'nitro', 'weapons2', 'armor2'], fallback: 'infantry',
     siege: null, worker: 'harvester',
   },
   corrino: {
@@ -121,6 +121,8 @@ export interface AIProfile {
   more: { barracks: number; factory: number };
   /** How far out from the construction yard, toward the middle of the map, the army gathers (tiles). */
   rallyOut: number;
+  /** A different tech path or research order than the faction's usual one (a build order to play). */
+  kit?: Partial<Pick<FactionKit, 'levels' | 'research'>>;
 }
 
 /** Combined-arms base preference for unit picks, before counters (see `counterWeights`). */
@@ -269,7 +271,7 @@ export class AI {
     this.nextRaidTime = profile.raids.start;
     this.nextScoutTime = profile.scout.first;
     this.intel = new Intel(game, team);
-    this.kit = KITS[game.teams[team].faction];
+    this.kit = { ...KITS[game.teams[team].faction], ...profile.kit };
     this.hub = FACTIONS[game.teams[team].faction].hub;
     this.camps = !!FACTIONS[game.teams[team].faction].camps;
     const flip = game.random() < 0.5;
@@ -1699,7 +1701,7 @@ export class AI {
     else u.command(this.game, { kind: 'amove', x: s.x, z: s.z });
   }
 
-  private centroid(units: Set<Unit>): { x: number; z: number } {
+  protected centroid(units: Set<Unit>): { x: number; z: number } {
     let x = 0;
     let z = 0;
     for (const u of units) {

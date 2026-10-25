@@ -57,24 +57,25 @@ function run(g: Game, seconds: number, until?: () => boolean): void {
   check(inside.every((u) => !u.carrier && u.root.visible) && bunker.occupants.length === 0, 'U: everyone gets out');
 }
 
-// Infantry Rockets against a tank: it can hit the bunker from 9 units, out of the rockets' reach (8); closer, it gets hit.
+// Infantry Rockets against armor: an MLRS can shell the bunker from 12 units, out of the infantry's reach; a tank
+// has the rockets' range (9), so wherever it can hit the bunker from, it gets hit back.
 {
   const { g, bunker } = setup();
   g.teams[0].upgrades.add('rockets');
   for (let k = 0; k < 3; k++) g.enterBunker(spawn(g, 'infantry', 0, bunker.x + 4, bunker.z + 4), bunker);
   const half = (bunker.size * TILE) / 2;
-  const far = spawn(g, 'tank', 1, bunker.x + half + 9 + 1.1, bunker.z);
+  const far = spawn(g, 'rocket', 1, bunker.x + half + 12 + 1, bunker.z);
   far.command(g, { kind: 'attack', target: bunker });
   // Hold it where it is: it fires as soon as it's in range anyway.
   run(g, 10);
   const farHurt = far.hp < far.maxHp;
-  check(!farHurt && bunker.hp < bunker.maxHp, 'a tank 9 out shells the bunker and takes nothing back', `bunker ${Math.round(bunker.maxHp - bunker.hp)} damage, tank ${Math.round(far.maxHp - far.hp)}`);
+  check(!farHurt && bunker.hp < bunker.maxHp, 'an MLRS 12 out shells the bunker and takes nothing back', `bunker ${Math.round(bunker.maxHp - bunker.hp)} damage, MLRS ${Math.round(far.maxHp - far.hp)}`);
   far.hp = 0;
   (g as unknown as { kill(e: unknown, by: null): void }).kill(far, null);
-  const near = spawn(g, 'tank', 1, bunker.x + half + 6 + 1.1, bunker.z);
+  const near = spawn(g, 'tank', 1, bunker.x + half + 9 + 1.1, bunker.z);
   near.command(g, { kind: 'attack', target: bunker });
   run(g, 10);
-  check(near.hp < near.maxHp, 'a tank 6 out gets hit by the rockets', `tank ${Math.round(near.maxHp - near.hp)} damage`);
+  check(near.hp < near.maxHp && bunker.hp < bunker.maxHp, 'a tank at its full range (9) trades hits with the rockets', `tank ${Math.round(near.maxHp - near.hp)} damage`);
 }
 
 // The bunker destroyed: the infantry inside get out alive.

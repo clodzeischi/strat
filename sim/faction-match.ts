@@ -5,6 +5,7 @@
 // Other pairs: FACTIONS=fremen,corrino npx tsx sim/faction-match.ts <fremenLevel> <corrinoLevel> <games> [offset]
 // (the first faction is the one reported on, in the 'corrino' fields). In parallel: FACTIONS=... sim/faction-match.sh
 import * as THREE from 'three';
+import './tune';
 import './fremen-variants'; // FREMEN_VARIANT=<name> plays an alternative Fremen makeup
 import { BRUTAL_OPTIONS, BRUTAL_PROFILE, BrutalAI, createAI } from '../src/game/brutal';
 import type { Difficulty } from '../src/game/game';

@@ -1,4 +1,4 @@
-import { BUILDINGS, TILE, UNITS, type Team, type UnitType } from '../config';
+import { BUILDINGS, CARRYALL, TILE, UNITS, type Team, type UnitType } from '../config';
 import { Carryall, distTo, type Unit } from '../entities';
 import { AI, HARD_PROFILE, power, profileFor, type AIProfile, type Role, type Wave } from './ai';
 import type { Difficulty, Game } from './game';
@@ -12,7 +12,7 @@ import * as dm from './dmath';
  * focus fire (`Micro`), badly hurt units leave the fight to heal and come back, waves march together, harvesters
  * run from raiders that would kill them, and Carryalls go to work: rocket launchers and paratroopers dropped on enemy
  * harvesters along routes clear of known anti-air, lifted out at the first sign of danger, with troopers jumping
- * early to draw the fire if their Carryall is hit on the way in. Waves split, so a flanking group hits the economy
+ * early to draw the fire if their Carryall is hit on the way in, and fresh units flown out to an army in the field. Waves split, so a flanking group hits the economy
  * while the main army attacks, and more trike raids keep the pressure on. Tuned with `sim/brutal.sh`; see
  * docs/PLAN.md.
  */
@@ -41,10 +41,17 @@ export interface BrutalOptions {
   sniper: 'rocket' | 'tank';
   /** Paratrooper strikes on enemy harvesters. */
   para: boolean;
+  /**
+   * Snipes and paratroopers against computer players too, not only against people. Off: another AI barely notices a
+   * drop (it doesn't split its attention or protect its harvesters), so they cost more than they win there (sims).
+   */
+  dropsVsAI: boolean;
   /** Troop strikes wait for a wave closing on the enemy base, so they open a second front. */
   paraWithWave: boolean;
   /** Carryalls with no operation ferry harvesters. */
   ferry: boolean;
+  /** A Carryall flies fresh units from home out to a wave in the field (one lift at a time). */
+  lift: boolean;
   /** Waves march together, the fast units waiting for the slow ones until contact. */
   march: boolean;
   /** Waves split off a fast flanking group that goes for the economy. */
@@ -64,7 +71,7 @@ export interface BrutalOptions {
 }
 
 export const BRUTAL_OPTIONS: BrutalOptions = {
-  micro: true, mend: 0.35, harvesterRetreat: true, carryalls: 2, snipe: true, sniper: 'rocket', para: true, paraWithWave: false, ferry: true, march: true, flank: true, think: 0.5,
+  micro: true, mend: 0.35, harvesterRetreat: true, carryalls: 2, snipe: true, sniper: 'rocket', para: true, dropsVsAI: false, paraWithWave: false, ferry: true, lift: true, march: true, flank: true, think: 0.5,
   hitechAt: 600, hitechAtLarge: 360, hitechArmy: 10, hitechLead: 1.2, hitechSpare: 400,
 };
 
@@ -77,10 +84,12 @@ type Point = { x: number; z: number };
  * A Carryall operation. 'snipe': one rocket launcher (or tank) set down in range of an enemy harvester; 'para': a
  * squad of infantry dropped on one. Both go the same way: load at home, fly in on a route clear of known anti-air
  * (`via`), drop, fight, and get lifted out at the first sign of danger (or when there's nothing left to shoot), then
- * on to the next target or home.
+ * on to the next target or home. 'lift': fresh units from home set down behind a wave in the field, which they join.
  */
 interface Op {
-  kind: 'snipe' | 'para';
+  kind: 'snipe' | 'para' | 'lift';
+  /** The wave a lift takes its cargo to. */
+  wave?: Wave;
   c: Carryall;
   /** What it carries in: the shooter, or the troopers. */
   cargo: Unit[];
@@ -109,6 +118,9 @@ export interface BrutalStats {
   opLosses: number;
   extractions: number;
   paraBails: number;
+  /** Lifts out to a wave, and the units they set down with it. */
+  lifts: number;
+  lifted: number;
   carryallsLost: number;
   mends: number;
   kites: number;
@@ -125,7 +137,7 @@ export class BrutalAI extends AI {
   private knownWaves = new Set<Wave>();
   /** Wave units waiting for the rest of their wave (see `marchWaves`). */
   private holding = new Set<Unit>();
-  readonly stats: BrutalStats = { snipes: 0, paras: 0, opKills: 0, opLosses: 0, extractions: 0, paraBails: 0, carryallsLost: 0, mends: 0, kites: 0, flanks: 0 };
+  readonly stats: BrutalStats = { snipes: 0, paras: 0, opKills: 0, opLosses: 0, extractions: 0, paraBails: 0, lifts: 0, lifted: 0, carryallsLost: 0, mends: 0, kites: 0, flanks: 0 };
 
   constructor(game: Game, team: Team, profile: AIProfile = BRUTAL_PROFILE, readonly opts: BrutalOptions = BRUTAL_OPTIONS) {
     super(game, team, profile);
@@ -368,6 +380,7 @@ export class BrutalAI extends AI {
     this.carryallIds = alive;
     // Not while the base is under attack: the cargo is needed at home, and loading up in a fight gets it shot.
     const busy = this.defenses.some((d) => d.base);
+    const drops = this.opts.dropsVsAI || g.teams.some((t) => t.team !== this.team && t.human);
     for (const c of this.carryalls()) {
       if (this.ops.has(c) || c.load.length) continue;
       if (busy) {
@@ -375,9 +388,10 @@ export class BrutalAI extends AI {
         continue;
       }
       const home = this.homeUnits();
-      if (this.opts.snipe) {
+      if (this.opts.snipe && drops) {
         const fit = (t: UnitType) => home.find((u) => u.type === t && u.hp > u.maxHp * 0.8);
-        const shooter = this.opts.sniper === 'tank' ? fit('tank') ?? fit('rocket') : fit('rocket') ?? fit('tank');
+        // Only a launcher outranges a harvester's escort; a tank set down by one mostly waits about (sims).
+        const shooter = this.opts.sniper === 'tank' ? fit('tank') ?? fit('rocket') : fit('rocket');
         const target = shooter && this.snipeTarget(c, shooter.type, 20);
         if (shooter && target) {
           this.launch(c, 'snipe', [shooter]);
@@ -392,12 +406,21 @@ export class BrutalAI extends AI {
           continue;
         }
       }
-      if (this.opts.para && g.time >= this.nextPara && (!this.opts.paraWithWave || this.waveClosing())) {
+      if (this.opts.para && drops && g.time >= this.nextPara && (!this.opts.paraWithWave || this.waveClosing())) {
         const troops = home.filter((u) => u.type === 'infantry' && u.hp > u.maxHp * 0.8).slice(0, 6);
         if (troops.length >= 4 && this.paraTarget(c, troops.length * UNITS.infantry.cost)) {
           this.launch(c, 'para', troops);
           this.nextPara = g.time + 90;
           this.stats.paras++;
+          continue;
+        }
+      }
+      if (this.opts.lift && ![...this.ops.values()].some((o) => o.kind === 'lift')) {
+        const job = this.liftJob(home);
+        if (job) {
+          this.launch(c, 'lift', job.cargo);
+          this.ops.get(c)!.wave = job.wave;
+          this.stats.lifts++;
           continue;
         }
       }
@@ -432,11 +455,39 @@ export class BrutalAI extends AI {
     this.ops.set(c, { kind, c, cargo, phase: 'load', since: t, quiet: t, drop: null, victim: null, via: null, hp0: c.hp, kills: new Map(cargo.map((u) => [u, u.kills])) });
   }
 
+  /**
+   * A lift worth flying: the strongest wave in the field at least 15 tiles from home, and fresh units at home to take
+   * out to it — a tank or rocket launcher, else two trikes, else three to six infantry.
+   */
+  private liftJob(home: Unit[]): { wave: Wave; cargo: Unit[] } | null {
+    const rally = this.rally;
+    if (!rally) return null;
+    let wave: Wave | null = null;
+    let best = 0;
+    for (const w of this.waves) {
+      if (w.units.size < 3) continue;
+      const p = this.centroid(w.units);
+      const strength = [...w.units].reduce((s, u) => s + power(u), 0);
+      if (hypot(p.x - rally.x, p.z - rally.z) > 15 * TILE && strength > best) {
+        best = strength;
+        wave = w;
+      }
+    }
+    if (!wave) return null;
+    const fresh = home.filter((u) => u.hp > u.maxHp * 0.8 && u.def.lift !== undefined);
+    const heavy = fresh.find((u) => u.type === 'tank' || u.type === 'rocket');
+    if (heavy) return { wave, cargo: [heavy] };
+    const trikes = fresh.filter((u) => u.type === 'trike').slice(0, 2);
+    if (trikes.length === 2) return { wave, cargo: trikes };
+    const troops = fresh.filter((u) => u.def.infantry).slice(0, 6);
+    return troops.length >= 3 ? { wave, cargo: troops } : null;
+  }
+
   /** Assigns the Carryall to the unferried harvester working furthest from a refinery. */
   private ferry(c: Carryall): boolean {
     const g = this.game;
     let best: Unit | null = null;
-    let far = 12 * TILE;
+    let far = CARRYALL.ferryMin * TILE;
     for (const h of g.units) {
       if (h.team !== this.team || h.type !== 'harvester' || h.carrier || h.order.kind !== 'harvest' || g.ferryFor(h)) continue;
       const ref = g.nearestBuilding(this.team, 'refinery', h.x, h.z);
@@ -574,9 +625,10 @@ export class BrutalAI extends AI {
         break;
       case 'approach':
         // Hit on the way in: troopers jump right here and draw the fire while the Carryall gets away; a launcher
-        // turns back.
+        // turns back; a lift sets its cargo down where it is, to go on by road.
         if (c.hp < op.hp0 - 30) {
-          if (op.kind === 'para') {
+          if (op.kind === 'lift') this.dropAt(op, { x: c.x, z: c.z });
+          else if (op.kind === 'para') {
             this.stats.paraBails++;
             this.dropAt(op, { x: c.x + dm.cos(c.heading) * 3 * TILE, z: c.z + dm.sin(c.heading) * 3 * TILE });
           } else this.goHome(op);
@@ -587,6 +639,10 @@ export class BrutalAI extends AI {
       case 'drop':
         if (aboard.length || op.cargo.some((u) => u.falling)) {
           if (c.hp < op.hp0 - 30 && op.kind === 'snipe' && c.task.kind === 'drop') this.goHome(op);
+          break;
+        }
+        if (op.kind === 'lift') {
+          this.joinWave(op);
           break;
         }
         // Down: the Carryall waits nearby, out of the way, ready to lift them out.
@@ -641,14 +697,18 @@ export class BrutalAI extends AI {
     const c = op.c;
     let drop: Point | null = null;
     let victim: Sighting | null = null;
-    if (op.kind === 'snipe') {
+    if (op.kind === 'lift') {
+      drop = this.behindWave(op);
+    } else if (op.kind === 'snipe') {
       const t = this.snipeTarget(c, op.cargo[0].type, 45);
       if (t) ({ drop, victim } = t);
     } else {
       victim = this.paraTarget(c, op.cargo.reduce((s, u) => s + power(u), 0));
       if (victim) drop = { x: victim.x, z: victim.z };
     }
-    const via = drop ? this.route(c, drop) : null;
+    // A lift flies straight in if it must: it goes to our own army, not past theirs.
+    let via = drop ? this.route(c, drop) : null;
+    if (op.kind === 'lift' && drop && via === null) via = undefined;
     if (!drop || via === null) {
       // Nothing right now: wait in the air a little for a target to turn up, then go home.
       if (op.phase !== 'wait') {
@@ -674,6 +734,36 @@ export class BrutalAI extends AI {
     const back = op.via ?? this.parkSpot();
     if (op.c.task.kind === 'drop' && back) op.c.task.back = back;
     this.setPhase(op, 'drop');
+  }
+
+  /** Where a lift sets down: a few tiles behind its wave, on the side toward home (none if the wave is gone). */
+  private behindWave(op: Op): Point | null {
+    const w = op.wave;
+    const rally = this.rally;
+    if (!w || !this.waves.includes(w) || !rally) return null;
+    for (const u of w.units) if (u.dead) w.units.delete(u);
+    if (!w.units.size) return null;
+    const p = this.centroid(w.units);
+    const len = hypot(rally.x - p.x, rally.z - p.z) || 1;
+    const m = this.game.map;
+    const cell = m.nearestCell(m.cellOf(p.x + ((rally.x - p.x) / len) * 6 * TILE), m.cellOf(p.z + ((rally.z - p.z) / len) * 6 * TILE), (cx, cz) => m.canEnter(cx, cz, 'vehicle'), 6);
+    return cell ? { x: m.center(cell.cx), z: m.center(cell.cz) } : null;
+  }
+
+  /** A lift's cargo is down: it joins the wave and heads where the wave is going (home, if the wave is gone). */
+  private joinWave(op: Op): void {
+    const w = op.wave;
+    const goal = w && this.waves.includes(w) ? [...w.units].map((u) => u.order).find((o) => o.kind === 'amove') : undefined;
+    if (w && goal?.kind === 'amove') {
+      for (const u of op.cargo) {
+        this.roles.set(u, 'wave');
+        w.units.add(u);
+        w.start += power(u);
+        u.command(this.game, { kind: 'amove', x: goal.x, z: goal.z });
+      }
+      this.stats.lifted += op.cargo.length;
+    }
+    this.endOp(op);
   }
 
   /** Back home with the cargo, set down at the rally point. */

@@ -8,14 +8,14 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   conyard: {
     name: 'Construction Yard', short: 'Const. Yard', cost: 2500, buildTime: 25, hp: 1600, size: 3, requires: [],
     desc: 'Builds structures, one at a time. Lose all of these and you cannot build.',
-    levels: [{ name: 'HQ Level 2', short: 'HQ Level 2', cost: 1500, time: 45, desc: 'Upgrades a Construction Yard. Unlocks Harvesting and Infantry Rockets.' }],
+    levels: [{ name: 'HQ Level 2', short: 'HQ Level 2', cost: 1500, time: 45, desc: 'Upgrades a Construction Yard. Unlocks Harvesting, Weapons II and Armor II.' }],
   },
   refinery: {
     name: 'Refinery', short: 'Refinery', cost: 1200, buildTime: 14, hp: 1000, size: 3, requires: [],
     desc: 'Processes spice into credits. Comes with a free Harvester.',
   },
   barracks: {
-    name: 'Barracks', short: 'Barracks', cost: 500, buildTime: 10, hp: 800, size: 2, requires: [],
+    name: 'Barracks', short: 'Barracks', cost: 400, buildTime: 10, hp: 800, size: 2, requires: [],
     desc: 'Trains infantry. Each Barracks adds a production line.',
     // Corrino only (Atreides barracks don't level up).
     levels: [{
@@ -30,10 +30,10 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   factory: {
     name: 'Factory', short: 'Factory', cost: 1000, buildTime: 14, hp: 1100, size: 3, requires: ['refinery', 'barracks'],
     desc: 'Builds vehicles. Each Factory adds a production line.',
-    levels: [{ name: 'Factory Level 2', short: 'Factory Lv 2', cost: 1200, time: 40, desc: 'Upgrades a Factory. Unlocks MLRS, Weapons II and Armor II.' }],
+    levels: [{ name: 'Factory Level 2', short: 'Factory Lv 2', cost: 1500, time: 40, desc: 'Upgrades a Factory. Unlocks the MLRS.' }],
   },
   hitech: {
-    name: 'Hi-Tech Factory', short: 'Hi-Tech', cost: 1200, buildTime: 16, hp: 1000, size: 3, requires: ['factory'],
+    name: 'Hi-Tech Factory', short: 'Hi-Tech', cost: 800, buildTime: 11, hp: 1000, size: 3, requires: ['factory'],
     desc: 'Builds aircraft: the Carryall. Each one adds a production line.',
   },
 
@@ -78,7 +78,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     desc: 'Planted in the sand by a Warrior or Fedaykin, it drums until a wild Sandworm comes. The worm swallows whatever moves on the sand around it, whoever it belongs to, and harvesters even standing still. Destroy it before then and no worm comes.',
   },
   camp: {
-    name: 'Spice Camp', short: 'Spice Camp', cost: 450, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 8.5, radius: 7 },
+    name: 'Spice Camp', short: 'Spice Camp', cost: 450, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 7.2, radius: 7 },
     desc: 'Set up by a Spice Crew on a spice field: turns the spice around it into credits. Packs up into a crew again (D) when the field runs dry.',
   },
 };

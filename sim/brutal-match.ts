@@ -51,7 +51,8 @@ for (let k = 0; k < games; k++) {
   const seed = Number(process.env.SEEDS ?? 1000) + Math.floor(n / 2);
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed);
   g.onSurrenderOffer = (t) => g.acceptSurrender(t);
-  const brutal = new BrutalAI(g, side, { ...BRUTAL_PROFILE, ...v.profile }, { ...BRUTAL_OPTIONS, ...v.opts });
+  // Drops as against a person: these sims are where they're tuned.
+  const brutal = new BrutalAI(g, side, { ...BRUTAL_PROFILE, ...v.profile }, { ...BRUTAL_OPTIONS, dropsVsAI: true, ...v.opts });
   const other = (1 - side) as Team;
   const opp = opponent === 'hard' ? new AI(g, other, HARD_PROFILE)
     : opponent === 'normal' ? new AI(g, other, NORMAL_PROFILE)

@@ -211,7 +211,7 @@ export class Hud {
       const ref = g.nearestBuilding(team, 'refinery', from.x, from.z);
       if (!ref) continue;
       const drive = (2 * hypot(ref.x - from.x, ref.z - from.z) * 1.3) / u.speed(g);
-      rate += capacity / (capacity / HARVESTER.rate + drive + capacity / HARVESTER.unloadRate + 4);
+      rate += capacity / (capacity / (HARVESTER.rate * (up ? HARVEST_UPGRADE.rate : 1)) + drive + capacity / HARVESTER.unloadRate + 4);
     }
     let camps = 0;
     for (const b of g.buildings) {
