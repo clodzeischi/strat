@@ -221,6 +221,21 @@ The stealthy desert fighter, after the concept's Fremen infantry: lean and a lit
 
   The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py` and `die.py` in the .blend. Don't rerun them over hand edits. The soles were closed by hand afterwards (and in `build.py`).
 
+### Fedaykin (`fedaykin`)
+
+The Warrior promoted by the rite: the elite, "the knife in the dark". Built to stand apart from the other infantry at a glance: the only hooded unit, the darkest thing on the field, an A-shaped outline (the Warrior is a stick, the Sardaukar a tall rectangle), a bright team banner seen from above, and the longest gun. The Warrior's rig and scale; the hood's peak makes him about 0.82 m. 346 tris for the body, 538 with every tier shown.
+- **Body:** a near-black robe (`1D1616`) flaring to mid-shin with a ragged hem, closed underneath; a pointed hood with its peak tipped forward, the face lost in its shadow behind dark-grey goggles; broad cloaked shoulders over a narrow waist, the stillsuit slate showing in the robe's V at the chest; earth-brown belt and wraps on the forearms and shins, dark gloves and boots.
+- **Team colour:** a long banner down the back, from the shoulders to the knees, with a pale blade sigil down its middle (the top-down read); a narrow tabard in the dark team shade down the front.
+- **`armor1`:** veteran steel shoulder plates with a dark rim, and steel bracers. **`armor2`:** a banner pole off the right shoulder blade with a team pennant.
+- **Weapons:** a long, heavy sonic rifle: dark housing, wrapped stock, steel barrel, an emitter with a cyan face (`weapons0`); `weapons1` adds a flared emitter bell with a cyan face, `weapons2` a scope with a cyan lens and two focusing prongs. Each later tier brings its own muzzle (`muzzle_w1`, `muzzle_w2`) further forward.
+- **Animation:** still, fanatical, each action directed by the user.
+  - Idle: upright at port arms, the rifle diagonal across the chest in both hands; one slow breath and a small turn of the hood (2 s).
+  - Walk: upright and level on a 6-frame cycle, the rifle held steady at port arms.
+  - Shoot: from the hip like a zealot, turned 45° clockwise, both hands on the rifle, the hood straight at the target; a slow, heavy push on each pulse (the 1 s cooldown).
+  - Die: hit in the chest, half a step back, then over backwards like a felled tree, arms flung wide; he lands rolled a little onto his left side, so the `armor2` pole stays above the sand. The rifle stays in his hand (it's skinned to it).
+
+  The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py` and `die.py` in the .blend. Don't rerun them over hand edits.
+
 ### Wind Glider (`glider`)
 
 A cloth wing, not a machine: after the concept's Fremen wind glider, about 2.1 m span and 1.4 m long, 418 tris. No moving parts, one `body`; the game banks it in turns.
