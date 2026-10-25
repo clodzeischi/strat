@@ -28,7 +28,7 @@ export type { BuildingModel, UnitAnimator, UnitModel, UpgradeKit, UpgradeLook } 
 export { hasBuildingModel, hasUnitModel, loadModels } from './gltf';
 export { makeParachute } from './parachute';
 export { makePod } from './pod';
-export { makeRiddenWorm, makeSandworm, WORM_DEPTH, type RiddenWormModel, type SandwormModel } from './sandworm';
+export { makeRiddenWorm, type RiddenWormModel } from './sandworm';
 export { CARRYALL_HOOK_Y, NACELLES, SEATS, SEAT_OFF, SEAT_ON } from './units/carryall';
 
 const UNIT_MODELS: Record<UnitType, UnitBlueprint> = {
