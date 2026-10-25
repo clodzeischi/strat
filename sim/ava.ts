@@ -27,6 +27,8 @@ for (let k = 0; k < games; k++) {
   const deaths: Record<string, number>[] = [{}, {}]; // per victim team: victim type -> credits lost
   const tech: Record<string, number>[] = [{}, {}];
   const kv: Record<string, number> = {}; // 'killer>victim' -> credits, both sides
+  const air: Record<string, number>[] = [{}, {}]; // per team: Carryall-seconds by what it's doing
+  const hdeaths: Record<string, unknown>[][] = [[], []]; // per team: each harvester lost, and how
 
   const seen = new Set<number>();
   const kill = (g as any).kill.bind(g);
@@ -36,6 +38,11 @@ for (let k = 0; k < games; k++) {
       kills[by.team][k] = (kills[by.team][k] ?? 0) + e.def.cost;
       deaths[e.team][e.type] = (deaths[e.team][e.type] ?? 0) + e.def.cost;
       kv[`${k}>${e.type}`] = (kv[`${k}>${e.type}`] ?? 0) + e.def.cost;
+      if (e.type === 'harvester') {
+        const ref = g.nearestBuilding(e.team, 'refinery', e.x, e.z);
+        const f = g.ferryFor(e) as any;
+        hdeaths[e.team].push({ t: Math.round(g.time), by: k, ferried: !!f, rescue: !!f?.task?.rescue, carried: !!e.carrier, state: (e as any).hstate, ref: ref ? Math.round(Math.hypot(ref.x - e.x, ref.z - e.z) / 2) : -1 });
+      }
     }
     kill(e, by);
   };
@@ -45,6 +52,12 @@ for (let k = 0; k < games; k++) {
     for (const ai of ais) ai.update(0.05);
     if (++tick % 20) continue;
     for (const u of g.units) if (!seen.has(u.id)) { seen.add(u.id); built[u.team][u.type] = (built[u.team][u.type] ?? 0) + 1; }
+    for (const u of g.units) {
+      if (u.type !== 'carryall') continue;
+      const c = u as any;
+      const k = c.load.length ? (c.load[0].type === 'harvester' ? 'lifting' : 'carrying') : c.task.kind;
+      air[u.team][k] = (air[u.team][k] ?? 0) + 1;
+    }
     for (const t of [0, 1] as Team[]) {
       for (const up of g.teams[t].upgrades) if (tech[t][up] === undefined) tech[t][up] = Math.round(g.time);
       for (const l of ['conyard', 'factory'] as const) if (g.techLevel(t, l) >= 2 && tech[t][l + '2'] === undefined) tech[t][l + '2'] = Math.round(g.time);
@@ -55,5 +68,6 @@ for (let k = 0; k < games; k++) {
     a, b, seed, side, result: g.winner === null ? 'timeout' : g.winner === side ? 'win' : 'loss', time: Math.round(g.time),
     spice: [Math.round(g.teams[side].stats.spiceHarvested), Math.round(g.teams[o].stats.spiceHarvested)],
     built: [built[side], built[o]], kills: [kills[side], kills[o]], deaths: [deaths[side], deaths[o]], tech: [tech[side], tech[o]], kv,
+    stats: [ais[side].stats, ais[o].stats], air: [air[side], air[o]], hdeaths: [hdeaths[side], hdeaths[o]],
   }));
 }

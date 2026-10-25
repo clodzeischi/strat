@@ -138,19 +138,19 @@ export class Carryall extends Unit {
     return true;
   }
 
-  /** Whether the harvester it ferries should stop and wait: a lift is coming for its long trip or its rescue. */
-  wantsToLift(game: Game, h: Unit): boolean {
+  /** Whether a lift is coming for the harvester it ferries: for its long trip or its rescue (`wait`: only one it should stop for). */
+  wantsToLift(game: Game, h: Unit, wait = false): boolean {
     const t = this.task;
     if (t.kind !== 'ferry' || t.harvester !== h || this.load.length) return false;
-    if (t.rescue) return true;
+    if (t.rescue) return !wait;
     const goal = h.travelGoal(game);
     return !!goal && hypot(goal.x - h.x, goal.z - h.z) > CARRYALL.ferryMin * TILE;
   }
 
-  /** The ferried harvester is under fire: it heads for home, and waits there for this Carryall to fly it out. */
+  /** The ferried harvester is badly hurt: it heads for home, and this Carryall picks it up on the way to fly it out. */
   rescue(game: Game, h: Unit): void {
     const t = this.task;
-    if (t.kind !== 'ferry' || t.harvester !== h || t.rescue || h.carrier || this.load.length) return;
+    if (t.kind !== 'ferry' || t.harvester !== h || t.rescue || h.carrier || this.load.length || h.hp > h.maxHp * CARRYALL.rescueAt) return;
     if (h.retreat(game)) t.rescue = true;
   }
 

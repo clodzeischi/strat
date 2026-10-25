@@ -49,6 +49,10 @@ export const EXTRA: Record<string, Strat> = {
   eco: { profile: { ...BRUTAL_PROFILE, kit: { levels: ['conyard', 'factory'], research: ['harvest', 'rockets', 'weapons1', 'armor1', 'nitro', 'weapons2', 'armor2'] } } },
   // Stock Brutal with an early Hi-Tech Factory, so its two Carryalls ferry harvesters from the first minutes.
   air: { profile: BRUTAL_PROFILE, opts: { hitechAt: 150, hitechAtLarge: 150, hitechArmy: 0, hitechLead: 0, hitechSpare: 0 } },
+  airnf: { profile: BRUTAL_PROFILE, opts: { hitechAt: 150, hitechAtLarge: 150, hitechArmy: 0, hitechLead: 0, hitechSpare: 0, ferry: false } },
+  air5: { profile: BRUTAL_PROFILE, opts: { hitechAt: 300, hitechAtLarge: 300, hitechArmy: 6, hitechLead: 1, hitechSpare: 200 } },
+  air7: { profile: BRUTAL_PROFILE, opts: { hitechAt: 420, hitechAtLarge: 420, hitechArmy: 8, hitechLead: 1, hitechSpare: 200 } },
+  nolift: { profile: BRUTAL_PROFILE, opts: { lift: false } },
   // Stock Brutal that never builds Carryalls: what its usual (late) Carryalls are worth.
   nocarry: { profile: BRUTAL_PROFILE, opts: { carryalls: 0 } },
 };

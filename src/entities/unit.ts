@@ -633,8 +633,9 @@ export class Unit extends Entity {
           if (this.followPath(game, dt)) this.order = { kind: 'idle' };
           break;
         case 'harvest':
-          // With a Carryall assigned, wait for the lift instead of setting off on a long drive.
-          if (!game.ferryFor(this)?.wantsToLift(game, this)) this.updateHarvester(game, dt);
+          // With a Carryall assigned, wait for the lift instead of setting off on a long drive; one coming to fly it out
+          // of a fight picks it up on the move, so it doesn't stop to be shot while it waits.
+          if (!game.ferryFor(this)?.wantsToLift(game, this, true)) this.updateHarvester(game, dt);
           break;
         case 'repair':
           if (this.updateRepair(game, this.order.target, dt)) {

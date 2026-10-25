@@ -1701,7 +1701,7 @@ export class AI {
     else u.command(this.game, { kind: 'amove', x: s.x, z: s.z });
   }
 
-  private centroid(units: Set<Unit>): { x: number; z: number } {
+  protected centroid(units: Set<Unit>): { x: number; z: number } {
     let x = 0;
     let z = 0;
     for (const u of units) {

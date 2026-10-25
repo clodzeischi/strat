@@ -301,6 +301,42 @@ mech > trike 88, trike > bio 60 (it was 43 in r16, before the Harvesting-first o
 Kill ratios unchanged: tank 1.38, MLRS 2.97, infantry 0.89, trike 0.81. A minute+ ahead on tech wins: Weapons II 86%,
 Rockets 74%, HQ Lv 2 67%, Factory Lv 2 66%, Nitro 66%. Checks, smoke and determinism pass.
 
+### 17. Carryalls: how the AI uses them
+
+`sim/ava.ts` now logs Brutal's operation counters, what each side's Carryalls spend their time on, and how each
+harvester died. 60-120 games per row against stock Brutal (small maps):
+
+| plan | before | after the fixes below |
+|---|---|---|
+| nocarry: never builds Carryalls | 53-55 | 52 |
+| air: Hi-Tech at 2:30 | 23-33 | |
+| air5: Hi-Tech at 5:00 | 35 | |
+| air7: Hi-Tech at 7:00 | 46 | 45 (47 with Hi-Tech 500 / Carryall 300) |
+| airnf: Hi-Tech at 2:30, no ferrying | 12 | |
+| nolift: stock without troop lifts | | 51 |
+
+What was wrong, and what changed:
+- **A ferried harvester froze when hit.** Any hit sent it home and stopped it dead until its Carryall swooped in; busy
+  or far away, it sat there and was shot. Now the rescue only comes once it's below 2/3 health (`CARRYALL.rescueAt`,
+  the threshold Brutal's own harvesters run at) and the harvester keeps driving while the Carryall picks it up on the
+  move. (Game rule, so it applies to players' Carryalls too.)
+- **The AI ferried only trips over 12 tiles** while Carryalls take them from 6: it now uses `CARRYALL.ferryMin`.
+- **Snipes took a tank when no MLRS was home**, which spent half its op hovering and killed ~0.2 harvesters a game:
+  snipes now take only a launcher.
+- **New: troop lifts.** An idle Carryall (one lift at a time) flies a fresh tank or MLRS, two trikes or 3-6 infantry
+  from home to the strongest wave more than 15 tiles out, sets them down behind it, and they join it. It flies
+  straight in when no route is clear of anti-air (it's going to its own army). 2-5 lifts a game.
+
+Findings: ferrying is what makes Carryalls pay (the 2:30 plan wins 33% with ferrying, 12% without, ~8,000 spice a game
+apart). Harvester losses weren't the Carryalls' doing: 13 of 236 dead harvesters had one assigned; most died to tanks
+within 10 tiles of their own Refinery, i.e. the losing side's base being overrun. In the AI's hands Carryalls are now
+about neutral (stock with vs without: 48-52%), and an earlier Hi-Tech still costs ~5 points at any price tried: games
+are decided around 10-12 minutes, before ~1,600 credits of air pays back. Their value to a player (drops, flanks,
+rescues) isn't something these sims measure.
+
+Mirror round robin (r18) is the same as r17 within noise (avg: std 56, rush 44, bio 55, mech 65, trike 43, tech 56,
+turtle 31; triangle 55 / 90 / 59): every plan gets its Carryalls late. Checks, smoke and determinism pass.
+
 ## Summary of changes (vs main)
 
 | | main | branch |
@@ -321,9 +357,11 @@ Rockets 74%, HQ Lv 2 67%, Factory Lv 2 66%, Nitro 66%. Checks, smoke and determi
 | Hi-Tech Factory | 1,200, 16 s | 800, 11 s |
 | Carryall | 700, 12 s; ferries trips from 10 tiles | 400, 8 s; from 6 tiles |
 | Atreides AI research | Rockets first, Harvesting 5th | Harvesting first |
+| Ferried harvester under fire | stops and waits for its Carryall on the first hit | flown out below 2/3 health, keeps driving |
+| Brutal's Carryalls | ferry 12+ tile trips; snipe with MLRS or tank | ferry 6+; snipe with MLRS only; troop lifts to waves |
 
 Open / not done:
-- Carryalls: cheap now, but the AI's use of them adds nothing (round 16); its ferry still waits for 12-tile trips.
+- Carryalls are about neutral in the AI's hands (round 17); an earlier Hi-Tech costs ~5 points whatever its price.
 - The infantry rush was the weak plan (21% small maps, 5% medium) until the slower economy (44%, round 16); the turtle is now the weakest (30%).
   Cheaper infantry (80) didn't help it and broke the trike > bio leg (round 12).
 - Turtling loses (41%) — wanted — but nothing in the rules punishes a big army as such (no upkeep); the AI's waves

@@ -103,4 +103,5 @@ export const CARRYALL = {
   clearance: 4.2, // least height over the ground under and just ahead (climbs over cliffs with a vehicle hanging)
   orbit: 11, // radius of the holding circle
   ferryMin: 6, // tiles: harvester trips shorter than this aren't worth a lift
+  rescueAt: 0.67, // a ferried harvester hit below this share of its health is flown out of the fight
 };
