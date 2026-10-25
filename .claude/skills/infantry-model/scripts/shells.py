@@ -11,6 +11,7 @@ from mathutils.geometry import intersect_point_line
 H = 0.75 / 1.8
 CLOTH = 'CLOTH'     # the darker team shade, (1, 0) on the team material
 SPICE = dict(O=('P2', 0, 1), H=('P2', 0, 2), L=('P2', 0, 3))   # spice oranges on palette2.png, darkest first
+BROWN = dict(O=('P2', 1, 1), H=('P2', 1, 2), L=('P2', 1, 3))   # leather browns on palette2.png, darkest first
 
 class Mesh:
     """Plain lists: verts (co, weights), faces (vert ids, swatch), shells (face ids, axis polyline or None = closed),

@@ -25,8 +25,8 @@ export interface UnitModel {
   anim?: UnitAnimator;
 }
 
-/** The looping actions of an animated unit. */
-export type AnimState = 'idle' | 'walk' | 'shoot';
+/** The looping actions of an animated unit (`ride`: a Sandrider on his worm; `idle` if the model has none). */
+export type AnimState = 'idle' | 'walk' | 'shoot' | 'ride';
 
 export interface UnitAnimator {
   /** Plays a looping action (`rate` scales its speed); `fired` restarts `shoot` so each shot gets its kick. */

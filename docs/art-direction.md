@@ -252,6 +252,22 @@ The Warrior by another rite: a patient spotter who sits still for long stretches
 
   The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py`, `deploy.py`, `shoot_set.py` and `die.py` in the .blend, with `mortar_keys.py` (keying that includes the travelling bones). Don't rerun them over hand edits. The 90-frame budget is used to the frame.
 
+### Sandrider (`sandrider`)
+
+The elite melee Fremen, the one who rides the worm. After the concept, pushed away from the Fedaykin (who already has the hood, the robe and the back banner): leather brown instead of black, a long rider's cape instead of a robe, maker hooks on his back instead of a banner, and a milk-white crysknife instead of a dark kris. The Warrior's rig and scale plus `hook.L` and `hook.R` (children of `chest`). 404 tris for the body, 452 with the knife.
+- **Body:** brown leather (`palette2.png`'s leather) over the stillsuit: a wrapped hood, goggles and a dark face wrap, a harness round the chest, leather on the shoulders, knee pads and wrapped shins, dark boots and gloves; a long cape from the shoulders to the calves with a ragged hem, and a short ragged tabard in front.
+- **Maker hooks** (the top-down read): two, crossed in an X over the cape, wooden shafts with steel hooks, each on its own bone so he can take them in hand to ride.
+- **Team colour:** the scarf and the armbands.
+- **`weapons0`** (the only tier): the crysknife, long, curved and milk-white, with a dark grip and a steel guard.
+- **Animation:** a coiled predator, each action directed by the user.
+  - Idle: a low crouch on the balls of his feet, the knife reversed point-down by his hip, the left hand open ahead; a slow breath and a listening tilt of the head (2 s).
+  - Walk: a low prowl on a 6-frame cycle, the knife held the same way (also his rush, played up to 1.4x).
+  - Shoot (the kill): a lunge onto his right foot and a backhand slash along an arc round his shoulder, keyed on every frame so it has momentum (0.8 s).
+  - Die: drops to both knees, the knife drawn to his chest, head bowed; a still beat, then he tips forward onto his face.
+  - Ride: on the worm's second ring, a deep wide crouch, both maker hooks driven into the ring ahead like reins, swaying with the worm (1 s). The game plays it whenever he's mounted.
+
+  The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py`, `die.py` and `ride.py` in the .blend. Don't rerun them over hand edits.
+
 ### Spice Crew (`crew`)
 
 A spice hunter, a little gone on it: a weary pack mule under a frame ruck that dwarfs him. The Warrior's rig and scale. 448 tris for the body, 480 with the probe. The only unit in spice orange (`palette2.png`), so a crew is easy to find on the field.

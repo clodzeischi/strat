@@ -46,6 +46,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 | `artillery` | Soulcrusher | Corrino | 1.1 | yes | weapons, armor | deploy animation |
 | `warrior` | Fremen Warrior | Fremen | 0.45 | | weapons, armor | animated |
 | `fedaykin` | Fedaykin | Fremen | 0.5 | | weapons, armor | animated |
+| `sandrider` | Sandrider | Fremen | 0.5 | | | animated; `ride` on his worm |
 | `mortar` | Fremen Mortar | Fremen | 0.5 | | | animated; sets up (`deploy`, `shoot_set`, `muzzle_deploy`) |
 | `crew` | Spice Crew | Fremen | 0.45 | | | animated; no `shoot` (unarmed) |
 | `glider` | Wind Glider | Fremen | 0.9 | | | aircraft; the game rolls it in turns |
@@ -142,13 +143,13 @@ Hex values are sRGB, as in Blender's color picker. Blender models don't use the 
 
 `src/public/models/palette2.png` has the same layout and rules, on the `palette2` material (an Image Texture of it, **Closest**). Unused swatches are magenta, so a stray UV shows at once.
 
-| Row | Col 0 | Cols 1–3 |
-|---|---|---|
-| 1 | `8C3B10` spice, dark | unused |
-| 2 | `D2691E` spice | unused |
-| 3 | `F4A259` spice, light | unused |
+| Row | Col 0 | Col 1 | Cols 2–3 |
+|---|---|---|---|
+| 1 | `8C3B10` spice, dark | `4A2C1A` leather, dark | unused |
+| 2 | `D2691E` spice | `7A4A2A` leather | unused |
+| 3 | `F4A259` spice, light | `A8774B` leather, light | unused |
 
-In the infantry skill's `shells.py` these are `SPICE['O']`, `SPICE['H']` and `SPICE['L']`; `build_object` puts them on material index 2, so pass `[palette, team, palette2]`.
+In the infantry skill's `shells.py` these are `SPICE['O' / 'H' / 'L']` and `BROWN['O' / 'H' / 'L']`; `build_object` puts them on material index 2, so pass `[palette, team, palette2]`.
 
 ## Budgets
 
@@ -170,7 +171,7 @@ Delete faces pointing more than 45° down (normal Z < −0.7): no camera ever se
 
 Rig with an armature and animate as usual. A build step samples each frame and bakes the result into a vertex animation texture, so the armature doesn't ship.
 
-- Actions, named exactly: `idle`, `walk`, `shoot`, `die`. An unarmed unit (`crew`) has no `shoot`. A unit that sets up (`mortar`) also has `deploy` and `shoot_set`, below.
+- Actions, named exactly: `idle`, `walk`, `shoot`, `die`. An unarmed unit (`crew`) has no `shoot`. A unit that rides (`sandrider`) also has a looping `ride`, played while mounted, standing on the mount's top at z = 0. A unit that sets up (`mortar`) also has `deploy` and `shoot_set`, below.
 - Animate at **15 fps** (scene frame rate). `idle`, `walk` and `shoot` must loop: the first and last frames match.
 - Keep each action short. `walk` is one stride cycle of about 0.6–0.8 s at walking speed (2.4–3 m/s, see `speed` in `units.ts`). Total across all actions ≤ 90 frames.
 - The rig moves on the spot: no root motion. The game moves the unit.

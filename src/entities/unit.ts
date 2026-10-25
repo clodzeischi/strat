@@ -325,7 +325,9 @@ export class Unit extends Entity {
     a.cooldown2 = this.cooldown2;
     a.shooting = fired ? 0.8 : Math.max(0, a.shooting - dt);
     const speed = dt > 0 ? moved / dt : 0;
-    if (speed > 0.3) this.anim!.set('walk', false, THREE.MathUtils.clamp(speed / this.def.speed, 0.6, 1.4));
+    // On his worm a Sandrider rides, however fast it carries him.
+    if (this.mount) this.anim!.set('ride', false);
+    else if (speed > 0.3) this.anim!.set('walk', false, THREE.MathUtils.clamp(speed / this.def.speed, 0.6, 1.4));
     else if (a.shooting > 0) this.anim!.set('shoot', fired);
     else this.anim!.set('idle', false);
   }

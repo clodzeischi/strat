@@ -2312,7 +2312,10 @@ export class Game {
     this.effects.dust(new THREE.Vector3(w.x, this.map.surfaceAt(w.x, w.z) + 0.2, w.z), 0xd8c49a, 2);
   }
 
-  /** Drawing: each piece between ticks, riding high out of the sand and rolling in a slow wave down the body. */
+  /**
+   * Drawing: each piece between ticks, mostly under the sand with only its back showing, rising and falling in a slow
+   * wave down the body; the rider stands on his ring's back and rides the wave with it.
+   */
   private drawRidden(dt: number, alpha: number): void {
     const now = this.time + alpha * 0.05;
     for (const w of this.ridden) {
@@ -2321,12 +2324,15 @@ export class Game {
       for (let i = 0; i < pieces.length; i++) {
         const p = pieces[i];
         p.position.lerpVectors(w.from[i], w.to[i], alpha);
-        p.position.y += radii[i] * 0.45 + 0.35 * dm.sin(now * 3 - i * 0.8);
+        p.position.y += -radii[i] * RIDE.sink + 0.12 * dm.sin(now * 3 - i * 0.8);
         const h = w.headings[i];
         let turn = h.to - h.from;
         turn -= Math.round(turn / (2 * Math.PI)) * 2 * Math.PI;
         p.rotation.y = -(h.from + turn * alpha);
       }
+      // The rider on his ring's back, moving with it (drawn after the units, so this wins over his own pose).
+      const seat = pieces[RIDE.seat];
+      w.rider.root.position.set(seat.position.x, seat.position.y + radii[RIDE.seat], seat.position.z);
       if (root.visible) {
         w.dustTimer -= dt;
         if (w.dustTimer <= 0) {
