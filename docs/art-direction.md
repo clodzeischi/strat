@@ -236,6 +236,20 @@ The Warrior promoted by the rite: the elite, "the knife in the dark". Built to s
 
   The scripts are `build.py`, `idle.py`, `walk.py`, `shoot.py` and `die.py` in the .blend. Don't rerun them over hand edits.
 
+### Spice Crew (`crew`)
+
+A spice hunter, a little gone on it: a weary pack mule under a frame ruck that dwarfs him. The Warrior's rig and scale. 448 tris for the body, 480 with the probe. The only unit in spice orange (`palette2.png`), so a crew is easy to find on the field.
+- **Body:** the Warrior's stillsuit, worn and stained; the mask pulled down into the scarf and the goggles pushed up on the brow, so the face shows, with the spice's blue-in-blue eyes (a cyan band); spice-orange gloves, orange dust caked on the shin fronts and boot toes, a fat orange spice pouch on the belt and a steel sample tube.
+- **The ruck** (the top-down read): two frame poles rising well over his head with a crossbar; a bulging spice-orange sack much wider than him, its top dusted pale; a slate tarp roll on top with a team strap; a steel canister on the left and a small spice bag dangling on the right.
+- **Team colour:** the scarf, the armbands and the tarp strap.
+- **`weapons0`** (the only tier; he's unarmed): a spice probe carried as a walking stick, a steel point and an orange sensor bulb, gripped near the top.
+- **Animation:** a weary pack mule, each action directed by the user. No `shoot` (unarmed) and no `deploy` (the crew turns straight into a Spice Camp).
+  - Idle: bowed low, knees bent, his weight hanging on the probe planted ahead (its point pinned in the sand); heavy breathing that never stops, two breaths a loop, and once a loop a jerk of the head to his right (3 s).
+  - Walk: an 8-frame heavy plod, low dragging steps, a deep bob as the load lands; the probe as a walking stick, opposite the right leg, planted and held still with the left step; the left hand hooked in the ruck strap.
+  - Die: a jolt, the knees buckle, and the load drives him flat on his face, pinned under the sack; one bounce of the sack.
+
+  The scripts are `build.py`, `idle.py`, `walk.py` and `die.py` in the .blend. Don't rerun them over hand edits.
+
 ### Wind Glider (`glider`)
 
 A cloth wing, not a machine: after the concept's Fremen wind glider, about 2.1 m span and 1.4 m long, 418 tris. No moving parts, one `body`; the game banks it in turns.
