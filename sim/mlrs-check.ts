@@ -37,7 +37,7 @@ function crossing(lock: boolean, moving: boolean): number {
   const { g, at, step } = arena();
   const p = at(-4, 0);
   const mlrs = g.spawnUnit('rocket', A, p.x, p.z, 0);
-  const s = at(3, -4);
+  const s = at(1, -4);
   const target = g.spawnUnit('razor', C, s.x, s.z);
   target.hp = 1e6;
   target.order = { kind: 'idle' };
@@ -51,7 +51,7 @@ function crossing(lock: boolean, moving: boolean): number {
   if (lock) applyCommand(g, A, { c: 'lock', units: [mlrs.id], target: target.id });
   else mlrs.command(g, { kind: 'attack', target });
   // Drive back and forth across the MLRS's line of fire.
-  const ends = [at(3, 4), at(3, -4)];
+  const ends = [at(1, 4), at(1, -4)];
   let leg = 0;
   for (let t = 0; t < 8; t += 0.05) {
     if (moving && (target.order.kind === 'idle' || target.path.length === 0)) target.command(g, { kind: 'move', ...ends[leg++ % 2] });

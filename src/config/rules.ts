@@ -24,7 +24,7 @@ export const ARMOR_BONUS = 0.15; // damage reduction per Armor tier (to health)
 export const SHIELDS_BONUS = 0.2; // damage reduction to shields per Shields level
 /** Razor Flame Range upgrade: extra reach, in world units. */
 export const FLAME_RANGE = 2;
-export const NITRO = { speed: 1.4, cooldown: 1 / 1.5 };
+export const NITRO = { speed: 1.5, cooldown: 1 / 1.5 };
 export const HARVEST_UPGRADE = { capacity: 1.2, speed: 1.2 };
 
 /** Range bonus for shooting down from high ground, and penalty for shooting up at it. */

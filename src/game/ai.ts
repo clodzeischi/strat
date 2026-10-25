@@ -121,6 +121,8 @@ export interface AIProfile {
   more: { barracks: number; factory: number };
   /** How far out from the construction yard, toward the middle of the map, the army gathers (tiles). */
   rallyOut: number;
+  /** A different tech path or research order than the faction's usual one (a build order to play). */
+  kit?: Partial<Pick<FactionKit, 'levels' | 'research'>>;
 }
 
 /** Combined-arms base preference for unit picks, before counters (see `counterWeights`). */
@@ -269,7 +271,7 @@ export class AI {
     this.nextRaidTime = profile.raids.start;
     this.nextScoutTime = profile.scout.first;
     this.intel = new Intel(game, team);
-    this.kit = KITS[game.teams[team].faction];
+    this.kit = { ...KITS[game.teams[team].faction], ...profile.kit };
     this.hub = FACTIONS[game.teams[team].faction].hub;
     this.camps = !!FACTIONS[game.teams[team].faction].camps;
     const flip = game.random() < 0.5;
