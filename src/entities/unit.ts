@@ -160,6 +160,8 @@ export class Unit extends Entity {
   private showUpgrades: ((look: UpgradeLook) => void) | null;
   private upgradeKey = '';
   private muzzle: THREE.Object3D;
+  /** Where shots start once deployed, if not at `muzzle` (a Fremen Mortar fires his tube, not his pistol). */
+  private readonly muzzleDeploy: THREE.Object3D | null;
   /** The remote weapon station that turns to the secondary gun's target, and that gun's muzzle. Drawing only. */
   private readonly crow: THREE.Object3D | null;
   private readonly muzzle2: THREE.Object3D | null;
@@ -238,6 +240,7 @@ export class Unit extends Entity {
     this.body = model.body;
     this.turret = model.turret;
     this.muzzle = model.muzzle;
+    this.muzzleDeploy = model.muzzleDeploy ?? null;
     this.crow = model.crow ?? null;
     this.muzzle2 = model.muzzle2 ?? null;
     this.deployPose = model.deploy ?? null;
@@ -385,9 +388,10 @@ export class Unit extends Entity {
     return t === SAND || t === SPICE;
   }
 
-  /** Where shots start: the main gun's muzzle, or the secondary gun's (snapped onto its target first) if it has one. */
+  /** Where shots start: the main gun's muzzle (the deployed one when dug in), or the secondary gun's (snapped onto its target first) if it has one. */
   muzzleWorld(secondary = false): THREE.Vector3 {
-    const m = secondary && this.muzzle2 ? this.muzzle2 : this.muzzle;
+    const main = this.deployState === 'deployed' && this.muzzleDeploy ? this.muzzleDeploy : this.muzzle;
+    const m = secondary && this.muzzle2 ? this.muzzle2 : main;
     if (m === this.muzzle2) {
       this.crowHeading = this.crowAim;
       this.poseCrow();

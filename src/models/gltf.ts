@@ -15,7 +15,7 @@ const FILES = [
   'buildings/conyard.corrino', 'buildings/refinery.corrino', 'buildings/barracks.corrino', 'buildings/fab.corrino', 'buildings/tleilaxu.corrino', 'buildings/pad.corrino', 'buildings/turret.corrino',
   'buildings/sietch.fremen', 'buildings/barracks.fremen', 'buildings/perch.fremen', 'buildings/bunker.fremen', 'buildings/camp.fremen', 'buildings/thumper.fremen',
   'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/devastator.corrino', 'units/raider.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
-  'units/infantry.atreides', 'units/trooper.corrino', 'units/sardaukar.corrino', 'units/warrior.fremen', 'units/fedaykin.fremen', 'units/crew.fremen', 'units/glider.fremen',
+  'units/infantry.atreides', 'units/trooper.corrino', 'units/sardaukar.corrino', 'units/warrior.fremen', 'units/fedaykin.fremen', 'units/crew.fremen', 'units/mortar.fremen', 'units/glider.fremen',
 ];
 
 const scenes = new Map<string, THREE.Object3D>();
@@ -166,14 +166,17 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
   const all = clips.get(`units/${type}.${faction}`) ?? [];
   const deployClip = all.find((c) => c.name === 'deploy');
   const actions = all.filter((c) => c !== deployClip);
+  // An animated model plays its `deploy` in its own animator (two mixers would fight over the same bones).
+  const anim = actions.length ? animator(model, all) : undefined;
   return {
     body, turret, muzzle, showUpgrades,
     crow: model.getObjectByName('crow') ?? undefined,
     muzzle2: model.getObjectByName('muzzle2') ?? undefined,
     wings: named(model, 'wing_'),
     jets: named(model, 'jet_'),
-    anim: actions.length ? animator(model, actions) : undefined,
-    deploy: deployClip ? deployPose(model, deployClip) : undefined,
+    anim,
+    deploy: deployClip ? (anim ? anim.deploy : deployPose(model, deployClip)) : undefined,
+    muzzleDeploy: model.getObjectByName('muzzle_deploy') ?? undefined,
     plant: deployClip ? plantOf(model) : undefined,
   };
 }
@@ -212,7 +215,10 @@ function deployPose(model: THREE.Object3D, clip: THREE.AnimationClip): (t: numbe
   return pose;
 }
 
-/** Plays a skinned model's actions: one looping state at a time, cross-faded, and a one-off death. */
+/**
+ * Plays a skinned model's actions: one looping state at a time, cross-faded, and a one-off death. A model that sets
+ * up (a Fremen Mortar) also has `deploy`, held at how far it's set up, and may have `idle_set` and `shoot_set`.
+ */
 function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnimator {
   const mixer = new THREE.AnimationMixer(model);
   const act = (name: string) => {
@@ -225,23 +231,51 @@ function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnima
     death.setLoop(THREE.LoopOnce, 1);
     death.clampWhenFinished = true;
   }
-  let state: AnimState = 'idle';
+  // Setting up: `deploy` stands still (timeScale 0) at the time the set-up progress gives it.
+  const deploy = act('deploy');
+  const idleSet = act('idle_set');
+  const shootSet = act('shoot_set');
+  let setUp = 0;
+  let wanted: AnimState = 'idle';
   let current = loops.idle;
   let dead = false;
   current?.play();
   // Spread the idles so a squad doesn't breathe in step.
   if (current) current.time = Math.random() * current.getClip().duration;
+  const hold = (t: number) => {
+    deploy!.timeScale = 0;
+    deploy!.time = THREE.MathUtils.clamp(t, 0, 1) * deploy!.getClip().duration;
+  };
+  const switchTo = (a: THREE.AnimationAction, restart: boolean) => {
+    if (a === current && !restart) return;
+    const t = a === deploy ? a.time : 0;
+    a.reset().play();
+    if (a === deploy) hold(t / Math.max(1e-6, a.getClip().duration));
+    if (current && current !== a) current.crossFadeTo(a, 0.12, false);
+    current = a;
+  };
+  // The action for a looping state: set up, the set-up versions; in between, `deploy` held where it is.
+  const pick = (next: AnimState): THREE.AnimationAction | null => {
+    if (!deploy || setUp <= 0) return loops[next];
+    if (setUp < 1) return deploy;
+    if (next === 'shoot' && shootSet) return shootSet;
+    return idleSet ?? deploy;
+  };
   return {
     set(next, fired, rate = 1) {
-      const a = loops[next];
+      wanted = next;
+      const a = pick(next);
       // Once dying, nothing fades the death back out.
       if (!a || dead) return;
-      a.timeScale = rate;
-      if (next === state && !(fired && next === 'shoot')) return;
-      a.reset().play();
-      if (current && current !== a) current.crossFadeTo(a, 0.12, false);
-      state = next;
-      current = a;
+      if (a !== deploy) a.timeScale = rate;
+      switchTo(a, fired && (a === loops.shoot || a === shootSet));
+    },
+    deploy(t) {
+      setUp = t;
+      if (!deploy || dead) return;
+      if (t > 0 && (t < 1 || !idleSet)) hold(t);
+      const a = pick(wanted);
+      if (a) switchTo(a, false);
     },
     update(dt) {
       mixer.update(dt);
