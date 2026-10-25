@@ -377,6 +377,12 @@ maps, vs Brutal: Nitro 44%, no Nitro 46%.)
   home more than raiding). Against a person whose army is out of position it should hit much harder; these sims can't
   show that. No change made.
 
+### 20. x2 against shields taken out (user's call, to be worked out later)
+
+The user removed the x2 shield damage from round 14 for now; Corrino vs Atreides is to be settled in the cross-faction
+pass. Counter table regenerated. Without it, Atreides vs Corrino on Hard (both sides) is **5%** Atreides wins (200
+games; 31% with it after round 16, 36% on the old main). Checks, smoke, determinism pass.
+
 ## Summary of changes (vs main)
 
 | | main | branch |
@@ -390,7 +396,6 @@ maps, vs Brutal: Nitro 44%, no Nitro 46%.)
 | Barracks | 500 | 400 |
 | Factory Level 2 | 1,200: MLRS, Weapons II, Armor II | 1,500: MLRS only |
 | HQ Level 2 | Harvesting, Infantry Rockets | Harvesting, **Weapons II, Armor II** |
-| Atreides weapons vs shields | x1 | x2 |
 | Harvester pickup rate (all factions) | 60/s | 38/s |
 | Harvesting (Atreides and Corrino) | +20% load, +20% speed | +25% load, +25% speed, +50% pickup |
 | Spice Camp (Fremen) | 8.5/s | 7.2/s |
@@ -407,4 +412,4 @@ Open / not done:
 - Turtling loses (41%) — wanted — but nothing in the rules punishes a big army as such (no upkeep); the AI's waves
   cap at 16 units. A supply/upkeep rule would be a design decision.
 - Weapons II is still the strongest single tech signal (80%), likely partly because the side ahead techs first.
-- Corrino vs Atreides relies on the shield-break call above; Brutal-level cross-faction numbers not re-measured.
+- Corrino vs Atreides: 5% Atreides wins on Hard without the x2 against shields (round 20); to be settled in the AvC pass.
