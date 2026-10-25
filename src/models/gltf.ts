@@ -15,7 +15,7 @@ const FILES = [
   'buildings/conyard.corrino', 'buildings/refinery.corrino', 'buildings/barracks.corrino', 'buildings/fab.corrino', 'buildings/tleilaxu.corrino', 'buildings/pad.corrino', 'buildings/turret.corrino',
   'buildings/sietch.fremen', 'buildings/barracks.fremen', 'buildings/perch.fremen', 'buildings/bunker.fremen', 'buildings/camp.fremen', 'buildings/thumper.fremen',
   'units/harvester.atreides', 'units/harvester.corrino', 'units/razor.corrino', 'units/artillery.corrino', 'units/devastator.corrino', 'units/raider.corrino', 'units/trike.atreides', 'units/tank.atreides', 'units/rocket.atreides', 'units/repair.atreides', 'units/carryall.atreides',
-  'units/infantry.atreides', 'units/trooper.corrino', 'units/sardaukar.corrino', 'units/warrior.fremen', 'units/fedaykin.fremen', 'units/glider.fremen',
+  'units/infantry.atreides', 'units/trooper.corrino', 'units/sardaukar.corrino', 'units/warrior.fremen', 'units/fedaykin.fremen', 'units/crew.fremen', 'units/glider.fremen',
 ];
 
 const scenes = new Map<string, THREE.Object3D>();

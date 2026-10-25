@@ -116,9 +116,10 @@ The game draws models with its own flat-shaded, matte material (`MeshLambertMate
 
 - Use only **Principled BSDF**, with **Metallic 0** and **Roughness 1** so the Blender preview looks like the game.
 - Base Color comes from an **Image Texture** of `palette.png` with interpolation set to **Closest**. Do not use flat color values.
-- Each model has at most **two materials**:
+- Each model has at most **two materials**, plus `palette2` when it needs it:
   - `palette`: everything that isn't team colored.
   - `team`: surfaces tinted with the player's color. Use the same palette texture, mapped onto the greys in row 0 (see below). The game multiplies those greys by the team color.
+  - `palette2`: colours `palette.png` has no room for, from `palette2.png` (see below). Every swatch of the first palette is in use, so new colours go here.
 - Glowing parts (Fremen eyes, lights) may use **Emission** on a third material named `glow`. Use it sparingly.
 - **Object → Shade Flat** on every mesh. The game draws flat-shaded, so smooth normals are thrown away.
 
@@ -138,6 +139,16 @@ The game draws models with its own flat-shaded, matte material (`MeshLambertMate
 - Column 3, rows 1–3: accents for lights and screens, used sparingly (on `glow` when they should shine).
 
 Hex values are sRGB, as in Blender's color picker. Blender models don't use the procedural colors in `src/materials/palette.ts`.
+
+`src/public/models/palette2.png` has the same layout and rules, on the `palette2` material (an Image Texture of it, **Closest**). Unused swatches are magenta, so a stray UV shows at once.
+
+| Row | Col 0 | Cols 1–3 |
+|---|---|---|
+| 1 | `8C3B10` spice, dark | unused |
+| 2 | `D2691E` spice | unused |
+| 3 | `F4A259` spice, light | unused |
+
+In the infantry skill's `shells.py` these are `SPICE['O']`, `SPICE['H']` and `SPICE['L']`; `build_object` puts them on material index 2, so pass `[palette, team, palette2]`.
 
 ## Budgets
 
