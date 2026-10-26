@@ -457,4 +457,29 @@ Razor 12 (+10 biological), 170 health. Counter table regenerated.
 - Counter table regenerated.
 - Upgrade descriptions still say percentages: to do in stage 7.
 
-**Next step:** the round 3.3 batch; then `notier` tests for all factions on the written values.
+**Round 3.3 in games:**
+
+| mirror | plan averages |
+|---|---|
+| Atreides | mech 69, trike 61, std 59, bio 45, tech 43, turtle 42, rush 29 |
+| Corrino | std 76, **razor 74**, turtle 54, dev 47, air 46, sard 28, rush 25 |
+| Fremen | std 74, mortar 72, fed 70, rider 64, rush 42, mass 34, turtle 34, swarm 10 |
+
+- Upgrade levels (`notier` vs std): Atreides 35, Corrino 18, Fremen 43. Eco-only: 23 / 20 / 43.
+- Cross-faction: Atreides vs Corrino **0%**, Fremen vs Atreides 83%, Fremen vs Corrino 33%.
+- Corrino: every fixed plan bleeds 3,600–5,500 credits of harvesters a game to Razor raids. The Razor plan loses
+  almost none.
+
+**Round 3.4 (Corrino only):** Razor 10 (+12 biological), Corrino Weapons 1,100 / 40 s. Mirror (30 per pair): std 76,
+razor 68, turtle 61, air 50, dev 44, sard 29, rush 22. Levels: none 11%; without Weapons 18%, Armor 43%, Shields 48%.
+
+**Weapons step changed to a share of the whole hit** (base and bonus, before armor: StarCraft's "+1 (+1 armored)";
+`upgradedHit` in game.ts). Steps on the base alone favoured generalists: Trooper 10 → +2 (20%), Devastator machine
+gun +2 (25%), but the Atreides rifle +1 on a 10 hit (10%). At 15% per level, no levels vs std: Atreides 30, Corrino 24,
+Fremen 48.
+
+**Round 3.5 (written in):** step share 0.15 of the hit; Fremen Weapons/Armor +1 450 / 20 s and +2 650 / 30 s;
+Corrino Armor 700.
+
+**Next step:** the full batch on round 3.5. Open items: Corrino (Razor plan and std too strong, Sardaukar plan
+broken), cross-faction (stage 6), upgrade text (stage 7).

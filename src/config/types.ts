@@ -38,7 +38,7 @@ export interface WeaponDef {
   minRange: number; // can't fire at targets closer than this
   damage: number;
   bonus: Partial<Record<Tag, number>>; // added to damage per matching target tag (one, positive: sim/config-check.ts)
-  /** Added to each hit per Weapons upgrade level (default: WEAPON_STEP.share of `damage`, at least 1). */
+  /** Added to each hit per Weapons upgrade level (default: WEAPON_STEP.share of the hit against that target). */
   step?: number;
   /** Damage per hit against aircraft, in place of `damage` and its bonuses (default: as against the ground). */
   airDamage?: number;

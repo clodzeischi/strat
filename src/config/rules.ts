@@ -27,8 +27,8 @@ export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 
 export const MIN_HIT = 0.5;
 /** Structures that don't set their own: armor. */
 export const STRUCTURE = { armor: 5 };
-/** A weapon's default Weapons upgrade step: this share of its damage per level, rounded, at least 1. */
-export const WEAPON_STEP = { share: 0.2 };
+/** A weapon's default Weapons upgrade step: this share of its hit (base and bonus) per level. */
+export const WEAPON_STEP = { share: 0.15 };
 /** Razor Flame Range upgrade: extra reach, in world units. */
 export const FLAME_RANGE = 2;
 export const NITRO = { speed: 1.5, cooldown: 1 / 1.5 };

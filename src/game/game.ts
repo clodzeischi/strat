@@ -388,7 +388,7 @@ export class Game {
    * guess, for picking targets and focus fire.
    */
   expectedHit(team: Team, w: WeaponDef, target: Entity): number {
-    return Math.max(MIN_HIT, weaponDamage(w, target) + weaponStep(w) * this.tier(team, 'weapons') - armorOf(target) - this.tier(target.team, 'armor'));
+    return Math.max(MIN_HIT, upgradedHit(w, target, this.tier(team, 'weapons')) - armorOf(target) - this.tier(target.team, 'armor'));
   }
 
   /** Seconds between shots for this weapon, after upgrades. */
@@ -1126,7 +1126,7 @@ export class Game {
     if (target instanceof Unit && target.def.hides) this.unhide(target);
     // Whoever fires is seen by the side it hits for a moment, so units below a cliff can shoot back.
     if (attacker && attacker.team !== target.team) this.vision.reveal(target.team, attacker.x, attacker.z, this.ticks);
-    let dmg = (weaponDamage(w, target) + (attacker ? weaponStep(w) * this.tier(attacker.team, 'weapons') : 0)) * mult;
+    let dmg = upgradedHit(w, target, attacker ? this.tier(attacker.team, 'weapons') : 0) * mult;
     const armor = armorOf(target) + this.tier(target.team, 'armor');
     if (target.shields > 0 && !w.pierce) {
       // Shields take the hit first, less one per Shields and per Armor level; whatever gets through goes on to health,
@@ -2626,9 +2626,13 @@ export function weaponDamage(w: WeaponDef, target: Entity): number {
   return dmg;
 }
 
-/** What a weapon's hit gains per Weapons upgrade level. */
-export function weaponStep(w: WeaponDef): number {
-  return w.step ?? Math.max(1, Math.round(w.damage * WEAPON_STEP.share));
+/**
+ * A weapon's hit on a target with `level` Weapons upgrades, before armor: each level adds WEAPON_STEP.share of the hit,
+ * base and bonus alike (StarCraft's "+1 (+1 armored)"), or the weapon's own `step` if it sets one.
+ */
+export function upgradedHit(w: WeaponDef, target: Entity, level: number): number {
+  const hit = weaponDamage(w, target);
+  return hit + level * (w.step ?? hit * WEAPON_STEP.share);
 }
 
 /** A unit's or structure's own armor (Armor upgrades come on top). */

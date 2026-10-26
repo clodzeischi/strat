@@ -15,17 +15,17 @@ export const UPGRADES: Record<UpgradeType, UpgradeDef> = {
   harvest: { line: 'harvest', name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['conyard2', 'refinery'], desc: 'Harvesters carry 25% more, move 25% faster and pick up spice 50% faster.' },
 
   // ---- Corrino: one level each ----
-  cWeapons: { line: 'weapons', name: 'Weapons +1', short: 'Weapons +1', cost: 900, time: 35, requires: ['fab'], desc: '+20% damage for all units.' },
-  cArmor: { line: 'armor', name: 'Armor +1', short: 'Armor +1', cost: 600, time: 25, requires: ['fab'], desc: 'Units and buildings take 15% less damage to health.' },
+  cWeapons: { line: 'weapons', name: 'Weapons +1', short: 'Weapons +1', cost: 1100, time: 40, requires: ['fab'], desc: '+20% damage for all units.' },
+  cArmor: { line: 'armor', name: 'Armor +1', short: 'Armor +1', cost: 700, time: 25, requires: ['fab'], desc: 'Units and buildings take 15% less damage to health.' },
   cShields: { line: 'shields', name: 'Shields +1', short: 'Shields +1', cost: 400, time: 20, requires: ['tleilaxu'], desc: 'Shields take 20% less damage.' },
   cHarvest: { line: 'harvest', name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['refinery', 'fab'], desc: 'Harvesters carry 25% more, move 25% faster and pick up spice 50% faster.' },
   flame: { name: 'Razor Flame Range', short: 'Flame Range', cost: 500, time: 20, requires: ['fab'], desc: 'Razor flamethrowers reach one tile further.' },
 
   // ---- Fremen: two levels of Weapons and Armor, one per Sietch level after the first ----
-  fWeapons: { line: 'weapons', name: 'Weapons +1', short: 'Weapons +1', cost: 550, time: 25, requires: ['sietch2'], desc: '+30% damage for all units.' },
-  fWeapons2: { line: 'weapons', name: 'Weapons +2', short: 'Weapons +2', cost: 800, time: 35, requires: ['sietch3'], after: 'fWeapons', desc: '+60% damage for all units (total).' },
-  fArmor: { line: 'armor', name: 'Armor +1', short: 'Armor +1', cost: 550, time: 25, requires: ['sietch2'], desc: 'Units and buildings take 22% less damage.' },
-  fArmor2: { line: 'armor', name: 'Armor +2', short: 'Armor +2', cost: 800, time: 35, requires: ['sietch3'], after: 'fArmor', desc: 'Units and buildings take 45% less damage (total).' },
+  fWeapons: { line: 'weapons', name: 'Weapons +1', short: 'Weapons +1', cost: 450, time: 20, requires: ['sietch2'], desc: '+30% damage for all units.' },
+  fWeapons2: { line: 'weapons', name: 'Weapons +2', short: 'Weapons +2', cost: 650, time: 30, requires: ['sietch3'], after: 'fWeapons', desc: '+60% damage for all units (total).' },
+  fArmor: { line: 'armor', name: 'Armor +1', short: 'Armor +1', cost: 450, time: 20, requires: ['sietch2'], desc: 'Units and buildings take 22% less damage.' },
+  fArmor2: { line: 'armor', name: 'Armor +2', short: 'Armor +2', cost: 650, time: 30, requires: ['sietch3'], after: 'fArmor', desc: 'Units and buildings take 45% less damage (total).' },
   fHarvest: { line: 'harvest', name: 'Spice Mining', short: 'Spice Mining', cost: 600, time: 20, requires: [], desc: 'Spice Camps turn spice into credits 25% faster.' },
   stillsuit: { name: 'Stillsuits', short: 'Stillsuits', cost: 400, time: 20, requires: ['sietch2'], desc: 'Fremen units heal twice as fast, and start sooner after being hurt.' },
   sandwalk: { name: 'Sandwalk', short: 'Sandwalk', cost: 500, time: 20, requires: [], desc: 'Fremen infantry move a further 25% faster on sand and spice.' },
