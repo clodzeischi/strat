@@ -576,5 +576,17 @@ units: infantry 76 / 116, trike 110 / 203, Tank 425 / 725, MLRS 510 / 261).
 - Atreides mirror (20 per pair): tech 67, std 54, trike 50, mech 49, turtle 48, rush 43, bio 39. The triangle holds:
   bio > mech 90, mech > trike 80, trike > bio 90.
 
-**Next step:** the full batch on c5 (all mirrors 30 per pair, cross 60, upgrades), then the matrix report and
-relevance test against the stage 1 baseline; then stage 7 (text: unit descriptions, upgrade descriptions, PLAN.md).
+**Full batch on c5** (mirrors 30 per pair, cross-faction Hard 60):
+
+| | result |
+|---|---|
+| Atreides mirror | trike 61, tech 61, mech 54, std 52, bio 45, turtle 42, rush 36; bio > mech 77, mech > trike 67, trike > bio 90 |
+| Corrino mirror | **turtle 78** (beats every plan 68–93), std 63, razor 58, air 51, dev 43, sard 41, rush 17 |
+| Fremen mirror | std 75, mortar 69, rider 68, fed 65, rush 43, turtle 35, mass 33, swarm 12 (unchanged) |
+| Cross-faction | **Atreides vs Corrino 50%, Fremen vs Atreides 53%, Fremen vs Corrino 52%** |
+| Upgrade levels (`notier` vs std) | Atreides 25, Corrino 35, Fremen 43 |
+| Kill ratios (Atreides) | MLRS 2.85, Tank 1.29, trike 0.96, infantry 0.89 |
+
+**Next step:** the Corrino turtle. Its Auto Turrets kept their health while Corrino units lost 20%, and structure armor
+5 shrugs off small arms. Test turret health / damage in the Corrino mirror, then the final matrix and relevance
+report.
