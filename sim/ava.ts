@@ -62,15 +62,21 @@ for (let k = 0; k < games; k++) {
     }
     for (const t of [0, 1] as Team[]) {
       for (const up of g.teams[t].upgrades) if (tech[t][up] === undefined) tech[t][up] = Math.round(g.time);
-      for (const l of LEVEL_UP_ORDER) if (g.techLevel(t, l) >= 2 && tech[t][l + '2'] === undefined) tech[t][l + '2'] = Math.round(g.time);
+      for (const l of LEVEL_UP_ORDER) for (const n of [2, 3]) if (g.techLevel(t, l) >= n && tech[t][l + n] === undefined) tech[t][l + n] = Math.round(g.time);
       for (const b of g.buildings) if (b.team === t && ['tleilaxu', 'pad', 'hitech'].includes(b.type) && tech[t][b.type] === undefined) tech[t][b.type] = Math.round(g.time);
     }
   }
   const o = (1 - side) as Team;
+  // Sandworms each side called (ridden ones still up included), and the value of what they ate: the enemy's, and its own.
+  const allWorms = [...g.wormLog, ...g.worms, ...g.ridden.map((w) => ({ team: w.team, eatenEnemy: w.eatenEnemy, eatenOwn: 0 }))];
+  const worms = [side, o].map((t) => {
+    const ws = allWorms.filter((w) => w.team === t);
+    return { n: ws.length, enemy: ws.reduce((a, w) => a + w.eatenEnemy, 0), own: ws.reduce((a, w) => a + w.eatenOwn, 0) };
+  });
   console.log(JSON.stringify({
     a, b, seed, side, result: g.winner === null ? 'timeout' : g.winner === side ? 'win' : 'loss', time: Math.round(g.time),
     spice: [Math.round(g.teams[side].stats.spiceHarvested), Math.round(g.teams[o].stats.spiceHarvested)],
     built: [built[side], built[o]], kills: [kills[side], kills[o]], deaths: [deaths[side], deaths[o]], tech: [tech[side], tech[o]], kv,
-    stats: [(ais[side] as any).stats, (ais[o] as any).stats], air: [air[side], air[o]], hdeaths: [hdeaths[side], hdeaths[o]],
+    stats: [(ais[side] as any).stats, (ais[o] as any).stats], air: [air[side], air[o]], hdeaths: [hdeaths[side], hdeaths[o]], worms,
   }));
 }

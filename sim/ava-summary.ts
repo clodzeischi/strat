@@ -28,6 +28,14 @@ for (const s of strats) {
   const v = views.filter(([m]) => m === s);
   console.log(s.padEnd(10) + UT.map((u) => pad((v.reduce((x, [, , , i, r]) => x + (r.built[i][u] ?? 0), 0) / v.length).toFixed(1), 9)).join('') + pad((v.reduce((x, [, , , , r]) => x + r.time, 0) / v.length / 60).toFixed(1), 10));
 }
+if (rows.some((r) => r.worms)) {
+  console.log('\nSandworms per game, by strategy: called, enemy value eaten, own value eaten');
+  for (const s of strats) {
+    const v = views.filter(([m]) => m === s);
+    const sum = (k: string) => v.reduce((x, [, , , i, r]) => x + (r.worms?.[i]?.[k] ?? 0), 0) / v.length;
+    console.log(s.padEnd(10) + pad(sum('n').toFixed(2), 7) + pad(Math.round(sum('enemy')), 8) + pad(Math.round(sum('own')), 8));
+  }
+}
 console.log('\nKilled / lost (credits per game), by unit type, all games');
 const kill: Record<string, number> = {}, lost: Record<string, number> = {};
 for (const r of rows) for (const i of [0, 1]) {

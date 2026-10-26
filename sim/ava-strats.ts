@@ -3,7 +3,7 @@
 // shows whether one plan beats everything. 'std' is stock Brutal, which counters what it sees. A team plays its own
 // faction's plans (FACTION_STRATS).
 import { BRUTAL_OPTIONS, BRUTAL_PROFILE, BrutalAI, type BrutalOptions } from '../src/game/brutal';
-import { AI, HARD_PROFILE, power, type AIProfile } from '../src/game/ai';
+import { AI, HARD_PROFILE, KITS, power, type AIProfile } from '../src/game/ai';
 import { TILE, type Faction, type Team, type UnitType } from '../src/config';
 import type { Unit } from '../src/entities';
 import { hypot } from '../src/game/hypot';
@@ -188,7 +188,57 @@ export const CORRINO_EXTRA: Record<string, Strat> = {
   },
 };
 
-export const FACTION_STRATS: Partial<Record<Faction, Record<string, Strat>>> = { atreides: STRATS, corrino: CORRINO_STRATS };
+const fmix = (m: Partial<Record<UnitType, number>>) => ({ ...BRUTAL_PROFILE.mix, warrior: 0.1, fedaykin: 0.1, ...m });
+const F_ALL = ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2'] as const;
+
+/** Fremen build orders (docs/balance-fremen.md). */
+export const FREMEN_STRATS: Record<string, Strat> = {
+  std: { profile: BRUTAL_PROFILE },
+  // Three Barracks, Warriors only, early pressure, no tech.
+  rush: {
+    profile: plan({ opening: ['barracks', 'barracks', 'barracks'], harvesters: 2, techArmy: 40, mix: fmix({ warrior: 3, fedaykin: 0 }), initiative: 1, kit: { levels: [], research: [], siege: null, rider: undefined } }),
+    firstWave: 100,
+  },
+  // Warriors only, but upgraded: Sandwalk, Great Sietch for Weapons, Armor and Stillsuits, then Sietch III for +2; no rites.
+  swarm: {
+    profile: plan({ techArmy: 8, mix: fmix({ warrior: 3, fedaykin: 0 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { siege: null, rider: undefined, research: ['sandwalk', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'fWeapons2', 'fArmor2', 'ambush'], topLevelArmy: 1.5 } }),
+  },
+  // Great Sietch first: Fedaykin with Warriors.
+  fed: { profile: plan({ techArmy: 8, mix: fmix({ fedaykin: 3, warrior: 1 }), kit: { research: ['fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'], siege: { unit: 'mortar', per: 10, max: 2 }, rider: undefined } }) },
+  // Great Sietch first: a Mortar line behind a Warrior screen.
+  mortar: { profile: plan({ techArmy: 8, mix: fmix({ warrior: 2, fedaykin: 0.3 }), kit: { research: ['fWeapons', 'fArmor', 'fHarvest', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'], siege: { unit: 'mortar', per: 2, max: 14 }, rider: undefined } }) },
+  // Sandriders and their worms (up to eight), Ambush first at Sietch III, Fedaykin on the way.
+  rider: { profile: plan({ techArmy: 8, mix: fmix({ fedaykin: 2, warrior: 1 }), kit: { research: ['ambush', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2'], rider: { unit: 'sandrider', max: 8 }, siege: { unit: 'mortar', per: 10, max: 2 } } }) },
+  // Economy and mass: Spice Mining and Sandwalk, no Great Sietch, every other credit into Warriors.
+  mass: { profile: plan({ techArmy: 8, mix: fmix({ warrior: 3, fedaykin: 0 }), kit: { levels: [], research: ['fHarvest', 'sandwalk'], siege: null, rider: undefined } }) },
+  // Bunkers, everything researched, no attacks before 14:00, then a mixed army.
+  turtle: {
+    profile: plan({ bunkers: 4, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: fmix({ fedaykin: 2, warrior: 1 }), kit: { research: [...F_ALL], siege: { unit: 'mortar', per: 3, max: 8 }, rider: { unit: 'sandrider', max: 3 } } }),
+    opts: { flank: false }, firstWave: 840,
+  },
+};
+
+/** Fremen variants for single tests, not in the round robin. */
+export const FREMEN_EXTRA: Record<string, Strat> = {
+  // The Fedaykin plan teching after 8 units (now every plan's setting; it used to be 3), with Spice Mining first, with
+  // counter-picking, with up to four Sandriders, with Ambush first.
+  fed8: { profile: { ...FREMEN_STRATS.fed.profile, techArmy: 8 } },
+  fedh: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['fHarvest', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'] } } },
+  fed8h: { profile: { ...FREMEN_STRATS.fed.profile, techArmy: 8, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['fHarvest', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'] } } },
+  fedcf: { profile: { ...FREMEN_STRATS.fed.profile, counterFocus: 8 } },
+  fedr: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, rider: { unit: 'sandrider', max: 4 } } } },
+  fedamb: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['ambush', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2'] } } },
+  // The rider plan rushing Sietch III (with an army of 8, not 16): worse in every matchup (docs/balance-fremen.md).
+  riderrush: { profile: { ...FREMEN_STRATS.rider.profile, kit: { ...FREMEN_STRATS.rider.profile.kit, topLevelArmy: 1 } } },
+  // Stock Brutal with no combat research: only Spice Mining and Sandwalk (what the combat upgrades are worth together).
+  stdeco: { profile: { ...BRUTAL_PROFILE, kit: { research: ['fHarvest', 'sandwalk'] } } },
+  // ... and with no research at all.
+  stdbare: { profile: { ...BRUTAL_PROFILE, kit: { research: [] } } },
+  // Stock Brutal with Spice Mining last.
+  stdnoh: { profile: { ...BRUTAL_PROFILE, kit: { research: ['fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2', 'fHarvest'] } } },
+};
+
+export const FACTION_STRATS: Partial<Record<Faction, Record<string, Strat>>> = { atreides: STRATS, corrino: CORRINO_STRATS, fremen: FREMEN_STRATS };
 
 /** Not in the round robin: stock Brutal without its micro (kiting, focus fire), to see what control is worth. */
 export const EXTRA: Record<string, Strat> = {
@@ -214,8 +264,20 @@ export const EXTRA: Record<string, Strat> = {
 
 export function makeStrat(g: Game, team: Team, name: string): AI {
   if (name === 'hard') return new AI(g, team, HARD_PROFILE);
-  const s = FACTION_STRATS[g.teams[team].faction]?.[name] ?? EXTRA[name] ?? CORRINO_EXTRA[name];
+  // '<plan>-no-<upgrade>': the plan without that research, to see what the upgrade is worth.
+  const without = name.match(/^(\w+)-no-(\w+)$/);
+  if (without) {
+    const base = FACTION_STRATS[g.teams[team].faction]![without[1]];
+    const p = base.profile;
+    const research = (p.kit?.research ?? KITS[g.teams[team].faction].research).filter((u) => u !== without[2]);
+    return makeStratFrom(g, team, { ...base, profile: { ...p, kit: { ...p.kit, research } } });
+  }
+  const s = FACTION_STRATS[g.teams[team].faction]?.[name] ?? EXTRA[name] ?? CORRINO_EXTRA[name] ?? FREMEN_EXTRA[name];
   if (!s) throw new Error(`no strategy ${name}`);
+  return makeStratFrom(g, team, s);
+}
+
+function makeStratFrom(g: Game, team: Team, s: Strat): AI {
   const opts = { ...BRUTAL_OPTIONS, ...s.opts };
   const ai = s.squad ? new SquadAI(g, team, s.profile, opts, s.squad) : new BrutalAI(g, team, s.profile, opts);
   if (s.firstWave !== undefined) (ai as unknown as { nextWaveTime: number }).nextWaveTime = s.firstWave;

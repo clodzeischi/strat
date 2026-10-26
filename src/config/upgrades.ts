@@ -22,12 +22,14 @@ export const UPGRADES: Record<UpgradeType, UpgradeDef> = {
   flame: { name: 'Razor Flame Range', short: 'Flame Range', cost: 500, time: 20, requires: ['fab'], desc: 'Razor flamethrowers reach one tile further.' },
 
   // ---- Fremen: two levels of Weapons and Armor, one per Sietch level after the first ----
-  fWeapons: { line: 'weapons', name: 'Weapons +1', short: 'Weapons +1', cost: 800, time: 30, requires: ['sietch2'], desc: '+20% damage for all units.' },
-  fWeapons2: { line: 'weapons', name: 'Weapons +2', short: 'Weapons +2', cost: 1100, time: 40, requires: ['sietch3'], after: 'fWeapons', desc: '+40% damage for all units (total).' },
-  fArmor: { line: 'armor', name: 'Armor +1', short: 'Armor +1', cost: 800, time: 30, requires: ['sietch2'], desc: 'Units and buildings take 15% less damage.' },
-  fArmor2: { line: 'armor', name: 'Armor +2', short: 'Armor +2', cost: 1100, time: 40, requires: ['sietch3'], after: 'fArmor', desc: 'Units and buildings take 30% less damage (total).' },
+  // Steps count one and a half of the standard ones (`scale`): Fremen fights are over quickly, and at the usual +20%
+  // the upgrades never paid for themselves (docs/balance-fremen.md).
+  fWeapons: { line: 'weapons', scale: 1.5, name: 'Weapons +1', short: 'Weapons +1', cost: 550, time: 25, requires: ['sietch2'], desc: '+30% damage for all units.' },
+  fWeapons2: { line: 'weapons', scale: 1.5, name: 'Weapons +2', short: 'Weapons +2', cost: 800, time: 35, requires: ['sietch3'], after: 'fWeapons', desc: '+60% damage for all units (total).' },
+  fArmor: { line: 'armor', scale: 1.5, name: 'Armor +1', short: 'Armor +1', cost: 550, time: 25, requires: ['sietch2'], desc: 'Units and buildings take 22% less damage.' },
+  fArmor2: { line: 'armor', scale: 1.5, name: 'Armor +2', short: 'Armor +2', cost: 800, time: 35, requires: ['sietch3'], after: 'fArmor', desc: 'Units and buildings take 45% less damage (total).' },
   fHarvest: { line: 'harvest', name: 'Spice Mining', short: 'Spice Mining', cost: 600, time: 20, requires: [], desc: 'Spice Camps turn spice into credits 25% faster.' },
-  stillsuit: { name: 'Stillsuits', short: 'Stillsuits', cost: 600, time: 25, requires: ['sietch2'], desc: 'Fremen units heal twice as fast, and start sooner after being hurt.' },
+  stillsuit: { name: 'Stillsuits', short: 'Stillsuits', cost: 400, time: 20, requires: ['sietch2'], desc: 'Fremen units heal twice as fast, and start sooner after being hurt.' },
   sandwalk: { name: 'Sandwalk', short: 'Sandwalk', cost: 500, time: 20, requires: [], desc: 'Fremen infantry move a further 25% faster on sand and spice.' },
-  ambush: { name: 'Ambush', short: 'Ambush', cost: 700, time: 30, requires: ['sietch3'], desc: 'Units striking out of hiding deal +50% damage for 4 s.' },
+  ambush: { name: 'Ambush', short: 'Ambush', cost: 400, time: 30, requires: ['sietch3'], desc: 'Units striking out of hiding deal +75% damage for 4 s.' },
 };

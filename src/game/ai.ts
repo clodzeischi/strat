@@ -123,8 +123,8 @@ export interface AIProfile {
   more: { barracks: number; factory: number };
   /** How far out from the construction yard, toward the middle of the map, the army gathers (tiles). */
   rallyOut: number;
-  /** A different tech path or research order than the faction's usual one (a build order to play). */
-  kit?: Partial<Pick<FactionKit, 'levels' | 'research'>>;
+  /** A different tech path, research order or siege / rider counts than the faction's usual one (a build order to play). */
+  kit?: Partial<Pick<FactionKit, 'levels' | 'research' | 'siege' | 'rider' | 'topLevelArmy'>>;
 }
 
 /** Combined-arms base preference for unit picks, before counters (see `counterWeights`). */
@@ -383,11 +383,16 @@ export class AI {
     else this.game.startResearch(this.team, goal.type);
   }
 
-  /** Whether a building's next level unlocks a unit we train or research we do (Sietch III, before the Sandrider, doesn't). */
+  /** A unit this AI means to field: picked as a counter, or kept by its own rule (siege pieces, worm riders). */
+  private wantsUnit(t: UnitType): boolean {
+    return (this.profile.mix[t as Matchup] ?? 0) > 0 || this.kit.siege?.unit === t || this.kit.rider?.unit === t;
+  }
+
+  /** Whether a building's next level unlocks a unit we field or research we do. */
   private levelUnlocks(type: LevelUpType, level: number): boolean {
     const req = `${type}${level}`;
     const f = FACTIONS[this.game.teams[this.team].faction];
-    return f.train.some((u) => u && this.game.unitDef(this.team, u).requires.includes(req as Req)) ||
+    return [...f.train, ...(f.rites ?? [])].some((u) => u && this.wantsUnit(u) && this.game.unitDef(this.team, u).requires.includes(req as Req)) ||
       this.kit.research.some((u) => UPGRADES[u].requires.includes(req as Req)) ||
       Object.values(BUILDINGS).some((b) => b.levels?.some((l) => l.requires?.includes(req as Req)));
   }
@@ -802,6 +807,14 @@ export class AI {
   }
 
   /** Hunting raiders keep enough trikes for the next raid, while there's a harvester worth raiding. */
+  /**
+   * How many raider-type units at home belong to raiding: all of them where raiders are a unit of their own (trikes,
+   * razors), but only a raid group where they are the line infantry too (Fremen Warriors), so the rest go with the waves.
+   */
+  private raidReserve(): number {
+    return this.kit.raider === this.kit.fallback ? this.profile.raids.trikes : Infinity;
+  }
+
   private raidTrikeWanted(): boolean {
     const r = this.profile.raids;
     const raider = this.kit.raider;
@@ -1121,7 +1134,9 @@ export class AI {
       if (!c) continue;
       const x = m.center(c.cx);
       const z = m.center(c.cz);
-      if (ownSand.some((b) => hypot(b.x - x, b.z - z) < WORM.range + WORM.bite + 2 * TILE)) continue;
+      // Clear of our own structures on the sand: a ridden worm never bites its own side, but one whose rider is killed
+      // before it comes up hunts wild round the Thumper, so not right next to them.
+      if (ownSand.some((b) => hypot(b.x - x, b.z - z) < WORM.bite + 2 * TILE)) continue;
       // Not where the enemy has guns at hand: they'd destroy the Thumper before the worm comes.
       if (this.guardedSpot(x, z)) continue;
       const value = prey.filter((q) => hypot(q.x - x, q.z - z) <= RIDE.hunt).reduce((a, q) => a + q.value, 0);
@@ -1236,8 +1251,10 @@ export class AI {
   /** Enemy combat units near our buildings or harvesters, grouped into separate attacks. */
   private findThreats(): Omit<Defense, 'lastSeen' | 'units'>[] {
     const g = this.game;
-    const buildings = g.buildings.filter((b) => b.team === this.team);
-    const harvesters = g.units.filter((u) => u.team === this.team && u.type === 'harvester' && !u.carrier);
+    // Fremen Spice Camps stand out on the spice fields, often near the enemy's own: they're guarded like harvesters, and
+    // enemies by them don't make the base itself under attack (which would hold every wave back).
+    const buildings = g.buildings.filter((b) => b.team === this.team && b.type !== 'camp');
+    const harvesters = [...g.units.filter((u) => u.team === this.team && u.type === 'harvester' && !u.carrier), ...g.buildings.filter((b) => b.team === this.team && b.type === 'camp')];
     const near = (e: Entity, list: Entity[], r: number) => list.some((o) => hypot(o.x - e.x, o.z - e.z) < r);
     const groups: { units: Unit[]; x: number; z: number; base: boolean }[] = [];
     for (const e of g.units) {
@@ -1542,9 +1559,10 @@ export class AI {
     }
 
     if (baseAttacked) return;
-    // Hunting raiders keep their trikes out of the waves.
-    const hunt = this.profile.raids.hunt;
-    const ready = [...this.roles].filter(([u, r]) => r === 'home' && !u.dead && !u.carrier && !(hunt && u.type === this.kit.raider)).map(([u]) => u);
+    // Hunting raiders keep their trikes out of the waves (Fremen, whose raiders are their line Warriors, only a raid's worth).
+    const home = [...this.roles].filter(([u, r]) => r === 'home' && !u.dead && !u.carrier).map(([u]) => u);
+    const kept = new Set(this.profile.raids.hunt ? home.filter((u) => u.type === this.kit.raider).slice(0, this.raidReserve()) : []);
+    const ready = home.filter((u) => !kept.has(u));
     const strength = ready.reduce((s, u) => s + power(u), 0);
     // Initiative: strong enough to win outright, so go now, whatever the timer says.
     const enemy = this.enemyDefense();
@@ -1604,7 +1622,7 @@ export class AI {
     }
 
     if (baseAttacked || g.time < this.nextRaidTime || this.raiders.size) return;
-    const trikes = army.filter((u) => u.type === this.kit.raider && this.roles.get(u) === 'home');
+    const trikes = army.filter((u) => u.type === this.kit.raider && this.roles.get(u) === 'home').slice(0, this.raidReserve());
     if (trikes.length < r.trikes) return;
     const victim = r.hunt ? this.pickHarvester(trikes[0], trikes.reduce((s, u) => s + power(u), 0)) : this.intel.placedUnits().find((s) => s.harvester) ?? null;
     if (!victim) return;

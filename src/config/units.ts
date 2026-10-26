@@ -106,15 +106,15 @@ export const UNITS: Record<UnitType, UnitDef> = {
   warrior: {
     name: 'Fremen Warrior', producer: 'barracks', cost: 80, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
-    weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -2 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, shieldBreak: 3, sound: 'light_mg' },
-    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. The pistol\'s slow spring-fired darts get through shields (x3 against them). Strong vs infantry, can shoot at aircraft. Weak vs vehicles and flamers. Goes through rites to become a Fedaykin or a Fremen Mortar.',
+    weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -3.5 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, shieldBreak: 3, sound: 'light_mg' },
+    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. The pistol\'s slow spring-fired darts get through shields (x3 against them). Strong vs infantry, can shoot at aircraft. Weak vs vehicles, flamers and structures. Goes through rites to become a Fedaykin or a Fremen Mortar.',
   },
   fedaykin: {
     name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 230, speed: 3, turnRate: 12, radius: 0.5, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch2'], hides: true,
     rite: { from: 'warrior', cost: 115, time: 6.5 },
-    weapon: { range: 7, minRange: 0, damage: 10, bonus: { mechanical: 20, armored: 4, structure: 6, biological: -3 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, air: true, pierce: true, sound: 'small_laser' },
-    desc: 'Elite fighters with weirding modules: sonic weapons that tear vehicles apart and pass straight through shields. Strong vs vehicles and structures, can shoot at aircraft. Weak vs infantry. With Sietch III, can go through the rite of the Sandrider.',
+    weapon: { range: 7, minRange: 0, damage: 10, bonus: { mechanical: 20, armored: 4, structure: 6, biological: -3 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, cone: 0.25, air: true, pierce: true, sound: 'small_laser' },
+    desc: 'Elite fighters with weirding modules: sonic blasts that hit everything in a narrow cone, tear vehicles apart and pass straight through shields. Strong vs vehicles, structures and massed infantry, can shoot at aircraft. Weak vs Sandriders. With Sietch III, can go through the rite of the Sandrider.',
   },
   crew: {
     name: 'Spice Crew', producer: 'barracks', cost: 450, buildTime: 12, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
@@ -128,17 +128,17 @@ export const UNITS: Record<UnitType, UnitDef> = {
     weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 3, armored: -4, structure: -3 }, cooldown: 0.8, projectile: 'bullet', speed: 0, splash: 0, sound: 'light_mg' },
     deploy: {
       time: 1.5,
-      weapon: { range: 12, minRange: 4, damage: 24, bonus: { mechanical: 16, structure: 30, biological: -10 }, cooldown: 1.4, projectile: 'rocket', speed: 16, splash: 1.5, sound: 'launch_small' },
+      weapon: { range: 12, minRange: 4, damage: 24, bonus: { mechanical: 16, structure: 30, biological: -7 }, cooldown: 1.4, projectile: 'rocket', speed: 16, splash: 3, sound: 'launch_small' },
     },
-    desc: 'A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the move he barely fights; set up (D, 1.5 s), he lobs guided rockets at anything your side can see out to 12: strong vs vehicles and structures. Can\'t fire up close, and in the sand he digs in like any Fremen.',
+    desc: 'A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the move he barely fights; set up (D, 1.5 s), he lobs guided rockets at anything your side can see out to 12: strong vs vehicles, structures and packed infantry. Can\'t fire up close, and in the sand he digs in like any Fremen.',
   },
   sandrider: {
-    name: 'Sandrider', producer: 'barracks', cost: 500, buildTime: 12, hp: 260, speed: 3.2, turnRate: 12, radius: 0.5, sight: 11,
+    name: 'Sandrider', producer: 'barracks', cost: 500, buildTime: 12, hp: 280, speed: 3.2, turnRate: 12, radius: 0.5, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch3'], hides: true, thumper: true,
-    rite: { from: 'fedaykin', cost: 300, time: 12 },
+    rite: { from: 'fedaykin', cost: 220, time: 10 },
     weapon: { range: 0.9, minRange: 0, damage: 400, bonus: {}, cooldown: 1.6, projectile: 'bullet', speed: 0, splash: 0, only: ['biological'], pierce: true },
     charge: { range: 6, speed: 2 },
-    desc: 'A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls until you let it go: the worm goes where you send it and swallows the enemy on the sand (vehicles most of all), never your own. On foot, a zealot: rushes enemy infantry and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can\'t hurt vehicles, structures or aircraft on foot.',
+    desc: 'A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls until you let it go: the worm goes where you send it and swallows the enemy on the sand (vehicles most of all), never your own. On foot, a zealot: rushes the most valuable enemy infantry about and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can\'t hurt vehicles, structures or aircraft on foot.',
   },
   glider: {
     name: 'Wind Glider', producer: 'perch', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,
