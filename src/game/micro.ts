@@ -1,6 +1,6 @@
-import { ARMOR_BONUS, TILE, WEAPONS_BONUS, type Team } from '../config';
+import { TILE, type Team } from '../config';
 import { distTo, type Building, type Entity, type Order, type Unit } from '../entities';
-import { weaponDamage, type Game } from './game';
+import type { Game } from './game';
 import { hypot } from './hypot';
 import * as dm from './dmath';
 
@@ -160,7 +160,7 @@ export class Micro {
   private shot(u: Unit, e: Entity): number {
     const g = this.game;
     const w = g.weaponFor(u, e)!;
-    return weaponDamage(w, e) * (1 + WEAPONS_BONUS * g.bonus(u.team, 'weapons')) * (1 - ARMOR_BONUS * g.bonus(e.team, 'armor'));
+    return g.expectedHit(u.team, w, e);
   }
 
   private take(u: Unit, order: Order): void {

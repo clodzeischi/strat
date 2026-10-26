@@ -291,5 +291,27 @@ The Tank against Fremen: −0.06, −0.14, −0.19, −0.21, +0.03 across their 
 
 Cross-faction win rates: Fremen beat Atreides 90% and Corrino 62–70%; Atreides beat Corrino 2%.
 
-**Next step:** stage 2, the engine (armor, flat upgrades, air damage, minimum 0.5, no `shieldBreak` / `scale`, a
-config check), then the numbers translated into the new model.
+### Stage 2: engine (done)
+
+- **Per hit** (`Game.damage`, rules.ts `MIN_HIT`):
+  `(damage + bonus for the target's tags + step × Weapons level) × (Ambush, splash share)`.
+  - Shields take it first, less one per Shields level.
+  - What reaches health loses `armor + Armor level`.
+  - At least 0.5.
+- **New fields:**
+  - `UnitDef.armor` and `BuildingDef.armor` (default 0); `armorOf(e)` in game.ts.
+  - `WeaponDef.step`: damage per Weapons level, default a tenth of `damage`, at least 1; `weaponStep(w)`.
+  - `WeaponDef.airDamage`: replaces damage and bonuses against aircraft.
+- **Removed:** `WeaponDef.shieldBreak` (and the Warrior's ×3), `UpgradeDef.scale`, `WEAPONS_BONUS`, `ARMOR_BONUS`,
+  `SHIELDS_BONUS`. `Game.expectedHit` is what targeting and Micro's focus fire use now.
+- **Tools:**
+  - `sim/config-check.ts` fails on negative bonuses or more than one bonus per weapon: 18 of 21 weapons break the
+    rules until stage 3.
+  - `sim/matrix-report.ts` uses the new formula.
+  - `tsconfig.sim.json` typechecks sim/ too: `npx tsc --noEmit -p tsconfig.sim.json`. Seven errors in older checks
+    (ai-check, brutal-match, bunker-check, netplay-check, saturation, vision-check) predate this work.
+- fremen-check, corrino-check and sietch-check pass. The game runs on the old numbers with armor 0 and the default
+  flat steps until stage 3.
+
+**Next step:** stage 3, numbers by role (armor for every unit and structure, one positive bonus per weapon, separate
+air damage where needed), checked with `sim/config-check.ts` and `sim/matrix-report.ts`, then `sim/relevance.sh`.

@@ -37,7 +37,11 @@ export interface WeaponDef {
   range: number;
   minRange: number; // can't fire at targets closer than this
   damage: number;
-  bonus: Partial<Record<Tag, number>>; // added to damage per matching target tag
+  bonus: Partial<Record<Tag, number>>; // added to damage per matching target tag (one, positive: sim/config-check.ts)
+  /** Added to each hit per Weapons upgrade level (default: a tenth of `damage`, at least 1). */
+  step?: number;
+  /** Damage per hit against aircraft, in place of `damage` and its bonuses (default: as against the ground). */
+  airDamage?: number;
   cooldown: number; // seconds between shots
   projectile: ProjectileKind;
   speed: number; // projectile speed (ignored for bullets, which hit instantly)
@@ -48,8 +52,6 @@ export interface WeaponDef {
   unguided?: boolean;
   /** Flamethrower or weirding module: hits every enemy within range inside this half-angle (radians) around the aim. */
   cone?: number;
-  /** Shields take this many times the damage (slow projectiles, like a maula pistol's darts, get through them). */
-  shieldBreak?: number;
   /** Can only hit targets with one of these tags (the Sandrider's crysknife: infantry). */
   only?: Tag[];
   /** Passes straight through shields to health (sound: the Fedaykin's weirding modules; a slow blade). */
@@ -64,6 +66,8 @@ export interface UnitDef {
   cost: number;
   buildTime: number;
   hp: number;
+  /** Taken off every hit to health (plus one per Armor upgrade level). */
+  armor?: number;
   speed: number;
   turnRate: number; // radians per second
   radius: number;
@@ -119,6 +123,8 @@ export interface BuildingDef {
   cost: number;
   buildTime: number;
   hp: number;
+  /** Taken off every hit to health (plus one per Armor upgrade level). */
+  armor?: number;
   size: number; // footprint in tiles (square)
   requires: Req[];
   desc: string;
@@ -159,7 +165,5 @@ export interface UpgradeDef {
   after?: UpgradeType; // previous tier that must be researched first
   /** The level it adds to (weapons, armor, shields, harvesting). */
   line?: UpgradeLine;
-  /** How many standard steps of its line it adds (WEAPONS_BONUS, ARMOR_BONUS...): 1 unless set. */
-  scale?: number;
   desc: string;
 }

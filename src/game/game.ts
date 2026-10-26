@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import {
-  AMBUSH, ARMOR_BONUS, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
-  LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, SHIELDS_BONUS, START_CREDITS,
-  RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WEAPONS_BONUS, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
+  AMBUSH, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
+  LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, START_CREDITS, MIN_HIT,
+  RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
   type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
@@ -383,11 +383,12 @@ export class Game {
     return n;
   }
 
-  /** Strength of an upgrade line in standard steps: the tier, with each upgrade's `scale` (Fremen steps count for more). */
-  bonus(team: Team, line: UpgradeLine): number {
-    let n = 0;
-    for (const t of this.teams[team].upgrades) if (UPGRADES[t].line === line) n += UPGRADES[t].scale ?? 1;
-    return n;
+  /**
+   * What one hit of `w` from `team` does to `target`'s health, after its armor (shields left out): the attacker's
+   * guess, for picking targets and focus fire.
+   */
+  expectedHit(team: Team, w: WeaponDef, target: Entity): number {
+    return Math.max(MIN_HIT, weaponDamage(w, target) + weaponStep(w) * this.tier(team, 'weapons') - armorOf(target) - this.tier(target.team, 'armor'));
   }
 
   /** Seconds between shots for this weapon, after upgrades. */
@@ -411,7 +412,7 @@ export class Game {
       const w = seeker && this.weaponFor(seeker, e);
       if (seeker && !w) return; // e.g. an aircraft and no anti-air weapon
       if (w) {
-        const ratio = THREE.MathUtils.clamp(weaponDamage(w, e) / w.damage - 1, -1, 2);
+        const ratio = THREE.MathUtils.clamp(Math.max(MIN_HIT, weaponDamage(w, e) - armorOf(e)) / w.damage - 1, -1, 2);
         score -= ratio * 4;
         if (d < w.minRange) score += 30;
       }
@@ -1003,7 +1004,7 @@ export class Game {
 
   /** `secondary`: shot by a unit's second gun, which starts from its own muzzle if the model has one. */
   fire(u: Shooter, target: Entity, w: WeaponDef, secondary = false): void {
-    let mult = 1 + WEAPONS_BONUS * this.bonus(u.team, 'weapons');
+    let mult = 1;
     if (u instanceof Unit && u.def.hides) {
       // Striking out of hiding: Ambush adds damage for a few seconds; either way the shooter comes out of the sand.
       if (u.hidden && this.teams[u.team].upgrades.has('ambush')) u.ambushUntil = this.time + AMBUSH.time;
@@ -1125,15 +1126,18 @@ export class Game {
     if (target instanceof Unit && target.def.hides) this.unhide(target);
     // Whoever fires is seen by the side it hits for a moment, so units below a cliff can shoot back.
     if (attacker && attacker.team !== target.team) this.vision.reveal(target.team, attacker.x, attacker.z, this.ticks);
-    let dmg = weaponDamage(w, target) * mult;
+    let dmg = (weaponDamage(w, target) + (attacker ? weaponStep(w) * this.tier(attacker.team, 'weapons') : 0)) * mult;
+    const armor = armorOf(target) + this.tier(target.team, 'armor');
     if (target.shields > 0 && !w.pierce) {
-      // Shields take the hit first (less with Shields upgrades); whatever gets through goes on to health.
-      const onShields = dmg * (w.shieldBreak ?? 1) * (1 - SHIELDS_BONUS * this.bonus(target.team, 'shields'));
+      // Shields take the hit first (less one per Shields level); whatever gets through goes on to health, less armor.
+      const onShields = Math.max(MIN_HIT, dmg - this.tier(target.team, 'shields'));
       const absorbed = Math.min(target.shields, onShields);
       target.shields -= absorbed;
-      dmg *= 1 - absorbed / onShields;
+      const left = dmg * (1 - absorbed / onShields);
+      dmg = left > 0 ? Math.max(0, left - armor) : 0;
+    } else {
+      dmg = Math.max(MIN_HIT, dmg - armor);
     }
-    dmg *= 1 - ARMOR_BONUS * this.bonus(target.team, 'armor');
     target.hp -= dmg;
     if (target instanceof Unit) {
       target.onDamaged(attacker);
@@ -2615,9 +2619,20 @@ function walksThrough(h: Unit, other: Unit): boolean {
 
 /** Base damage plus the weapon's bonus for each of the target's tags, before upgrades. */
 export function weaponDamage(w: WeaponDef, target: Entity): number {
+  if (w.airDamage !== undefined && target.tags.includes('air')) return w.airDamage;
   let dmg = w.damage;
   for (const t of target.tags) dmg += w.bonus[t] ?? 0;
-  return Math.max(1, dmg);
+  return dmg;
+}
+
+/** What a weapon's hit gains per Weapons upgrade level. */
+export function weaponStep(w: WeaponDef): number {
+  return w.step ?? Math.max(1, Math.round(w.damage * 0.1));
+}
+
+/** A unit's or structure's own armor (Armor upgrades come on top). */
+export function armorOf(e: Entity): number {
+  return (e instanceof Unit ? e.def.armor : BUILDINGS[(e as Building).type].armor) ?? 0;
 }
 
 /**

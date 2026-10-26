@@ -19,9 +19,12 @@ export const QUEUE_MAX = 5; // per producer type
 export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab', 'sietch'];
 
 /** Upgrade effects. */
-export const WEAPONS_BONUS = 0.2; // damage per Weapons tier
-export const ARMOR_BONUS = 0.15; // damage reduction per Armor tier (to health)
-export const SHIELDS_BONUS = 0.2; // damage reduction to shields per Shields level
+/**
+ * Damage (docs/damage-redesign.md): a hit is the weapon's damage plus its bonus against the target's tags plus its
+ * upgrade step per Weapons level; shields take it first, less one per Shields level; what reaches health loses the
+ * target's armor plus one per Armor level. Never less than MIN_HIT.
+ */
+export const MIN_HIT = 0.5;
 /** Razor Flame Range upgrade: extra reach, in world units. */
 export const FLAME_RANGE = 2;
 export const NITRO = { speed: 1.5, cooldown: 1 / 1.5 };

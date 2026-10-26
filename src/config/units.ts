@@ -106,7 +106,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   warrior: {
     name: 'Fremen Warrior', producer: 'barracks', cost: 80, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
-    weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -3.5 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, shieldBreak: 3, sound: 'light_mg' },
+    weapon: { range: 4.5, minRange: 0, damage: 5, bonus: { biological: 5, armored: -4, structure: -3.5 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
     desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. The pistol\'s slow spring-fired darts get through shields (x3 against them). Strong vs infantry, can shoot at aircraft. Weak vs vehicles, flamers and structures. Goes through rites to become a Fedaykin or a Fremen Mortar.',
   },
   fedaykin: {
