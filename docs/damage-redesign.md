@@ -381,5 +381,25 @@ every unit equal, deltas sit near 0 and "worth it" near 50%. The useful signal i
 Targets revised accordingly: few big losses for every unit, and each one positive against what it's meant to counter.
 Raiding units (Trike, Razor, Sky Raider), hiding (Warriors) and worms (Sandrider) are judged in real games, not here.
 
-**Next step:** the three mirror round robins (30 games per pair) and cross-faction Hard games on round 3.1 + MLRS 38,
-to see where the game-level problems are before tuning toughness (rule 4) and upgrades (stage 4).
+**Round 3.1 in games** (mirrors 30 games per pair; cross-faction Hard, 60 games):
+
+| mirror | plan averages | games |
+|---|---|---|
+| Atreides | **trike 77**, std 65, mech 62, bio 41, rush 38, tech 34, turtle 33 | 12.5 min |
+| Corrino | **razor 84**, turtle 63, air 51, std 46, dev 37, rush 34, sard 34 | 13.7 min |
+| Fremen | **rush 87**, std 61, mortar 61, fed 57, rider 56, mass 50, turtle 23, swarm 6 | median 7.2 min, 61% under 8 min |
+
+- Kill ratios: MLRS 1.96, trike 1.35, tank 1.07, infantry 0.91; Soulcrusher 1.55, Sky Raider 1.33, Devastator 1.25,
+  Trooper 1.23, Sardaukar 0.78, Razor 0.71; Mortar 1.96, Fedaykin 1.85, Sandrider 1.08, Warrior 0.70.
+- Cross-faction: Fremen vs Atreides 87%, Fremen vs Corrino **32%** (Warriors lost shield-breaking), Atreides vs Corrino 5%.
+- Upgrades (eco-only std vs std): Atreides 16%, **Corrino 75%** (combat upgrades still worthless), Fremen 40%.
+
+**Why:**
+- **Milder counters make equal-cost fights closer,** so cheap fast units do better. Trikes now hit Tanks for 3
+  (was 1): at equal cost, 7.7 trikes out-damage two Tanks.
+- **Razors were raised to the floor against armor** (11 against a Devastator, was 2).
+- **Warriors hit structures for 4 (was 1.5),** so the rush razes bases.
+- **Lever:** toughness and cost (rule 4) and structure armor now have to do what steep bonuses did.
+
+**Next step:** targeted pair tests (TUNE) on the three dominant plans: structure armor 5, trike cost / health /
+cooldown and a harder-hitting Tank, Razor damage and health; then Corrino's upgrades.
