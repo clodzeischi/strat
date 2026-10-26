@@ -240,13 +240,56 @@ best against its intended target.
 All three mirror balances will be redone: their numbers were tuned in the old model. Expect several days of sim
 rounds. Stages 1–3 alone will tell us whether the model meets the viability target before any balance work.
 
-## 8. Decisions for you
+## 8. Decisions (taken 2026-10-26)
 
-1. **Flat armor per unit** (recommended), or keep armor as a tag only and just cap bonuses? Without armor stats we
-   lose SC2's "small fast hits are weak against heavy units" and need some negative bonuses back.
-2. **Flat upgrades** (recommended) or percentages? Flat ones change matchups as in SC2. Percentages are simpler but
-   only make an army stronger.
-3. **Fremen tags:** keep all-infantry (recommended, relying on the floor), or make Fedaykin and Sandriders armored
-   so anti-armor units have targets?
-4. **The Warrior loses its triple damage to shields,** per your rule. Fremen vs Corrino will need another lever if
-   it drops; most likely Fedaykin piercing does the job.
+1. **Flat armor per unit:** yes.
+2. **Flat upgrades:** yes, one model for all factions.
+3. **Fremen tags:** stay all `biological, light`; the floor has to hold without retagging.
+4. **Warrior `shieldBreak`:** removed. Fremen vs Corrino relies on Fedaykin piercing.
+
+## 9. Progress log (newest last; the resume point)
+
+### Stage 1: tools and baseline (main @ ceca5b6 config)
+
+**Tools:**
+- `sim/relevance.sh` (runs `sim/relevance.ts`): the mixed-army relevance test, about 3 minutes for everything.
+  - Reference armies of 6,000 credits (`REF` in sim/relevance.ts):
+    - Atreides: infantry 30%, trike 20%, tank 30%, MLRS 20%.
+    - Corrino: trooper 30%, Sardaukar 15%, Razor 15%, Devastator 20%, Sky Raider 10%, Soulcrusher 10%.
+    - Fremen: Warrior 45%, Fedaykin 30%, Mortar 15%, Sandrider 10%.
+  - Per unit X: the army with X at 25% against the army without X, against each enemy composition (their reference,
+    and their reference skewed half to each of their units), 3 maps × both sides.
+  - Delta > +0.02 counts as "worth it", < −0.1 as "big loss".
+  - **Caveat:** it's an open-field battle. It can't see raiding (Trike, Razor, Sky Raider), hiding (Warriors) or worms
+    (Sandrider). For those units the target is "no big losses", not "worth it".
+- `sim/ava-strats.ts`: `<plan>-eco` researches only the Harvesting line, `<plan>-bare` nothing. Every faction.
+
+**Relevance baseline** (share of enemy compositions where the unit is worth it; big losses in brackets):
+
+| Atreides | | Corrino | | Fremen | |
+|---|---|---|---|---|---|
+| MLRS | 100% (0) | Devastator | 88% (0) | Mortar | 71% (2) |
+| Infantry | 71% (2) | Trooper | 82% (0) | Fedaykin | 59% (2) |
+| Tank | 47% (4) | Soulcrusher | 47% (4) | Sandrider | 35% (8) |
+| Trike | 18% (9) | Sardaukar | 24% (4) | Warrior | 24% (7) |
+| | | Razor | 18% (10) | | |
+| | | Sky Raider | 0% (14) | | |
+
+The Tank against Fremen: −0.06, −0.14, −0.19, −0.21, +0.03 across their five compositions.
+
+**Upgrades** (std researching only Harvesting vs full std, 40 games; target 30–40%):
+- Atreides 13% (no research at all: 18%).
+- Corrino **70%**: their combat upgrades are a net loss (no research: 15%).
+- Fremen 23% (no research: 10%).
+
+**AI army value by unit in cross-faction games** (Hard vs Hard, 60 games):
+- Atreides vs Fremen: infantry 37%, trike 36%, MLRS 25%, **tank 2%**.
+- Corrino vs Fremen: Razor 37%, Devastator 21%, Trooper 20%, Sardaukar 17%, **Soulcrusher 4%, Sky Raider 1%**.
+- Corrino vs Atreides: Devastator 42%, Razor 21%, Sky Raider 12%, Trooper 11%, Soulcrusher 8%, Sardaukar 6%.
+- Atreides vs Corrino: infantry 30%, tank 27%, MLRS 24%, trike 19%.
+- Fremen vs either: Fedaykin about 40%, Warrior 37–39%, Mortar 14%, Sandrider 6–8%.
+
+Cross-faction win rates: Fremen beat Atreides 90% and Corrino 62–70%; Atreides beat Corrino 2%.
+
+**Next step:** stage 2, the engine (armor, flat upgrades, air damage, minimum 0.5, no `shieldBreak` / `scale`, a
+config check), then the numbers translated into the new model.

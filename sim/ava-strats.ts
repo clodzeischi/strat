@@ -4,7 +4,7 @@
 // faction's plans (FACTION_STRATS).
 import { BRUTAL_OPTIONS, BRUTAL_PROFILE, BrutalAI, type BrutalOptions } from '../src/game/brutal';
 import { AI, HARD_PROFILE, KITS, power, type AIProfile } from '../src/game/ai';
-import { TILE, type Faction, type Team, type UnitType } from '../src/config';
+import { TILE, UPGRADES, type Faction, type Team, type UnitType } from '../src/config';
 import type { Unit } from '../src/entities';
 import { hypot } from '../src/game/hypot';
 import type { Game } from '../src/game/game';
@@ -264,6 +264,14 @@ export const EXTRA: Record<string, Strat> = {
 
 export function makeStrat(g: Game, team: Team, name: string): AI {
   if (name === 'hard') return new AI(g, team, HARD_PROFILE);
+  // '<plan>-eco': the plan researching only its economy (the Harvesting line); '<plan>-bare': no research at all.
+  const only = name.match(/^(\w+)-(eco|bare)$/);
+  if (only) {
+    const base = FACTION_STRATS[g.teams[team].faction]![only[1]];
+    const p = base.profile;
+    const research = only[2] === 'bare' ? [] : (p.kit?.research ?? KITS[g.teams[team].faction].research).filter((u) => UPGRADES[u].line === 'harvest');
+    return makeStratFrom(g, team, { ...base, profile: { ...p, kit: { ...p.kit, research } } });
+  }
   // '<plan>-no-<upgrade>': the plan without that research, to see what the upgrade is worth.
   const without = name.match(/^(\w+)-no-(\w+)$/);
   if (without) {
