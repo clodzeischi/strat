@@ -539,3 +539,25 @@ with `TUNE` (`sim/matchups.ts` reads TUNE now) and plays Hard cross-faction game
 **Levers that keep a mirror intact:** a change applied to every unit of a faction (all health, all costs) moves both
 sides of its mirror alike, so the mirror stays balanced. Unit-specific changes (Fedaykin, Devastator) need the mirror
 re-checked.
+
+**Stage 6 tests** (Hard vs Hard, 60 games, counter table regenerated with each TUNE):
+
+| variant | A vs C | F vs C | F vs A |
+|---|---|---|---|
+| round 3.7 | 2 | 35 | 88 |
+| v1: Atreides combat units +15% health | 5 | | 75 |
+| v2: Atreides combat units −10% cost | 7 | | 87 |
+| v3: Devastator 750 health / 300 shields | 5 | 33 | |
+| v4: Fedaykin cone 0.15 | | 33 | 78 |
+| v5: Atreides Harvesting without HQ Level 2 | 2 | | 80 (Atreides mirror: tech 71, trike 34; not taken) |
+| c1: Corrino health and shields −20% | 5 | **52** | 88 |
+| c2: c1 + Atreides +15% health | 10 | 52 | 75 |
+
+- **Every Atreides build order loses to stock Corrino** (`FACTION=atreides FACTION_B=corrino`, 20 games each):
+  rush 0, std 5, bio 0, mech 0, trike 0, tech 5, turtle 0. So it's unit power, not the Atreides AI's choices.
+- **Toughness per 1,000 credits:** Corrino 1.2–1.6× its Atreides counterparts (Trooper 1,600 vs infantry 889,
+  Devastator 1,625 vs Tank 1,000). A comment in units.ts says it was meant that way ("health alone beats the Atreides
+  counterpart's, and shields come on top").
+- **The Devastator carries Corrino vs Atreides:** under c2 it kills 18,000 credits a game (61% of Corrino's kills)
+  at a 2.5 kill ratio, beating rocket infantry, Tanks and MLRS alike.
+- `sim/ava.ts` takes `FACTION_B` for the opponent's faction (cross-faction build-order tests).
