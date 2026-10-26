@@ -509,4 +509,33 @@ plan. All fixed plans now use `techArmy: 8` (the rush keeps 40).
 - **Fremen levels at 300 / 500:** `notier` vs std 43 (48 at 450 / 650). Written in at 350 / 550. Slightly under the
   target: Fremen games are short (median 8 min), so the levels arrive late.
 
-**Next step:** the full batch (all mirrors changed: plan research orders); then stage 6, cross-faction.
+**Round 3.7 (mirrors milestone):**
+
+| mirror | plan averages | worst-matchup check |
+|---|---|---|
+| Atreides | mech 63, tech 63, bio 56, std 49, trike 46, turtle 44, rush 30 | cycle: bio > mech 73, mech > trike 80, trike > bio 57 |
+| Corrino | turtle 66, std 61, air 58, razor 56, dev 45, sard 43, rush 21 | turtle beats everything narrowly (53–78), as in the old Corrino log |
+| Fremen | std 75, mortar 69, rider 68, fed 65, rush 43, turtle 35, mass 33, swarm 12 | std narrowly beats every plan (53–67) |
+
+- Kill ratios (Fremen): Mortar 2.12, Fedaykin 2.00, Sandrider 0.97, Warrior 0.74.
+- Upgrade levels (`notier` vs std): Atreides 30, Corrino 30, Fremen 43. Eco-only: 18 / 23 / 40.
+- Cross-faction (Hard, 60 games): Atreides vs Corrino 2%, Fremen vs Atreides 88%, Fremen vs Corrino 35%.
+
+Stages 3–5 are close enough to move on. Left for later: Corrino turtle; Fremen levels slightly weak; std a bit
+strong in the Fremen mirror.
+
+### Stage 6: cross-faction
+
+Order of strength: Corrino >> Fremen >> Atreides.
+- **Atreides vs Corrino:** Devastators kill 10,300 credits a game; Corrino out-earn Atreides (40.5k vs 32.6k spice);
+  the Atreides army trails from minute 4.
+- **Fremen vs Atreides:** Fremen out-build Atreides early; Fedaykin kill 9,700 a game; Atreides build 0.7 Tanks.
+- **Counter table** (attack-move duels): Fedaykin beat Atreides infantry −0.86, Tanks −0.67, Troopers −0.59,
+  Sardaukar −0.65; the Devastator beats everything but Troopers and aircraft.
+
+**Tool:** scratchpad `xtest.sh <name> <games> "<pairs>" [mirrors]` regenerates the counter table inside the snapshot
+with `TUNE` (`sim/matchups.ts` reads TUNE now) and plays Hard cross-faction games, optionally mirror round robins.
+
+**Levers that keep a mirror intact:** a change applied to every unit of a faction (all health, all costs) moves both
+sides of its mirror alike, so the mirror stays balanced. Unit-specific changes (Fedaykin, Devastator) need the mirror
+re-checked.

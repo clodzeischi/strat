@@ -12,6 +12,7 @@ import { cpus } from 'node:os';
 import { writeFileSync } from 'node:fs';
 import { Game } from '../src/game/game';
 import { FACTIONS, unitDef, type Faction, type Team, type UnitType } from '../src/config';
+import './tune'; // TUNE applies here too, so a tuned snapshot's AI picks counters for the tuned numbers
 
 const TYPES: UnitType[] = [
   'infantry', 'trike', 'tank', 'rocket', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery', 'warrior', 'fedaykin',
