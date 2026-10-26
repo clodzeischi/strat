@@ -154,3 +154,16 @@ open (+0.03 / -0.11) and win as a line in the games.
 
 The AI fixes (round 1) are most of it: Fremen waves now include their Warriors. The Fedaykin cone and the stronger
 upgrades add the rest. Atreides vs Corrino is still 1% (docs/balance-corrino.md). All three need a cross-faction pass.
+
+### 8. Fedaykin dialled back against vehicles and structures (after a playtest)
+
+Playtest: Fedaykin ate a harvester in about three seconds and razed buildings fast. `sim/ttk.ts` (a squad against one
+undefended target): 6 Fedaykin (1,200) killed a harvester in 3.6 s (2 tanks: 10.3, 5 Razors: 10.1) and a Refinery in
+10.8 s (tanks 40, Warriors 26; only set-up Mortars were faster, 6.7). Bonuses +20 vs mechanical, +4 armored, +6
+structure → **+8 mechanical, +14 armored, -2 structure**: a tank takes 32 a shot as before (34), light vehicles
+(harvesters, trikes, Razors, MLRS) 18 instead of 30, structures 8 instead of 16. Now 6.0 s for a harvester, 21.8 s for
+a Refinery, 34 s for a Construction Yard (fully upgraded: 3.6, 13.7, 21.9). Mortars are the siege unit.
+
+Mirror round robin (30 per pair): std 64, rider 69, mortar 69, fed 59, rush 42, mass 42, swarm 29, turtle 27 (round 7
+within noise; std loses to mortar 40, mortar to rider 40, rider and std even). Cross-faction, Hard vs Hard, 100 games:
+Fremen vs Atreides 93 → 90%, vs Corrino 75 → 62%. Counter table regenerated.

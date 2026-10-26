@@ -243,7 +243,7 @@ The Zerg of the game: cheap, fast infantry that live in the open desert. Low tec
 | Unit | Cost | Built at | Requires | Stats | Role |
 |---|---|---|---|---|---|
 | Fremen Warrior | 80 | Barracks | | 70 HP, speed 3, range 4.5 | The Zergling: cheap and fast, shoots aircraft, plants Thumpers. Beats infantry and Troopers, loses to vehicles, flamers and MLRS |
-| Fedaykin | 200 | Barracks | Sietch | 230 HP, range 7, +20 vs mechanical, **sonic: ignores shields, hits everything in a narrow cone** | Anti-vehicle infantry, and in the mirror the answer to massed Warriors. Beats tanks, Devastators, Razors, MLRS, Warrior mobs; loses to Sandriders |
+| Fedaykin | 200 | Barracks | Sietch | 230 HP, range 7, +8 vs mechanical and +14 more vs armored (-2 vs structures), **sonic: ignores shields, hits everything in a narrow cone** | Anti-vehicle infantry, and in the mirror the answer to massed Warriors. Beats tanks, Devastators, Razors, MLRS, Warrior mobs; loses to Sandriders |
 | Wind Glider | 100 | Barracks | Sietch | 60 HP, speed 10, sight 16, unarmed, flies | Recon. The fastest thing in the sky. Can't hover: it flies to where it's sent and circles there (radius 8) |
 | Fremen Mortar | 250 | Barracks | Great Sietch | 120 HP, speed 2.8; pistol on the move (range 4.5); set up (D, 1.5 s): guided rockets 4-12, 24 (+16 vehicles, +30 structures, -7 infantry) every 1.4 s, splash 3 | Siege, anti-vehicle and anti-blob from range. Hides like any Fremen while set up |
 | Spice Crew | 450 | Barracks | | 120 HP, unarmed | Sets up a Spice Camp |

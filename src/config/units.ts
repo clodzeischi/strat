@@ -113,8 +113,8 @@ export const UNITS: Record<UnitType, UnitDef> = {
     name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 230, speed: 3, turnRate: 12, radius: 0.5, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['sietch2'], hides: true,
     rite: { from: 'warrior', cost: 115, time: 6.5 },
-    weapon: { range: 7, minRange: 0, damage: 10, bonus: { mechanical: 20, armored: 4, structure: 6, biological: -3 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, cone: 0.25, air: true, pierce: true, sound: 'small_laser' },
-    desc: 'Elite fighters with weirding modules: sonic blasts that hit everything in a narrow cone, tear vehicles apart and pass straight through shields. Strong vs vehicles, structures and massed infantry, can shoot at aircraft. Weak vs Sandriders. With Sietch III, can go through the rite of the Sandrider.',
+    weapon: { range: 7, minRange: 0, damage: 10, bonus: { mechanical: 8, armored: 14, structure: -2, biological: -3 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, cone: 0.25, air: true, pierce: true, sound: 'small_laser' },
+    desc: 'Elite fighters with weirding modules: sonic blasts that hit everything in a narrow cone, crack armor and pass straight through shields. Strong vs tanks and massed infantry, fair vs light vehicles, can shoot at aircraft. Weak vs Sandriders and slow against structures. With Sietch III, can go through the rite of the Sandrider.',
   },
   crew: {
     name: 'Spice Crew', producer: 'barracks', cost: 450, buildTime: 12, hp: 120, speed: 2.6, turnRate: 12, radius: 0.45, sight: 9,
