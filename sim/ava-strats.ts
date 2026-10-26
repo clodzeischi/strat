@@ -264,12 +264,15 @@ export const EXTRA: Record<string, Strat> = {
 
 export function makeStrat(g: Game, team: Team, name: string): AI {
   if (name === 'hard') return new AI(g, team, HARD_PROFILE);
-  // '<plan>-eco': the plan researching only its economy (the Harvesting line); '<plan>-bare': no research at all.
-  const only = name.match(/^(\w+)-(eco|bare)$/);
+  // '<plan>-eco': the plan researching only its economy (the Harvesting line); '<plan>-bare': no research at all;
+  // '<plan>-notier': everything but the Weapons, Armor and Shields levels (what the levels are worth).
+  const only = name.match(/^(\w+)-(eco|bare|notier)$/);
   if (only) {
     const base = FACTION_STRATS[g.teams[team].faction]![only[1]];
     const p = base.profile;
-    const research = only[2] === 'bare' ? [] : (p.kit?.research ?? KITS[g.teams[team].faction].research).filter((u) => UPGRADES[u].line === 'harvest');
+    const all = p.kit?.research ?? KITS[g.teams[team].faction].research;
+    const research = only[2] === 'bare' ? [] : only[2] === 'eco' ? all.filter((u) => UPGRADES[u].line === 'harvest')
+      : all.filter((u) => !['weapons', 'armor', 'shields'].includes(UPGRADES[u].line ?? ''));
     return makeStratFrom(g, team, { ...base, profile: { ...p, kit: { ...p.kit, research } } });
   }
   // '<plan>-no-<upgrade>': the plan without that research, to see what the upgrade is worth.

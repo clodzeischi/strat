@@ -7,7 +7,7 @@ export const UNIT_ORDER: UnitType[] = [
 
 export const UNITS: Record<UnitType, UnitDef> = {
   harvester: {
-    name: 'Harvester', producer: 'factory', cost: 800, buildTime: 10, hp: 600, armor: 2, speed: 3, turnRate: 3, radius: 1.1, sight: 8,
+    name: 'Harvester', producer: 'factory', cost: 800, buildTime: 10, hp: 600, armor: 3, speed: 3, turnRate: 3, radius: 1.1, sight: 8,
     turret: false, infantry: false, tags: ['mechanical', 'light'], weapon: null, requires: ['factory', 'refinery'], lift: 6,
     desc: 'Collects spice and brings it to a Refinery.',
   },
@@ -63,7 +63,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   sardaukar: {
     name: 'Sardaukar', producer: 'barracks', cost: 260, buildTime: 9, hp: 220, shields: 120, armor: 1, speed: 2.6, turnRate: 12, radius: 0.5, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks2'],
-    weapon: { range: 5.5, minRange: 0, damage: 16, bonus: { biological: 16 }, airDamage: 24, cooldown: 0.75, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'coax_mg' },
+    weapon: { range: 5.5, minRange: 0, damage: 18, bonus: { biological: 18 }, airDamage: 24, cooldown: 0.75, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'coax_mg' },
     desc: "The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and MLRS.",
   },
   razor: {

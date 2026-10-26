@@ -417,5 +417,44 @@ Raiding units (Trike, Razor, Sky Raider), hiding (Warriors) and worms (Sandrider
 **Round 3.2 (written in):** structure armor 5; trike 4 (+3 light); Tank 22 (+22 mechanical), 500 health; MLRS 44;
 Razor 12 (+10 biological), 170 health. Counter table regenerated.
 
-**Next step:** the full batch on round 3.2 (scratchpad `batch.sh`: mirrors 30 per pair, cross-faction Hard 60,
-upgrade tests), then Corrino's upgrades (combat research worthless at 75%).
+**Round 3.2 in games** (mirrors 30 per pair; cross-faction Hard 60):
+
+| mirror | plan averages | games |
+|---|---|---|
+| Atreides | mech 68, trike 65, std 58, bio 46, tech 40, rush 38, turtle 36 | 12.5 min |
+| Corrino | **razor 81**, turtle 56, air 52, std 45, dev 42, sard 38, rush 37 | 13.5 min |
+| Fremen | std 72, mortar 69, rider 69, fed 68, rush 43, mass 34, turtle 34, swarm 12 | median 8.1 min |
+
+- Atreides is back to a cycle: mech > trike 63, trike > bio 83.
+- Cross-faction: Fremen vs Atreides 87%, vs Corrino 35%; Atreides vs Corrino 8%.
+- **Razor plan:** it wins the economy. Opponents lose about 4,200–5,100 credits of harvesters a game, the Razor plan
+  800. Pre-redesign it was 2,840 vs 3,000, and std then built 20.6 Sardaukar a game against it; now 2.7 (the counter
+  table rates the Sardaukar low).
+
+**Upgrade levels** (`<plan>-notier` = everything but Weapons/Armor/Shields, vs full std, 40 games; target 30–40%):
+
+| step share | Atreides | Corrino | Fremen |
+|---|---|---|---|
+| 0.1 | 40 | 93 | 60 |
+| 0.2 | 30 | 68 | 43 |
+| 0.3 | 33 | 53 | 28 |
+
+- **Skip tests are confounded by research order:** skipping one upgrade brings the next forward. The Corrino AI
+  researched Harvesting fourth (Atreides and Fremen research theirs first), so every Corrino skip test measured
+  "Harvesting sooner". Its eco-only plan also won 75–80% for that reason.
+- With Harvesting first (Corrino kit changed), step 0.2, Weapons 600 / Armor 500 / Shields 500: no levels 18%; without
+  Weapons 19%, without Armor 40%, without Shields 50%; eco-only 10%.
+- Armor levels now also count against shields (they protect a Corrino unit's whole pool). Before that, Corrino Armor
+  was a net loss even at 400.
+
+**Round 3.3 (written in):**
+- Weapons step share 0.2 (`WEAPON_STEP` in rules.ts).
+- Armor levels count against shields too.
+- Corrino AI researches Harvesting first.
+- Corrino Weapons 900 / 35 s, Armor 600 / 25 s, Shields 400 / 20 s.
+- Sardaukar 18 (+18 biological).
+- Harvesters armor 3.
+- Counter table regenerated.
+- Upgrade descriptions still say percentages: to do in stage 7.
+
+**Next step:** the round 3.3 batch; then `notier` tests for all factions on the written values.

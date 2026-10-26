@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   AMBUSH, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
-  LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, START_CREDITS, MIN_HIT, STRUCTURE,
+  LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, START_CREDITS, MIN_HIT, STRUCTURE, WEAPON_STEP,
   RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
@@ -1129,8 +1129,9 @@ export class Game {
     let dmg = (weaponDamage(w, target) + (attacker ? weaponStep(w) * this.tier(attacker.team, 'weapons') : 0)) * mult;
     const armor = armorOf(target) + this.tier(target.team, 'armor');
     if (target.shields > 0 && !w.pierce) {
-      // Shields take the hit first (less one per Shields level); whatever gets through goes on to health, less armor.
-      const onShields = Math.max(MIN_HIT, dmg - this.tier(target.team, 'shields'));
+      // Shields take the hit first, less one per Shields and per Armor level; whatever gets through goes on to health,
+      // less armor.
+      const onShields = Math.max(MIN_HIT, dmg - this.tier(target.team, 'shields') - this.tier(target.team, 'armor'));
       const absorbed = Math.min(target.shields, onShields);
       target.shields -= absorbed;
       const left = dmg * (1 - absorbed / onShields);
@@ -2627,7 +2628,7 @@ export function weaponDamage(w: WeaponDef, target: Entity): number {
 
 /** What a weapon's hit gains per Weapons upgrade level. */
 export function weaponStep(w: WeaponDef): number {
-  return w.step ?? Math.max(1, Math.round(w.damage * 0.1));
+  return w.step ?? Math.max(1, Math.round(w.damage * WEAPON_STEP.share));
 }
 
 /** A unit's or structure's own armor (Armor upgrades come on top). */

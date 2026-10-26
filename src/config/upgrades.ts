@@ -16,8 +16,8 @@ export const UPGRADES: Record<UpgradeType, UpgradeDef> = {
 
   // ---- Corrino: one level each ----
   cWeapons: { line: 'weapons', name: 'Weapons +1', short: 'Weapons +1', cost: 900, time: 35, requires: ['fab'], desc: '+20% damage for all units.' },
-  cArmor: { line: 'armor', name: 'Armor +1', short: 'Armor +1', cost: 900, time: 35, requires: ['fab'], desc: 'Units and buildings take 15% less damage to health.' },
-  cShields: { line: 'shields', name: 'Shields +1', short: 'Shields +1', cost: 900, time: 35, requires: ['tleilaxu'], desc: 'Shields take 20% less damage.' },
+  cArmor: { line: 'armor', name: 'Armor +1', short: 'Armor +1', cost: 600, time: 25, requires: ['fab'], desc: 'Units and buildings take 15% less damage to health.' },
+  cShields: { line: 'shields', name: 'Shields +1', short: 'Shields +1', cost: 400, time: 20, requires: ['tleilaxu'], desc: 'Shields take 20% less damage.' },
   cHarvest: { line: 'harvest', name: 'Harvesting', short: 'Harvesting', cost: 600, time: 20, requires: ['refinery', 'fab'], desc: 'Harvesters carry 25% more, move 25% faster and pick up spice 50% faster.' },
   flame: { name: 'Razor Flame Range', short: 'Flame Range', cost: 500, time: 20, requires: ['fab'], desc: 'Razor flamethrowers reach one tile further.' },
 
