@@ -313,5 +313,73 @@ Cross-faction win rates: Fremen beat Atreides 90% and Corrino 62–70%; Atreides
 - fremen-check, corrino-check and sietch-check pass. The game runs on the old numbers with armor 0 and the default
   flat steps until stage 3.
 
-**Next step:** stage 3, numbers by role (armor for every unit and structure, one positive bonus per weapon, separate
-air damage where needed), checked with `sim/config-check.ts` and `sim/matrix-report.ts`, then `sim/relevance.sh`.
+### Stage 3: numbers by role
+
+**First draft (round 3.1)**, before any sims. Fast, small weapons got a bigger hit with a longer cooldown where armor
+would otherwise crush them (Razor). Health is unchanged for now: armor does the soaking. Structures default to armor 3
+(`STRUCTURE_ARMOR`); the floor isn't applied to structures (hitting buildings is a siege job).
+
+| unit | armor | weapon (cooldown) | was |
+|---|---|---|---|
+| Atreides infantry | 0 | 7 (+3 biological), 0.6 s | 5 (+5 bio, −4 armored, −3 structure) |
+| ... Infantry Rockets | | 14 (+12 armored), 1.5 s | 6 (+22 armored, −2 structure) |
+| Trike | 1 | 5 (+2 light), 0.3 s | 4 (+2 bio, −3 armored, −2 structure) |
+| Tank | 2 | 20 (+20 mechanical), 1.4 s | 18 (+22 mechanical, −10 bio) |
+| MLRS | 1 | 38 (+30 structure), air 60, 2.8 s | 40 (+25 bio, +10 armored, +35 structure, +25 air) |
+| Repair Vehicle, Carryall | 1 | | |
+| Harvester | 2 | | |
+| Trooper | 0 | 10 (+10 armored), air 4, 0.7 s | 8 (+14 armored, −3 structure, −6.5 air) |
+| Sardaukar | 1 | 16 (+16 biological), air 24, 0.75 s | 12 (+24 bio, +12 air, −4 structure) |
+| Razor | 1 | 14 (+10 biological) cone, 0.6 s | 4 (+8 bio, −2 armored, −2 structure), 0.3 s |
+| Devastator | 3 | 60 (+40 armored), 2 s; MG 8 (+4 biological), 0.2 s | 55 (+45 armored, −20 bio); MG 6 (+6 bio, −3, −3) |
+| Sky Raider | 1 | 16 (+20 armored), 1.2 s; mines 40 (+60 biological) | 12 (+24 armored, −4 structure); mines 30 (+90 bio, −10 armored) |
+| Soulcrusher | 2 | 14 (+12 structure); set up 70 (+110 structure), 4.5 s | set up 60 (+120 structure, +20 bio) |
+| Auto Turret | | 14 (+6 mechanical), 0.9 s | 12 (+6 mechanical, −6 structure) |
+| Fremen Warrior | 0 | 7 (+3 biological), 0.55 s | 5 (+5 bio, −4 armored, −3.5 structure), ×3 vs shields |
+| Fedaykin | 1 | 14 (+12 armored) cone, pierce, 1 s | 10 (+8 mechanical, +14 armored, −2 structure, −3 bio) |
+| Fremen Mortar | 0 | pistol 6, 0.8 s; set up 28 (+26 structure), 1.4 s | 5 (+3 bio, −4, −3); set up 24 (+16 mech, +30 structure, −7 bio) |
+| Sandrider | 1 | knife 400 (infantry only), unchanged | |
+| Sandworm | | 400 (+400 mechanical), no upgrade step | 400 (+400 mechanical, −100 structure) |
+
+Upgrade steps are the default (a tenth of the hit, at least 1) until stage 4.
+
+Already trimmed in the table above: Trooper 9 (+13) → 10 (+10) and Fedaykin 12 (+16) → 14 (+12) (spreads 6.3× → 5.7×
+counting the Trooper's weak anti-air, 3.6× → 2.8×); MLRS 45 → 38 after the relevance run.
+
+**Round 3.1 matrix** (`sim/matrix-report.ts`):
+- Every weapon is within 1.0–2.9× of its best, apart from the Trooper's deliberately weak anti-air.
+- Crippled units against a faction (under 40% of their best):
+  - Atreides vs Fremen: none (the Tank was at 20%, now 50%).
+  - Corrino vs Fremen: none (Trooper 36% → 51%, Sky Raider 33% → 45%).
+  - Only the Sandrider's knife (infantry only, the agreed exception) and the Fedaykin against Fremen (37%) remain.
+- `sim/config-check.ts`: all 22 weapons follow the rules.
+
+**Relevance, round 3.1** (before the MLRS trim; worth it / big losses):
+
+| unit | baseline | 3.1 |
+|---|---|---|
+| MLRS | 100% / 0 | 100% / 0 |
+| Atreides infantry | 71% / 2 | 59% / 1 |
+| Tank | 47% / 4 | 65% / 2 (vs Fremen: 1/5 → 4/5) |
+| Trike | 18% / 9 | 35% / 6 |
+| Trooper | 82% / 0 | 94% / 0 |
+| Devastator | 88% / 0 | 94% / 0 |
+| Soulcrusher | 47% / 4 | 41% / 4 |
+| Sardaukar | 24% / 4 | 18% / 5 |
+| Razor | 18% / 10 | 12% / 10 |
+| Sky Raider | 0% / 14 | 6% / 15 |
+| Fremen Warrior | 24% / 7 | 0% / 9 |
+| Fedaykin | 59% / 2 | 82% / 2 |
+| Fremen Mortar | 71% / 2 | 71% / 0 |
+| Sandrider | 35% / 8 | 12% / 4 |
+
+**Reading it:** the test compares a unit with the rest of its own army, so it can't put everyone above zero. With
+every unit equal, deltas sit near 0 and "worth it" near 50%. The useful signal is the outliers:
+- **Too strong in open battle:** MLRS (+0.38 on average), Devastator (+0.18), Trooper (+0.15).
+- **Too weak:** Sky Raider (−0.27), Razor (−0.15), Warrior (−0.11, without its shield-breaking).
+
+Targets revised accordingly: few big losses for every unit, and each one positive against what it's meant to counter.
+Raiding units (Trike, Razor, Sky Raider), hiding (Warriors) and worms (Sandrider) are judged in real games, not here.
+
+**Next step:** the three mirror round robins (30 games per pair) and cross-faction Hard games on round 3.1 + MLRS 38,
+to see where the game-level problems are before tuning toughness (rule 4) and upgrades (stage 4).

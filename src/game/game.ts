@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {
   AMBUSH, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
-  LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, START_CREDITS, MIN_HIT,
+  LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, START_CREDITS, MIN_HIT, STRUCTURE_ARMOR,
   RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
@@ -2632,7 +2632,7 @@ export function weaponStep(w: WeaponDef): number {
 
 /** A unit's or structure's own armor (Armor upgrades come on top). */
 export function armorOf(e: Entity): number {
-  return (e instanceof Unit ? e.def.armor : BUILDINGS[(e as Building).type].armor) ?? 0;
+  return e instanceof Unit ? e.def.armor ?? 0 : BUILDINGS[(e as Building).type].armor ?? STRUCTURE_ARMOR;
 }
 
 /**
