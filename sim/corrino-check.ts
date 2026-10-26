@@ -158,7 +158,9 @@ function arena(): { g2: Game; at: (dx: number, dz: number) => { x: number; z: nu
   (sitter.def as { weapon: unknown }) === sitter.def; // keep the tank from wandering: it has no target in sight
   step(8);
   check(sitter.dead || sitter.hp < sitter.maxHp, 'deployed Artillery shells a target its side can see, out of its own sight');
-  // A target off to the side: the turret swings round, the hull doesn't.
+  // A target off to the side: the turret swings round, the hull doesn't. (The tank shelled above is taken away first, so
+  // its death doesn't pull the turret back mid-turn.)
+  if (!sitter.dead) { sitter.hp = 0; (g2 as unknown as { kill(e: unknown, by: null): void }).kill(sitter, null); }
   const side = at(12, -6);
   g2.spawnUnit('trooper', C, side.x - 3, side.z).hp = 1e6;
   const flank = g2.spawnUnit('tank', A, side.x, side.z);
