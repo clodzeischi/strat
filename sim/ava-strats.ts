@@ -12,7 +12,7 @@ import type { Game } from '../src/game/game';
 const mix = (m: Partial<Record<UnitType, number>>) => ({ ...BRUTAL_PROFILE.mix, infantry: 0.1, trike: 0.1, tank: 0.1, rocket: 0.1, ...m });
 /** A fixed plan: its own unit mix, barely bent by what the enemy fields. */
 const plan = (p: Partial<AIProfile>): AIProfile => ({ ...BRUTAL_PROFILE, counterFocus: 1, ...p });
-const ALL = ['weapons1', 'armor1', 'weapons2', 'armor2', 'harvest'] as const;
+const ALL = ['harvest', 'weapons1', 'armor1', 'weapons2', 'armor2'] as const;
 
 export interface Strat {
   profile: AIProfile;
@@ -114,24 +114,24 @@ export const STRATS: Record<string, Strat> = {
     opts: { carryalls: 0 }, firstWave: 100,
   },
   // Infantry core that gets Infantry Rockets early (HQ Level 2 first).
-  bio: { profile: plan({ mix: mix({ infantry: 3, tank: 0.4, rocket: 0.4 }), techArmy: 8, kit: { levels: ['conyard'], research: ['rockets', 'weapons1', 'armor1', 'harvest', 'weapons2', 'armor2'] } }) },
+  bio: { profile: plan({ mix: mix({ infantry: 3, tank: 0.4, rocket: 0.4 }), techArmy: 8, kit: { levels: ['conyard'], research: ['harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } }) },
   // Tanks with some trikes, Weapons and Armor, no Factory Level 2 rush.
-  mech: { profile: plan({ mix: mix({ tank: 3, trike: 0.6 }), kit: { levels: ['conyard'], research: ['weapons1', 'armor1', 'harvest', 'weapons2', 'armor2'] } }) },
+  mech: { profile: plan({ mix: mix({ tank: 3, trike: 0.6 }), kit: { levels: ['conyard'], research: ['harvest', 'weapons1', 'armor1', 'weapons2', 'armor2'] } }) },
   // Trikes everywhere: Nitro first, big raids, constant pressure on harvesters.
   trike: {
-    profile: plan({ mix: mix({ trike: 3, tank: 0.6, infantry: 0.4 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { levels: ['conyard'], research: ['nitro', 'weapons1', 'armor1', 'harvest', 'weapons2', 'armor2'] } }),
+    profile: plan({ mix: mix({ trike: 3, tank: 0.6, infantry: 0.4 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { levels: ['conyard'], research: ['harvest', 'nitro', 'weapons1', 'armor1', 'weapons2', 'armor2'] } }),
   },
   // Factory Level 2 as early as possible, MLRS and tanks.
   tech: { profile: plan({ techArmy: 8, mix: mix({ rocket: 3, tank: 1.5 }), kit: { levels: ['factory', 'conyard'], research: [...ALL] } }) },
   // Bunkers, everything researched, no attacks before 14:00, then the big army.
   turtle: {
-    profile: plan({ bunkers: 3, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: mix({ tank: 2, rocket: 2, infantry: 0.6 }), kit: { levels: ['factory', 'conyard'], research: ['weapons1', 'armor1', 'rockets', 'harvest', 'weapons2', 'armor2', 'nitro'] } }),
+    profile: plan({ bunkers: 3, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: mix({ tank: 2, rocket: 2, infantry: 0.6 }), kit: { levels: ['factory', 'conyard'], research: ['harvest', 'weapons1', 'armor1', 'rockets', 'weapons2', 'armor2', 'nitro'] } }),
     opts: { carryalls: 0, flank: false }, firstWave: 840,
   },
 };
 
 const cmix = (m: Partial<Record<UnitType, number>>) => ({ ...BRUTAL_PROFILE.mix, trooper: 0.1, sardaukar: 0.1, razor: 0.1, devastator: 0.1, raider: 0.1, artillery: 0.1, ...m });
-const C_ALL = ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] as const;
+const C_ALL = ['cHarvest', 'cWeapons', 'cArmor', 'cShields', 'flame'] as const;
 
 /** Corrino build orders (docs/balance-corrino.md). */
 export const CORRINO_STRATS: Record<string, Strat> = {
@@ -143,14 +143,14 @@ export const CORRINO_STRATS: Record<string, Strat> = {
   },
   // Razors everywhere: Flame Range first, big raids on the economy, no tech buildings.
   razor: {
-    profile: plan({ techArmy: 40, mix: cmix({ razor: 3, trooper: 0.6 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { levels: [], research: ['flame', 'cWeapons', 'cArmor', 'cHarvest'] } }),
+    profile: plan({ techArmy: 40, mix: cmix({ razor: 3, trooper: 0.6 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { levels: [], research: ['cHarvest', 'flame', 'cWeapons', 'cArmor'] } }),
   },
   // Imperial Barracks first: Sardaukar with troopers.
-  sard: { profile: plan({ techArmy: 8, mix: cmix({ sardaukar: 3, trooper: 1, razor: 0.3 }), kit: { levels: ['barracks', 'fab'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] } }) },
+  sard: { profile: plan({ techArmy: 8, mix: cmix({ sardaukar: 3, trooper: 1, razor: 0.3 }), kit: { levels: ['barracks', 'fab'], research: ['cHarvest', 'cWeapons', 'cArmor', 'cShields', 'flame'] } }) },
   // Fab Level 2 first: Devastators with troopers.
-  dev: { profile: plan({ techArmy: 8, mix: cmix({ devastator: 3, trooper: 1.2, razor: 0.4 }), kit: { levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] } }) },
+  dev: { profile: plan({ techArmy: 8, mix: cmix({ devastator: 3, trooper: 1.2, razor: 0.4 }), kit: { levels: ['fab', 'barracks'], research: ['cHarvest', 'cWeapons', 'cArmor', 'cShields', 'flame'] } }) },
   // Tleilaxu early for Sky Raiders: air and troopers.
-  air: { profile: plan({ techArmy: 8, mix: cmix({ raider: 3, trooper: 1, razor: 0.3 }), kit: { levels: [], research: ['cWeapons', 'cShields', 'cArmor', 'cHarvest', 'flame'] } }) },
+  air: { profile: plan({ techArmy: 8, mix: cmix({ raider: 3, trooper: 1, razor: 0.3 }), kit: { levels: [], research: ['cHarvest', 'cWeapons', 'cShields', 'cArmor', 'flame'] } }) },
   // Turrets, everything researched, no attacks before 14:00, then Devastators, Soulcrushers and Sardaukar.
   turtle: {
     profile: plan({ bunkers: 4, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
@@ -201,14 +201,14 @@ export const FREMEN_STRATS: Record<string, Strat> = {
   },
   // Warriors only, but upgraded: Sandwalk, Great Sietch for Weapons, Armor and Stillsuits, then Sietch III for +2; no rites.
   swarm: {
-    profile: plan({ techArmy: 8, mix: fmix({ warrior: 3, fedaykin: 0 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { siege: null, rider: undefined, research: ['sandwalk', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'fWeapons2', 'fArmor2', 'ambush'], topLevelArmy: 1.5 } }),
+    profile: plan({ techArmy: 8, mix: fmix({ warrior: 3, fedaykin: 0 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { siege: null, rider: undefined, research: ['fHarvest', 'sandwalk', 'fWeapons', 'fArmor', 'stillsuit', 'fWeapons2', 'fArmor2', 'ambush'], topLevelArmy: 1.5 } }),
   },
   // Great Sietch first: Fedaykin with Warriors.
-  fed: { profile: plan({ techArmy: 8, mix: fmix({ fedaykin: 3, warrior: 1 }), kit: { research: ['fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'], siege: { unit: 'mortar', per: 10, max: 2 }, rider: undefined } }) },
+  fed: { profile: plan({ techArmy: 8, mix: fmix({ fedaykin: 3, warrior: 1 }), kit: { research: ['fHarvest', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'], siege: { unit: 'mortar', per: 10, max: 2 }, rider: undefined } }) },
   // Great Sietch first: a Mortar line behind a Warrior screen.
-  mortar: { profile: plan({ techArmy: 8, mix: fmix({ warrior: 2, fedaykin: 0.3 }), kit: { research: ['fWeapons', 'fArmor', 'fHarvest', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'], siege: { unit: 'mortar', per: 2, max: 14 }, rider: undefined } }) },
+  mortar: { profile: plan({ techArmy: 8, mix: fmix({ warrior: 2, fedaykin: 0.3 }), kit: { research: ['fHarvest', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'], siege: { unit: 'mortar', per: 2, max: 14 }, rider: undefined } }) },
   // Sandriders and their worms (up to eight), Ambush first at Sietch III, Fedaykin on the way.
-  rider: { profile: plan({ techArmy: 8, mix: fmix({ fedaykin: 2, warrior: 1 }), kit: { research: ['ambush', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2'], rider: { unit: 'sandrider', max: 8 }, siege: { unit: 'mortar', per: 10, max: 2 } } }) },
+  rider: { profile: plan({ techArmy: 8, mix: fmix({ fedaykin: 2, warrior: 1 }), kit: { research: ['fHarvest', 'ambush', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2'], rider: { unit: 'sandrider', max: 8 }, siege: { unit: 'mortar', per: 10, max: 2 } } }) },
   // Economy and mass: Spice Mining and Sandwalk, no Great Sietch, every other credit into Warriors.
   mass: { profile: plan({ techArmy: 8, mix: fmix({ warrior: 3, fedaykin: 0 }), kit: { levels: [], research: ['fHarvest', 'sandwalk'], siege: null, rider: undefined } }) },
   // Bunkers, everything researched, no attacks before 14:00, then a mixed army.
@@ -227,7 +227,7 @@ export const FREMEN_EXTRA: Record<string, Strat> = {
   fed8h: { profile: { ...FREMEN_STRATS.fed.profile, techArmy: 8, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['fHarvest', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'] } } },
   fedcf: { profile: { ...FREMEN_STRATS.fed.profile, counterFocus: 8 } },
   fedr: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, rider: { unit: 'sandrider', max: 4 } } } },
-  fedamb: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['ambush', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2'] } } },
+  fedamb: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['fHarvest', 'ambush', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2'] } } },
   // The rider plan rushing Sietch III (with an army of 8, not 16): worse in every matchup (docs/balance-fremen.md).
   riderrush: { profile: { ...FREMEN_STRATS.rider.profile, kit: { ...FREMEN_STRATS.rider.profile.kit, topLevelArmy: 1 } } },
   // Stock Brutal with no combat research: only Spice Mining and Sandwalk (what the combat upgrades are worth together).
@@ -235,7 +235,7 @@ export const FREMEN_EXTRA: Record<string, Strat> = {
   // ... and with no research at all.
   stdbare: { profile: { ...BRUTAL_PROFILE, kit: { research: [] } } },
   // Stock Brutal with Spice Mining last.
-  stdnoh: { profile: { ...BRUTAL_PROFILE, kit: { research: ['fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2', 'fHarvest'] } } },
+  stdnoh: { profile: { ...BRUTAL_PROFILE, kit: { research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2'] } } },
 };
 
 export const FACTION_STRATS: Partial<Record<Faction, Record<string, Strat>>> = { atreides: STRATS, corrino: CORRINO_STRATS, fremen: FREMEN_STRATS };
@@ -253,10 +253,10 @@ export const EXTRA: Record<string, Strat> = {
   nolift: { profile: BRUTAL_PROFILE, opts: { lift: false } },
   // Stock Brutal plus a death squad: Trike Nitro first, then six trikes kept out of the waves that do nothing but hunt
   // harvesters, every 15 s whenever six are home. 'trikesquad': the same without Nitro.
-  deathsquad: { squad: { nitro: true }, profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, kit: { research: ['nitro', 'harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
+  deathsquad: { squad: { nitro: true }, profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, kit: { research: ['harvest', 'nitro', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
   // The same squad without Nitro, sent out at the time Nitro usually comes in (6:15).
   slowsquad: { squad: { nitro: false, from: 375 }, profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, kit: { research: ['harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
-  nitrosquad: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, raids: { trikes: 6, start: 0, interval: 15, hunt: true }, kit: { research: ['nitro', 'harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
+  nitrosquad: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, raids: { trikes: 6, start: 0, interval: 15, hunt: true }, kit: { research: ['harvest', 'nitro', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
   trikesquad: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, raids: { trikes: 6, start: 0, interval: 15, hunt: true }, kit: { research: ['harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
   // Stock Brutal that never builds Carryalls: what its usual (late) Carryalls are worth.
   nocarry: { profile: BRUTAL_PROFILE, opts: { carryalls: 0 } },

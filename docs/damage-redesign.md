@@ -499,5 +499,14 @@ Corrino Armor 700.
 that alone was worth ~40 points (docs/balance-fremen.md, round 3), and it's the likely reason Corrino's std beats every
 plan. All fixed plans now use `techArmy: 8` (the rush keeps 40).
 
-**Next step:** Atreides and Corrino round robins with the plan fix; Fremen levels at 300 / 500; then stage 6
-(cross-faction).
+**Round 3.6 (plans tech after 8 units):**
+- **Atreides:** mech 63, std 60, bio 54, tech 49, trike 49, turtle 46, rush 30. Every real plan is within 46–63, with
+  a clean cycle: bio > mech 67, mech > trike 83, trike > bio 68.
+- **Corrino:** std still 86 (plans 22–63). Cause: the fixed Corrino plans researched Harvesting fourth while stock
+  Brutal now researches it first. Several Atreides and Fremen plans had it late too.
+- **Every plan researches its economy upgrade first now.** It isn't a strategic choice; the AI skips it until it's
+  available.
+- **Fremen levels at 300 / 500:** `notier` vs std 43 (48 at 450 / 650). Written in at 350 / 550. Slightly under the
+  target: Fremen games are short (median 8 min), so the levels arrive late.
+
+**Next step:** the full batch (all mirrors changed: plan research orders); then stage 6, cross-faction.
