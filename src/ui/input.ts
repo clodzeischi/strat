@@ -225,16 +225,25 @@ export class Input {
     };
   }
 
-  /** Entity under the cursor: units by screen distance, buildings by footprint. */
+  /**
+   * Entity under the cursor: units by screen distance, buildings by footprint. Units are picked within a generous circle
+   * (aircraft, small and quick, a much bigger one, and their shadow on the ground counts too); where circles overlap,
+   * the unit whose middle is nearest for its size wins, so a big aircraft circle doesn't steal a click on a soldier.
+   */
   private pick(x: number, y: number): Entity | null {
     let best: Entity | null = null;
     let bestD = Infinity;
     for (const u of this.game.units) {
       if (u.carrier || !this.game.shown(u)) continue;
       const s = this.toScreen(u.x, u.y + 0.5, u.z);
-      const d = Math.hypot(s.x - x, s.y - y);
-      if (d < u.radius * 18 + 8 && d < bestD) {
-        bestD = d;
+      let d = Math.hypot(s.x - x, s.y - y);
+      if (u.def.air) {
+        const g = this.toScreen(u.x, this.game.map.surfaceAt(u.x, u.z), u.z);
+        d = Math.min(d, Math.hypot(g.x - x, g.y - y));
+      }
+      const r = u.def.air ? u.radius * 34 + 14 : Math.max(22, u.radius * 26 + 10);
+      if (d < r && d / r < bestD) {
+        bestD = d / r;
         best = u;
       }
     }
