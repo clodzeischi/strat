@@ -260,7 +260,8 @@ function arena(): { g2: Game; at: (dx: number, dz: number) => { x: number; z: nu
   step(UNITS.devastator.detonate!.delay - 0.3);
   check(!dev.dead, 'self-destruct waits for its delay');
   step(0.6);
-  check(dev.dead && near.every((u) => u.dead || u.hp < u.maxHp * 0.4) && !far.dead && far.hp === far.maxHp, 'then wrecks what is near and spares what is far');
+  const blast = UNITS.devastator.detonate!.weapon.damage;
+  check(dev.dead && near.every((u) => u.dead || u.maxHp - u.hp >= blast * 0.5) && !far.dead && far.hp === far.maxHp, 'then wrecks what is near and spares what is far');
 }
 {
   const { g2, at, step } = arena();
