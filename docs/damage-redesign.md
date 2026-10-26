@@ -481,5 +481,23 @@ Fremen 48.
 **Round 3.5 (written in):** step share 0.15 of the hit; Fremen Weapons/Armor +1 450 / 20 s and +2 650 / 30 s;
 Corrino Armor 700.
 
-**Next step:** the full batch on round 3.5. Open items: Corrino (Razor plan and std too strong, Sardaukar plan
-broken), cross-faction (stage 6), upgrade text (stage 7).
+**Round 3.5 in games:**
+
+| mirror | plan averages |
+|---|---|
+| Atreides | mech 66, std 62, trike 57, bio 55, turtle 44, tech 36, rush 31 |
+| Corrino | **std 84**, razor 63, turtle 59, air 53, dev 40, sard 29, rush 22 |
+| Fremen | std 71, mortar 69, fed 68, rider 66, rush 42, mass 40, turtle 34, swarm 10 |
+
+- Atreides has a clean triangle: bio > mech 63, mech > trike 83, trike > bio 60.
+- Kill ratios: MLRS 2.18, tank 1.28, infantry 0.95, trike 0.93; Soulcrusher 1.67, Sky Raider 1.51, Devastator 1.35,
+  Trooper 1.26, Sardaukar 0.84, Razor 0.54; Mortar 1.96, Fedaykin 1.96, Sandrider 0.98, Warrior 0.73.
+- Upgrade levels (`notier` vs std): Atreides 30, Corrino 30, Fremen 48. Eco-only: 18 / 23 / 35.
+- Cross-faction: Atreides vs Corrino 2%, Fremen vs Atreides 85%, Fremen vs Corrino 35%.
+
+**Plans:** the fixed Atreides and Corrino plans teched after 3–6 units, stock Brutal after 8. In the Fremen mirror
+that alone was worth ~40 points (docs/balance-fremen.md, round 3), and it's the likely reason Corrino's std beats every
+plan. All fixed plans now use `techArmy: 8` (the rush keeps 40).
+
+**Next step:** Atreides and Corrino round robins with the plan fix; Fremen levels at 300 / 500; then stage 6
+(cross-faction).

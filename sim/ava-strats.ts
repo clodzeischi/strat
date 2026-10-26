@@ -114,7 +114,7 @@ export const STRATS: Record<string, Strat> = {
     opts: { carryalls: 0 }, firstWave: 100,
   },
   // Infantry core that gets Infantry Rockets early (HQ Level 2 first).
-  bio: { profile: plan({ mix: mix({ infantry: 3, tank: 0.4, rocket: 0.4 }), techArmy: 6, kit: { levels: ['conyard'], research: ['rockets', 'weapons1', 'armor1', 'harvest', 'weapons2', 'armor2'] } }) },
+  bio: { profile: plan({ mix: mix({ infantry: 3, tank: 0.4, rocket: 0.4 }), techArmy: 8, kit: { levels: ['conyard'], research: ['rockets', 'weapons1', 'armor1', 'harvest', 'weapons2', 'armor2'] } }) },
   // Tanks with some trikes, Weapons and Armor, no Factory Level 2 rush.
   mech: { profile: plan({ mix: mix({ tank: 3, trike: 0.6 }), kit: { levels: ['conyard'], research: ['weapons1', 'armor1', 'harvest', 'weapons2', 'armor2'] } }) },
   // Trikes everywhere: Nitro first, big raids, constant pressure on harvesters.
@@ -122,10 +122,10 @@ export const STRATS: Record<string, Strat> = {
     profile: plan({ mix: mix({ trike: 3, tank: 0.6, infantry: 0.4 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { levels: ['conyard'], research: ['nitro', 'weapons1', 'armor1', 'harvest', 'weapons2', 'armor2'] } }),
   },
   // Factory Level 2 as early as possible, MLRS and tanks.
-  tech: { profile: plan({ techArmy: 3, mix: mix({ rocket: 3, tank: 1.5 }), kit: { levels: ['factory', 'conyard'], research: [...ALL] } }) },
+  tech: { profile: plan({ techArmy: 8, mix: mix({ rocket: 3, tank: 1.5 }), kit: { levels: ['factory', 'conyard'], research: [...ALL] } }) },
   // Bunkers, everything researched, no attacks before 14:00, then the big army.
   turtle: {
-    profile: plan({ bunkers: 3, techArmy: 4, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: mix({ tank: 2, rocket: 2, infantry: 0.6 }), kit: { levels: ['factory', 'conyard'], research: ['weapons1', 'armor1', 'rockets', 'harvest', 'weapons2', 'armor2', 'nitro'] } }),
+    profile: plan({ bunkers: 3, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: mix({ tank: 2, rocket: 2, infantry: 0.6 }), kit: { levels: ['factory', 'conyard'], research: ['weapons1', 'armor1', 'rockets', 'harvest', 'weapons2', 'armor2', 'nitro'] } }),
     opts: { carryalls: 0, flank: false }, firstWave: 840,
   },
 };
@@ -146,14 +146,14 @@ export const CORRINO_STRATS: Record<string, Strat> = {
     profile: plan({ techArmy: 40, mix: cmix({ razor: 3, trooper: 0.6 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { levels: [], research: ['flame', 'cWeapons', 'cArmor', 'cHarvest'] } }),
   },
   // Imperial Barracks first: Sardaukar with troopers.
-  sard: { profile: plan({ techArmy: 3, mix: cmix({ sardaukar: 3, trooper: 1, razor: 0.3 }), kit: { levels: ['barracks', 'fab'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] } }) },
+  sard: { profile: plan({ techArmy: 8, mix: cmix({ sardaukar: 3, trooper: 1, razor: 0.3 }), kit: { levels: ['barracks', 'fab'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] } }) },
   // Fab Level 2 first: Devastators with troopers.
-  dev: { profile: plan({ techArmy: 3, mix: cmix({ devastator: 3, trooper: 1.2, razor: 0.4 }), kit: { levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] } }) },
+  dev: { profile: plan({ techArmy: 8, mix: cmix({ devastator: 3, trooper: 1.2, razor: 0.4 }), kit: { levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] } }) },
   // Tleilaxu early for Sky Raiders: air and troopers.
-  air: { profile: plan({ techArmy: 3, mix: cmix({ raider: 3, trooper: 1, razor: 0.3 }), kit: { levels: [], research: ['cWeapons', 'cShields', 'cArmor', 'cHarvest', 'flame'] } }) },
+  air: { profile: plan({ techArmy: 8, mix: cmix({ raider: 3, trooper: 1, razor: 0.3 }), kit: { levels: [], research: ['cWeapons', 'cShields', 'cArmor', 'cHarvest', 'flame'] } }) },
   // Turrets, everything researched, no attacks before 14:00, then Devastators, Soulcrushers and Sardaukar.
   turtle: {
-    profile: plan({ bunkers: 4, techArmy: 4, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
+    profile: plan({ bunkers: 4, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
     opts: { flank: false }, firstWave: 840,
   },
 };
