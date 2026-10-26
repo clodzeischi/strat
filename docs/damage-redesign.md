@@ -568,4 +568,13 @@ re-checked.
 
 **Reading so far:** Corrino −20% toughness puts Fremen and Corrino level (~50%). Atreides are the weak faction by a
 wide margin: +30% health and −10% cost still only reach 25% vs Corrino and 35% vs Fremen. Uniform changes keep the
-Atreides mirror intact in principle; checking it with each step. Next: c5 (Atreides +45% health, −15% cost).
+Atreides mirror intact in principle; checking it with each step.
+
+**c5 (written in):** Corrino −20% health and shields (all combat units); Atreides +45% health and −15% cost (all combat
+units: infantry 76 / 116, trike 110 / 203, Tank 425 / 725, MLRS 510 / 261).
+- Cross-faction: **Atreides vs Corrino 50%** (15.1 min), **Fremen vs Atreides 53%**, Fremen vs Corrino ~50% (c1).
+- Atreides mirror (20 per pair): tech 67, std 54, trike 50, mech 49, turtle 48, rush 43, bio 39. The triangle holds:
+  bio > mech 90, mech > trike 80, trike > bio 90.
+
+**Next step:** the full batch on c5 (all mirrors 30 per pair, cross 60, upgrades), then the matrix report and
+relevance test against the stage 1 baseline; then stage 7 (text: unit descriptions, upgrade descriptions, PLAN.md).

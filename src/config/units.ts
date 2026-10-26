@@ -12,7 +12,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Collects spice and brings it to a Refinery.',
   },
   infantry: {
-    name: 'Infantry', producer: 'barracks', cost: 90, buildTime: 4.5, hp: 80, speed: 2.4, turnRate: 12, radius: 0.45, sight: 10,
+    name: 'Infantry', producer: 'barracks', cost: 76, buildTime: 4.5, hp: 116, speed: 2.4, turnRate: 12, radius: 0.45, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'],
     weapon: { range: 6, minRange: 0, damage: 7, bonus: { biological: 3 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
     antiArmor: { range: 9, minRange: 0, damage: 14, bonus: { armored: 12 }, cooldown: 1.5, projectile: 'rocket', speed: 18, splash: 0, air: true, sound: 'launch_small' },
@@ -20,21 +20,21 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Cheap rifle squad. Strong vs infantry. With Infantry Rockets, devastating vs armor. Can shoot at aircraft.',
   },
   trike: {
-    name: 'Trike', producer: 'factory', cost: 130, buildTime: 4.5, hp: 140, armor: 1, speed: 7.5, turnRate: 6, radius: 0.8, sight: 12,
+    name: 'Trike', producer: 'factory', cost: 110, buildTime: 4.5, hp: 203, armor: 1, speed: 7.5, turnRate: 6, radius: 0.8, sight: 12,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['factory'],
     weapon: { range: 7, minRange: 0, damage: 4, bonus: { light: 3 }, cooldown: 0.3, projectile: 'bullet', speed: 0, splash: 0, sound: 'heavy_mg' },
     lift: 3,
     desc: 'Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing harvesters. With Trike Nitro, faster still and firing faster.',
   },
   tank: {
-    name: 'Tank', producer: 'factory', cost: 500, buildTime: 9, hp: 500, armor: 2, speed: 3.8, turnRate: 2.5, radius: 1.1, sight: 13,
+    name: 'Tank', producer: 'factory', cost: 425, buildTime: 9, hp: 725, armor: 2, speed: 3.8, turnRate: 2.5, radius: 1.1, sight: 13,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory'],
     weapon: { range: 9, minRange: 0, damage: 22, bonus: { mechanical: 22 }, cooldown: 1.4, projectile: 'shell', speed: 32, splash: 0, sound: 'single_shot' },
     lift: 6,
     desc: 'Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.',
   },
   rocket: {
-    name: 'MLRS', producer: 'factory', cost: 600, buildTime: 13, hp: 180, armor: 1, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
+    name: 'MLRS', producer: 'factory', cost: 510, buildTime: 13, hp: 261, armor: 1, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
     turret: true, infantry: false, tags: ['mechanical', 'light'], requires: ['factory2'],
     weapon: { range: 15, minRange: 6, damage: 44, bonus: { structure: 30 }, airDamage: 60, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 3, air: true, unguided: true, sound: 'launch_large' },
     lockOn: { duration: 8, cooldown: 20 },
@@ -55,25 +55,25 @@ export const UNITS: Record<UnitType, UnitDef> = {
 
   // ---- Corrino: health alone beats the Atreides counterpart's, and shields come on top ----
   trooper: {
-    name: 'Harkonnen Trooper', producer: 'barracks', cost: 100, buildTime: 5, hp: 100, shields: 60, speed: 2.1, turnRate: 12, radius: 0.45, sight: 10,
+    name: 'Harkonnen Trooper', producer: 'barracks', cost: 100, buildTime: 5, hp: 80, shields: 48, speed: 2.1, turnRate: 12, radius: 0.45, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'],
     weapon: { range: 9, minRange: 0, damage: 10, bonus: { armored: 10 }, airDamage: 4, cooldown: 0.7, projectile: 'rocket', speed: 20, splash: 0, air: true, sound: 'launch_small' },
     desc: 'Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, beats trikes by numbers, and can take potshots at aircraft. Weak vs MLRS.',
   },
   sardaukar: {
-    name: 'Sardaukar', producer: 'barracks', cost: 260, buildTime: 9, hp: 220, shields: 120, armor: 1, speed: 2.6, turnRate: 12, radius: 0.5, sight: 10,
+    name: 'Sardaukar', producer: 'barracks', cost: 260, buildTime: 9, hp: 176, shields: 96, armor: 1, speed: 2.6, turnRate: 12, radius: 0.5, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks2'],
     weapon: { range: 5.5, minRange: 0, damage: 18, bonus: { biological: 18 }, airDamage: 24, cooldown: 0.75, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'coax_mg' },
     desc: "The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and MLRS.",
   },
   razor: {
-    name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 170, shields: 100, armor: 1, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
+    name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 136, shields: 80, armor: 1, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['fab'],
     weapon: { range: 4, minRange: 0, damage: 10, bonus: { biological: 12 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, cone: 0.35 },
     desc: 'Dune buggy with a flamethrower that burns everything in front of it. Shreds infantry. Weak vs tanks.',
   },
   devastator: {
-    name: 'Devastator', producer: 'fab', cost: 800, buildTime: 16, hp: 900, shields: 400, armor: 3, speed: 2.4, turnRate: 1.6, radius: 1.4, sight: 12,
+    name: 'Devastator', producer: 'fab', cost: 800, buildTime: 16, hp: 720, shields: 320, armor: 3, speed: 2.4, turnRate: 1.6, radius: 1.4, sight: 12,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu', 'fab2'],
     weapon: { range: 10, minRange: 0, damage: 60, bonus: { armored: 40 }, cooldown: 2, projectile: 'shell', speed: 28, splash: 1.5, sound: 'heavy_laser' },
     holdFire: true,
@@ -82,7 +82,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: "Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, but only fires standing still; its machine gun cuts down infantry, even on the move. Can self-destruct in a huge blast. Weak vs aircraft, MLRS and massed troopers.",
   },
   raider: {
-    name: 'Sky Raider', producer: 'fab', cost: 600, buildTime: 13, hp: 260, shields: 120, armor: 1, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
+    name: 'Sky Raider', producer: 'fab', cost: 600, buildTime: 13, hp: 208, shields: 96, armor: 1, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
     turret: false, infantry: false, tags: ['mechanical', 'air'], requires: ['tleilaxu'], air: true,
     weapon: { range: 5, minRange: 0, damage: 16, bonus: { armored: 20 }, cooldown: 1.2, projectile: 'rocket', speed: 22, splash: 0, sound: 'sky_raider_fire' },
     mines: {
@@ -92,7 +92,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Light ornithopter for scouting and raids. Rockets strong vs armor. Lays mines that wreck infantry and wear down harvesters. Weak vs anti-air.',
   },
   artillery: {
-    name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 260, shields: 140, armor: 2, speed: 2.8, turnRate: 2, radius: 1.1, sight: 12,
+    name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 208, shields: 112, armor: 2, speed: 2.8, turnRate: 2, radius: 1.1, sight: 12,
     turret: true, holdFire: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu'],
     weapon: { range: 8, minRange: 0, damage: 14, bonus: { structure: 12 }, cooldown: 1.5, projectile: 'shell', speed: 26, splash: 0, sound: 'single_shot' },
     deploy: {
