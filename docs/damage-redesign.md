@@ -552,6 +552,10 @@ re-checked.
 | v5: Atreides Harvesting without HQ Level 2 | 2 | | 80 (Atreides mirror: tech 71, trike 34; not taken) |
 | c1: Corrino health and shields −20% | 5 | **52** | 88 |
 | c2: c1 + Atreides +15% health | 10 | 52 | 75 |
+| d1: c1 + Devastator 1,000 credits | 13 | 50 | (Corrino mirror: std 74, turtle 74, dev 35) |
+| d2: c1 + Devastator MG 5, gun 55 | 7 | 50 | (Corrino mirror: turtle 77, std 67, dev 42) |
+| c3: c1 + Atreides +30% health | 15 | | 68 |
+| c4: c3 + Atreides −10% cost | 25 | | 65 |
 
 - **Every Atreides build order loses to stock Corrino** (`FACTION=atreides FACTION_B=corrino`, 20 games each):
   rush 0, std 5, bio 0, mech 0, trike 0, tech 5, turtle 0. So it's unit power, not the Atreides AI's choices.
@@ -561,3 +565,7 @@ re-checked.
 - **The Devastator carries Corrino vs Atreides:** under c2 it kills 18,000 credits a game (61% of Corrino's kills)
   at a 2.5 kill ratio, beating rocket infantry, Tanks and MLRS alike.
 - `sim/ava.ts` takes `FACTION_B` for the opponent's faction (cross-faction build-order tests).
+
+**Reading so far:** Corrino −20% toughness puts Fremen and Corrino level (~50%). Atreides are the weak faction by a
+wide margin: +30% health and −10% cost still only reach 25% vs Corrino and 35% vs Fremen. Uniform changes keep the
+Atreides mirror intact in principle; checking it with each step. Next: c5 (Atreides +45% health, −15% cost).
