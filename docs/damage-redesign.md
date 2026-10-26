@@ -587,6 +587,50 @@ units: infantry 76 / 116, trike 110 / 203, Tank 425 / 725, MLRS 510 / 261).
 | Upgrade levels (`notier` vs std) | Atreides 25, Corrino 35, Fremen 43 |
 | Kill ratios (Atreides) | MLRS 2.85, Tank 1.29, trike 0.96, infantry 0.89 |
 
-**Next step:** the Corrino turtle. Its Auto Turrets kept their health while Corrino units lost 20%, and structure armor
-5 shrugs off small arms. Test turret health / damage in the Corrino mirror, then the final matrix and relevance
-report.
+**Corrino turtle:** turret health 500, damage 11 or armor 3 change nothing (turtle vs std / razor / air / dev:
+63–77 in every variant). As in the old Corrino log, the maxed-out late Corrino army wins when nobody punishes it
+before 14:00. That's a strategy problem, not a matrix one; left open.
+
+## 10. State at the end of the first pass (branch `damage-redesign`, 2026-10-26)
+
+**Achieved:**
+
+| goal | baseline | now |
+|---|---|---|
+| Weapon spreads (best / worst target) | 3–15× | 1.0–2.9×, plus three deliberate cases (below) |
+| Negative bonuses / weapons breaking the rules | 24 / 18 of 21 | 0 / 0 (`sim/config-check.ts`) |
+| Odds-fixing exceptions | Warrior ×3 vs shields, Trooper −6.5 vs air, Fremen upgrade scale | none |
+| Crippled units vs a faction (< 40% of best) | Tank vs Fremen 20%, Trooper 36%, Sky Raider 33%, ... | only the Sandrider's knife (agreed) and Fedaykin vs Fremen 37% |
+| Upgrade levels (no levels vs std) | Atreides 13*, Corrino 70*, Fremen 23* | 25 / 35 / 43 |
+| Cross-faction (Hard) | A–C 2%, F–A 88–90%, F–C 62–70% | **A–C 50%, F–A 53%, F–C 52%** |
+| Atreides mirror | (pre-redesign: 52–61, std 64) | 36–61, a clean triangle |
+| Fremen mirror | std 64, plans 25–68 | std 75, plans 33–69 |
+| Corrino mirror | (pre-redesign: 22–66) | 17–78 (turtle) |
+
+\* Baseline upgrade numbers are eco-only (they also dropped the tool upgrades), so they're not quite the same test.
+
+**The three deliberate spread cases:**
+- Trike vs heavy armor (Tank, Devastator, Soulcrusher), 5.4×: the Tank has to counter trikes.
+- The Trooper's weak anti-air.
+- The Sandrider's knife (infantry only).
+
+**Open items:**
+1. **Corrino turtle (78%)**: see above.
+2. **The AI rarely builds some units against some factions:** Tanks vs Fremen 2%, Sky Raiders vs Fremen 1%, Sardaukar
+   vs Atreides 2%. Its counter picks come from equal-cost attack-move duels and punish any negative matchup hard
+   (`counterFocus` 8, losses counted double). In mixed armies the Tank vs Fremen is now about neutral (relevance
+   −0.15 to +0.04). The Sky Raider vs Fremen is still a clear loss (−0.26 to −0.57): every Fremen unit shoots
+   aircraft and its rockets' bonus is vs armored.
+3. Fremen levels a bit weak (43%); std a bit strong in the Fremen mirror (75); MLRS kill ratio high (2.85).
+4. Not playtested yet. Uniform faction changes (Atreides +45% health / −15% cost, Corrino −20% toughness) change how
+   long fights take; worth a feel check.
+5. Stage 7 left: PLAN.md unit tables still show the old numbers (this doc and src/config are current).
+
+**Where the numbers live:** src/config/units.ts (armor, weapons), upgrades.ts (prices), rules.ts (`MIN_HIT`,
+`STRUCTURE.armor` 5, `WEAPON_STEP.share` 0.15). The engine is in game.ts (`damage`, `upgradedHit`, `armorOf`,
+`expectedHit`).
+
+**To resume:** read this section. Scratchpad scripts (`batch.sh`, `pairs.sh`, `xtest.sh`, `show.sh`) aren't in the
+repo; their jobs can be redone with `sim/ava.sh` (`FACTION`, `FACTION_B`), `sim/cross-detail.ts` +
+`sim/cross-summary.ts`, `sim/relevance.sh`, `sim/matrix-report.ts` and `sim/config-check.ts`. Regenerate the
+counter table (`npx tsx sim/matchups.ts`, which honours TUNE) after any stat change.
