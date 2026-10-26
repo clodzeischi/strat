@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Round robin of Atreides build orders (sim/ava-strats.ts) in the mirror, on every core, with a summary.
+# Round robin of a faction's build orders (sim/ava-strats.ts; FACTION=corrino, Atreides by default) in the mirror, on every core, with a summary.
 # Usage: sim/ava.sh <games-per-pair> [strat...]      (default: every strategy; SEEDS, SIZE as in sim/ava.ts)
 # Long batches: sim/snap.sh <name> sim/ava.sh ...  Raw lines are kept in $OUT (printed at the end).
 cd "$(dirname "$0")/.."
 GAMES=${1:-20}; shift
-STRATS=(${@:-$(npx tsx -e "import {STRATS} from './sim/ava-strats'; console.log(Object.keys(STRATS).join(' '))")})
+STRATS=(${@:-$(npx tsx -e "import {FACTION_STRATS} from './sim/ava-strats'; console.log(Object.keys(FACTION_STRATS[(process.env.FACTION ?? 'atreides') as 'atreides']!).join(' '))")})
 OUT=${OUT:-$(mktemp)}
 CHUNK=2
 for ((i = 0; i < ${#STRATS[@]}; i++)); do for ((j = i; j < ${#STRATS[@]}; j++)); do

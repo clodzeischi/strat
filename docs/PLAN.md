@@ -243,14 +243,14 @@ The Zerg of the game: cheap, fast infantry that live in the open desert. Low tec
 | Unit | Cost | Built at | Requires | Stats | Role |
 |---|---|---|---|---|---|
 | Fremen Warrior | 80 | Barracks | | 70 HP, speed 3, range 4.5 | The Zergling: cheap and fast, shoots aircraft, plants Thumpers. Beats infantry and Troopers, loses to vehicles, flamers and MLRS |
-| Fedaykin | 200 | Barracks | Sietch | 230 HP, range 7, +20 vs mechanical, **sonic: ignores shields** | Anti-vehicle infantry, plants Thumpers. Beats tanks, Devastators, Razors, MLRS; loses to infantry |
+| Fedaykin | 200 | Barracks | Sietch | 230 HP, range 7, +8 vs mechanical and +14 more vs armored (-2 vs structures), **sonic: ignores shields, hits everything in a narrow cone** | Anti-vehicle infantry, and in the mirror the answer to massed Warriors. Beats tanks, Devastators, Razors, MLRS, Warrior mobs; loses to Sandriders |
 | Wind Glider | 100 | Barracks | Sietch | 60 HP, speed 10, sight 16, unarmed, flies | Recon. The fastest thing in the sky. Can't hover: it flies to where it's sent and circles there (radius 8) |
-| Fremen Mortar | 250 | Barracks | Great Sietch | 120 HP, speed 2.8; pistol on the move (range 4.5); set up (D, 1.5 s): guided rockets 4-12, 24 (+16 vehicles, +30 structures, -10 infantry) every 1.4 s, small splash | Siege and anti-vehicle from range. Hides like any Fremen while set up |
+| Fremen Mortar | 250 | Barracks | Great Sietch | 120 HP, speed 2.8; pistol on the move (range 4.5); set up (D, 1.5 s): guided rockets 4-12, 24 (+16 vehicles, +30 structures, -7 infantry) every 1.4 s, splash 3 | Siege, anti-vehicle and anti-blob from range. Hides like any Fremen while set up |
 | Spice Crew | 450 | Barracks | | 120 HP, unarmed | Sets up a Spice Camp |
 
 **Buildings:** Construction Yard, Barracks, **Sietch** (1000: Fedaykin, Gliders, Thumpers, research; levels up to the **Great Sietch**, 1200: Mortars, Ambush), Bunker, the **Spice Camp** (from a crew) and the **Thumper** (planted by infantry).
 
-**Upgrades:** Great Sietch, Weapons +1, Armor +1, Ambush (units striking out of hiding deal +50% for 4 s; needs the Great Sietch), Stillsuits, Sandwalk, Spice Mining (camps +25%).
+**Upgrades:** Great Sietch, Weapons +1, Armor +1, Ambush (units striking out of hiding deal +75% for 4 s; needs Sietch III), Stillsuits, Sandwalk, Spice Mining (camps +25%). Fremen Weapons and Armor steps count one and a half standard steps (+30% / 22% each); numbers in docs/balance-fremen.md.
 
 **AI.** Plants Thumpers where a worm will catch the most enemy economy it knows of (harvesters seen in the last 20 s, camps), never near its own camps or structures on the sand; the planter waits by it to ride the worm, and keeps it. Every faction's AI: units on the sand near a worm (or a Thumper about to bring one) run for the nearest rock (packing up first if set up), and Fremen there dig in instead; units on rock near an enemy's ridden worm shoot its rider; harvesters working near a Thumper it can hear or see park at a refinery and go back once the worm is gone; up to three nearby units go after an enemy Thumper it sees. Fremen keep one Glider to scout with, and one Mortar per five combat units (up to five) as siege, like Corrino's Artillery.
 
@@ -340,6 +340,11 @@ What it took, in order:
 - Tried and dropped: earlier/cheaper Sietch III, cheaper Sandriders, 60 s rides, 300 HP / 5 s Thumpers. Each lifted Atreides far more than Corrino (to 75-83% vs Atreides at 45-54% vs Corrino).
 
 Open: worms are still rare (about one ride a game, 0.7-1.0); the Sandrider rarely decides a game. Corrino is a few points under 50%. Tools: `OPP=corrino npx tsx sim/fremen-trace.ts` (a Fremen game every 30 s), `sim/kill-tally.ts`, variants as above.
+
+**Mirror balance (2026-10-25, branch `fvf-balance`):** docs/balance-fremen.md. Fedaykin got a sonic cone, Mortars a
+wider splash, Warriors are weak against structures, Sandriders 280 HP with a 220 / 10 s rite and go for valuable
+infantry, Fremen upgrades cheaper and stronger, and two AI bugs that kept Fremen Warriors out of every wave are fixed.
+Fremen now beat Atreides 93% and Corrino 75% (Hard vs Hard): a cross-faction pass is next.
 
 Later, separately: hand-to-hand fighting for the other Fremen and for the Sardaukar.
 

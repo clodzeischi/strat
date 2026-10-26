@@ -19,7 +19,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     desc: 'Trains infantry. Each Barracks adds a production line.',
     // Corrino only (Atreides barracks don't level up).
     levels: [{
-      name: 'Imperial Barracks', short: 'Imperial Bks', cost: 1000, time: 40, requires: ['tleilaxu'],
+      name: 'Imperial Barracks', short: 'Imperial Bks', cost: 800, time: 40, requires: ['tleilaxu'],
       desc: 'Upgrades a Barracks. Unlocks Sardaukar and drop pods: new infantry land by pod at the rally point, anywhere you can see.',
     }],
   },
@@ -41,7 +41,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   fab: {
     name: 'Fab', short: 'Fab', cost: 1100, buildTime: 15, hp: 1200, size: 3, requires: ['refinery', 'barracks'],
     desc: 'Builds vehicles and aircraft. Each Fab adds a production line.',
-    levels: [{ name: 'Fab Level 2', short: 'Fab Lv 2', cost: 1200, time: 40, requires: ['tleilaxu'], desc: 'Upgrades a Fab. Unlocks Devastators.' }],
+    levels: [{ name: 'Fab Level 2', short: 'Fab Lv 2', cost: 1000, time: 40, requires: ['tleilaxu'], desc: 'Upgrades a Fab. Unlocks Devastators.' }],
   },
   tleilaxu: {
     name: 'Tleilaxu Research', short: 'Tleilaxu', cost: 1300, buildTime: 18, hp: 1000, size: 3, requires: ['fab'],

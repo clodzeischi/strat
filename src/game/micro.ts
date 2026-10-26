@@ -160,7 +160,7 @@ export class Micro {
   private shot(u: Unit, e: Entity): number {
     const g = this.game;
     const w = g.weaponFor(u, e)!;
-    return weaponDamage(w, e) * (1 + WEAPONS_BONUS * g.tier(u.team, 'weapons')) * (1 - ARMOR_BONUS * g.tier(e.team, 'armor'));
+    return weaponDamage(w, e) * (1 + WEAPONS_BONUS * g.bonus(u.team, 'weapons')) * (1 - ARMOR_BONUS * g.bonus(e.team, 'armor'));
   }
 
   private take(u: Unit, order: Order): void {

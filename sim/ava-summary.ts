@@ -21,12 +21,20 @@ for (const s of strats) {
   console.log(s.padEnd(26) + cells.map((c) => (c === null ? pad('.', 7) : pad(Math.round(c), 7))).join('') + pad(Math.round(vals.reduce((x, y) => x + y, 0) / Math.max(1, vals.length)), 7));
 }
 // Unit mix, and kill value / loss value per unit type, over all sides.
-const UT = ['infantry', 'trike', 'tank', 'rocket', 'repair', 'carryall', 'harvester'];
+const UT = [...new Set(rows.flatMap((r) => r.built.flatMap((b: Record<string, number>) => Object.keys(b))))];
 console.log('\nUnits built per game, by strategy');
 console.log(''.padEnd(10) + UT.map((u) => pad(u.slice(0, 7), 9)).join('') + '   avg min');
 for (const s of strats) {
   const v = views.filter(([m]) => m === s);
   console.log(s.padEnd(10) + UT.map((u) => pad((v.reduce((x, [, , , i, r]) => x + (r.built[i][u] ?? 0), 0) / v.length).toFixed(1), 9)).join('') + pad((v.reduce((x, [, , , , r]) => x + r.time, 0) / v.length / 60).toFixed(1), 10));
+}
+if (rows.some((r) => r.worms)) {
+  console.log('\nSandworms per game, by strategy: called, enemy value eaten, own value eaten');
+  for (const s of strats) {
+    const v = views.filter(([m]) => m === s);
+    const sum = (k: string) => v.reduce((x, [, , , i, r]) => x + (r.worms?.[i]?.[k] ?? 0), 0) / v.length;
+    console.log(s.padEnd(10) + pad(sum('n').toFixed(2), 7) + pad(Math.round(sum('enemy')), 8) + pad(Math.round(sum('own')), 8));
+  }
 }
 console.log('\nKilled / lost (credits per game), by unit type, all games');
 const kill: Record<string, number> = {}, lost: Record<string, number> = {};
@@ -38,7 +46,7 @@ for (const u of [...new Set([...Object.keys(kill), ...Object.keys(lost)])].sort(
   console.log(`  ${u.padEnd(10)} killed ${pad(Math.round((kill[u] ?? 0) / games), 6)}  lost ${pad(Math.round((lost[u] ?? 0) / games), 6)}  ratio ${((kill[u] ?? 0) / Math.max(1, lost[u] ?? 0)).toFixed(2)}`);
 }
 console.log('\nTech: share of sides that got it, and avg time (s)');
-const T = ['conyard2', 'factory2', 'rockets', 'nitro', 'weapons1', 'armor1', 'weapons2', 'armor2', 'harvest'];
+const T = [...new Set(rows.flatMap((r) => r.tech.flatMap((t: Record<string, number>) => Object.keys(t))))];
 console.log(''.padEnd(10) + T.map((t) => pad(t.slice(0, 8), 12)).join(''));
 for (const s of strats) {
   const v = views.filter(([m]) => m === s);
@@ -56,13 +64,13 @@ const payoff = (t: string) => {
   }
   return n ? `${Math.round((100 * w) / n)}% of ${n}` : '-';
 };
-console.log(`\nWin% when a side got it a minute+ before the other (or alone): factory2 ${payoff('factory2')}, conyard2 ${payoff('conyard2')}, weapons2 ${payoff('weapons2')}, rockets ${payoff('rockets')}, nitro ${payoff('nitro')}`);
+console.log(`\nWin% when a side got it a minute+ before the other (or alone): ${T.map((t) => `${t} ${payoff(t)}`).join(', ')}`);
 
 // Who kills whom (credits per game), all games.
 const KV: Record<string, number> = {};
 for (const r of rows) for (const [k, v] of Object.entries(r.kv ?? {})) KV[k] = (KV[k] ?? 0) + (v as number);
 if (Object.keys(KV).length) {
-  const V = ['infantry', 'trike', 'tank', 'rocket', 'repair', 'harvester', 'carryall'];
+  const V = [...new Set(Object.keys(KV).map((x) => x.split('>')[1]))];
   console.log('\nKiller (row) x victim (column), credits per game');
   console.log(''.padEnd(10) + V.map((v) => pad(v.slice(0, 7), 9)).join(''));
   for (const k of [...new Set(Object.keys(KV).map((x) => x.split('>')[0]))]) console.log(k.padEnd(10) + V.map((v) => pad(Math.round((KV[`${k}>${v}`] ?? 0) / games), 9)).join(''));

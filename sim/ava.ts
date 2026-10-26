@@ -1,11 +1,12 @@
-// Atreides mirror: one build order (sim/ava-strats.ts) against another, each random map played from both sides.
+// A faction mirror (FACTION=corrino; Atreides by default): one build order (sim/ava-strats.ts) against another, each
+// random map played from both sides.
 // One JSON line per game: result, length, what each side built and researched (and when), and who killed what
 // (credits, by killer type). Usage: npx tsx sim/ava.ts <strat> <oppStrat> <games> [offset]
 // SEEDS=<first map seed> (default 1000); SIZE=96 for medium maps. In parallel, with a summary: sim/ava.sh
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
 import { Building, Unit } from '../src/entities';
-import type { MapSize, Team, UnitType } from '../src/config';
+import { LEVEL_UP_ORDER, type Faction, type MapSize, type Team, type UnitType } from '../src/config';
 import './tune';
 import { makeStrat } from './ava-strats';
 
@@ -14,12 +15,13 @@ const games = Number(gamesArg ?? 10);
 const offset = Number(offsetArg ?? 0);
 const first = Number(process.env.SEEDS ?? 1000);
 const MAX_TIME = 30 * 60;
+const FACTION = (process.env.FACTION ?? 'atreides') as Faction;
 
 for (let k = 0; k < games; k++) {
   const n = k + offset;
   const side = (n % 2) as Team; // a's team
   const seed = first + Math.floor(n / 2);
-  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed, ['atreides', 'atreides']);
+  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed, [FACTION, FACTION]);
   g.onSurrenderOffer = (t) => g.acceptSurrender(t);
   const ais = ([0, 1] as Team[]).map((t) => makeStrat(g, t, t === side ? a : b));
   const built: Partial<Record<UnitType, number>>[] = [{}, {}];
@@ -60,14 +62,21 @@ for (let k = 0; k < games; k++) {
     }
     for (const t of [0, 1] as Team[]) {
       for (const up of g.teams[t].upgrades) if (tech[t][up] === undefined) tech[t][up] = Math.round(g.time);
-      for (const l of ['conyard', 'factory'] as const) if (g.techLevel(t, l) >= 2 && tech[t][l + '2'] === undefined) tech[t][l + '2'] = Math.round(g.time);
+      for (const l of LEVEL_UP_ORDER) for (const n of [2, 3]) if (g.techLevel(t, l) >= n && tech[t][l + n] === undefined) tech[t][l + n] = Math.round(g.time);
+      for (const b of g.buildings) if (b.team === t && ['tleilaxu', 'pad', 'hitech'].includes(b.type) && tech[t][b.type] === undefined) tech[t][b.type] = Math.round(g.time);
     }
   }
   const o = (1 - side) as Team;
+  // Sandworms each side called (ridden ones still up included), and the value of what they ate: the enemy's, and its own.
+  const allWorms = [...g.wormLog, ...g.worms, ...g.ridden.map((w) => ({ team: w.team, eatenEnemy: w.eatenEnemy, eatenOwn: 0 }))];
+  const worms = [side, o].map((t) => {
+    const ws = allWorms.filter((w) => w.team === t);
+    return { n: ws.length, enemy: ws.reduce((a, w) => a + w.eatenEnemy, 0), own: ws.reduce((a, w) => a + w.eatenOwn, 0) };
+  });
   console.log(JSON.stringify({
     a, b, seed, side, result: g.winner === null ? 'timeout' : g.winner === side ? 'win' : 'loss', time: Math.round(g.time),
     spice: [Math.round(g.teams[side].stats.spiceHarvested), Math.round(g.teams[o].stats.spiceHarvested)],
     built: [built[side], built[o]], kills: [kills[side], kills[o]], deaths: [deaths[side], deaths[o]], tech: [tech[side], tech[o]], kv,
-    stats: [(ais[side] as any).stats, (ais[o] as any).stats], air: [air[side], air[o]], hdeaths: [hdeaths[side], hdeaths[o]],
+    stats: [(ais[side] as any).stats, (ais[o] as any).stats], air: [air[side], air[o]], hdeaths: [hdeaths[side], hdeaths[o]], worms,
   }));
 }

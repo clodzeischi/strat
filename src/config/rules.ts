@@ -56,7 +56,7 @@ export const HIDE = { delay: 3, detect: 2 * 2 };
 /** Fremen infantry speed on sand and spice: the bonus, and the Sandwalk upgrade's on top. */
 export const SAND_SPEED = { base: 0.2, sandwalk: 0.25 };
 /** Ambush: units that strike out of hiding deal this much more damage for `time` seconds. */
-export const AMBUSH = { bonus: 0.5, time: 4 };
+export const AMBUSH = { bonus: 0.75, time: 4 };
 /**
  * Fremen healing: a share of health per second once unhurt for `delay` s (Stillsuits: x`stillsuit`, after `quick` s).
  * Units dug into the sand heal x`buried`; near a High Perch, units and structures heal faster too (BuildingDef.heals).

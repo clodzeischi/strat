@@ -1,9 +1,10 @@
-// Atreides build orders for the mirror balance pass (docs/balance-atreides.md): each is Brutal (micro, mending,
-// Carryall operations) playing a fixed plan instead of picking counters, so a round robin between them shows whether
-// one plan beats everything. 'std' is stock Brutal, which counters what it sees.
+// Build orders for the mirror balance passes (docs/balance-atreides.md, docs/balance-corrino.md): each is Brutal
+// (micro, mending, Carryall operations) playing a fixed plan instead of picking counters, so a round robin between them
+// shows whether one plan beats everything. 'std' is stock Brutal, which counters what it sees. A team plays its own
+// faction's plans (FACTION_STRATS).
 import { BRUTAL_OPTIONS, BRUTAL_PROFILE, BrutalAI, type BrutalOptions } from '../src/game/brutal';
-import { AI, HARD_PROFILE, power, type AIProfile } from '../src/game/ai';
-import { TILE, type Team, type UnitType } from '../src/config';
+import { AI, HARD_PROFILE, KITS, power, type AIProfile } from '../src/game/ai';
+import { TILE, type Faction, type Team, type UnitType } from '../src/config';
 import type { Unit } from '../src/entities';
 import { hypot } from '../src/game/hypot';
 import type { Game } from '../src/game/game';
@@ -129,6 +130,116 @@ export const STRATS: Record<string, Strat> = {
   },
 };
 
+const cmix = (m: Partial<Record<UnitType, number>>) => ({ ...BRUTAL_PROFILE.mix, trooper: 0.1, sardaukar: 0.1, razor: 0.1, devastator: 0.1, raider: 0.1, artillery: 0.1, ...m });
+const C_ALL = ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] as const;
+
+/** Corrino build orders (docs/balance-corrino.md). */
+export const CORRINO_STRATS: Record<string, Strat> = {
+  std: { profile: BRUTAL_PROFILE },
+  // Two Barracks first, troopers with some razors, early pressure, no tech.
+  rush: {
+    profile: plan({ opening: ['barracks', 'barracks', 'refinery', 'factory'], harvesters: 3, extraRefinery: 'never', techArmy: 40, mix: cmix({ trooper: 3, razor: 1 }), initiative: 1 }),
+    firstWave: 100,
+  },
+  // Razors everywhere: Flame Range first, big raids on the economy, no tech buildings.
+  razor: {
+    profile: plan({ techArmy: 40, mix: cmix({ razor: 3, trooper: 0.6 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { levels: [], research: ['flame', 'cWeapons', 'cArmor', 'cHarvest'] } }),
+  },
+  // Imperial Barracks first: Sardaukar with troopers.
+  sard: { profile: plan({ techArmy: 3, mix: cmix({ sardaukar: 3, trooper: 1, razor: 0.3 }), kit: { levels: ['barracks', 'fab'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] } }) },
+  // Fab Level 2 first: Devastators with troopers.
+  dev: { profile: plan({ techArmy: 3, mix: cmix({ devastator: 3, trooper: 1.2, razor: 0.4 }), kit: { levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'] } }) },
+  // Tleilaxu early for Sky Raiders: air and troopers.
+  air: { profile: plan({ techArmy: 3, mix: cmix({ raider: 3, trooper: 1, razor: 0.3 }), kit: { levels: [], research: ['cWeapons', 'cShields', 'cArmor', 'cHarvest', 'flame'] } }) },
+  // Turrets, everything researched, no attacks before 14:00, then Devastators, Soulcrushers and Sardaukar.
+  turtle: {
+    profile: plan({ bunkers: 4, techArmy: 4, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
+    opts: { flank: false }, firstWave: 840,
+  },
+};
+
+/** Variants for single tests, not in the round robin. */
+export const CORRINO_EXTRA: Record<string, Strat> = {
+  // An early razor rush off two Fabs, troopers alongside, no tech.
+  razorrush: {
+    profile: plan({ opening: ['refinery', 'barracks', 'factory', 'factory'], harvesters: 3, extraRefinery: 'never', techArmy: 40, mix: cmix({ razor: 3, trooper: 1 }), initiative: 1 }),
+    firstWave: 150,
+  },
+  // Stock Brutal that never attacks below its full wave gate, however long it's waited.
+  stdp: { profile: { ...BRUTAL_PROFILE, patience: 1 } },
+  // Stock Brutal that only attacks clearly stronger (1.3x what it knows of the enemy, and no initiative attacks), and not
+  // before 8:00.
+  stdlate: { profile: { ...BRUTAL_PROFILE, waveGate: 1.3, patience: 1, initiative: 0 }, firstWave: 480 },
+  // Stock Brutal with a heavier Soulcrusher share in its picks.
+  stdart: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, artillery: 1.5 } } },
+  // Stock Brutal's army and counter-picking, waiting like the turtle until 14:00 (no raids, no flanks).
+  stdpassive: { profile: { ...BRUTAL_PROFILE, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity } }, opts: { flank: false }, firstWave: 840 },
+  // The turtle's army (Devastators, Soulcrushers, Sardaukar, troopers, everything researched) attacking as usual.
+  mixed: { profile: plan({ techArmy: 4, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }) },
+  // The turtle's waiting without its turrets.
+  passive: {
+    profile: plan({ techArmy: 4, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
+    opts: { flank: false }, firstWave: 840,
+  },
+  // The turtle without Soulcrushers (and none from the siege rule).
+  turtlenoart: {
+    profile: plan({ bunkers: 4, techArmy: 4, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 0, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
+    opts: { flank: false }, firstWave: 840,
+  },
+};
+
+const fmix = (m: Partial<Record<UnitType, number>>) => ({ ...BRUTAL_PROFILE.mix, warrior: 0.1, fedaykin: 0.1, ...m });
+const F_ALL = ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2'] as const;
+
+/** Fremen build orders (docs/balance-fremen.md). */
+export const FREMEN_STRATS: Record<string, Strat> = {
+  std: { profile: BRUTAL_PROFILE },
+  // Three Barracks, Warriors only, early pressure, no tech.
+  rush: {
+    profile: plan({ opening: ['barracks', 'barracks', 'barracks'], harvesters: 2, techArmy: 40, mix: fmix({ warrior: 3, fedaykin: 0 }), initiative: 1, kit: { levels: [], research: [], siege: null, rider: undefined } }),
+    firstWave: 100,
+  },
+  // Warriors only, but upgraded: Sandwalk, Great Sietch for Weapons, Armor and Stillsuits, then Sietch III for +2; no rites.
+  swarm: {
+    profile: plan({ techArmy: 8, mix: fmix({ warrior: 3, fedaykin: 0 }), raids: { trikes: 6, start: 110, interval: 30, hunt: true }, kit: { siege: null, rider: undefined, research: ['sandwalk', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'fWeapons2', 'fArmor2', 'ambush'], topLevelArmy: 1.5 } }),
+  },
+  // Great Sietch first: Fedaykin with Warriors.
+  fed: { profile: plan({ techArmy: 8, mix: fmix({ fedaykin: 3, warrior: 1 }), kit: { research: ['fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'], siege: { unit: 'mortar', per: 10, max: 2 }, rider: undefined } }) },
+  // Great Sietch first: a Mortar line behind a Warrior screen.
+  mortar: { profile: plan({ techArmy: 8, mix: fmix({ warrior: 2, fedaykin: 0.3 }), kit: { research: ['fWeapons', 'fArmor', 'fHarvest', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'], siege: { unit: 'mortar', per: 2, max: 14 }, rider: undefined } }) },
+  // Sandriders and their worms (up to eight), Ambush first at Sietch III, Fedaykin on the way.
+  rider: { profile: plan({ techArmy: 8, mix: fmix({ fedaykin: 2, warrior: 1 }), kit: { research: ['ambush', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2'], rider: { unit: 'sandrider', max: 8 }, siege: { unit: 'mortar', per: 10, max: 2 } } }) },
+  // Economy and mass: Spice Mining and Sandwalk, no Great Sietch, every other credit into Warriors.
+  mass: { profile: plan({ techArmy: 8, mix: fmix({ warrior: 3, fedaykin: 0 }), kit: { levels: [], research: ['fHarvest', 'sandwalk'], siege: null, rider: undefined } }) },
+  // Bunkers, everything researched, no attacks before 14:00, then a mixed army.
+  turtle: {
+    profile: plan({ bunkers: 4, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: fmix({ fedaykin: 2, warrior: 1 }), kit: { research: [...F_ALL], siege: { unit: 'mortar', per: 3, max: 8 }, rider: { unit: 'sandrider', max: 3 } } }),
+    opts: { flank: false }, firstWave: 840,
+  },
+};
+
+/** Fremen variants for single tests, not in the round robin. */
+export const FREMEN_EXTRA: Record<string, Strat> = {
+  // The Fedaykin plan teching after 8 units (now every plan's setting; it used to be 3), with Spice Mining first, with
+  // counter-picking, with up to four Sandriders, with Ambush first.
+  fed8: { profile: { ...FREMEN_STRATS.fed.profile, techArmy: 8 } },
+  fedh: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['fHarvest', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'] } } },
+  fed8h: { profile: { ...FREMEN_STRATS.fed.profile, techArmy: 8, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['fHarvest', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2', 'ambush'] } } },
+  fedcf: { profile: { ...FREMEN_STRATS.fed.profile, counterFocus: 8 } },
+  fedr: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, rider: { unit: 'sandrider', max: 4 } } } },
+  fedamb: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['ambush', 'fWeapons', 'fArmor', 'stillsuit', 'fHarvest', 'sandwalk', 'fWeapons2', 'fArmor2'] } } },
+  // The rider plan rushing Sietch III (with an army of 8, not 16): worse in every matchup (docs/balance-fremen.md).
+  riderrush: { profile: { ...FREMEN_STRATS.rider.profile, kit: { ...FREMEN_STRATS.rider.profile.kit, topLevelArmy: 1 } } },
+  // Stock Brutal with no combat research: only Spice Mining and Sandwalk (what the combat upgrades are worth together).
+  stdeco: { profile: { ...BRUTAL_PROFILE, kit: { research: ['fHarvest', 'sandwalk'] } } },
+  // ... and with no research at all.
+  stdbare: { profile: { ...BRUTAL_PROFILE, kit: { research: [] } } },
+  // Stock Brutal with Spice Mining last.
+  stdnoh: { profile: { ...BRUTAL_PROFILE, kit: { research: ['fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2', 'fHarvest'] } } },
+};
+
+export const FACTION_STRATS: Partial<Record<Faction, Record<string, Strat>>> = { atreides: STRATS, corrino: CORRINO_STRATS, fremen: FREMEN_STRATS };
+
 /** Not in the round robin: stock Brutal without its micro (kiting, focus fire), to see what control is worth. */
 export const EXTRA: Record<string, Strat> = {
   nomicro: { profile: BRUTAL_PROFILE, opts: { micro: false } },
@@ -153,8 +264,20 @@ export const EXTRA: Record<string, Strat> = {
 
 export function makeStrat(g: Game, team: Team, name: string): AI {
   if (name === 'hard') return new AI(g, team, HARD_PROFILE);
-  const s = STRATS[name] ?? EXTRA[name];
+  // '<plan>-no-<upgrade>': the plan without that research, to see what the upgrade is worth.
+  const without = name.match(/^(\w+)-no-(\w+)$/);
+  if (without) {
+    const base = FACTION_STRATS[g.teams[team].faction]![without[1]];
+    const p = base.profile;
+    const research = (p.kit?.research ?? KITS[g.teams[team].faction].research).filter((u) => u !== without[2]);
+    return makeStratFrom(g, team, { ...base, profile: { ...p, kit: { ...p.kit, research } } });
+  }
+  const s = FACTION_STRATS[g.teams[team].faction]?.[name] ?? EXTRA[name] ?? CORRINO_EXTRA[name] ?? FREMEN_EXTRA[name];
   if (!s) throw new Error(`no strategy ${name}`);
+  return makeStratFrom(g, team, s);
+}
+
+function makeStratFrom(g: Game, team: Team, s: Strat): AI {
   const opts = { ...BRUTAL_OPTIONS, ...s.opts };
   const ai = s.squad ? new SquadAI(g, team, s.profile, opts, s.squad) : new BrutalAI(g, team, s.profile, opts);
   if (s.firstWave !== undefined) (ai as unknown as { nextWaveTime: number }).nextWaveTime = s.firstWave;

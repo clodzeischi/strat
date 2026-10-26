@@ -46,7 +46,7 @@ export interface WeaponDef {
   air?: boolean;
   /** Shells aimed at the ground where the target stood when fired; anything that moves out of the blast is safe. */
   unguided?: boolean;
-  /** Flamethrower: hits every enemy within range inside this half-angle (radians) around the aim. */
+  /** Flamethrower or weirding module: hits every enemy within range inside this half-angle (radians) around the aim. */
   cone?: number;
   /** Shields take this many times the damage (slow projectiles, like a maula pistol's darts, get through them). */
   shieldBreak?: number;
@@ -159,5 +159,7 @@ export interface UpgradeDef {
   after?: UpgradeType; // previous tier that must be researched first
   /** The level it adds to (weapons, armor, shields, harvesting). */
   line?: UpgradeLine;
+  /** How many standard steps of its line it adds (WEAPONS_BONUS, ARMOR_BONUS...): 1 unless set. */
+  scale?: number;
   desc: string;
 }

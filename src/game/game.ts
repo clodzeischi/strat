@@ -383,6 +383,13 @@ export class Game {
     return n;
   }
 
+  /** Strength of an upgrade line in standard steps: the tier, with each upgrade's `scale` (Fremen steps count for more). */
+  bonus(team: Team, line: UpgradeLine): number {
+    let n = 0;
+    for (const t of this.teams[team].upgrades) if (UPGRADES[t].line === line) n += UPGRADES[t].scale ?? 1;
+    return n;
+  }
+
   /** Seconds between shots for this weapon, after upgrades. */
   cooldownFor(u: Shooter, w: WeaponDef): number {
     return w.cooldown * (u instanceof Unit && u.type === 'trike' && this.teams[u.team].upgrades.has('nitro') ? NITRO.cooldown : 1);
@@ -408,6 +415,8 @@ export class Game {
         score -= ratio * 4;
         if (d < w.minRange) score += 30;
       }
+      // A charging zealot (the Sandrider) goes for the most valuable of the infantry about, past the cheap ones in front.
+      if (seeker instanceof Unit && seeker.def.charge && e instanceof Unit) score -= Math.min(e.def.cost / 50, 10);
       if (score < bestScore) {
         bestScore = score;
         best = e;
@@ -994,7 +1003,7 @@ export class Game {
 
   /** `secondary`: shot by a unit's second gun, which starts from its own muzzle if the model has one. */
   fire(u: Shooter, target: Entity, w: WeaponDef, secondary = false): void {
-    let mult = 1 + WEAPONS_BONUS * this.tier(u.team, 'weapons');
+    let mult = 1 + WEAPONS_BONUS * this.bonus(u.team, 'weapons');
     if (u instanceof Unit && u.def.hides) {
       // Striking out of hiding: Ambush adds damage for a few seconds; either way the shooter comes out of the sand.
       if (u.hidden && this.teams[u.team].upgrades.has('ambush')) u.ambushUntil = this.time + AMBUSH.time;
@@ -1034,7 +1043,7 @@ export class Game {
     });
   }
 
-  /** Flamethrower: burns every enemy within reach inside the cone around the aim (the target always). */
+  /** Flamethrower (or weirding module): hits every enemy within reach inside the cone around the aim (the target always). */
   private flame(u: Shooter, target: Entity, w: WeaponDef, mult: number, from: THREE.Vector3): void {
     const aim = dm.atan2(target.z - u.z, target.x - u.x);
     const reach = this.rangeFor(u, w, target) + 0.3;
@@ -1047,15 +1056,17 @@ export class Game {
     for (const e of this.units) burn(e);
     for (const e of this.buildings) burn(e);
     this.damage(target, w, mult, u);
-    // Drawn as a gout of fire toward the target (visual only, so Math.random is fine).
+    // Drawn as a gout of fire toward the target, or for a weirding module (which pierces) a pale ripple of sound kicking
+    // up sand (visual only, so Math.random is fine).
     const to = target.aimPoint();
     for (let k = 1; k <= 4; k++) {
       const p = from.clone().lerp(to, k / 4);
       p.x += (Math.random() - 0.5) * 0.5 * k;
       p.z += (Math.random() - 0.5) * 0.5 * k;
-      this.effects.puff(p, k < 3 ? 0xffd060 : 0xff6a20);
+      if (w.pierce) this.effects.trail(p, k < 3 ? 0xe8f0ff : 0xd8c49a, 0.5 + k * 0.25);
+      else this.effects.puff(p, k < 3 ? 0xffd060 : 0xff6a20);
     }
-    this.effects.flash(from, 0.3);
+    if (!w.pierce) this.effects.flash(from, 0.3);
   }
 
   private updateProjectiles(dt: number): void {
@@ -1117,12 +1128,12 @@ export class Game {
     let dmg = weaponDamage(w, target) * mult;
     if (target.shields > 0 && !w.pierce) {
       // Shields take the hit first (less with Shields upgrades); whatever gets through goes on to health.
-      const onShields = dmg * (w.shieldBreak ?? 1) * (1 - SHIELDS_BONUS * this.tier(target.team, 'shields'));
+      const onShields = dmg * (w.shieldBreak ?? 1) * (1 - SHIELDS_BONUS * this.bonus(target.team, 'shields'));
       const absorbed = Math.min(target.shields, onShields);
       target.shields -= absorbed;
       dmg *= 1 - absorbed / onShields;
     }
-    dmg *= 1 - ARMOR_BONUS * this.tier(target.team, 'armor');
+    dmg *= 1 - ARMOR_BONUS * this.bonus(target.team, 'armor');
     target.hp -= dmg;
     if (target instanceof Unit) {
       target.onDamaged(attacker);
