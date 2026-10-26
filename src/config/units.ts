@@ -39,7 +39,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     weapon: { range: 15, minRange: 6, damage: 44, bonus: { structure: 30 }, airDamage: 60, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 3, air: true, unguided: true, sound: 'launch_large' },
     lockOn: { duration: 8, cooldown: 20 },
     lift: 6,
-    desc: 'Long-range rocket artillery. Devastating vs infantry and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Lightly armored and can\'t fire up close: trikes that get in tear it apart.',
+    desc: 'Long-range rocket artillery with a wide blast. Devastating vs massed troops and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Lightly armored and can\'t fire up close: trikes that get in tear it apart.',
   },
   repair: {
     name: 'Repair Vehicle', producer: 'factory', cost: 450, buildTime: 8, hp: 300, armor: 1, speed: 4.2, turnRate: 3.5, radius: 0.9, sight: 10,
@@ -107,7 +107,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     name: 'Fremen Warrior', producer: 'barracks', cost: 80, buildTime: 3.5, hp: 70, speed: 3, turnRate: 12, radius: 0.45, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
     weapon: { range: 4.5, minRange: 0, damage: 7, bonus: { biological: 3 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
-    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. The pistol\'s slow spring-fired darts get through shields (x3 against them). Strong vs infantry, can shoot at aircraft. Weak vs vehicles, flamers and structures. Goes through rites to become a Fedaykin or a Fremen Mortar.',
+    desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles, flamers and structures. Goes through rites to become a Fedaykin or a Fremen Mortar.',
   },
   fedaykin: {
     name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 230, armor: 1, speed: 3, turnRate: 12, radius: 0.5, sight: 11,
