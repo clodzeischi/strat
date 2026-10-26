@@ -22,21 +22,21 @@ export const UNITS: Record<UnitType, UnitDef> = {
   trike: {
     name: 'Trike', producer: 'factory', cost: 130, buildTime: 4.5, hp: 140, armor: 1, speed: 7.5, turnRate: 6, radius: 0.8, sight: 12,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['factory'],
-    weapon: { range: 7, minRange: 0, damage: 5, bonus: { light: 2 }, cooldown: 0.3, projectile: 'bullet', speed: 0, splash: 0, sound: 'heavy_mg' },
+    weapon: { range: 7, minRange: 0, damage: 4, bonus: { light: 3 }, cooldown: 0.3, projectile: 'bullet', speed: 0, splash: 0, sound: 'heavy_mg' },
     lift: 3,
     desc: 'Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing harvesters. With Trike Nitro, faster still and firing faster.',
   },
   tank: {
-    name: 'Tank', producer: 'factory', cost: 500, buildTime: 9, hp: 450, armor: 2, speed: 3.8, turnRate: 2.5, radius: 1.1, sight: 13,
+    name: 'Tank', producer: 'factory', cost: 500, buildTime: 9, hp: 500, armor: 2, speed: 3.8, turnRate: 2.5, radius: 1.1, sight: 13,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory'],
-    weapon: { range: 9, minRange: 0, damage: 20, bonus: { mechanical: 20 }, cooldown: 1.4, projectile: 'shell', speed: 32, splash: 0, sound: 'single_shot' },
+    weapon: { range: 9, minRange: 0, damage: 22, bonus: { mechanical: 22 }, cooldown: 1.4, projectile: 'shell', speed: 32, splash: 0, sound: 'single_shot' },
     lift: 6,
     desc: 'Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.',
   },
   rocket: {
     name: 'MLRS', producer: 'factory', cost: 600, buildTime: 13, hp: 180, armor: 1, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
     turret: true, infantry: false, tags: ['mechanical', 'light'], requires: ['factory2'],
-    weapon: { range: 15, minRange: 6, damage: 38, bonus: { structure: 30 }, airDamage: 60, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 3, air: true, unguided: true, sound: 'launch_large' },
+    weapon: { range: 15, minRange: 6, damage: 44, bonus: { structure: 30 }, airDamage: 60, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 3, air: true, unguided: true, sound: 'launch_large' },
     lockOn: { duration: 8, cooldown: 20 },
     lift: 6,
     desc: 'Long-range rocket artillery. Devastating vs infantry and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Lightly armored and can\'t fire up close: trikes that get in tear it apart.',
@@ -67,9 +67,9 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: "The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and MLRS.",
   },
   razor: {
-    name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 200, shields: 100, armor: 1, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
+    name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 170, shields: 100, armor: 1, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['fab'],
-    weapon: { range: 4, minRange: 0, damage: 14, bonus: { biological: 10 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, cone: 0.35 },
+    weapon: { range: 4, minRange: 0, damage: 12, bonus: { biological: 10 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, cone: 0.35 },
     desc: 'Dune buggy with a flamethrower that burns everything in front of it. Shreds infantry. Weak vs tanks.',
   },
   devastator: {

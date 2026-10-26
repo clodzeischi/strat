@@ -401,5 +401,21 @@ Raiding units (Trike, Razor, Sky Raider), hiding (Warriors) and worms (Sandrider
 - **Warriors hit structures for 4 (was 1.5),** so the rush razes bases.
 - **Lever:** toughness and cost (rule 4) and structure armor now have to do what steep bonuses did.
 
-**Next step:** targeted pair tests (TUNE) on the three dominant plans: structure armor 5, trike cost / health /
-cooldown and a harder-hitting Tank, Razor damage and health; then Corrino's upgrades.
+**Targeted tests after 3.1** (30 games per pair; `rules.STRUCTURE.armor` is TUNE-able now):
+- **Fremen rush** vs std / fed / mortar: structure armor 3 → 88 / 88 / 88, **5 → 43 / 42 / 43**, 6 → 23.
+- **Trikes beat everything in duels** with micro: tanks +0.29, infantry +0.56, MLRS +0.56 (old matrix: −0.51 vs
+  tanks).
+  - Trike 4 (+3 light) with Tank 24 (+24 mechanical), 520 HP: trike vs tank −0.39, though tank vs MLRS rises to
+    +0.45.
+  - In games, trike 4 (+3) with Tank 22 (+22), 500 HP: trike plan vs mech 37, vs std 70.
+  - The tech plan collapsed with the MLRS at 38 (vs std 3–10%).
+- **TUNE tests don't move stock Brutal's counter-picking** (it reads the generated table in src/game/matchups.ts),
+  so std results under TUNE are biased: write values in and regenerate before judging std.
+- **Razor:** duels already have it losing to the Devastator (−0.55). Its plan wins on raids and on structures
+  (11 a hit, was 2). With Razor 12 (+10 bio) and 170 health: vs Devastator −0.67, vs Trooper −0.03.
+
+**Round 3.2 (written in):** structure armor 5; trike 4 (+3 light); Tank 22 (+22 mechanical), 500 health; MLRS 44;
+Razor 12 (+10 biological), 170 health. Counter table regenerated.
+
+**Next step:** the full batch on round 3.2 (scratchpad `batch.sh`: mirrors 30 per pair, cross-faction Hard 60,
+upgrade tests), then Corrino's upgrades (combat research worthless at 75%).

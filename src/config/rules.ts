@@ -25,8 +25,8 @@ export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 
  * target's armor plus one per Armor level. Never less than MIN_HIT.
  */
 export const MIN_HIT = 0.5;
-/** Armor of a structure that doesn't set its own. */
-export const STRUCTURE_ARMOR = 3;
+/** Structures that don't set their own: armor. */
+export const STRUCTURE = { armor: 5 };
 /** Razor Flame Range upgrade: extra reach, in world units. */
 export const FLAME_RANGE = 2;
 export const NITRO = { speed: 1.5, cooldown: 1 / 1.5 };

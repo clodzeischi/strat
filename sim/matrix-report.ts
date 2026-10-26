@@ -5,7 +5,7 @@
 // how much of a roster is "crippled" (below FLOOR of its own best) against the other faction's units on average.
 // Usage: npx tsx sim/matrix-report.ts [floor=0.4]      (TUNE as usual; RAW=1 prints per-hit damage instead of DPS)
 import './tune';
-import { BUILDINGS, FACTIONS, MIN_HIT, STRUCTURE_ARMOR, unitDef, shieldsFor, type Faction, type UnitType } from '../src/config';
+import { BUILDINGS, FACTIONS, MIN_HIT, STRUCTURE, unitDef, shieldsFor, type Faction, type UnitType } from '../src/config';
 import type { UnitDef, WeaponDef, Tag } from '../src/config/types';
 
 const FLOOR = Number(process.argv[2] ?? 0.4);
@@ -23,7 +23,7 @@ const target = (f: Faction, t: UnitType, name: string = t): Target => {
 const TARGETS: Target[] = [
   ...(Object.keys(ROSTER) as Faction[]).flatMap((f) => ROSTER[f].map((t) => target(f, t))),
   target('atreides', 'harvester', 'harv(A)'), target('corrino', 'harvester', 'harv(C)'),
-  { name: 'refinery', faction: 'atreides', tags: ['structure'], hp: BUILDINGS.refinery.hp, shields: 0, armor: BUILDINGS.refinery.armor ?? STRUCTURE_ARMOR, air: false, cost: BUILDINGS.refinery.cost },
+  { name: 'refinery', faction: 'atreides', tags: ['structure'], hp: BUILDINGS.refinery.hp, shields: 0, armor: BUILDINGS.refinery.armor ?? STRUCTURE.armor, air: false, cost: BUILDINGS.refinery.cost },
 ];
 
 /** One hit before armor (the game's weaponDamage). */
