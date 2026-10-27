@@ -74,7 +74,7 @@ Cost in credits; speed and sight in tiles (per second for speed). Shields absorb
 |---|---|---|---|---|---|---|---|---|---|---|
 | Infantry | 80 | 4.5 s | Barracks | Barracks | 120 | – | 0 | 1.2 | 5 | biological, light |
 | Trike | 110 | 4.5 s | Factory | Factory | 200 | – | 1 | 3.75 | 6 | mechanical, light |
-| Tank | 425 | 9 s | Factory | Factory | 725 | – | 2 | 1.9 | 6.5 | mechanical, armored |
+| Tank | 425 | 9 s | Factory | Factory | 725 | – | 3 | 1.9 | 6.5 | mechanical, armored |
 | MLRS | 510 | 13 s | Factory | Factory Level 2 | 265 | – | 1 | 1.7 | 9 | mechanical, light |
 | Harvester | 800 | 10 s | Factory | Factory, Refinery | 600 | – | 2 | 1.5 | 4 | mechanical, armored |
 | Repair Vehicle | 450 | 8 s | Factory | Factory | 300 | – | 1 | 2.1 | 5 | mechanical, light |
