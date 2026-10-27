@@ -66,10 +66,17 @@ export function renderModelIcons(faction: Faction, team: Team): void {
     }
   }
   if (!shots.length) return;
+  setModelIcons(renderShots(shots, SIZE));
+}
 
+/**
+ * Renders each shot's object on a transparent square of `size` px, framed from the icon angle, as PNG data URLs. Also
+ * makes the manual's portraits (sim/manual.ts).
+ */
+export function renderShots<K>(shots: { key: K; make: () => THREE.Object3D; azimuth?: number }[], size: number): Map<K, string> {
   // A throwaway renderer, so the game's own keeps its state; same lights and color handling as the game.
   const canvas = document.createElement('canvas');
-  canvas.width = canvas.height = SIZE;
+  canvas.width = canvas.height = size;
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
   renderer.setClearColor(0x000000, 0);
   const scene = new THREE.Scene();
@@ -78,7 +85,7 @@ export function renderModelIcons(faction: Faction, team: Team): void {
   sun.position.copy(TO_SUN);
   scene.add(sun);
   const camera = new THREE.OrthographicCamera();
-  const urls = new Map<IconKey, string>();
+  const urls = new Map<K, string>();
   for (const s of shots) {
     const obj = s.make();
     scene.add(obj);
@@ -89,7 +96,7 @@ export function renderModelIcons(faction: Faction, team: Team): void {
   }
   renderer.dispose();
   renderer.forceContextLoss();
-  setModelIcons(urls);
+  return urls;
 }
 
 const v = new THREE.Vector3();

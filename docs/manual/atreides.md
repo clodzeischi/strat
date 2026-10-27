@@ -19,12 +19,10 @@ House Atreides fights with speed and reach. Its units are cheap and quick to bui
 - **Air:** the Hi-Tech Factory builds Carryalls. Each lifts a Tank or MLRS, two Trikes, or six Infantry. Heavy vehicles are set down in a touch-and-go landing; Infantry and Trikes parachute out on a fly-by.
 - **Upgrades:** Weapons I and Armor I after a Factory, then HQ Level 2 for Weapons II, Armor II and Harvesting.
 
-## Specs
-
 <!-- specs -->
 <!-- Generated from src/config by sim/manual.ts: edit the config, then rerun it. -->
 
-### Tech tree
+## Tech tree
 
 Structures (boxes), their level-ups (rounded) and the units they unlock (pills). Dotted arrows are Fremen rites.
 
@@ -66,73 +64,387 @@ flowchart LR
   class u_infantry,u_trike,u_tank,u_rocket,u_harvester,u_repair,u_carryall unit
 ```
 
-### Units
+## Units
 
-Cost in credits; speed and sight in tiles (per second for speed). Shields absorb damage before health and recover on their own.
+<table>
+<tr><td align="center" width="96"><a href="#infantry"><img src="img/atreides/infantry.png" width="72" alt=""><br><sub>Infantry</sub></a></td><td align="center" width="96"><a href="#trike"><img src="img/atreides/trike.png" width="72" alt=""><br><sub>Trike</sub></a></td><td align="center" width="96"><a href="#tank"><img src="img/atreides/tank.png" width="72" alt=""><br><sub>Tank</sub></a></td><td align="center" width="96"><a href="#mlrs"><img src="img/atreides/rocket.png" width="72" alt=""><br><sub>MLRS</sub></a></td><td align="center" width="96"><a href="#harvester"><img src="img/atreides/harvester.png" width="72" alt=""><br><sub>Harvester</sub></a></td><td align="center" width="96"><a href="#repair-vehicle"><img src="img/atreides/repair.png" width="72" alt=""><br><sub>Repair Vehicle</sub></a></td><td align="center" width="96"><a href="#carryall"><img src="img/atreides/carryall.png" width="72" alt=""><br><sub>Carryall</sub></a></td></tr>
+</table>
 
-| Unit | Cost | Build | Made at | Requires | Health | Shields | Armor | Speed | Sight | Tags |
-|---|---|---|---|---|---|---|---|---|---|---|
-| Infantry | 80 | 4.5 s | Barracks | Barracks | 120 | – | 0 | 1.2 | 5 | biological, light |
-| Trike | 110 | 4.5 s | Factory | Factory | 200 | – | 1 | 3.75 | 6 | mechanical, light |
-| Tank | 425 | 9 s | Factory | Factory | 725 | – | 3 | 1.9 | 6.5 | mechanical, armored |
-| MLRS | 510 | 13 s | Factory | Factory Level 2 | 265 | – | 1 | 1.7 | 9 | mechanical, light |
-| Harvester | 800 | 10 s | Factory | Factory, Refinery | 600 | – | 2 | 1.5 | 4 | mechanical, armored |
-| Repair Vehicle | 450 | 8 s | Factory | Factory | 300 | – | 1 | 2.1 | 5 | mechanical, light |
-| Carryall | 400 | 8 s | Hi-Tech Factory | Hi-Tech Factory | 380 | – | 1 | 4.5 | 6 | mechanical, air |
+Speed and sight in tiles. Damage is per hit before armor, plus the bonus against targets with that attribute; DPS is base damage over the cooldown. **Strong / weak against** list, from each faction, the unit this one beats (or loses to) most clearly in equal-cost fights in the open (siege units set up first, Infantry Rockets researched). For units that don't fight, weak against is what kills them fastest for its price.
 
-### Weapons
+### Infantry
 
-Damage per hit, before armor, plus its bonus against targets with that tag. DPS is the base damage over the cooldown. Range in tiles.
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/infantry.png" width="200" alt="Infantry"></td>
+<td valign="top">
 
-| Weapon | Damage | Cooldown (s) | DPS | Range | Notes |
+<table>
+<tr><th align="left">Cost</th><td>80</td></tr>
+<tr><th align="left">Build time</th><td>4.5 s</td></tr>
+<tr><th align="left">Made at</th><td>Barracks</td></tr>
+<tr><th align="left">Requires</th><td>Barracks</td></tr>
+<tr><th align="left">Health</th><td>120</td></tr>
+<tr><th align="left">Armor</th><td>0</td></tr>
+<tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
+<tr><th align="left">Speed</th><td>1.2 tiles/s</td></tr>
+<tr><th align="left">Sight</th><td>5 tiles</td></tr>
+<tr><th align="left">Carryall space</th><td>1 of 6</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Cheap rifle squad. Strong vs infantry. With Infantry Rockets, devastating vs armor. Can shoot at aircraft.
+
+| Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
 |---|---|---|---|---|---|
-| Infantry | 7 (+3 vs biological) | 0.6 | 11.67 | 3 | hits aircraft |
-| Infantry: rockets vs Armored (Infantry Rockets) | 14 (+12 vs armored) | 1.5 | 9.33 | 4.5 | hits aircraft |
-| Trike | 5 (+3 vs light) | 0.3 | 16.67 | 3.5 | ground only |
-| Tank | 22 (+22 vs mechanical) | 1.4 | 15.71 | 4.5 | ground only |
-| MLRS | 44 (+30 vs structure) | 2.8 | 15.71 | 3–7.5 | hits aircraft for 60; splash 2 tiles; unguided: falls where the target stood |
+| Main | 7 (+3 vs biological) | 0.6 | 11.67 | 3 | hits aircraft |
+| Rockets vs Armored (Infantry Rockets) | 14 (+12 vs armored) | 1.5 | 9.33 | 4.5 | hits aircraft |
 
-### Unit notes
+**Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
-**Infantry.** Cheap rifle squad. Strong vs infantry. With Infantry Rockets, devastating vs armor. Can shoot at aircraft.
-- Carryall space: 1 of 6.
+**Weak against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](#mlrs) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](corrino.md#soulcrusher) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](fremen.md#fremen-mortar)
 
-**Trike.** Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing harvesters. With Trike Nitro, faster still and firing faster.
-- Carryall space: 3 of 6.
+---
 
-**Tank.** Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.
-- Carryall space: 6 of 6.
+### Trike
 
-**MLRS.** Long-range rocket artillery with a wide blast. Devastating vs massed troops and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Lightly armored and can't fire up close: trikes that get in tear it apart.
-- Lock On: its rockets home in on one target for 8 s; recharges in 20 s.
-- Carryall space: 6 of 6.
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/trike.png" width="200" alt="Trike"></td>
+<td valign="top">
 
-**Harvester.** Collects spice and brings it to a Refinery.
-- Carryall space: 6 of 6.
+<table>
+<tr><th align="left">Cost</th><td>110</td></tr>
+<tr><th align="left">Build time</th><td>4.5 s</td></tr>
+<tr><th align="left">Made at</th><td>Factory</td></tr>
+<tr><th align="left">Requires</th><td>Factory</td></tr>
+<tr><th align="left">Health</th><td>200</td></tr>
+<tr><th align="left">Armor</th><td>1</td></tr>
+<tr><th align="left">Attributes</th><td>Mechanical, Light</td></tr>
+<tr><th align="left">Speed</th><td>3.75 tiles/s</td></tr>
+<tr><th align="left">Sight</th><td>6 tiles</td></tr>
+<tr><th align="left">Carryall space</th><td>3 of 6</td></tr>
+</table>
 
-**Repair Vehicle.** Repairs vehicles, aircraft and buildings for credits. Right-click something damaged; repairs anything nearby when idle.
-- Repairs vehicles, aircraft and structures: 30 HP/s within 1.25 tiles, for credits.
-- Carryall space: 6 of 6.
+</td>
+</tr></table>
 
-**Carryall.** Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, D to drop. Assigned to a harvester, it ferries it between spice and refinery.
-- Flies: crosses any terrain; only anti-air weapons can hit it.
+Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing harvesters. With Trike Nitro, faster still and firing faster.
 
-### Structures
+| Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
+|---|---|---|---|---|---|
+| Main | 5 (+3 vs light) | 0.3 | 16.67 | 3.5 | ground only |
 
-Level-ups (↳) upgrade a building of that type in place. Structures have armor 5 unless listed otherwise.
+**Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](#infantry) &nbsp; <img src="img/corrino/sardaukar.png" width="32" align="absmiddle" alt=""> [Sardaukar](corrino.md#sardaukar) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
-| Structure | Cost | Build | Requires | Health | Shields | Armor | Size | Notes |
-|---|---|---|---|---|---|---|---|---|
-| Construction Yard | 2500 | 25 s | – | 1600 | – | 5 | 3×3 | Builds structures, one at a time. Lose all of these and you cannot build. |
-| ↳ HQ Level 2 | 1500 | 45 s | Construction Yard | | | | | Upgrades a Construction Yard. Unlocks Harvesting, Weapons II and Armor II. |
-| Refinery | 1200 | 14 s | – | 1000 | – | 5 | 3×3 | Processes spice into credits. Comes with a free Harvester. |
-| Barracks | 400 | 10 s | – | 800 | – | 5 | 2×2 | Trains infantry. Each Barracks adds a production line. |
-| Factory | 1000 | 14 s | Refinery, Barracks | 1100 | – | 5 | 3×3 | Builds vehicles. Each Factory adds a production line. |
-| ↳ Factory Level 2 | 1500 | 40 s | Factory | | | | | Upgrades a Factory. Unlocks the MLRS. |
-| Hi-Tech Factory | 800 | 11 s | Factory | 1000 | – | 5 | 3×3 | Builds aircraft: the Carryall. Each one adds a production line. |
-| Bunker | 400 | 10 s | Barracks | 1400 | – | 5 | 2×2 | Holds three infantry, who shoot from it and can't be hurt while inside. Right-click it with infantry selected; Unload on the command card lets them out. |
+**Weak against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider)
 
-### Research
+---
+
+### Tank
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/tank.png" width="200" alt="Tank"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>425</td></tr>
+<tr><th align="left">Build time</th><td>9 s</td></tr>
+<tr><th align="left">Made at</th><td>Factory</td></tr>
+<tr><th align="left">Requires</th><td>Factory</td></tr>
+<tr><th align="left">Health</th><td>725</td></tr>
+<tr><th align="left">Armor</th><td>3</td></tr>
+<tr><th align="left">Attributes</th><td>Mechanical, Armored</td></tr>
+<tr><th align="left">Speed</th><td>1.9 tiles/s</td></tr>
+<tr><th align="left">Sight</th><td>6.5 tiles</td></tr>
+<tr><th align="left">Carryall space</th><td>6 of 6</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.
+
+| Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
+|---|---|---|---|---|---|
+| Main | 22 (+22 vs mechanical) | 1.4 | 15.71 | 4.5 | ground only |
+
+**Strong against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](#mlrs) &nbsp; <img src="img/corrino/razor.png" width="32" align="absmiddle" alt=""> [Razor](corrino.md#razor) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](fremen.md#fremen-mortar)
+
+**Weak against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](#infantry) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
+
+---
+
+### MLRS
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/rocket.png" width="200" alt="MLRS"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>510</td></tr>
+<tr><th align="left">Build time</th><td>13 s</td></tr>
+<tr><th align="left">Made at</th><td>Factory</td></tr>
+<tr><th align="left">Requires</th><td>Factory Level 2</td></tr>
+<tr><th align="left">Health</th><td>265</td></tr>
+<tr><th align="left">Armor</th><td>1</td></tr>
+<tr><th align="left">Attributes</th><td>Mechanical, Light</td></tr>
+<tr><th align="left">Speed</th><td>1.7 tiles/s</td></tr>
+<tr><th align="left">Sight</th><td>9 tiles</td></tr>
+<tr><th align="left">Carryall space</th><td>6 of 6</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Long-range rocket artillery with a wide blast. Devastating vs massed troops and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Lightly armored and can't fire up close: trikes that get in tear it apart.
+
+- **Lock On** (D): its rockets home in on one target for 8 s; recharges in 20 s.
+
+| Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
+|---|---|---|---|---|---|
+| Main | 44 (+30 vs structure) | 2.8 | 15.71 | 3–7.5 | hits aircraft for 60; splash 2 tiles; unguided: falls where the target stood |
+
+**Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](#infantry) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+
+**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](#trike) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](corrino.md#soulcrusher)
+
+---
+
+### Harvester
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/harvester.png" width="200" alt="Harvester"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>800</td></tr>
+<tr><th align="left">Build time</th><td>10 s</td></tr>
+<tr><th align="left">Made at</th><td>Factory</td></tr>
+<tr><th align="left">Requires</th><td>Factory, Refinery</td></tr>
+<tr><th align="left">Health</th><td>600</td></tr>
+<tr><th align="left">Armor</th><td>2</td></tr>
+<tr><th align="left">Attributes</th><td>Mechanical, Armored</td></tr>
+<tr><th align="left">Speed</th><td>1.5 tiles/s</td></tr>
+<tr><th align="left">Sight</th><td>4 tiles</td></tr>
+<tr><th align="left">Carryall space</th><td>6 of 6</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Collects spice and brings it to a Refinery.
+
+**Strong against:** –
+
+**Weak against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](#infantry) &nbsp; <img src="img/corrino/trooper.png" width="32" align="absmiddle" alt=""> [Harkonnen Trooper](corrino.md#harkonnen-trooper) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
+
+---
+
+### Repair Vehicle
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/repair.png" width="200" alt="Repair Vehicle"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>450</td></tr>
+<tr><th align="left">Build time</th><td>8 s</td></tr>
+<tr><th align="left">Made at</th><td>Factory</td></tr>
+<tr><th align="left">Requires</th><td>Factory</td></tr>
+<tr><th align="left">Health</th><td>300</td></tr>
+<tr><th align="left">Armor</th><td>1</td></tr>
+<tr><th align="left">Attributes</th><td>Mechanical, Light</td></tr>
+<tr><th align="left">Speed</th><td>2.1 tiles/s</td></tr>
+<tr><th align="left">Sight</th><td>5 tiles</td></tr>
+<tr><th align="left">Carryall space</th><td>6 of 6</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Repairs vehicles, aircraft and buildings for credits. Right-click something damaged; repairs anything nearby when idle.
+
+- **Repair:** 30 HP/s to vehicles, aircraft and structures within 1.25 tiles, for credits.
+
+**Strong against:** –
+
+**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](#trike) &nbsp; <img src="img/corrino/trooper.png" width="32" align="absmiddle" alt=""> [Harkonnen Trooper](corrino.md#harkonnen-trooper) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+
+---
+
+### Carryall
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/carryall.png" width="200" alt="Carryall"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>400</td></tr>
+<tr><th align="left">Build time</th><td>8 s</td></tr>
+<tr><th align="left">Made at</th><td>Hi-Tech Factory</td></tr>
+<tr><th align="left">Requires</th><td>Hi-Tech Factory</td></tr>
+<tr><th align="left">Health</th><td>380</td></tr>
+<tr><th align="left">Armor</th><td>1</td></tr>
+<tr><th align="left">Attributes</th><td>Mechanical, Air</td></tr>
+<tr><th align="left">Speed</th><td>4.5 tiles/s</td></tr>
+<tr><th align="left">Sight</th><td>6 tiles</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, D to drop. Assigned to a harvester, it ferries it between spice and refinery.
+
+- **Flies:** crosses any terrain; only anti-air weapons can hit it.
+
+**Strong against:** –
+
+**Weak against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](#infantry) &nbsp; <img src="img/corrino/sardaukar.png" width="32" align="absmiddle" alt=""> [Sardaukar](corrino.md#sardaukar) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+
+## Structures
+
+<table>
+<tr><td align="center" width="96"><a href="#construction-yard"><img src="img/atreides/conyard.png" width="72" alt=""><br><sub>Construction Yard</sub></a></td><td align="center" width="96"><a href="#refinery"><img src="img/atreides/refinery.png" width="72" alt=""><br><sub>Refinery</sub></a></td><td align="center" width="96"><a href="#barracks"><img src="img/atreides/barracks.png" width="72" alt=""><br><sub>Barracks</sub></a></td><td align="center" width="96"><a href="#factory"><img src="img/atreides/factory.png" width="72" alt=""><br><sub>Factory</sub></a></td><td align="center" width="96"><a href="#hi-tech-factory"><img src="img/atreides/hitech.png" width="72" alt=""><br><sub>Hi-Tech Factory</sub></a></td><td align="center" width="96"><a href="#bunker"><img src="img/atreides/bunker.png" width="72" alt=""><br><sub>Bunker</sub></a></td></tr>
+</table>
+
+### Construction Yard
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/conyard.png" width="200" alt="Construction Yard"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>2500</td></tr>
+<tr><th align="left">Build time</th><td>25 s</td></tr>
+<tr><th align="left">Requires</th><td>–</td></tr>
+<tr><th align="left">Health</th><td>1600</td></tr>
+<tr><th align="left">Armor</th><td>5</td></tr>
+<tr><th align="left">Size</th><td>3×3 tiles</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Builds structures, one at a time. Lose all of these and you cannot build.
+
+- **HQ Level 2** (level-up): 1500 credits, 45 s. Upgrades a Construction Yard. Unlocks Harvesting, Weapons II and Armor II.
+
+---
+
+### Refinery
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/refinery.png" width="200" alt="Refinery"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>1200</td></tr>
+<tr><th align="left">Build time</th><td>14 s</td></tr>
+<tr><th align="left">Requires</th><td>–</td></tr>
+<tr><th align="left">Health</th><td>1000</td></tr>
+<tr><th align="left">Armor</th><td>5</td></tr>
+<tr><th align="left">Size</th><td>3×3 tiles</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Processes spice into credits. Comes with a free Harvester.
+
+---
+
+### Barracks
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/barracks.png" width="200" alt="Barracks"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>400</td></tr>
+<tr><th align="left">Build time</th><td>10 s</td></tr>
+<tr><th align="left">Requires</th><td>–</td></tr>
+<tr><th align="left">Health</th><td>800</td></tr>
+<tr><th align="left">Armor</th><td>5</td></tr>
+<tr><th align="left">Size</th><td>2×2 tiles</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Trains infantry. Each Barracks adds a production line.
+
+---
+
+### Factory
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/factory.png" width="200" alt="Factory"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>1000</td></tr>
+<tr><th align="left">Build time</th><td>14 s</td></tr>
+<tr><th align="left">Requires</th><td>Refinery, Barracks</td></tr>
+<tr><th align="left">Health</th><td>1100</td></tr>
+<tr><th align="left">Armor</th><td>5</td></tr>
+<tr><th align="left">Size</th><td>3×3 tiles</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Builds vehicles. Each Factory adds a production line.
+
+- **Factory Level 2** (level-up): 1500 credits, 40 s. Upgrades a Factory. Unlocks the MLRS.
+
+---
+
+### Hi-Tech Factory
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/hitech.png" width="200" alt="Hi-Tech Factory"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>800</td></tr>
+<tr><th align="left">Build time</th><td>11 s</td></tr>
+<tr><th align="left">Requires</th><td>Factory</td></tr>
+<tr><th align="left">Health</th><td>1000</td></tr>
+<tr><th align="left">Armor</th><td>5</td></tr>
+<tr><th align="left">Size</th><td>3×3 tiles</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Builds aircraft: the Carryall. Each one adds a production line.
+
+---
+
+### Bunker
+
+<table><tr>
+<td width="220" align="center" valign="top"><img src="img/atreides/bunker.png" width="200" alt="Bunker"></td>
+<td valign="top">
+
+<table>
+<tr><th align="left">Cost</th><td>400</td></tr>
+<tr><th align="left">Build time</th><td>10 s</td></tr>
+<tr><th align="left">Requires</th><td>Barracks</td></tr>
+<tr><th align="left">Health</th><td>1400</td></tr>
+<tr><th align="left">Armor</th><td>5</td></tr>
+<tr><th align="left">Size</th><td>2×2 tiles</td></tr>
+</table>
+
+</td>
+</tr></table>
+
+Holds three infantry, who shoot from it and can't be hurt while inside. Right-click it with infantry selected; Unload on the command card lets them out.
+
+- **Garrison:** 3 infantry.
+
+## Research
 
 Researched one at a time, from the Upgrade tab. Weapons levels add 15% of each hit (bonus included); Armor levels take one more point off every hit.
 

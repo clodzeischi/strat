@@ -1,6 +1,6 @@
 # Strat manual
 
-How the game plays, then a page per faction with its tech tree and every unit, structure and upgrade.
+How the game plays, then a page per faction: its tech tree, a card for every unit (portrait, stats, weapons, and what it's strong and weak against) and structure, and its research.
 
 - [Atreides](atreides.md): fast and mobile, with Carryalls, Repair Vehicles and the MLRS.
 - [Corrino](corrino.md): slow, expensive and shielded, with Devastators, Sky Raiders and drop pods.
