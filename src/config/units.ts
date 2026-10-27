@@ -55,19 +55,19 @@ export const UNITS: Record<UnitType, UnitDef> = {
 
   // ---- Corrino: health alone beats the Atreides counterpart's, and shields come on top ----
   trooper: {
-    name: 'Harkonnen Trooper', producer: 'barracks', cost: 100, buildTime: 5, hp: 80, shields: 48, speed: 2.1, turnRate: 12, radius: 0.45, sight: 10,
+    name: 'Harkonnen Trooper', producer: 'barracks', cost: 110, buildTime: 6, hp: 80, shields: 80, speed: 2.1, turnRate: 12, radius: 0.45, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'],
-    weapon: { range: 9, minRange: 0, damage: 10, bonus: { armored: 10 }, airDamage: 4, cooldown: 0.7, projectile: 'rocket', speed: 20, splash: 0, air: true, sound: 'launch_small' },
-    desc: 'Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, beats trikes by numbers, and can take potshots at aircraft. Weak vs MLRS.',
+    weapon: { range: 9, minRange: 0, damage: 10, bonus: { armored: 10 }, airDamage: 10, cooldown: 0.7, projectile: 'rocket', speed: 20, splash: 0, air: true, sound: 'launch_small' },
+    desc: 'Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, beats trikes by numbers, and shoots at aircraft. Weak vs MLRS.',
   },
   sardaukar: {
-    name: 'Sardaukar', producer: 'barracks', cost: 260, buildTime: 9, hp: 176, shields: 96, armor: 1, speed: 2.6, turnRate: 12, radius: 0.5, sight: 10,
+    name: 'Sardaukar', producer: 'barracks', cost: 260, buildTime: 9, hp: 180, shields: 100, armor: 1, speed: 2.6, turnRate: 12, radius: 0.5, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks2'],
     weapon: { range: 5.5, minRange: 0, damage: 18, bonus: { biological: 18 }, airDamage: 24, cooldown: 0.75, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'coax_mg' },
     desc: "The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and MLRS.",
   },
   razor: {
-    name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 136, shields: 80, armor: 1, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
+    name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 135, shields: 80, armor: 1, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['fab'],
     weapon: { range: 4, minRange: 0, damage: 10, bonus: { biological: 12 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, cone: 0.35 },
     desc: 'Dune buggy with a flamethrower that burns everything in front of it. Shreds infantry. Weak vs tanks.',
@@ -82,7 +82,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: "Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, but only fires standing still; its machine gun cuts down infantry, even on the move. Can self-destruct in a huge blast. Weak vs aircraft, MLRS and massed troopers.",
   },
   raider: {
-    name: 'Sky Raider', producer: 'fab', cost: 600, buildTime: 13, hp: 208, shields: 96, armor: 1, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
+    name: 'Sky Raider', producer: 'fab', cost: 600, buildTime: 13, hp: 200, shields: 100, armor: 1, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
     turret: false, infantry: false, tags: ['mechanical', 'air'], requires: ['tleilaxu'], air: true,
     weapon: { range: 5, minRange: 0, damage: 16, bonus: { armored: 20 }, cooldown: 1.2, projectile: 'rocket', speed: 22, splash: 0, sound: 'sky_raider_fire' },
     mines: {
@@ -92,12 +92,12 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Light ornithopter for scouting and raids. Rockets strong vs armor. Lays mines that wreck infantry and wear down harvesters. Weak vs anti-air.',
   },
   artillery: {
-    name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 208, shields: 112, armor: 2, speed: 2.8, turnRate: 2, radius: 1.1, sight: 12,
+    name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 200, shields: 110, armor: 2, speed: 2.8, turnRate: 2, radius: 1.1, sight: 12,
     turret: true, holdFire: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu'],
     weapon: { range: 8, minRange: 0, damage: 14, bonus: { structure: 12 }, cooldown: 1.5, projectile: 'shell', speed: 26, splash: 0, sound: 'single_shot' },
     deploy: {
       time: 3,
-      weapon: { range: 26, minRange: 8, damage: 70, bonus: { structure: 110 }, cooldown: 4.5, projectile: 'shell', speed: 13, splash: 3, unguided: true, sound: 'launch_large' },
+      weapon: { range: 26, minRange: 8, damage: 70, bonus: { structure: 110 }, cooldown: 4.5, projectile: 'shell', speed: 13, splash: 4, unguided: true, sound: 'launch_large' },
     },
     desc: "Self-propelled howitzer with a short gun, and can't fire on the move. Deployed, it shells anything your side can see at long range; the shells are slow and fall where the target was. Brutal on buildings and defenses. Weak vs tanks.",
   },

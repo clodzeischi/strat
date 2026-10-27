@@ -81,13 +81,13 @@ Cost in credits; speed and sight in tiles (per second for speed). Shields absorb
 
 | Unit | Cost | Build | Made at | Requires | Health | Shields | Armor | Speed | Sight | Tags |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Harkonnen Trooper | 100 | 5 s | Barracks | Barracks | 80 | 48 | 0 | 1.05 | 5 | biological, light |
-| Sardaukar | 260 | 9 s | Barracks | Imperial Barracks | 176 | 96 | 1 | 1.3 | 5 | biological, light |
-| Razor | 250 | 7 s | Fab | Fab | 136 | 80 | 1 | 3 | 5.5 | mechanical, light |
+| Harkonnen Trooper | 110 | 6 s | Barracks | Barracks | 80 | 80 | 0 | 1.05 | 5 | biological, light |
+| Sardaukar | 260 | 9 s | Barracks | Imperial Barracks | 180 | 100 | 1 | 1.3 | 5 | biological, light |
+| Razor | 250 | 7 s | Fab | Fab | 135 | 80 | 1 | 3 | 5.5 | mechanical, light |
 | Devastator | 800 | 16 s | Fab | Tleilaxu Research, Fab Level 2 | 720 | 320 | 3 | 1.2 | 6 | mechanical, armored |
 | Harvester | 800 | 10 s | Fab | Fab, Refinery | 600 | 300 | 2 | 1.5 | 4 | mechanical, light |
-| Sky Raider | 600 | 13 s | Fab | Tleilaxu Research | 208 | 96 | 1 | 4.5 | 7 | mechanical, air |
-| Soulcrusher | 650 | 13 s | Fab | Tleilaxu Research | 208 | 112 | 2 | 1.4 | 6 | mechanical, armored |
+| Sky Raider | 600 | 13 s | Fab | Tleilaxu Research | 200 | 100 | 1 | 4.5 | 7 | mechanical, air |
+| Soulcrusher | 650 | 13 s | Fab | Tleilaxu Research | 200 | 110 | 2 | 1.4 | 6 | mechanical, armored |
 
 ### Weapons
 
@@ -95,7 +95,7 @@ Damage per hit, before armor, plus its bonus against targets with that tag. DPS 
 
 | Weapon | Damage | Cooldown (s) | DPS | Range | Notes |
 |---|---|---|---|---|---|
-| Harkonnen Trooper | 10 (+10 vs armored) | 0.7 | 14.29 | 4.5 | hits aircraft for 4 |
+| Harkonnen Trooper | 10 (+10 vs armored) | 0.7 | 14.29 | 4.5 | hits aircraft for 10 |
 | Sardaukar | 18 (+18 vs biological) | 0.75 | 24 | 2.75 | hits aircraft for 24 |
 | Razor | 10 (+12 vs biological) | 0.6 | 16.67 | 2 | ground only; cone ±20° |
 | Devastator | 60 (+40 vs armored) | 2 | 30 | 5 | ground only; splash 0.75 tiles |
@@ -104,11 +104,11 @@ Damage per hit, before armor, plus its bonus against targets with that tag. DPS 
 | Sky Raider | 16 (+20 vs armored) | 1.2 | 13.33 | 2.5 | ground only |
 | Sky Raider: mine | 40 (+60 vs biological) | – | – | – | ground only; splash 2 tiles |
 | Soulcrusher (mobile) | 14 (+12 vs structure) | 1.5 | 9.33 | 4 | ground only |
-| Soulcrusher (set up) | 70 (+110 vs structure) | 4.5 | 15.56 | 4–13 | ground only; splash 1.5 tiles; unguided: falls where the target stood |
+| Soulcrusher (set up) | 70 (+110 vs structure) | 4.5 | 15.56 | 4–13 | ground only; splash 2 tiles; unguided: falls where the target stood |
 
 ### Unit notes
 
-**Harkonnen Trooper.** Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, beats trikes by numbers, and can take potshots at aircraft. Weak vs MLRS.
+**Harkonnen Trooper.** Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, beats trikes by numbers, and shoots at aircraft. Weak vs MLRS.
 
 
 **Sardaukar.** The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and MLRS.
