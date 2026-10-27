@@ -130,7 +130,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
       time: 1.5,
       weapon: { range: 12, minRange: 4, damage: 28, bonus: { structure: 26 }, cooldown: 1.4, projectile: 'rocket', speed: 16, splash: 3, sound: 'launch_small' },
     },
-    desc: 'A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the move he barely fights; set up (D, 1.5 s), he lobs guided rockets at anything your side can see out to 12: strong vs vehicles, structures and packed infantry. Can\'t fire up close, and in the sand he digs in like any Fremen.',
+    desc: 'A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the move he barely fights; set up (D, 1.5 s), he lobs guided rockets at anything your side can see out to 6 tiles: strong vs vehicles, structures and packed infantry. Can\'t fire up close, and in the sand he digs in like any Fremen.',
   },
   sandrider: {
     name: 'Sandrider', producer: 'barracks', cost: 500, buildTime: 12, hp: 280, armor: 1, speed: 3.2, turnRate: 12, radius: 0.5, sight: 11,

@@ -31,6 +31,10 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 - **Online 1v1.** Host a game on your own server (a Raspberry Pi is plenty) and play a friend on your network. See [Multiplayer](#multiplayer).
 - **A computer opponent** that plays any of the three factions (pick one, or Random) under the same fog of war as you, with no map knowledge: it scouts to find your base and see what you're building, and plans only from what it has seen. It defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Hard it runs a bigger economy, attacks when it's stronger, raids your harvesters, repairs its vehicles after defending and pulls back from fights it's losing. It uses its faction's tricks: Corrino deploys Soulcrushers and drops pods, Fremen hide, set up camps and call Sandworms. On Brutal its units kite and focus fire, pull badly hurt units out of fights, and march in formation; it splits its attacks, raids more, and late in the game Atreides drop MLRS and paratroopers on your harvesters by Carryall, lifting them out again before you can catch them. End-of-game stats screen.
 
+## Manual
+
+The [manual](docs/manual/README.md) covers how the game plays, and has a page per faction ([Atreides](docs/manual/atreides.md), [Corrino](docs/manual/corrino.md), [Fremen](docs/manual/fremen.md)) with its tech tree and every unit, structure and upgrade.
+
 ## Screenshots
 
 | | |
@@ -88,7 +92,8 @@ It prints addresses like `http://192.168.1.20:8080`. Both players open that addr
 | **S** (Command tab) | Stop |
 | **D** (Command tab) | The unit's ability: Carryall drop, Deploy / Pack Up, Lock On (MLRS), Lay Mine (Sky Raider), Set Up Camp (Spice Crew), Plant Thumper |
 | **F** (Command tab) | Hold Position (Bunker: Unload) |
-| **V** (Command tab) | Self-destruct (Devastator); salvage a Bunker |
+| **V** (Command tab) | Self-destruct (Devastator), Dig In (Fremen); salvage a Bunker |
+| **C** (Command tab, a structure selected) | Salvage it for half its price |
 | **V** (Train tab) | Rally All: set every production building's rally point, keeping your selection |
 | IDLE button (top right) | Select the next idle harvester or Spice Crew (Shift: all of them) |
 | Minimap | Left click to look there; right click to send the selection there; attack-move, drop and rally clicks work on it too |

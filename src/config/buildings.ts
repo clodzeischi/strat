@@ -75,7 +75,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   },
   thumper: {
     name: 'Thumper', short: 'Thumper', cost: 250, buildTime: 0, hp: 150, size: 1, requires: ['sietch2'], onSand: true, deployed: true,
-    desc: 'Planted in the sand by a Warrior or Fedaykin, it drums until a wild Sandworm comes. The worm swallows whatever moves on the sand around it, whoever it belongs to, and harvesters even standing still. Destroy it before then and no worm comes.',
+    desc: 'Planted in the sand by a Sandrider, it drums until a Sandworm comes: the Sandrider climbs on if it is close by; otherwise the worm comes wild and swallows anything on the sand around it, whoever it belongs to. Destroy it before then and no worm comes.',
   },
   camp: {
     name: 'Spice Camp', short: 'Spice Camp', cost: 450, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 7.2, radius: 7 },

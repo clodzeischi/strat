@@ -497,7 +497,7 @@ export class CommandCard {
         tip: () => {
           const u = input.ownUnits().find((u) => u.def.deploy);
           const d = u?.def.deploy;
-          return d ? `Selected ${u!.name}s set up (${d.time} s) to fire on anything your side can see out to ${d.weapon.range}, or pack up to move again. Set up, they ignore move orders.` : '';
+          return d ? `Selected ${u!.name}s set up (${d.time} s) to fire on anything your side can see out to ${d.weapon.range / TILE} tiles, or pack up to move again. Set up, they ignore move orders.` : '';
         },
         view: () => ({ active: input.deployedShare() > 0.5 }),
         use: () => input.toggleDeploy(),
