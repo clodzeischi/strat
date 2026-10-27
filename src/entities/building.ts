@@ -13,8 +13,8 @@ import * as dm from '../game/dmath';
  */
 export type Facing = 'south' | 'east' | 'north' | 'west';
 
-/** Seconds a structure takes to salvage, and the share of its price that comes back. */
-export const SALVAGE = { time: 5, refund: 0.75 };
+/** Seconds a structure takes to salvage, and the share of its price that comes back (`bunker`: for buildings that hold infantry). */
+export const SALVAGE = { time: 5, refund: 0.5, bunker: 0.75 }; // bunkers: cheap to put up at the front and take down again
 
 /**
  * The side facing the point (x, z), in world units, from a building centered at (bx, bz). Exact diagonals pick the

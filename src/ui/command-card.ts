@@ -78,7 +78,7 @@ interface CardEl {
  * Selecting units or a building with orders opens the Command tab, so A is attack-move whenever an army is selected;
  * letting go of them returns to the tab you were on. The Command tab shows what the selection's lead kind can do
  * (the highest tier in a mix, Tab for the next): attack-move and stop for any units, plus Drop for Carryalls, Rally
- * for production buildings, Unload and Salvage for bunkers. Everything is sent through `input.issue` as commands,
+ * for production buildings, Salvage for any structure (Unload too for bunkers). Everything is sent through `input.issue` as commands,
  * like any player action.
  */
 export class CommandCard {
@@ -212,7 +212,7 @@ export class CommandCard {
       if (lead.def.garrison) return [null, null, null, c.unload, null, null, null, c.salvage];
       if (lead.def.extract) return [null, null, c.pack, null, null, null, null, null];
       const mend = FACTIONS[this.faction].selfRepair ? c.mend : null;
-      return [this.input.ownProducers().length ? c.rally : null, null, null, null, null, null, null, mend];
+      return [this.input.ownProducers().length ? c.rally : null, null, null, null, null, null, c.salvage, mend];
     }
     if (!this.input.ownUnits().length) return [];
     const u = lead instanceof Unit ? lead : null;
@@ -559,7 +559,12 @@ export class CommandCard {
         icon: () => 'salvage',
         name: () => 'Salvage',
         cost: () => 0,
-        tip: () => `Tear down the selected bunkers for ${SALVAGE.refund * 100}% of their price. Takes ${SALVAGE.time} s; the infantry inside come out. Right-click to cancel.`,
+        tip: () => {
+          const lead = input.ownBuildings()[0];
+          const block = lead && lead.salvage === null ? this.game.salvageBlock(lead) : null;
+          if (block && !input.canSalvage()) return block;
+          return `Tear down the selected structures for ${SALVAGE.refund * 100}% of their price (bunkers ${SALVAGE.bunker * 100}%). Takes ${SALVAGE.time} s; infantry inside come out. Right-click to cancel.`;
+        },
         view: () => {
           const p = input.salvageProgress();
           return { disabled: !input.canSalvage() && p === null, active: p !== null, progress: p };

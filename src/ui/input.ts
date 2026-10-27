@@ -532,22 +532,22 @@ export class Input {
   }
 
   canSalvage(): boolean {
-    return this.ownBunkers().some((b) => b.salvage === null);
+    return this.ownBuildings().some((b) => b.salvage === null && !this.game.salvageBlock(b));
   }
 
-  /** Salvage progress of the selected bunkers (the furthest along), or null when none is being salvaged. */
+  /** Salvage progress of the selected structures (the furthest along), or null when none is being salvaged. */
   salvageProgress(): number | null {
-    const p = this.ownBunkers().map((b) => b.salvage).filter((v): v is number => v !== null);
+    const p = this.ownBuildings().map((b) => b.salvage).filter((v): v is number => v !== null);
     return p.length ? Math.max(...p) : null;
   }
 
   salvage(): void {
-    const list = this.ownBunkers().filter((b) => b.salvage === null);
+    const list = this.ownBuildings().filter((b) => b.salvage === null && !this.game.salvageBlock(b));
     if (list.length) this.issue({ c: 'salvage', buildings: list.map((b) => b.id) });
   }
 
   cancelSalvage(): void {
-    const list = this.ownBunkers().filter((b) => b.salvage !== null);
+    const list = this.ownBuildings().filter((b) => b.salvage !== null);
     if (list.length) this.issue({ c: 'cancelSalvage', buildings: list.map((b) => b.id) });
   }
 

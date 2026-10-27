@@ -728,9 +728,23 @@ export class Game {
     }
   }
 
+  /**
+   * Why a structure can't be salvaged, or null if it can: any can except a Spice Camp (it packs up instead) and the
+   * side's last hub (it would lock itself out of building).
+   */
+  salvageBlock(b: Building): string | null {
+    if (b.dead || b.def.extract) return 'It packs up instead.';
+    const hub = FACTIONS[this.teams[b.team].faction].hub;
+    if (b.type === hub && this.count(b.team, hub) <= 1) return `Your last ${b.name} can't be salvaged.`;
+    return null;
+  }
+
   /** Starts salvaging a structure: its infantry come out, and in a few seconds it's gone for part of its price. */
   startSalvage(b: Building): void {
-    if (b.dead || b.salvage !== null || !b.def.garrison) return;
+    if (b.salvage !== null || this.salvageBlock(b)) return;
+    // Two hubs salvaged at once would leave none: only one of the last two goes.
+    const hub = FACTIONS[this.teams[b.team].faction].hub;
+    if (b.type === hub && this.buildings.filter((o) => o.team === b.team && o.type === hub && !o.dead && o.salvage === null).length <= 1) return;
     b.salvage = 0;
     this.unloadBunker(b);
   }
@@ -744,7 +758,7 @@ export class Game {
       if (b.salvage === null || b.dead) continue;
       b.salvage += dt / SALVAGE.time;
       if (b.salvage < 1) continue;
-      this.teams[b.team].credits += BUILDINGS[b.type].cost * SALVAGE.refund;
+      this.teams[b.team].credits += BUILDINGS[b.type].cost * (b.def.garrison ? SALVAGE.bunker : SALVAGE.refund);
       b.dead = true;
       b.setSelected(false);
       this.scene.remove(b.root);
