@@ -2,7 +2,7 @@
 
 A Dune-style real-time strategy game in the browser, built with Three.js and TypeScript. Harvest spice, build a base, and fight a computer opponent (or a friend, online) across a randomly generated desert as one of three factions: the mobile Atreides, the shielded Corrino, or the Fremen, who hide in the sand and call down Sandworms.
 
-![A Carryall paradropping Atreides infantry beside a Corrino base](docs/screenshots/airdrop.jpg)
+![A Fremen Sandrider's worm tearing into an Atreides army beside the Atreides base](docs/screenshots/worm.jpg)
 
 ## Features
 
@@ -35,14 +35,12 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 
 | | |
 |---|---|
-| ![The main menu over a fly-over of the desert](docs/screenshots/menu.jpg) | ![A built-up blue Atreides base with a group of tanks selected](docs/screenshots/gameplay.jpg) |
-| The main menu, over a fly-over of the generated map. | An Atreides base, with the command card bottom left and the minimap bottom right. |
-| ![Atreides and Corrino armies clashing over a spice field](docs/screenshots/battle.jpg) | ![A Sandworm rearing out of the sand beside an Atreides refinery](docs/screenshots/worm.jpg) |
-| Atreides and Corrino clash over a spice field. | A Fremen Thumper's Sandworm bursts up beside an enemy refinery. |
-| ![A Corrino base with its Repair Pad and army](docs/screenshots/corrino.jpg) | ![A Fremen base with a group of Warriors selected](docs/screenshots/fremen.jpg) |
-| A Corrino base, with its Repair Pad and army. | A Fremen base, with a group of Warriors selected. |
-| ![Watching a replay, with the controls and both sides' numbers bottom left](docs/screenshots/replay.jpg) | |
-| Watching a replay: speed, timeline, whose eyes to watch through, and both sides' numbers. | |
+| ![A Carryall paradropping Atreides infantry onto a spice field](docs/screenshots/airdrop.jpg) | ![An Atreides base on a rock shelf, its army selected below it](docs/screenshots/atreides.jpg) |
+| A Carryall paradrops Atreides infantry onto a contested spice field. | An Atreides base on a rock shelf, its army selected and fighting at the ramp. |
+| ![Corrino Devastators and infantry clashing with Atreides tanks and MLRS](docs/screenshots/battle.jpg) | ![A Corrino base on a rock shelf, Devastators and a Razor selected](docs/screenshots/corrino.jpg) |
+| Corrino Devastators and infantry meet an Atreides tank and MLRS column. | A Corrino base, with Devastators and a Razor selected. |
+| ![A Fremen Sietch base with Fedaykin, Warriors and a Mortar selected](docs/screenshots/fremen.jpg) | ![Fremen Warriors and Fedaykin storming an Atreides base, a ridden worm behind them](docs/screenshots/assault.jpg) |
+| A Fremen base around its Sietch, with Fedaykin, Warriors and a Mortar selected. | Fremen storm an Atreides base, a Sandrider's worm coming up behind them. |
 
 ## Getting started
 
