@@ -28,7 +28,8 @@ export type Command =
   /** Fremen: these Sandriders let their worms go. */
   | { c: 'release'; units: number[] }
   | { c: 'unload'; buildings: number[] }
-  | { c: 'rally'; buildings: number[]; x: number; z: number }
+  /** With `target` (one of the team's units), the rally point goes with that unit and new units follow it. */
+  | { c: 'rally'; buildings: number[]; x: number; z: number; target?: number | null }
   | { c: 'salvage'; buildings: number[] }
   | { c: 'cancelSalvage'; buildings: number[] }
   /** Artillery sets up (`on`) or packs up; Spice Crews set up their camp. With `queue` (Shift), after their other orders. */
@@ -125,9 +126,12 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
         if (b instanceof Building && b.team === team) game.unloadBunker(b);
       }
       return;
-    case 'rally':
-      for (const b of ownBuildings(game, team, cmd.buildings)) if (PRODUCERS.includes(b.type as Producer)) game.setRally(b, cmd.x, cmd.z);
+    case 'rally': {
+      const t = entityById(game, cmd.target ?? null);
+      const lead = t instanceof Unit && t.team === team && !t.dead && !(t instanceof Carryall) ? t : null;
+      for (const b of ownBuildings(game, team, cmd.buildings)) if (PRODUCERS.includes(b.type as Producer)) game.setRally(b, cmd.x, cmd.z, lead);
       return;
+    }
     case 'salvage':
       for (const b of ownBuildings(game, team, cmd.buildings)) game.startSalvage(b);
       return;
@@ -276,6 +280,11 @@ function go(game: Game, selected: Unit[], x: number, z: number, target: Entity |
     for (const u of mechs) u.command(game, { kind: 'escort', group: [...armed], x: goal.x, z: goal.z });
     units = units.filter((u) => !mechs.includes(u));
     if (units.length === 0) return;
+  }
+  if (target instanceof Unit && target.team === team && !attack) {
+    // Right-clicking one of our own units: follow it.
+    for (const u of units) if (u !== target) u.command(game, { kind: 'follow', target });
+    return;
   }
   if (target && target.team !== team) {
     const rest: Unit[] = [];

@@ -45,7 +45,9 @@ export type Order =
   /** Fremen Dig In: under the sand where it stands at once, holding its fire so it doesn't give itself away. */
   | { kind: 'dig' }
   /** Walk to (x, z) and plant a Thumper there (Fremen Sandriders). */
-  | { kind: 'plant'; x: number; z: number };
+  | { kind: 'plant'; x: number; z: number }
+  /** Follow one of our own units (right-clicked, or a rally point set on it), fighting what comes near on the way. */
+  | { kind: 'follow'; target: Unit };
 
 /** An order waiting its turn (Shift+click): taken up once the unit has nothing else to do. */
 export type QueuedOrder =
@@ -54,6 +56,9 @@ export type QueuedOrder =
   | { kind: 'attack'; target: Entity }
   /** Artillery sets up; a Spice Crew sets up camp (`walked`: it already walked to its spot, so it won't look for another). */
   | { kind: 'deploy'; walked?: boolean };
+
+/** Following: stop this far from the leader (plus both radii); fight only while within `leash` of it. */
+const FOLLOW = { gap: TILE * 1.2, leash: TILE * 6 };
 
 /** Combat aircraft (the Sky Raider) fly this high over the ground. */
 const AIR_HEIGHT = CARRYALL.altitude - 3; // other aircraft fly lower than Carryalls
@@ -599,16 +604,19 @@ export class Unit extends Entity {
       } else {
         this.target = this.order.target;
       }
-    } else if (weapon && (this.order.kind === 'idle' || this.order.kind === 'amove' || this.order.kind === 'hold')) {
+    } else if (weapon && (this.order.kind === 'idle' || this.order.kind === 'amove' || this.order.kind === 'hold' || this.order.kind === 'follow')) {
       const hold = this.order.kind === 'hold';
+      // Following, it fights only near its leader: further off, it drops the fight and catches up.
+      const lead = this.order.kind === 'follow' ? this.order.target : null;
+      const leashed = !!lead && !lead.dead && hypot(lead.x - this.x, lead.z - this.z) > FOLLOW.leash;
       // Also dropped if it can't be hit at all (an aircraft that shot at a unit without anti-air), and on Hold
       // Position once it's out of reach.
       const t = this.target;
-      if (t && (t.dead || !game.sees(this.team, t) || distTo(t, this.x, this.z) > this.def.sight * 1.3 || !game.weaponFor(this, t) || (hold && !this.inReach(game, t)))) {
+      if (t && (leashed || t.dead || !game.sees(this.team, t) || distTo(t, this.x, this.z) > this.def.sight * 1.3 || !game.weaponFor(this, t) || (hold && !this.inReach(game, t)))) {
         this.target = null;
         if (this.order.kind !== 'amove') this.path = [];
       }
-      if (!this.target && this.scanTimer <= 0) {
+      if (!this.target && !leashed && this.scanTimer <= 0) {
         this.scanTimer = 0.4 + game.random() * 0.2;
         // Dug in, Fremen lie in wait: they only take on what walks into range, rather than give themselves away;
         // on Hold Position, anyone does.
@@ -645,6 +653,9 @@ export class Unit extends Entity {
           break;
         case 'escort':
           this.updateEscort(game, dt);
+          break;
+        case 'follow':
+          this.updateFollow(game, this.order.target, dt);
           break;
         case 'plant':
           // Close enough to the spot (or as close as it gets): plant the Thumper, and wait for orders.
@@ -693,14 +704,22 @@ export class Unit extends Entity {
   private updateGlide(game: Game, dt: number): void {
     const R = this.def.glides!.orbit;
     const edge = game.map.worldSize();
+    if (this.order.kind === 'follow' && this.order.target.dead) this.order = { kind: 'idle' };
     const o = this.order;
     let gx: number;
     let gz: number;
-    if ((o.kind === 'move' || o.kind === 'amove') && hypot(o.x - this.x, o.z - this.z) > R * 0.5) {
+    if (o.kind === 'follow' && hypot(o.target.x - this.x, o.target.z - this.z) > R * 1.5) {
+      gx = o.target.x;
+      gz = o.target.z;
+    } else if ((o.kind === 'move' || o.kind === 'amove') && hypot(o.x - this.x, o.z - this.z) > R * 0.5) {
       gx = o.x;
       gz = o.z;
     } else {
-      if (o.kind !== 'idle') {
+      if (o.kind === 'follow') {
+        // Following: circle over the leader.
+        this.orbitX = o.target.x;
+        this.orbitZ = o.target.z;
+      } else if (o.kind !== 'idle') {
         // Arrived (or an order it can't follow, like an attack): circle here.
         this.order = { kind: 'idle' };
         this.orbitX = o.kind === 'move' || o.kind === 'amove' ? o.x : this.x;
@@ -917,6 +936,29 @@ export class Unit extends Entity {
     }
     this.followPath(game, dt);
     return false;
+  }
+
+  /** Keeps close to the leader: drives after it when it gets away, waits when near. Its death ends the order. */
+  private updateFollow(game: Game, lead: Unit, dt: number): void {
+    if (lead.dead || lead.team !== this.team) {
+      this.order = { kind: 'idle' };
+      this.path = [];
+      return;
+    }
+    const d = hypot(lead.x - this.x, lead.z - this.z) - this.radius - lead.radius;
+    // Some slack before setting off again, so followers don't twitch after every step the leader takes.
+    if (d <= FOLLOW.gap || (this.path.length === 0 && !this.chasing && d <= FOLLOW.gap * 1.6)) {
+      this.path = [];
+      this.chasing = false;
+      return;
+    }
+    this.repathTimer -= dt;
+    if (this.chasing || this.repathTimer <= 0 || this.path.length === 0) {
+      this.chasing = false;
+      this.repathTimer = 0.5 + game.random() * 0.2;
+      this.setPath(game, lead.x, lead.z);
+    }
+    this.followPath(game, dt);
   }
 
   /** Drives up to a damaged friendly unit or structure and mends it, paying as it goes. */
