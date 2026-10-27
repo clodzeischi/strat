@@ -21,6 +21,18 @@ export interface Strat {
   firstWave?: number;
   /** A trike death squad that hunts harvesters (see SquadAI): from Nitro on, or from this game time without it. */
   squad?: { nitro: boolean; from?: number };
+  /** Maximum pressure on harvesters, with a backup group that punishes the defenders (see PressureAI). */
+  pressure?: PressureOpts;
+}
+
+export interface PressureOpts {
+  /** What the squads are made of, how many squads, units each, and from what game time. */
+  unit: UnitType;
+  squads: number;
+  size: number;
+  from: number;
+  /** The backup group's strength (credits of units) at most; the rest of the army stays with Brutal's waves. */
+  backup: number;
 }
 
 /**
@@ -106,6 +118,212 @@ class SquadAI extends BrutalAI {
   }
 }
 
+/** Enemy structures that shoot (turrets, bunkers) within `tiles` of a point, as far as we know. */
+function defensesNear(ai: { intel: AI['intel'] }, p: { x: number; z: number }, tiles: number): number {
+  let n = 0;
+  for (const b of ai.intel.buildings.values()) if ((b.type === 'turret' || b.type === 'bunker') && hypot(b.x - p.x, b.z - p.z) < tiles * TILE) n++;
+  return n;
+}
+
+/**
+ * Brutal plus maximum pressure on the enemy economy, scripted for the sims. From `from` on, `squads` small squads of
+ * fast units each hunt a different harvester (SquadAI's hit and run: kill, on to the next, home when outgunned or
+ * worn down, topped up there). Behind them, a backup group (up to `backup` credits of the army) waits out of reach of
+ * the enemy's turrets and bunkers, and falls on any group that comes out to chase the squads, if it can beat it.
+ * The rest of the army stays Brutal's. Counters land in `stats` (press*).
+ */
+class PressureAI extends BrutalAI {
+  private squads: { units: Set<Unit>; regroup: boolean; prey: Unit | null }[] = [];
+  private backup = new Set<Unit>();
+  private timer = 0;
+  constructor(game: Game, team: Team, profile: AIProfile, opts: BrutalOptions, private readonly p: PressureOpts) {
+    super(game, team, profile, opts);
+    for (let i = 0; i < p.squads; i++) this.squads.push({ units: new Set(), regroup: true, prey: null });
+    Object.assign(this.stats, { pressHarv: 0, pressLost: 0, backupKills: 0, backupLost: 0, backupFights: 0 });
+  }
+
+  private get st() {
+    return this.stats as unknown as Record<string, number>;
+  }
+
+  /** Keeps the squads' units coming: while there are fewer than the squads need, they're the next pick. */
+  protected chooseUnit(): UnitType {
+    const g = this.game;
+    const need = this.p.squads * this.p.size;
+    const have = g.count(this.team, this.p.unit) + this.ts.queues[g.unitDef(this.team, this.p.unit).producer].filter((q) => q.type === this.p.unit).length;
+    if (g.time >= this.p.from - 60 && have < need && g.canTrain(this.team, this.p.unit)) return this.p.unit;
+    return super.chooseUnit();
+  }
+
+  /** Units at home the AI can spare. */
+  private spare(pred: (u: Unit) => boolean): Unit[] {
+    const out: Unit[] = [];
+    for (const [u, r] of this.roles) if (!u.dead && !u.carrier && r === 'home' && pred(u)) out.push(u);
+    return out;
+  }
+
+  private take(u: Unit, into: Set<Unit>): void {
+    this.leaveGroups(u);
+    this.roles.set(u, 'drop'); // out of every other job the AI has
+    into.add(u);
+  }
+
+  update(dt: number): void {
+    super.update(dt);
+    if ((this.timer -= dt) > 0) return;
+    this.timer = 0.5;
+    const g = this.game;
+    const rally = this.rally;
+    if (g.time < this.p.from || !rally) return;
+    // Base attacked by more than the units at home can handle: everyone goes back to Brutal.
+    if ((this as unknown as { outgunned: boolean }).outgunned) {
+      for (const sq of this.squads) for (const u of sq.units) this.giveBack(u, sq.units);
+      for (const u of [...this.backup]) this.giveBack(u, this.backup);
+      return;
+    }
+    const preyTaken = new Set<Unit>();
+    for (const sq of this.squads) this.runSquad(sq, rally, preyTaken);
+    this.runBackup(rally);
+  }
+
+  private giveBack(u: Unit, from: Set<Unit>): void {
+    from.delete(u);
+    if (!u.dead) this.roles.set(u, 'home');
+  }
+
+  private runSquad(sq: PressureAI['squads'][number], rally: { x: number; z: number }, taken: Set<Unit>): void {
+    const g = this.game;
+    for (const u of [...sq.units]) if (u.dead) {
+      sq.units.delete(u);
+      this.st.pressLost++;
+    }
+    if (sq.prey?.dead) {
+      this.st.pressHarv++;
+      sq.prey = null;
+    }
+    if (sq.units.size < this.p.size) for (const u of this.spare((u) => u.type === this.p.unit)) {
+      if (sq.units.size >= this.p.size) break;
+      this.take(u, sq.units);
+      u.command(g, { kind: 'move', x: rally.x, z: rally.z });
+    }
+    const units = [...sq.units];
+    if (!units.length) return;
+    const c = this.centroid(sq.units);
+    const strength = units.reduce((s, u) => s + power(u), 0);
+    if (sq.regroup) {
+      if (sq.units.size >= this.p.size && units.every((u) => hypot(u.x - rally.x, u.z - rally.z) < 8 * TILE)) sq.regroup = false;
+      else {
+        for (const u of units) if (u.order.kind === 'idle' && hypot(u.x - rally.x, u.z - rally.z) > 4 * TILE) u.command(g, { kind: 'move', x: rally.x, z: rally.z });
+        return;
+      }
+    }
+    if (sq.units.size <= Math.ceil(this.p.size / 2) || this.guardAround(c, 9) > strength * 0.8 || defensesNear(this, c, 7) > 1) {
+      sq.regroup = true;
+      sq.prey = null;
+      for (const u of units) u.command(g, { kind: 'move', x: rally.x, z: rally.z });
+      return;
+    }
+    let prey: Unit | null = null;
+    let best = 14 * TILE;
+    for (const e of g.units) {
+      if (e.team === this.team || e.dead || e.carrier || e.type !== 'harvester' || taken.has(e) || !g.sees(this.team, e)) continue;
+      const d = hypot(e.x - c.x, e.z - c.z);
+      if (d < best && defensesNear(this, e, 6) === 0) {
+        best = d;
+        prey = e;
+      }
+    }
+    if (prey) {
+      taken.add(prey);
+      sq.prey = prey;
+      for (const u of units) if (u.order.kind !== 'attack' || u.order.target !== prey) u.command(g, { kind: 'attack', target: prey });
+      return;
+    }
+    // Else to the least guarded harvester we know of (another one than the other squads', where we can).
+    const others = this.squads.filter((o) => o !== sq && o.units.size).map((o) => this.centroid(o.units));
+    let goal: { x: number; z: number } | null = null;
+    let bestScore = Infinity;
+    for (const h of this.intel.placedUnits()) {
+      if (!h.harvester || defensesNear(this, h, 6)) continue;
+      const guard = this.guardAround(h, 12);
+      if (guard > strength * 0.5) continue;
+      const crowd = others.some((o) => hypot(o.x - h.x, o.z - h.z) < 10 * TILE) ? 400 : 0;
+      const score = guard + crowd + hypot(h.x - c.x, h.z - c.z) * 5;
+      if (score < bestScore) {
+        bestScore = score;
+        goal = h;
+      }
+    }
+    goal ??= this.intel.enemyBase();
+    for (const u of units) {
+      const o = u.order;
+      if (o.kind === 'attack' && !o.target.dead) continue;
+      if (o.kind !== 'move' || hypot(o.x - goal.x, o.z - goal.z) > 4 * TILE) u.command(g, { kind: 'move', x: goal.x, z: goal.z });
+    }
+  }
+
+  private runBackup(rally: { x: number; z: number }): void {
+    const g = this.game;
+    for (const u of [...this.backup]) if (u.dead) {
+      this.backup.delete(u);
+      this.st.backupLost += u.def.cost;
+    }
+    let have = [...this.backup].reduce((s, u) => s + u.def.cost, 0);
+    const atHome = (u: Unit) => hypot(u.x - rally.x, u.z - rally.z) < 10 * TILE;
+    if ([...this.backup].every(atHome)) {
+      for (const u of this.spare((u) => !!u.def.weapon && u.type !== this.p.unit && u.type !== 'harvester' && !u.def.air && u.deployState === 'mobile')) {
+        if (have + u.def.cost > this.p.backup) continue;
+        this.take(u, this.backup);
+        have += u.def.cost;
+      }
+    }
+    const units = [...this.backup];
+    if (!units.length) return;
+    const c = this.centroid(this.backup);
+    const strength = units.reduce((s, u) => s + power(u), 0);
+    // Outgunned: home.
+    if (this.guardAround(c, 10) > strength * 1.1) {
+      for (const u of units) if (u.order.kind !== 'move' || hypot(u.order.x - rally.x, u.order.z - rally.z) > 3 * TILE) u.command(g, { kind: 'move', x: rally.x, z: rally.z });
+      return;
+    }
+    // Defenders out chasing our squads, away from their turrets and bunkers, and that we can beat: on them.
+    let prey: Unit | null = null;
+    let best = 16 * TILE;
+    for (const e of g.units) {
+      if (e.team === this.team || e.dead || e.carrier || !e.def.weapon || e.def.air || !g.sees(this.team, e)) continue;
+      const d = hypot(e.x - c.x, e.z - c.z);
+      if (d >= best || defensesNear(this, e, 8)) continue;
+      if (this.guardAround(e, 8) > strength * 0.8) continue;
+      best = d;
+      prey = e;
+    }
+    if (prey) {
+      this.st.backupFights += 0.5;
+      for (const u of units) if (u.order.kind !== 'amove' || hypot(u.order.x - prey.x, u.order.z - prey.z) > 3 * TILE) u.command(g, { kind: 'amove', x: prey.x, z: prey.z });
+      return;
+    }
+    // Else wait behind the squads: back from the busiest one toward home, out of reach of their defenses.
+    const out = this.squads.filter((s) => !s.regroup && s.units.size);
+    if (!out.length) {
+      for (const u of units) if (u.order.kind === 'idle' && !atHome(u)) u.command(g, { kind: 'move', x: rally.x, z: rally.z });
+      return;
+    }
+    const sc = this.centroid(out[0].units);
+    const len = hypot(rally.x - sc.x, rally.z - sc.z) || 1;
+    let back = 8 * TILE;
+    let spot = { x: sc.x, z: sc.z };
+    for (; back < len; back += 2 * TILE) {
+      spot = { x: sc.x + ((rally.x - sc.x) / len) * back, z: sc.z + ((rally.z - sc.z) / len) * back };
+      if (!defensesNear(this, spot, 13)) break;
+    }
+    for (const u of units) {
+      const o = u.order;
+      if (u.target) continue;
+      if (o.kind !== 'amove' || hypot(o.x - spot.x, o.z - spot.z) > 4 * TILE) u.command(g, { kind: 'amove', x: spot.x, z: spot.z });
+    }
+  }
+}
+
 export const STRATS: Record<string, Strat> = {
   std: { profile: BRUTAL_PROFILE },
   // Barracks first, infantry, early pressure, no tech.
@@ -160,6 +378,18 @@ export const CORRINO_STRATS: Record<string, Strat> = {
 
 /** Variants for single tests, not in the round robin. */
 export const CORRINO_EXTRA: Record<string, Strat> = {
+  // Maximum pressure on harvesters (PressureAI): two squads of four Razors hunting from 3:00, a backup group of up
+  // to 3,000 credits behind them punishing the defenders, the rest of the army Brutal's. Army: stock Brutal's picks.
+  press: { profile: BRUTAL_PROFILE, pressure: { unit: 'razor', squads: 2, size: 4, from: 180, backup: 3000 } },
+  // The same with a heavier Razor share, so the squads stay topped up.
+  pressr: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, razor: 2 } }, pressure: { unit: 'razor', squads: 2, size: 4, from: 180, backup: 3000 } },
+  // Sky Raider squads (over cliffs; turrets can't hit them), three each, from Tleilaxu on.
+  // Controls for pressair: its army without the pressure; and the pressure without the backup group.
+  airmix: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, raider: 2 } } },
+  pressairnb: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, raider: 2 } }, pressure: { unit: 'raider', squads: 2, size: 3, from: 180, backup: 0 } },
+  // Trooper squads (slow, but they hit harvesters hardest and outrange Troopers' prey), six each.
+  presstroop: { profile: BRUTAL_PROFILE, pressure: { unit: 'trooper', squads: 2, size: 6, from: 180, backup: 3000 } },
+  pressair: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, raider: 2 } }, pressure: { unit: 'raider', squads: 2, size: 3, from: 180, backup: 3000 } },
   // An early razor rush off two Fabs, troopers alongside, no tech.
   razorrush: {
     profile: plan({ opening: ['refinery', 'barracks', 'factory', 'factory'], harvesters: 3, extraRefinery: 'never', techArmy: 40, mix: cmix({ razor: 3, trooper: 1 }), initiative: 1 }),
@@ -290,7 +520,7 @@ export function makeStrat(g: Game, team: Team, name: string): AI {
 
 function makeStratFrom(g: Game, team: Team, s: Strat): AI {
   const opts = { ...BRUTAL_OPTIONS, ...s.opts };
-  const ai = s.squad ? new SquadAI(g, team, s.profile, opts, s.squad) : new BrutalAI(g, team, s.profile, opts);
+  const ai = s.pressure ? new PressureAI(g, team, s.profile, opts, s.pressure) : s.squad ? new SquadAI(g, team, s.profile, opts, s.squad) : new BrutalAI(g, team, s.profile, opts);
   if (s.firstWave !== undefined) (ai as unknown as { nextWaveTime: number }).nextWaveTime = s.firstWave;
   return ai;
 }

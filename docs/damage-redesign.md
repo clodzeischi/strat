@@ -637,3 +637,34 @@ deathball against Fremen was "perfectly fine" (viable, not crushing), the off-ma
 repo; their jobs can be redone with `sim/ava.sh` (`FACTION`, `FACTION_B`), `sim/cross-detail.ts` +
 `sim/cross-summary.ts`, `sim/relevance.sh`, `sim/matrix-report.ts` and `sim/config-check.ts`. Regenerate the
 counter table (`npx tsx sim/matchups.ts`, which honours TUNE) after any stat change.
+
+## 11. The Corrino turtle against harvester pressure (2026-10-26)
+
+The user's question: does maximum pressure on harvesters, making the turtle react and punishing the small squads it
+sends out, beat it? New in `sim/ava-strats.ts`: `PressureAI` (Corrino extras `press*`): from 3:00, two squads hunt
+harvesters (hit and run, home when outgunned, topped up there, their unit kept in production), and a backup group (up
+to 3,000 credits) waits behind them out of reach of turrets and bunkers and falls on any defenders it can beat. The
+rest of the army stays stock Brutal's. `sim/press-trace.ts` traces one game.
+
+Against the turtle (40 games each, Corrino mirror):
+
+| plan | win | turtle harvesters killed / game | own lost | spice lead |
+|---|---|---|---|---|
+| std (control) | 31 | | | |
+| press (Razor squads) | 25 | | | |
+| pressr (Razor squads, more Razors) | 16 | | | |
+| presstroop (Trooper squads of 6) | 48 | | | |
+| airmix (pressair's army, no pressure) | 28 | 2.9 | 4.0 | -655 |
+| pressairnb (Sky Raider squads, no backup) | 39 | 3.9 | 4.2 | -994 |
+| **pressair** (Sky Raider squads of 3 + backup) | **69** | 5.4 | 2.5 | +1,271 |
+
+- It's the tactic, not the army: the same army without it wins 28%. Squads alone help a little; the backup group is
+  what makes it work (it halves squad losses, 16 to 8 Sky Raiders a game, and kills the defenders).
+- Razors are the wrong tool: Troopers (range 9 to the Razor's 4) kill most of them, and they hit harvesters weakly.
+  Sky Raiders fly over cliffs and turrets can't touch them.
+- pressair against the other plans (30 games): rush 83, dev 87, std 67, air 63, razor 62, **sard 43** (Sardaukar shoot
+  aircraft hard). presstroop: std 60, dev 80.
+
+So the turtle isn't unbeatable: its 78% came from no plan in the round robin exploiting its passive economy. The
+pressure tactic beats almost everything because stock Brutal doesn't have it. Next step if wanted: give stock Brutal
+(the real opponent) this behavior, then rerun the mirrors.
