@@ -88,7 +88,7 @@ export class Carryall extends Unit {
     this.path = [];
     this.target = null;
     if (order.kind === 'move' || order.kind === 'amove') this.task = { kind: 'move', x: order.x, z: order.z };
-    else if (order.kind === 'attack') this.task = { kind: 'move', x: order.target.x, z: order.target.z };
+    else if (order.kind === 'attack' || order.kind === 'follow') this.task = { kind: 'move', x: order.target.x, z: order.target.z };
     else this.task = { kind: 'orbit', x: this.x, z: this.z };
   }
 

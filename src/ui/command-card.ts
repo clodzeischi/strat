@@ -360,7 +360,7 @@ export class CommandCard {
       icon: () => 'rally',
       name: () => 'Rally All',
       cost: () => 0,
-      tip: () => 'Then click a spot (or the minimap): new units from every one of your production buildings go there. What you have selected stays selected.',
+      tip: () => 'Then click a spot (or the minimap): new units from every one of your production buildings go there. Click one of your units: they follow it. What you have selected stays selected.',
       view: () => ({ disabled: !input.allProducers().length, active: input.rallyAllMode }),
       use: () => input.rallyAll(),
     };
@@ -488,7 +488,7 @@ export class CommandCard {
         () => input.canDrop(), () => input.dropMode, () => input.drop()),
       unload: command('unload', 'Unload', 'Selected bunkers let their infantry out.', () => input.canUnload(), () => false, () => input.unload()),
       rally: command('rally', 'Rally Point',
-        'Then click a spot (or the minimap): new units from the selected buildings go there, leaving by the side that faces it. Right-clicking the ground does the same.',
+        'Then click a spot (or the minimap): new units from the selected buildings go there, leaving by the side that faces it. Click one of your units: they follow it (until it dies). Right-clicking does the same.',
         () => input.ownProducers().length > 0, () => input.rallyMode, () => input.rally()),
       deploy: {
         icon: () => 'deploy',

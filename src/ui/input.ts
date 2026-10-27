@@ -515,11 +515,14 @@ export class Input {
     this.rallyAllMode = !on;
   }
 
-  private setRally(x: number, z: number, all = false): void {
+  /** On one of our units (`on`), the rally point goes with it and new units follow it. */
+  private setRally(x: number, z: number, all = false, on: Entity | null = null): void {
     const producers = all ? this.allProducers() : this.ownProducers();
     if (!producers.length) return;
-    this.issue({ c: 'rally', buildings: producers.map((b) => b.id), x, z });
-    this.game.effects.marker(new THREE.Vector3(x, this.game.map.surfaceAt(x, z), z), 0x7cff7c);
+    const lead = on instanceof Unit && on.team === this.team && !(on instanceof Carryall) ? on : null;
+    this.issue({ c: 'rally', buildings: producers.map((b) => b.id), x, z, target: lead?.id ?? null });
+    if (lead) this.game.effects.marker(new THREE.Vector3(lead.x, lead.y, lead.z), 0x7cff7c);
+    else this.game.effects.marker(new THREE.Vector3(x, this.game.map.surfaceAt(x, z), z), 0x7cff7c);
   }
 
   /** Corrino: start (or stop) the selected damaged structures repairing themselves. */
@@ -676,7 +679,7 @@ export class Input {
       this.rallyMode = false;
       this.rallyAllMode = false;
       const g = this.groundPoint(p.x, p.y);
-      if (g) this.setRally(g.x, g.z, all);
+      if (g) this.setRally(g.x, g.z, all, this.pick(p.x, p.y));
       return;
     }
     if (wasDragging) this.boxSelect(start, p, e.shiftKey);
@@ -739,7 +742,7 @@ export class Input {
     const team = this.team;
     const units = this.ownUnits();
     if (units.length === 0) {
-      this.setRally(point.x, point.z);
+      this.setRally(point.x, point.z, false, target);
       return;
     }
     this.issue({ c: 'go', units: units.map((u) => u.id), x: point.x, z: point.z, target: target?.id ?? null, attack: attackMove, queue: this.queueing });
@@ -747,7 +750,7 @@ export class Input {
     if (target && target.team !== team) g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xff5040);
     else if (target && target.hp < target.maxHp && repairable(target) && units.some((u) => u.def.repair)) {
       g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xffd27a);
-    } else if (target && (target instanceof Carryall || target instanceof Building || units.some((u) => u instanceof Carryall))) {
+    } else if (target && (target instanceof Carryall || target instanceof Building || target instanceof Unit || units.some((u) => u instanceof Carryall))) {
       g.effects.marker(new THREE.Vector3(target.x, g.map.surfaceAt(target.x, target.z), target.z), 0x7cff7c);
     } else g.effects.marker(point, attackMove ? 0xff9040 : 0x7cff7c);
   }

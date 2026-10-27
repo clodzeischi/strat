@@ -639,10 +639,7 @@ export class Game {
     this.scene.add(b.root);
     this.buildings.push(b);
     if (PRODUCERS.includes(type as Producer)) {
-      // Default rally point: a few tiles out of the door, where units used to gather.
-      const front = b.frontCell();
-      const out = b.doorStep();
-      b.rally = { x: this.map.center(front.cx + out.dx * 2), z: this.map.center(front.cz + out.dz * 2) };
+      b.rally = this.defaultRally(b);
     }
     if (type === 'refinery') {
       const dock = this.dockCell(b);
@@ -677,6 +674,7 @@ export class Game {
       const z = this.map.center(c.cz);
       const u = this.spawnUnit(type, team, x, z, site.doorHeading());
       u.startPod(this, x, z);
+      if (site.rallyUnit) u.order = { kind: 'follow', target: site.rallyUnit };
       this.onDrop(u, u);
       return;
     }
@@ -689,6 +687,10 @@ export class Game {
       u.commandHarvest(this, null);
       return;
     }
+    if (site.rallyUnit) {
+      u.command(this, { kind: 'follow', target: site.rallyUnit });
+      return;
+    }
     if (!site.rallyDefault) {
       u.command(this, { kind: 'move', x: rally.x, z: rally.z });
       return;
@@ -699,10 +701,31 @@ export class Game {
     if (s) u.command(this, { kind: 'move', x: this.map.center(s.cx), z: this.map.center(s.cz) });
   }
 
-  /** Sets where a producer's new units go. */
-  setRally(b: Building, x: number, z: number): void {
-    b.rally = { x, z };
+  /** The default rally point: a few tiles out of the door, where units used to gather. */
+  private defaultRally(b: Building): { x: number; z: number } {
+    const front = b.frontCell();
+    const out = b.doorStep();
+    return { x: this.map.center(front.cx + out.dx * 2), z: this.map.center(front.cz + out.dz * 2) };
+  }
+
+  /** Sets where a producer's new units go; on a unit (`lead`), they follow it, and the point goes with it. */
+  setRally(b: Building, x: number, z: number, lead: Unit | null = null): void {
+    b.rally = lead ? { x: lead.x, z: lead.z } : { x, z };
     b.rallyDefault = false;
+    b.rallyUnit = lead;
+  }
+
+  /** Rally points set on units go with them; once the unit is gone, back to the default. */
+  private updateRallies(): void {
+    for (const b of this.buildings) {
+      const u = b.rallyUnit;
+      if (!u) continue;
+      if (u.dead || u.team !== b.team) {
+        b.rallyUnit = null;
+        b.rally = this.defaultRally(b);
+        b.rallyDefault = true;
+      } else b.rally = { x: u.x, z: u.z };
+    }
   }
 
   /** Starts salvaging a structure: its infantry come out, and in a few seconds it's gone for part of its price. */
@@ -2245,6 +2268,11 @@ export class Game {
           w.lairX = w.x;
           w.lairZ = w.z;
         }
+      } else if (o.kind === 'follow' && !o.target.dead) {
+        // Following one of ours: the worm keeps near it, biting what it meets on the way.
+        gx = o.target.x;
+        gz = o.target.z;
+        w.target = null;
       } else if (o.kind === 'attack' && !o.target.dead && o.target.team !== w.team) {
         gx = o.target.x;
         gz = o.target.z;
@@ -2433,6 +2461,7 @@ export class Game {
       this.updateHiding(true);
       this.vision.update(this.units, this.buildings, this.ticks);
     }
+    this.updateRallies();
     for (const ts of this.teams) this.updateProduction(ts, dt);
     // Alternate the order units act in, so neither side always gets the first shot in a tick.
     const order = this.ticks % 2 ? this.units : [...this.units].reverse();
@@ -2549,7 +2578,7 @@ export class Game {
     for (const ts of this.teams) h.num(ts.credits).int(ts.upgrades.size);
     for (const u of this.units) h.int(u.id).num(u.x).num(u.z).num(u.y).num(u.hp).num(u.shields).num(u.heading);
     for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected).int(u.queue.length).num(u.rite?.until ?? -1);
-    for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields);
+    for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields).int(b.rallyUnit?.id ?? -1);
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
     for (const d of this.drums) h.int(d.b.id).num(d.due);
     for (const w of this.worms) h.num(w.x).num(w.z).num(w.nextBite).int(w.target?.id ?? -1);

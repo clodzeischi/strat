@@ -53,6 +53,8 @@ export class Building extends Entity {
   rally: Point | null = null;
   /** Whether the rally point is still the default one (new units then spread around it instead of stacking). */
   rallyDefault = true;
+  /** A unit of ours the rally point is set on: it moves with it, new units follow it, and it resets when it dies. */
+  rallyUnit: Unit | null = null;
   /** Being salvaged: 0 to 1, after which it's removed and part of its price refunded. */
   salvage: number | null = null;
   /** Corrino: mending itself (paid as it goes) until back at full health. */
