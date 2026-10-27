@@ -593,6 +593,9 @@ before 14:00. That's a strategy problem, not a matrix one; left open.
 
 ## 10. State at the end of the first pass (branch `damage-redesign`, 2026-10-26)
 
+**Playtested and merged into main (2026-10-26).** The user played all three factions and liked it; a Devastator
+deathball against Fremen was "perfectly fine" (viable, not crushing), the off-matchup case the redesign was after.
+
 **Achieved:**
 
 | goal | baseline | now |
