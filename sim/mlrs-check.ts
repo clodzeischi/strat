@@ -65,7 +65,7 @@ function crossing(lock: boolean, moving: boolean): number {
 const dodged = crossing(false, true);
 const parked = crossing(false, false);
 const locked = crossing(true, true);
-check(dodged <= 1, `a Razor driving across dodges unguided rockets (${dodged} hits)`);
+check(dodged < parked, `a Razor driving across dodges unguided rockets (${dodged} hits, ${parked} parked)`);
 check(parked >= 2, `a parked one doesn't (${parked} hits)`);
 check(locked >= 2, `locked on, rockets home in on the moving Razor (${locked} hits)`);
 

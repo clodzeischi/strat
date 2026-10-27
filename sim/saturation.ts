@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
 import { SPICE } from '../src/map';
-import { BUILDINGS, type Team } from '../src/config';
+import type { Team } from '../src/config';
 
 const g0 = new Game(new THREE.Scene(), new THREE.PerspectiveCamera());
 let tiles = 0, spice = 0;

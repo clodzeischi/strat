@@ -7,6 +7,7 @@
 import './tune';
 import { BUILDINGS, FACTIONS, MIN_HIT, STRUCTURE, unitDef, shieldsFor, type Faction, type UnitType } from '../src/config';
 import type { UnitDef, WeaponDef, Tag } from '../src/config/types';
+import { weaponDamage } from '../src/game/game';
 
 const FLOOR = Number(process.argv[2] ?? 0.4);
 const ROSTER: Record<Faction, UnitType[]> = {
@@ -27,7 +28,7 @@ const TARGETS: Target[] = [
 ];
 
 /** One hit before armor (the game's weaponDamage). */
-const perHit = (w: WeaponDef, tags: Tag[]) => (w.airDamage !== undefined && tags.includes('air') ? w.airDamage : w.damage + tags.reduce((s, t) => s + (w.bonus[t] ?? 0), 0));
+const perHit = (w: WeaponDef, tags: Tag[]) => weaponDamage(w, { tags });
 /** Seconds one weapon needs to empty a target's health and shields (Infinity if it can't hit it). */
 function timeToKill(w: WeaponDef, tg: Target): number {
   if (tg.air && !w.air) return Infinity;

@@ -1,5 +1,7 @@
 # Strat roadmap
 
+> A design log: plans and decisions as they were made. Unit numbers in it are from when each part was written; the current ones are in the [manual](manual/README.md), generated from `src/config`.
+
 Living plan for upcoming features and the AI difficulty work. Decisions are marked **Decided**; everything else is a proposal.
 
 ## Order of work
@@ -440,7 +442,7 @@ Next for Brutal: rocket-launcher armies and turtles are its weakest matchups (ki
 
 **Reaction time instead of APM:** each level gets a reaction delay (around 2 s / 1 s / 0.3 s).
 
-**Open:** should Brutal get resource bonuses? Current recommendation: no. Should the AI only see what its units can see? Today it sees the whole map.
+**Open:** should Brutal get resource bonuses? Current recommendation: no. (The AI now plays under the fog of war, knowing only what its side has seen: `src/game/intel.ts`.)
 
 ## Simulation findings (single map, seed 7)
 

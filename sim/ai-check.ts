@@ -29,7 +29,7 @@ function setup(warmup = 420, waves = false): Setup {
   const ai: Brain = createAI(g, AI_TEAM, DIFFICULTY);
   const s: Setup = { g, ai, offers: 0 };
   g.onSurrenderOffer = () => s.offers++;
-  for (const b of g.buildings) if (b.team === PLAYER_TEAM) b.hp = b.maxHp = 1e9;
+  for (const b of g.buildings) if (b.team === PLAYER_TEAM) Object.assign(b, { hp: 1e9, maxHp: 1e9 });
   for (const u of g.units) if (u.team === PLAYER_TEAM) kill(g, u);
   // No attacks or scouting runs of its own (Hard attacks whenever it's stronger, and the player here has no army), so
   // the army stays home.
@@ -117,7 +117,6 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
   check(trike[0].dead, 'trike harassing a harvester is killed', `${Math.round(r.time)}s`);
   check(r.units.size <= 4, 'only a few units respond to one trike', `${r.units.size} of ${total}`);
   run(s, 45);
-  const home = conyard(s.g);
   const strays = army(s.g, AI_TEAM).filter((u) => dist(u, rallyOf(s)) > 14 * TILE);
   check(strays.length === 0, 'defenders are back home 45s later', `${strays.length} still out`);
 }
@@ -145,7 +144,7 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
   const home = conyard(s.g);
   const player = s.g.buildings.find((b) => b.team === PLAYER_TEAM)!;
   const kiter = spawnAttackers(s.g, 'trike', 1, home, 16)[0];
-  kiter.hp = kiter.maxHp = 1e6; // it only needs to keep the bait going
+  Object.assign(kiter, { hp: 1e6, maxHp: 1e6 }); // it only needs to keep the bait going
   let farthest = 0;
   let next = 0;
   run(s, 120, () => {

@@ -59,12 +59,12 @@ class Conn {
 const host = new Conn();
 const guest = new Conn();
 await Promise.all([host.open(), guest.open()]);
-host.send({ t: 'host', name: 'Ada', size: 64, version: PROTOCOL_VERSION });
+host.send({ t: 'host', name: 'Ada', size: 64, faction: 'atreides', version: PROTOCOL_VERSION });
 const { code } = await host.next('hosted');
 guest.send({ t: 'list' });
 const { rooms } = await guest.next('rooms');
 check(rooms.some((r) => r.code === code && r.host === 'Ada'), 'the hosted game shows in the lobby', `${rooms.length} open`);
-guest.send({ t: 'join', code, name: 'Bo', version: PROTOCOL_VERSION });
+guest.send({ t: 'join', code, name: 'Bo', faction: 'corrino', version: PROTOCOL_VERSION });
 const matches: MatchInfo[] = [(await host.next('match')).match, (await guest.next('match')).match];
 check(matches[0].seed === matches[1].seed && matches[0].team === 0 && matches[1].team === 1, 'both get the same map and different sides', `seed ${matches[0].seed}`);
 

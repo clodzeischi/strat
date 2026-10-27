@@ -15,6 +15,8 @@
 | `render/` | Drawing: `terrain.ts` (ground mesh), `camera.ts`, `shadows.ts`, `rally-lines.ts` (the selected buildings' rally points), `effects/` (one file per effect pool, plus `effects.ts`). |
 | `ui/` | Player-facing: `input.ts` (mouse and keys, turned into commands; the selection and its subgroups), `command-card.ts` (the 4×3 grid of tabs and buttons; its Command tab follows the selection's lead subgroup) with `keys.ts` (hotkeys by key position) and `icons.ts`, `hud.ts` (credits, minimap, messages), `audio.ts` (loading and mixing audio) with `voice.ts` (the announcer and unit voice lines), `sounds.ts` (shots, blasts and clicks) and `music.ts` (the title and match music), `menu.ts`, `replay-viewer.ts` (the controls and numbers while watching a replay), `placement.ts` (building placement grid). |
 
+Outside `src/`: `server/` (the game server for online play), `sim/` (headless simulations and checks: balance batches, the AI's counter table `sim/matchups.ts`, the manual's generator `sim/manual.ts`, and the `*-check.ts` scripts that `npm run check` runs with the typechecks), `docs/` (design notes, balance logs, and the player manual in `docs/manual/`) and `art/` (the Blender sources of the models).
+
 Folders that are split into several files have an `index.ts`, so the rest of the code imports `../config`, `../map`, `../entities` or `../models` without caring which file something is in.
 
 Kept in one file on purpose: `GameMap`, `Unit` and `Game` are each one class; splitting a class across files would make it harder to follow. Shader code stays in TypeScript strings rather than `.glsl` files, because the headless sims in `sim/` load the terrain code and can't import raw shader files the way the browser build can.

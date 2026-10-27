@@ -18,7 +18,7 @@ function setup(): { g: Game; bunker: Building } {
     u.hp = 0;
     (g as unknown as { kill(e: unknown, by: null): void }).kill(u, null);
   }
-  for (const b of g.buildings) b.hp = b.maxHp = 1e9; // the yards stay out of it
+  for (const b of g.buildings) Object.assign(b, { hp: 1e9, maxHp: 1e9 }); // the yards stay out of it
   const m = g.map;
   const mid = Math.round(m.size / 2);
   const c = m.nearestCell(mid, mid, (x, z) => [0, 1, 2, 3].every((k) => m.canEnter(x + (k % 2), z + (k >> 1), 'vehicle')) && m.tile(x, z) !== 3, 20)!;

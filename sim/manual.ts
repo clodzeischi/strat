@@ -10,6 +10,7 @@ import {
   type BuildingType, type Faction, type LevelUpType, type Req, type UnitType, type UpgradeType,
 } from '../src/config';
 import type { UnitDef, WeaponDef } from '../src/config/types';
+import { weaponDamage } from '../src/game/game';
 
 const tiles = (v: number) => +(v / TILE).toFixed(2);
 const num = (v: number) => +v.toFixed(2);
@@ -62,7 +63,7 @@ function dpsShare(fa: Faction, a: UnitType, fb: Faction, b: UnitType): number {
   const sh = shieldsFor(fb, db);
   const w = da.deploy?.weapon ?? da.weapon;
   if (!w || (db.air && !w.air) || (w.only && !db.tags.some((t) => w.only!.includes(t)))) return 0;
-  const hit = w.airDamage !== undefined && db.air ? w.airDamage : w.damage + db.tags.reduce((s, t) => s + (w.bonus[t] ?? 0), 0);
+  const hit = weaponDamage(w, db);
   const hits = (w.pierce ? 0 : sh / Math.max(MIN_HIT, hit)) + db.hp / Math.max(MIN_HIT, hit - (db.armor ?? 0));
   return 1000 / da.cost / (hits * w.cooldown);
 }

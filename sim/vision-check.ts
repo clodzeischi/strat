@@ -21,7 +21,7 @@ function setup(): Game {
     u.hp = 0;
     (g as unknown as { kill(e: unknown, by: null): void }).kill(u, null);
   }
-  for (const b of g.buildings) b.hp = b.maxHp = 1e9;
+  for (const b of g.buildings) Object.assign(b, { hp: 1e9, maxHp: 1e9 });
   g.update(0.05);
   return g;
 }

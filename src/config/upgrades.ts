@@ -1,10 +1,5 @@
 import type { UpgradeDef, UpgradeType } from './types';
 
-export const UPGRADE_ORDER: UpgradeType[] = [
-  'weapons1', 'weapons2', 'armor1', 'armor2', 'rockets', 'nitro', 'harvest', 'cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame',
-  'fWeapons', 'fWeapons2', 'fArmor', 'fArmor2', 'fHarvest', 'stillsuit', 'sandwalk', 'ambush',
-];
-
 export const UPGRADES: Record<UpgradeType, UpgradeDef> = {
   weapons1: { line: 'weapons', name: 'Weapons I', short: 'Weapons I', cost: 700, time: 25, requires: ['factory'], desc: 'Every weapon hits 15% harder, bonus damage included (armor still comes off each hit).' },
   weapons2: { line: 'weapons', name: 'Weapons II', short: 'Weapons II', cost: 1200, time: 45, requires: ['conyard2'], after: 'weapons1', desc: 'Every weapon hits 30% harder in all, bonus damage included.' },

@@ -1,9 +1,5 @@
 import type { BuildingDef, BuildingType, LevelDef, LevelUpType, Req, Tag } from './types';
 
-export const BUILDING_ORDER: BuildingType[] = [
-  'conyard', 'refinery', 'barracks', 'bunker', 'factory', 'hitech', 'fab', 'tleilaxu', 'pad', 'turret', 'sietch', 'perch', 'thumper', 'camp',
-];
-
 export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   conyard: {
     name: 'Construction Yard', short: 'Const. Yard', cost: 2500, buildTime: 25, hp: 1600, size: 3, requires: [],

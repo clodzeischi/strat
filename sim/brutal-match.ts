@@ -36,7 +36,7 @@ export const VARIANTS: Record<string, { opts?: Partial<BrutalOptions>; profile?:
   'para-wave': { opts: { paraWithWave: true } },
   'harv-7': { profile: { harvesters: 7 } },
   'outmatched-1.6': { profile: { sustain: { ...BRUTAL_PROFILE.sustain, outmatched: 1.6 } } },
-  'mix-turret': { profile: { mix: { infantry: 0.4, trike: 0.3, tank: 1.2, rocket: 1.2 } } },
+  'mix-turret': { profile: { mix: { ...BRUTAL_PROFILE.mix, infantry: 0.4, trike: 0.3, tank: 1.2, rocket: 1.2 } } },
 };
 
 const [variant, opponent, gamesArg, offsetArg] = process.argv.slice(2);

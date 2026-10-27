@@ -1,10 +1,5 @@
 import type { UnitDef, UnitType } from './types';
 
-export const UNIT_ORDER: UnitType[] = [
-  'harvester', 'infantry', 'trike', 'tank', 'rocket', 'repair', 'carryall', 'trooper', 'sardaukar', 'razor', 'devastator', 'raider', 'artillery',
-  'warrior', 'fedaykin', 'crew', 'glider', 'mortar',
-];
-
 export const UNITS: Record<UnitType, UnitDef> = {
   harvester: {
     name: 'Harvester', producer: 'factory', cost: 800, buildTime: 10, hp: 600, armor: 2, speed: 3, turnRate: 3, radius: 1.1, sight: 8,

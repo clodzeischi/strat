@@ -5,7 +5,7 @@ import {
   RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
   type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
-  type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
+  type Tag, type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
 import { Effects } from '../render/effects/effects';
 import { Building, Carryall, distTo, facingToward, moveClassOf, repairable, SALVAGE, Unit, type Entity, type Mount } from '../entities';
@@ -2662,7 +2662,7 @@ function walksThrough(h: Unit, other: Unit): boolean {
 }
 
 /** Base damage plus the weapon's bonus for each of the target's tags, before upgrades. */
-export function weaponDamage(w: WeaponDef, target: Entity): number {
+export function weaponDamage(w: WeaponDef, target: { tags: readonly Tag[] }): number {
   if (w.airDamage !== undefined && target.tags.includes('air')) return w.airDamage;
   let dmg = w.damage;
   for (const t of target.tags) dmg += w.bonus[t] ?? 0;
@@ -2673,7 +2673,7 @@ export function weaponDamage(w: WeaponDef, target: Entity): number {
  * A weapon's hit on a target with `level` Weapons upgrades, before armor: each level adds WEAPON_STEP.share of the hit,
  * base and bonus alike (StarCraft's "+1 (+1 armored)"), or the weapon's own `step` if it sets one.
  */
-export function upgradedHit(w: WeaponDef, target: Entity, level: number): number {
+export function upgradedHit(w: WeaponDef, target: { tags: readonly Tag[] }, level: number): number {
   const hit = weaponDamage(w, target);
   return hit + level * (w.step ?? hit * WEAPON_STEP.share);
 }

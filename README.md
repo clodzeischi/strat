@@ -55,7 +55,7 @@ npm install
 npm run dev
 ```
 
-Then open the address Vite prints (usually http://localhost:5173). `npm run build` makes a production build in `dist/`.
+Then open the address Vite prints (usually http://localhost:5173). `npm run build` makes a production build in `dist/`. `npm run check` runs the typechecks and every check script in `sim/` (about 40 seconds).
 
 ## Multiplayer
 
