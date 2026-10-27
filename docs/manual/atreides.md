@@ -72,11 +72,11 @@ Cost in credits; speed and sight in tiles (per second for speed). Shields absorb
 
 | Unit | Cost | Build | Made at | Requires | Health | Shields | Armor | Speed | Sight | Tags |
 |---|---|---|---|---|---|---|---|---|---|---|
-| Infantry | 76 | 4.5 s | Barracks | Barracks | 116 | – | 0 | 1.2 | 5 | biological, light |
-| Trike | 110 | 4.5 s | Factory | Factory | 203 | – | 1 | 3.75 | 6 | mechanical, light |
+| Infantry | 80 | 4.5 s | Barracks | Barracks | 120 | – | 0 | 1.2 | 5 | biological, light |
+| Trike | 110 | 4.5 s | Factory | Factory | 200 | – | 1 | 3.75 | 6 | mechanical, light |
 | Tank | 425 | 9 s | Factory | Factory | 725 | – | 2 | 1.9 | 6.5 | mechanical, armored |
-| MLRS | 510 | 13 s | Factory | Factory Level 2 | 261 | – | 1 | 1.7 | 9 | mechanical, light |
-| Harvester | 800 | 10 s | Factory | Factory, Refinery | 600 | – | 3 | 1.5 | 4 | mechanical, light |
+| MLRS | 510 | 13 s | Factory | Factory Level 2 | 265 | – | 1 | 1.7 | 9 | mechanical, light |
+| Harvester | 800 | 10 s | Factory | Factory, Refinery | 600 | – | 2 | 1.5 | 4 | mechanical, armored |
 | Repair Vehicle | 450 | 8 s | Factory | Factory | 300 | – | 1 | 2.1 | 5 | mechanical, light |
 | Carryall | 400 | 8 s | Hi-Tech Factory | Hi-Tech Factory | 380 | – | 1 | 4.5 | 6 | mechanical, air |
 
@@ -88,9 +88,9 @@ Damage per hit, before armor, plus its bonus against targets with that tag. DPS 
 |---|---|---|---|---|---|
 | Infantry | 7 (+3 vs biological) | 0.6 | 11.67 | 3 | hits aircraft |
 | Infantry: rockets vs Armored (Infantry Rockets) | 14 (+12 vs armored) | 1.5 | 9.33 | 4.5 | hits aircraft |
-| Trike | 4 (+3 vs light) | 0.3 | 13.33 | 3.5 | ground only |
+| Trike | 5 (+3 vs light) | 0.3 | 16.67 | 3.5 | ground only |
 | Tank | 22 (+22 vs mechanical) | 1.4 | 15.71 | 4.5 | ground only |
-| MLRS | 44 (+30 vs structure) | 2.8 | 15.71 | 3–7.5 | hits aircraft for 60; splash 1.5 tiles; unguided: falls where the target stood |
+| MLRS | 44 (+30 vs structure) | 2.8 | 15.71 | 3–7.5 | hits aircraft for 60; splash 2 tiles; unguided: falls where the target stood |
 
 ### Unit notes
 

@@ -7,12 +7,12 @@ export const UNIT_ORDER: UnitType[] = [
 
 export const UNITS: Record<UnitType, UnitDef> = {
   harvester: {
-    name: 'Harvester', producer: 'factory', cost: 800, buildTime: 10, hp: 600, armor: 3, speed: 3, turnRate: 3, radius: 1.1, sight: 8,
+    name: 'Harvester', producer: 'factory', cost: 800, buildTime: 10, hp: 600, armor: 2, speed: 3, turnRate: 3, radius: 1.1, sight: 8,
     turret: false, infantry: false, tags: ['mechanical', 'light'], weapon: null, requires: ['factory', 'refinery'], lift: 6,
     desc: 'Collects spice and brings it to a Refinery.',
   },
   infantry: {
-    name: 'Infantry', producer: 'barracks', cost: 76, buildTime: 4.5, hp: 116, speed: 2.4, turnRate: 12, radius: 0.45, sight: 10,
+    name: 'Infantry', producer: 'barracks', cost: 80, buildTime: 4.5, hp: 120, speed: 2.4, turnRate: 12, radius: 0.45, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'],
     weapon: { range: 6, minRange: 0, damage: 7, bonus: { biological: 3 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
     antiArmor: { range: 9, minRange: 0, damage: 14, bonus: { armored: 12 }, cooldown: 1.5, projectile: 'rocket', speed: 18, splash: 0, air: true, sound: 'launch_small' },
@@ -20,9 +20,9 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Cheap rifle squad. Strong vs infantry. With Infantry Rockets, devastating vs armor. Can shoot at aircraft.',
   },
   trike: {
-    name: 'Trike', producer: 'factory', cost: 110, buildTime: 4.5, hp: 203, armor: 1, speed: 7.5, turnRate: 6, radius: 0.8, sight: 12,
+    name: 'Trike', producer: 'factory', cost: 110, buildTime: 4.5, hp: 200, armor: 1, speed: 7.5, turnRate: 6, radius: 0.8, sight: 12,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['factory'],
-    weapon: { range: 7, minRange: 0, damage: 4, bonus: { light: 3 }, cooldown: 0.3, projectile: 'bullet', speed: 0, splash: 0, sound: 'heavy_mg' },
+    weapon: { range: 7, minRange: 0, damage: 5, bonus: { light: 3 }, cooldown: 0.3, projectile: 'bullet', speed: 0, splash: 0, sound: 'heavy_mg' },
     lift: 3,
     desc: 'Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing harvesters. With Trike Nitro, faster still and firing faster.',
   },
@@ -34,9 +34,9 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.',
   },
   rocket: {
-    name: 'MLRS', producer: 'factory', cost: 510, buildTime: 13, hp: 261, armor: 1, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
+    name: 'MLRS', producer: 'factory', cost: 510, buildTime: 13, hp: 265, armor: 1, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
     turret: true, infantry: false, tags: ['mechanical', 'light'], requires: ['factory2'],
-    weapon: { range: 15, minRange: 6, damage: 44, bonus: { structure: 30 }, airDamage: 60, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 3, air: true, unguided: true, sound: 'launch_large' },
+    weapon: { range: 15, minRange: 6, damage: 44, bonus: { structure: 30 }, airDamage: 60, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 4, air: true, unguided: true, sound: 'launch_large' },
     lockOn: { duration: 8, cooldown: 20 },
     lift: 6,
     desc: 'Long-range rocket artillery with a wide blast. Devastating vs massed troops and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Lightly armored and can\'t fire up close: trikes that get in tear it apart.',

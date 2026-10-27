@@ -85,7 +85,7 @@ Cost in credits; speed and sight in tiles (per second for speed). Shields absorb
 | Sardaukar | 260 | 9 s | Barracks | Imperial Barracks | 176 | 96 | 1 | 1.3 | 5 | biological, light |
 | Razor | 250 | 7 s | Fab | Fab | 136 | 80 | 1 | 3 | 5.5 | mechanical, light |
 | Devastator | 800 | 16 s | Fab | Tleilaxu Research, Fab Level 2 | 720 | 320 | 3 | 1.2 | 6 | mechanical, armored |
-| Harvester | 800 | 10 s | Fab | Fab, Refinery | 600 | 300 | 3 | 1.5 | 4 | mechanical, light |
+| Harvester | 800 | 10 s | Fab | Fab, Refinery | 600 | 300 | 2 | 1.5 | 4 | mechanical, light |
 | Sky Raider | 600 | 13 s | Fab | Tleilaxu Research | 208 | 96 | 1 | 4.5 | 7 | mechanical, air |
 | Soulcrusher | 650 | 13 s | Fab | Tleilaxu Research | 208 | 112 | 2 | 1.4 | 6 | mechanical, armored |
 
