@@ -341,6 +341,10 @@ What it took, in order:
 
 Open: worms are still rare (about one ride a game, 0.7-1.0); the Sandrider rarely decides a game. Corrino is a few points under 50%. Tools: `OPP=corrino npx tsx sim/fremen-trace.ts` (a Fremen game every 30 s), `sim/kill-tally.ts`, variants as above.
 
+**Damage redesign (2026-10-26, branch `damage-redesign`):** a StarCraft-style damage model (unit armor, one positive
+bonus per weapon, flat upgrades) replaced the tag tables; the unit stats in the tables above are out of date. Current
+numbers and results: docs/damage-redesign.md.
+
 **Mirror balance (2026-10-25, branch `fvf-balance`):** docs/balance-fremen.md. Fedaykin got a sonic cone, Mortars a
 wider splash, Warriors are weak against structures, Sandriders 280 HP with a 220 / 10 s rite and go for valuable
 infantry, Fremen upgrades cheaper and stronger, and two AI bugs that kept Fremen Warriors out of every wave are fixed.

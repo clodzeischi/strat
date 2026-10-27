@@ -47,7 +47,7 @@ export const KITS: Record<Faction, FactionKit> = {
   },
   corrino: {
     factory: 'fab', defense: 'turret', raider: 'razor', scouts: ['raider', 'razor', 'trooper'], mender: { building: 'pad' }, tech: ['tleilaxu'],
-    levels: ['fab', 'barracks'], research: ['cWeapons', 'cArmor', 'cShields', 'cHarvest', 'flame'], fallback: 'trooper',
+    levels: ['fab', 'barracks'], research: ['cHarvest', 'cWeapons', 'cArmor', 'cShields', 'flame'], fallback: 'trooper',
     siege: { unit: 'artillery', per: 10, max: 3 }, worker: 'harvester',
   },
   // The High Perch stands in for the factory (the second step of the opening, after which tech starts): the Sietch is

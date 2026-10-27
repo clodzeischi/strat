@@ -158,7 +158,9 @@ function arena(): { g2: Game; at: (dx: number, dz: number) => { x: number; z: nu
   (sitter.def as { weapon: unknown }) === sitter.def; // keep the tank from wandering: it has no target in sight
   step(8);
   check(sitter.dead || sitter.hp < sitter.maxHp, 'deployed Artillery shells a target its side can see, out of its own sight');
-  // A target off to the side: the turret swings round, the hull doesn't.
+  // A target off to the side: the turret swings round, the hull doesn't. (The tank shelled above is taken away first, so
+  // its death doesn't pull the turret back mid-turn.)
+  if (!sitter.dead) { sitter.hp = 0; (g2 as unknown as { kill(e: unknown, by: null): void }).kill(sitter, null); }
   const side = at(12, -6);
   g2.spawnUnit('trooper', C, side.x - 3, side.z).hp = 1e6;
   const flank = g2.spawnUnit('tank', A, side.x, side.z);
@@ -258,7 +260,8 @@ function arena(): { g2: Game; at: (dx: number, dz: number) => { x: number; z: nu
   step(UNITS.devastator.detonate!.delay - 0.3);
   check(!dev.dead, 'self-destruct waits for its delay');
   step(0.6);
-  check(dev.dead && near.every((u) => u.dead || u.hp < u.maxHp * 0.4) && !far.dead && far.hp === far.maxHp, 'then wrecks what is near and spares what is far');
+  const blast = UNITS.devastator.detonate!.weapon.damage;
+  check(dev.dead && near.every((u) => u.dead || u.maxHp - u.hp >= blast * 0.5) && !far.dead && far.hp === far.maxHp, 'then wrecks what is near and spares what is far');
 }
 {
   const { g2, at, step } = arena();

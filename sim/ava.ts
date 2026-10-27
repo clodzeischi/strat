@@ -16,12 +16,14 @@ const offset = Number(offsetArg ?? 0);
 const first = Number(process.env.SEEDS ?? 1000);
 const MAX_TIME = 30 * 60;
 const FACTION = (process.env.FACTION ?? 'atreides') as Faction;
+// FACTION_B: the faction of <oppStrat>'s side, for cross-faction build-order tests (default: the mirror).
+const FACTION_B = (process.env.FACTION_B || FACTION) as Faction;
 
 for (let k = 0; k < games; k++) {
   const n = k + offset;
   const side = (n % 2) as Team; // a's team
   const seed = first + Math.floor(n / 2);
-  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed, [FACTION, FACTION]);
+  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed, side === 0 ? [FACTION, FACTION_B] : [FACTION_B, FACTION]);
   g.onSurrenderOffer = (t) => g.acceptSurrender(t);
   const ais = ([0, 1] as Team[]).map((t) => makeStrat(g, t, t === side ? a : b));
   const built: Partial<Record<UnitType, number>>[] = [{}, {}];

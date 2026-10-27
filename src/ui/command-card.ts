@@ -12,9 +12,12 @@ const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
 const reqList = (reqs: Req[]) => reqs.map(reqName).join(', ');
 
 function weaponLine(w: WeaponDef): string {
-  const bonus = Object.entries(w.bonus).map(([t, v]) => `${v! > 0 ? '+' : ''}${v} vs ${cap(t)}`).join(', ');
+  const extras = [
+    ...Object.entries(w.bonus).map(([t, v]) => `+${v} vs ${cap(t)}`),
+    ...(w.airDamage !== undefined ? [`${w.airDamage} vs Air`] : []),
+  ].join(', ');
   const range = w.minRange ? `${w.minRange / TILE}-${w.range / TILE}` : `${w.range / TILE}`;
-  return `Damage ${w.damage}${bonus ? ` (${bonus})` : ''}  Range ${range} tiles${w.pierce ? '  Ignores shields' : ''}`;
+  return `Damage ${w.damage}${extras ? ` (${extras})` : ''}  Range ${range} tiles${w.pierce ? '  Ignores shields' : ''}`;
 }
 
 type Tab = 'build' | 'train' | 'research' | 'command';
@@ -282,7 +285,7 @@ export class CommandCard {
         tip: () => {
           const sh = shieldsFor(this.faction, d);
           const gun = d.weapon ? `\n${weaponLine(d.weapon)}` : '';
-          return `${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}${gun}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to cancel.`;
+          return `${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}${d.armor ? `  Armor ${d.armor}` : ''}${gun}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to cancel.`;
         },
         view: () => {
           const g = this.game;
@@ -330,7 +333,7 @@ export class CommandCard {
         tip: () => {
           const w = d.weapon ? `\n${weaponLine(d.weapon)}` : '';
           const anti = d.antiArmor ? `\nRockets (upgrade): ${weaponLine(d.antiArmor)}` : '';
-          return `[${d.tags.map(cap).join(', ')}]\n${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}  Speed ${d.speed}${w}${anti}\nBuilt at: ${BUILDINGS[d.producer].name}${
+          return `[${d.tags.map(cap).join(', ')}]\n${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}${d.armor ? `  Armor ${d.armor}` : ''}  Speed ${d.speed}${w}${anti}\nBuilt at: ${BUILDINGS[d.producer].name}${
             d.requires.length > 1 ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to remove from the queue.`;
         },
         view: () => {

@@ -27,13 +27,6 @@ export const VARIANTS: Record<string, { desc: string; apply: () => void }> = {
   rs: { desc: 'rites + s3early.', apply: () => { for (const v of ['rites', 's3early']) VARIANTS[v].apply(); } },
   rsd: { desc: 'rites + s3early + drum.', apply: () => { for (const v of ['rites', 's3early', 'drum']) VARIANTS[v].apply(); } },
   rsf: { desc: 'rites + s3early + fedbio.', apply: () => { for (const v of ['rites', 's3early', 'fedbio']) VARIANTS[v].apply(); } },
-  maula15: { desc: 'rites + Warrior shots hit shields x1.5.', apply: () => { VARIANTS.rites.apply(); UNITS.warrior.weapon!.shieldBreak = 1.5; } },
-  maula2: { desc: 'rites + Warrior shots hit shields x2.', apply: () => { VARIANTS.rites.apply(); UNITS.warrior.weapon!.shieldBreak = 2; } },
-  maula3: { desc: 'rites + Warrior shots hit shields x3.', apply: () => { VARIANTS.rites.apply(); UNITS.warrior.weapon!.shieldBreak = 3; } },
-  m3n: { desc: 'Warrior shots hit shields x3 (rites as built).', apply: () => { UNITS.warrior.weapon!.shieldBreak = 3; } },
-  mid: { desc: 'Fedaykin rite 115 / 6.5 s, Mortar 160 / 8.5 s; Warrior shots hit shields x3.', apply: () => { Object.assign(UNITS.fedaykin.rite!, { cost: 115, time: 6.5 }); Object.assign(UNITS.mortar.rite!, { cost: 160, time: 8.5 }); UNITS.warrior.weapon!.shieldBreak = 3; } },
-  sb35: { desc: 'Warrior shots hit shields x3.5 (not 3).', apply: () => { UNITS.warrior.weapon!.shieldBreak = 3.5; } },
-  sb4: { desc: 'Warrior shots hit shields x4 (not 3).', apply: () => { UNITS.warrior.weapon!.shieldBreak = 4; } },
   worms: { desc: 's3early + rider + ride.', apply: () => { for (const v of ['s3early', 'rider', 'ride']) VARIANTS[v].apply(); } },
   all: { desc: 's3early + rider + ride + rites.', apply: () => { for (const v of ['s3early', 'rider', 'ride', 'rites']) VARIANTS[v].apply(); } },
 

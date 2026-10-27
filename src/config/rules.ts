@@ -19,9 +19,16 @@ export const QUEUE_MAX = 5; // per producer type
 export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab', 'sietch'];
 
 /** Upgrade effects. */
-export const WEAPONS_BONUS = 0.2; // damage per Weapons tier
-export const ARMOR_BONUS = 0.15; // damage reduction per Armor tier (to health)
-export const SHIELDS_BONUS = 0.2; // damage reduction to shields per Shields level
+/**
+ * Damage (docs/damage-redesign.md): a hit is the weapon's damage plus its bonus against the target's tags plus its
+ * upgrade step per Weapons level; shields take it first, less one per Shields level; what reaches health loses the
+ * target's armor plus one per Armor level. Never less than MIN_HIT.
+ */
+export const MIN_HIT = 0.5;
+/** Structures that don't set their own: armor. */
+export const STRUCTURE = { armor: 5 };
+/** A weapon's default Weapons upgrade step: this share of its hit (base and bonus) per level. */
+export const WEAPON_STEP = { share: 0.15 };
 /** Razor Flame Range upgrade: extra reach, in world units. */
 export const FLAME_RANGE = 2;
 export const NITRO = { speed: 1.5, cooldown: 1 / 1.5 };
@@ -78,7 +85,7 @@ export const THUMPER = { cost: 250, cooldown: 60, delay: 8, hear: 30, revealEver
 export const WORM = {
   range: 15, bite: 4, hunt: 20, biteEvery: 2.5, speed: 9, reach: 2.5,
   sink: 0.88, rear: 5, rearHeight: 4.5,
-  weapon: { range: 0, minRange: 0, damage: 400, bonus: { mechanical: 400, structure: -100 }, cooldown: 0, projectile: 'bullet', speed: 0, splash: 4, pierce: true } as WeaponDef,
+  weapon: { range: 0, minRange: 0, damage: 400, bonus: { mechanical: 400 }, step: 0, cooldown: 0, projectile: 'bullet', speed: 0, splash: 4, pierce: true } as WeaponDef,
 };
 /**
  * A Sandrider rides the worm its Thumper calls, if it's within `mount` when the worm comes, and keeps it until it lets it
