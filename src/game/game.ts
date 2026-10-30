@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  AMBUSH, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
+  AMBUSH, BUILD_RANGE, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, START_CREDITS, MIN_HIT, STRUCTURE, WEAPON_STEP,
   RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req,
@@ -626,11 +626,12 @@ export class Game {
   /** Whether a footprint at (cx, cz) is close enough to one of the team's own buildings. */
   inBuildRange(type: BuildingType, team: Team, cx: number, cz: number): boolean {
     const size = BUILDINGS[type].size;
+    const range = FACTIONS[this.teams[team].faction].buildRange ?? BUILD_RANGE;
     return this.buildings.some((b) => {
       if (b.team !== team || b.dead) return false;
       const gapX = Math.max(b.cx - (cx + size), cx - (b.cx + b.size), 0);
       const gapZ = Math.max(b.cz - (cz + size), cz - (b.cz + b.size), 0);
-      return Math.max(gapX, gapZ) <= 4;
+      return Math.max(gapX, gapZ) <= range;
     });
   }
 

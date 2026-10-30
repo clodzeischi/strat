@@ -24,6 +24,8 @@ export interface FactionDef {
   units?: Partial<Record<UnitType, Partial<UnitDef>>>;
   /** Structures may go on open sand, not just rock (Fremen). */
   buildOnSand?: boolean;
+  /** Tiles of gap a new structure may leave to one of the team's own, instead of BUILD_RANGE (Fremen reach farther across the rock). */
+  buildRange?: number;
   /** Units and structures heal slowly on their own (Fremen; see FREMEN_REGEN). */
   regen?: boolean;
   /** No harvesters and refineries: income comes from Spice Camps that crews set up on the fields. */
@@ -74,6 +76,7 @@ export const FACTIONS: Record<Faction, FactionDef> = {
     shields: false,
     selfRepair: false,
     buildOnSand: true,
+    buildRange: 6,
     regen: true,
     camps: true,
   },

@@ -13,6 +13,8 @@ export const TEAM_COLORS = [0x3d7be0, 0xd8402f];
 export const TEAM_CSS = ['#3d7be0', '#d8402f'];
 
 export const START_CREDITS = 2500;
+/** How far a new structure may stand from one of the team's own: tiles of gap, edge to edge (a faction may set its own). */
+export const BUILD_RANGE = 4;
 
 export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab', 'perch'];
 export const QUEUE_MAX = 5; // per producer type
