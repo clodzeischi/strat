@@ -254,6 +254,8 @@ export class AI {
   /** The unit out scouting, and the places it still has to look at. */
   private scout: Unit | null = null;
   private scoutRoute: { x: number; z: number }[] = [];
+  /** The scout is going round the spawn spots, looking for the enemy base. */
+  private searching = false;
   /** The scout has had its look and is parked at a watch post (see `toWatchPost`). */
   private watching = false;
   private nextScoutTime: number;
@@ -1650,6 +1652,13 @@ export class AI {
         if (!this.toWatchPost()) this.endScout();
         return;
       }
+      // Found the base on the round of the spots: go have a proper look at it instead.
+      if (this.searching && this.intel.baseKnown) {
+        this.searching = false;
+        const base = this.intel.enemyBase();
+        this.scoutRoute = [base];
+        s.command(g, { kind: 'move', x: base.x, z: base.z });
+      }
       const goal = this.scoutRoute[0];
       if (goal && (hypot(s.x - goal.x, s.z - goal.z) < 4 * TILE || s.order.kind === 'idle')) {
         this.scoutRoute.shift();
@@ -1675,7 +1684,10 @@ export class AI {
     const spice = m.nearestCell(m.cellOf(base.x), m.cellOf(base.z), (x, z) => m.tile(x, z) === SPICE, 24);
     // The base first while we don't know where it is; once we do, the spice field (harvesters) on the way in.
     const field = spice ? { x: m.center(spice.cx), z: m.center(spice.cz) } : null;
-    this.scoutRoute = this.intel.baseKnown && field ? [field, base] : field ? [base, field] : [base];
+    // Base unknown: round every spawn spot it could be at, nearest first, until it turns up.
+    this.searching = !this.intel.baseKnown;
+    this.scoutRoute = this.intel.baseKnown && field ? [field, base] : this.searching ? this.intel.candidateSpots() : [base];
+    if (!this.scoutRoute.length) this.scoutRoute = [base];
     // Later runs also look in on wherever we've gone longest without a look (a hidden expansion, say).
     if (this.intel.baseKnown) this.scoutRoute.push(this.intel.searchSpot());
     this.leaveGroups(scout);
@@ -1709,6 +1721,7 @@ export class AI {
     const s = this.scout;
     this.scout = null;
     this.watching = false;
+    this.searching = false;
     this.scoutRoute = [];
     // The opening is when a look matters most (an early attack has to be seen coming): more often then.
     const t = this.game.time;

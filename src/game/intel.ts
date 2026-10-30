@@ -1,7 +1,10 @@
-import { FACTIONS, type BuildingType, type Team, type UnitType } from '../config';
+import { FACTIONS, TILE, type BuildingType, type Team, type UnitType } from '../config';
 import type { Unit } from '../entities';
 import type { Game } from './game';
 import { hypot } from './hypot';
+
+/** A spawn spot counts as empty if seen with no enemy structure within this many tiles of it. */
+const SPOT_RADIUS = 12;
 
 /** Searching divides the map into squares this many tiles across. */
 const REGION = 8;
@@ -83,6 +86,39 @@ export class Intel {
     }
     // A structure's spot in view without it: destroyed.
     for (const [id, s] of this.buildings) if (s.seen < t && v.seesAt(this.team, s.x, s.z)) this.buildings.delete(id);
+    // A spawn spot in view with no enemy structure near it: they didn't start there.
+    const m = g.map;
+    m.spots.forEach((c, k) => {
+      if (this.cleared.has(k)) return;
+      const x = m.center(c.cx);
+      const z = m.center(c.cz);
+      if (!v.seesAt(this.team, x, z)) return;
+      if (![...this.buildings.values()].some((b) => hypot(b.x - x, b.z - z) < SPOT_RADIUS * TILE)) this.cleared.add(k);
+    });
+  }
+
+  /** Spawn spots (indices into the map's) seen empty, or our own. */
+  private cleared = new Set<number>();
+
+  /**
+   * Spawn spots the enemy could have started at, as far as we know: none seen empty, ours aside. In visiting order
+   * from our base, each the nearest of those left (straight line), as a scout would go round them.
+   */
+  candidateSpots(): { x: number; z: number }[] {
+    const m = this.game.map;
+    const own = m.bases[this.team];
+    let at = { x: m.center(own.cx), z: m.center(own.cz) };
+    const left = m.spots
+      .filter((c, k) => !this.cleared.has(k) && (c.cx !== own.cx || c.cz !== own.cz))
+      .map((c) => ({ x: m.center(c.cx), z: m.center(c.cz) }));
+    const out: { x: number; z: number }[] = [];
+    while (left.length) {
+      let best = 0;
+      for (let k = 1; k < left.length; k++) if (hypot(left[k].x - at.x, left[k].z - at.z) < hypot(left[best].x - at.x, left[best].z - at.z)) best = k;
+      at = left.splice(best, 1)[0];
+      out.push(at);
+    }
+    return out;
   }
 
   /** Game time we last had an enemy structure in sight. */
@@ -115,7 +151,7 @@ export class Intel {
 
   /**
    * Where the enemy base is, as far as we know: its hub (Construction Yard, Sietch), or the middle of the structures we've seen;
-   * with none seen, the mirror image of our own start (maps are point-symmetric, which any player can work out).
+   * with none seen, the nearest spawn spot not yet seen empty (with only two spots, simply the other one).
    */
   enemyBase(): { x: number; z: number } {
     const known = [...this.buildings.values()];
@@ -123,6 +159,8 @@ export class Intel {
     const yard = known.find((s) => s.type === hub);
     if (yard) return { x: yard.x, z: yard.z };
     if (known.length) return { x: known.reduce((a, s) => a + s.x, 0) / known.length, z: known.reduce((a, s) => a + s.z, 0) / known.length };
+    const spot = this.candidateSpots()[0];
+    if (spot) return spot;
     const m = this.game.map;
     const start = m.bases[(1 - this.team) as Team] ?? m.bases[0];
     return { x: m.center(start.cx), z: m.center(start.cz) };

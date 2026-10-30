@@ -1,4 +1,4 @@
-import { SPICE_MAX, TILE } from '../config';
+import { MAP_SPOTS, SPICE_MAX, TILE, type MapSize } from '../config';
 import { blur, fbm, hash, percentile, valueNoise } from './noise';
 import { CLIFF, HIGH_Y, LARGE, NARROW, NORMAL, RAMP_WIDTH, ROCK, SAND, SPICE, SURFACE_RES, type Cell, type MoveClass } from './tiles';
 import { hypot } from '../game/hypot';
@@ -12,13 +12,52 @@ const RAMP_EVERY = 6;
 const RAMP_GAP = 1;
 /** Rock areas with at least this many rock tiles stand as raised shelves. */
 const SHELF_MIN = 50;
-/** One mirrored pair of desert mesas per this many map tiles (2 pairs on the 64 map, 8 on the 128). */
+/** One desert mesa per half this many map tiles (4 on the 64 map, 16 on the 128), in sets copied by symmetry. */
 const MESA_AREA = 2000;
 /** Share of a rock shelf's edge left as cliff, as a range: one unbroken stretch, the rest opened up by ramps. */
 const SHELF_CLIFF = [0.3, 0.45];
 
 /** Tiles kept between a base center and the map edge. */
 const BASE_MARGIN = 10;
+/** Radius in tiles of the rock a base stands on (before the outline's wobble). */
+const BASE_RADIUS = 9.1;
+
+/**
+ * A symmetry of the square map about its middle: (x, z) offsets from the middle go to (xx x + xz z, zx x + zz z).
+ * Rotations and mirror images only, so cells land exactly on cells.
+ */
+interface Sym {
+  xx: number;
+  xz: number;
+  zx: number;
+  zz: number;
+}
+const ROTATIONS: Sym[] = [
+  { xx: 1, xz: 0, zx: 0, zz: 1 },
+  { xx: 0, xz: -1, zx: 1, zz: 0 },
+  { xx: -1, xz: 0, zx: 0, zz: -1 },
+  { xx: 0, xz: 1, zx: -1, zz: 0 },
+];
+const MIRRORS: Sym[] = ROTATIONS.map((r) => ({ xx: r.xz, xz: r.xx, zx: r.zz, zz: r.zx }));
+/**
+ * The map's symmetries by spawn spot count, which spot 0 is carried to every other spot by: a half turn for 2, the
+ * quarter turns for 4, and those plus mirror images for 8. Every spot sees the same terrain around it.
+ */
+const SYMMETRIES: Record<number, Sym[]> = {
+  2: [ROTATIONS[0], ROTATIONS[2]],
+  4: ROTATIONS,
+  8: [...ROTATIONS, ...MIRRORS],
+};
+
+/** The sum of some numbers, added smallest first (the same however they came). */
+function sumSorted(values: number[]): number {
+  return values.sort((a, b) => a - b).reduce((t, v) => t + v, 0);
+}
+
+/** Spawn spots on a map of this size (MAP_SPOTS; other sizes, as sims may use, go by the nearest smaller one). */
+function spotCount(size: number): number {
+  return MAP_SPOTS[size as MapSize] ?? (size >= 128 ? 8 : size >= 96 ? 4 : 2);
+}
 
 /** The four uphill directions a ramp can face, indexed by `GameMap.rampDir`. */
 const DIR4: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -52,8 +91,12 @@ export class GameMap {
   surfaceBottom = 0;
   /** Building id occupying each cell, 0 if free. */
   occupied: Int32Array;
-  /** Base centers for team 0 and team 1. */
+  /** Every spawn spot (a base plateau, with its home field), in symmetry order. */
+  spots: Cell[];
+  /** Base centers for team 0 and team 1: two of the spots, picked from the seed. */
   bases: Cell[];
+  /** The map's symmetries (see SYMMETRIES): every spot looks the same. */
+  private syms: Sym[];
   /** Incremented whenever spice tiles change, so the minimap knows to redraw. */
   version = 0;
 
@@ -68,32 +111,58 @@ export class GameMap {
     this.rampDir = new Uint8Array(N * N);
     this.occupied = new Int32Array(N * N);
     this.surface = new Float32Array((N * SURFACE_RES + 1) ** 2);
-    this.bases = [];
+    this.syms = SYMMETRIES[spotCount(size)];
+    this.spots = [];
     for (let attempt = 0; attempt < 20; attempt++) {
-      this.bases = this.pickBases(seed + attempt * 101);
+      this.spots = this.pickSpots(seed + attempt * 101);
       if (this.generate(seed + attempt * 101)) break;
     }
+    // Players start at two different spots at random: next door or across the map.
+    const n = this.spots.length;
+    const a = Math.floor(hash(5, 6, seed) * n);
+    const b = (a + 1 + Math.floor(hash(7, 8, seed) * (n - 1))) % n;
+    this.bases = [this.spots[a], this.spots[b]];
     this.buildSurface(seed);
   }
 
+  /** Where a cell goes under a symmetry. */
+  private image(cx: number, cz: number, s: Sym): Cell {
+    const c = (this.size - 1) / 2;
+    const x = cx - c;
+    const z = cz - c;
+    return { cx: Math.round(c + s.xx * x + s.xz * z), cz: Math.round(c + s.zx * x + s.zz * z) };
+  }
+
+  /** A cell index under every symmetry (itself first; repeats where a symmetry leaves it in place). */
+  private orbit(i: number): number[] {
+    const N = this.size;
+    return this.syms.map((s) => {
+      const c = this.image(i % N, (i / N) | 0, s);
+      return this.idx(c.cx, c.cz);
+    });
+  }
+
   /**
-   * Spawn spots from the seed: base 0 at a random angle and distance from the middle, base 1 mirrored through
-   * it, so the map stays point-symmetric. Kept far enough from the edges for the base plateau and spice field,
-   * and from about two thirds of the map width apart up to nearly corner to corner.
+   * Spawn spots from the seed: spot 0 at a random angle and distance from the middle, the others its images under
+   * the map's symmetries. Kept far enough from the edges for the base plateau and spice field, and far enough from
+   * each other: two spots run from about two thirds of the map width apart up to nearly corner to corner; with
+   * eight, they ring the map, a little more than a plateau and field apart.
    */
-  private pickBases(seed: number): Cell[] {
+  private pickSpots(seed: number): Cell[] {
     const N = this.size;
     const mid = (N - 1) / 2;
-    const room = mid - BASE_MARGIN; // farthest a base may sit from the middle along either axis
-    const angle = hash(1, 2, seed) * Math.PI * 2;
+    const room = mid - BASE_MARGIN; // farthest a spot may sit from the middle along either axis
+    const n = this.syms.length;
+    // With eight, spot 0 sits 17-28 degrees off an axis, so it and its mirror image across the diagonal stay apart.
+    const angle = n === 8 ? ((17 + hash(1, 2, seed) * 11) * Math.PI) / 180 : hash(1, 2, seed) * Math.PI * 2;
     const cos = dm.cos(angle);
     const sin = dm.sin(angle);
     const rMax = room / Math.max(Math.abs(cos), Math.abs(sin));
-    const rMin = Math.min(0.32 * N, rMax);
+    const rMin = Math.min((n === 8 ? 0.36 : n === 4 ? 0.3 : 0.32) * N, rMax);
     const r = rMin + (rMax - rMin) * Math.sqrt(hash(3, 4, seed)); // leans toward far apart
     const cx = Math.round(mid + cos * r);
     const cz = Math.round(mid + sin * r);
-    return [{ cx, cz }, { cx: N - 1 - cx, cz: N - 1 - cz }];
+    return this.syms.map((s) => this.image(cx, cz, s));
   }
 
   /** Vertices per side of the surface grid. */
@@ -478,15 +547,22 @@ export class GameMap {
     this.ramp.fill(0);
     this.spice.fill(0);
 
-    // Point-symmetric noise so both bases get the same terrain.
+    // Noise averaged over the map's symmetries, so every spot gets the same terrain.
+    const G = this.syms.length;
     for (let cz = 0; cz < N; cz++) {
       for (let cx = 0; cx < N; cx++) {
-        const mx = N - 1 - cx;
-        const mz = N - 1 - cz;
         const i = this.idx(cx, cz);
-        h[i] = (fbm(cx / 7, cz / 7, seed) + fbm(mx / 7, mz / 7, seed)) / 2;
-        s[i] = (fbm(cx / 5 + 50, cz / 5 + 50, seed + 9) + fbm(mx / 5 + 50, mz / 5 + 50, seed + 9)) / 2;
-        baseDist[i] = Math.min(...this.bases.map((b) => hypot(cx - b.cx, cz - b.cz)));
+        const hs: number[] = [];
+        const ss: number[] = [];
+        for (const sym of this.syms) {
+          const { cx: x, cz: z } = this.image(cx, cz, sym);
+          hs.push(fbm(x / 7, z / 7, seed));
+          ss.push(fbm(x / 5 + 50, z / 5 + 50, seed + 9));
+        }
+        // Summed in sorted order, so every image of a cell gets exactly the same value.
+        h[i] = sumSorted(hs) / G;
+        s[i] = sumSorted(ss) / G;
+        baseDist[i] = Math.min(...this.spots.map((b) => hypot(cx - b.cx, cz - b.cz)));
       }
     }
 
@@ -495,7 +571,7 @@ export class GameMap {
     for (let i = 0; i < total; i++) {
       const wobble = (h[i] - 0.5) * 6;
       let t = SAND;
-      if (baseDist[i] < 8.5 + wobble) t = ROCK;
+      if (baseDist[i] < BASE_RADIUS + wobble) t = ROCK;
       else if (h[i] > cliffT) t = CLIFF;
       else if (h[i] > rockT) t = ROCK;
       this.tiles[i] = t;
@@ -522,26 +598,26 @@ export class GameMap {
       }
     }
 
-    // A guaranteed spice field near each base, toward the map center.
-    for (const b of this.bases) {
-      // Off to one side of the line toward the middle (as the original corner bases had it).
-      // Offsets round the same way on both sides, so the two fields stay exact mirrors.
+    // A guaranteed spice field near each spot, toward the map center: worked out for spot 0, copied to the others.
+    {
+      const b = this.spots[0];
       const mid = (N - 1) / 2;
       const len = hypot(mid - b.cx, mid - b.cz) || 1;
       const ux = (mid - b.cx) / len;
       const uz = (mid - b.cz) / len;
-      const round = (v: number) => Math.sign(v) * Math.round(Math.abs(v));
-      const fx = b.cx + round(ux * 11 - uz * 6);
-      const fz = b.cz + round(uz * 11 + ux * 6);
+      // Off to one side of the line toward the middle (as the original corner bases had it).
+      const fx = b.cx + Math.round(ux * 11.6 - uz * 6);
+      const fz = b.cz + Math.round(uz * 11.6 + ux * 6);
       for (let dz = -4; dz <= 4; dz++) {
         for (let dx = -4; dx <= 4; dx++) {
           const x = fx + dx;
           const z = fz + dz;
           if (!this.inBounds(x, z) || dx * dx + dz * dz > 16) continue;
-          const i = this.idx(x, z);
-          if (baseDist[i] < 9) continue;
-          this.tiles[i] = SPICE;
-          this.spice[i] = SPICE_MAX * (1 - hypot(dx, dz) / 6);
+          if (baseDist[this.idx(x, z)] < 9.6) continue;
+          for (const i of this.orbit(this.idx(x, z))) {
+            this.tiles[i] = SPICE;
+            this.spice[i] = SPICE_MAX * (1 - hypot(dx, dz) / 6);
+          }
         }
       }
     }
@@ -550,9 +626,9 @@ export class GameMap {
 
     // Connectivity: vehicles must be able to drive between the bases. Cells nobody can reach become
     // cliffs; spice that only infantry can reach (behind narrow ramps) is removed, since harvesters can't get to it.
-    const start = this.bases[0];
+    const start = this.spots[0];
     const byVehicle = this.flood(start.cx, start.cz, 'vehicle');
-    if (!byVehicle[this.idx(this.bases[1].cx, this.bases[1].cz)]) return false;
+    if (this.spots.some((b) => !byVehicle[this.idx(b.cx, b.cz)])) return false;
     const byFoot = this.flood(start.cx, start.cz, 'foot');
     for (let i = 0; i < total; i++) {
       if (!byFoot[i] && this.tiles[i] !== CLIFF) {
@@ -591,17 +667,20 @@ export class GameMap {
     return true;
   }
 
-  /** A few small desert mesas in mirrored pairs, on open low sand away from bases. */
+  /** A few small desert mesas, copied under the map's symmetries, on open low sand away from bases. */
   private placeMesas(seed: number, baseDist: number[]): void {
     const N = this.size;
-    const pairs = Math.round((N * N) / MESA_AREA);
+    const sets = Math.max(1, Math.round((2 * N * N) / (MESA_AREA * this.syms.length)));
     let made = 0;
-    for (let k = 0; k < pairs * 40 && made < pairs; k++) {
+    for (let k = 0; k < sets * 40 && made < sets; k++) {
       const cx = Math.floor(hash(k, 11, seed) * N);
       const cz = Math.floor(hash(k, 12, seed) * N);
       const r = 2.8 + hash(k, 13, seed) * 1.8;
-      // Far enough from its own mirror image that the pair stays two mesas.
-      if (hypot(cx - (N - 1 - cx), cz - (N - 1 - cz)) < 2 * (r + 4)) continue;
+      // Far enough from its own images that they stay separate mesas.
+      if (this.syms.slice(1).some((sym) => {
+        const c = this.image(cx, cz, sym);
+        return hypot(cx - c.cx, cz - c.cz) < 2 * (r + 4);
+      })) continue;
       const cells: number[] = [];
       let ok = true;
       for (let dz = -8; dz <= 8 && ok; dz++) {
@@ -621,7 +700,7 @@ export class GameMap {
         }
       }
       if (!ok || cells.length < 24) continue;
-      for (const i of cells) this.level[i] = this.level[this.idx(N - 1 - (i % N), N - 1 - ((i / N) | 0))] = 1;
+      for (const i of cells) for (const j of this.orbit(i)) this.level[j] = 1;
       made++;
     }
   }
@@ -687,7 +766,7 @@ export class GameMap {
   }
 
   /**
-   * Carves ramps into the edges of every plateau, in mirrored pairs so both sides get the same ones.
+   * Carves ramps into the edges of every plateau, copied under the map's symmetries so every spot gets the same ones.
    * Rock shelves keep a cliff along one stretch of their edge (a flank only artillery can hit from below) and
    * the rest is opened with frequent, mostly wide ramps; single-file and infantry-only ones are the occasional
    * exception, and a shelf's first two always take vehicles. Desert mesas get one ramp.
@@ -695,8 +774,14 @@ export class GameMap {
   private placeRamps(seed: number): void {
     const N = this.size;
     const open = (i: number) => this.tiles[i] !== CLIFF;
-    const mirror = (i: number) => this.idx(N - 1 - (i % N), N - 1 - ((i / N) | 0));
     const opposite = [1, 0, 3, 2];
+    // A direction (index into DIR4) under a symmetry.
+    const turn = (d: number, sym: Sym) => {
+      const [dx, dz] = DIR4[d];
+      const x = sym.xx * dx + sym.xz * dz;
+      const z = sym.zx * dx + sym.zz * dz;
+      return DIR4.findIndex(([a, b]) => a === x && b === z);
+    };
     const { label, cells: plateaus } = this.regions((i) => this.level[i] === 1 && open(i));
     const placed: number[] = [];
     const near = (i: number, j: number, r: number) =>
@@ -732,10 +817,26 @@ export class GameMap {
           strip.push({ c: this.idx(x, z), row });
         }
       }
-      const cells = strip.map((s) => s.c);
-      if (cells.some((c) => placed.some((p) => near(c, p, RAMP_GAP)) || cells.some((m) => near(c, mirror(m), RAMP_GAP)))) return false;
-      for (const [copy, dir] of [[strip, down], [strip.map((s) => ({ c: mirror(s.c), row: s.row })), opposite[down]]] as const) {
-        for (const { c, row } of copy) {
+      // The strip under every symmetry; a copy a symmetry leaves in place is carved once.
+      const copies: { cells: { c: number; row: number }[]; dir: number }[] = [];
+      const keys = new Set<string>();
+      for (const sym of this.syms) {
+        const cells = strip.map(({ c, row }) => {
+          const m = this.image(c % N, (c / N) | 0, sym);
+          return { c: this.idx(m.cx, m.cz), row };
+        });
+        const key = cells.map((x) => x.c).sort((a, b) => a - b).join();
+        if (keys.has(key)) continue;
+        keys.add(key);
+        copies.push({ cells, dir: turn(down, sym) });
+      }
+      const all = copies.map((k) => k.cells.map((x) => x.c));
+      for (let a = 0; a < all.length; a++) {
+        if (all[a].some((c) => placed.some((p) => near(c, p, RAMP_GAP)))) return false;
+        for (let b = a + 1; b < all.length; b++) if (all[a].some((c) => all[b].some((m) => near(c, m, RAMP_GAP)))) return false;
+      }
+      for (const { cells, dir } of copies) {
+        for (const { c, row } of cells) {
           if (this.tiles[c] === CLIFF) this.tiles[c] = row < 0 ? ROCK : SAND;
           this.level[c] = row <= 0 ? 1 : 0;
           if (row === 0) {
@@ -750,9 +851,10 @@ export class GameMap {
     };
 
     plateaus.forEach((plateau, id) => {
-      const twin = label[mirror(plateau[0])];
-      if (twin < id && twin !== -1) return; // its mirror twin already got (mirrored) ramps
-      const self = twin === id; // a center plateau gets every ramp twice, once per side
+      const images = this.orbit(plateau[0]).map((i) => label[i]);
+      if (images.some((l) => l !== -1 && l < id)) return; // an image of it already got (copied) ramps
+      // A plateau the symmetries carry onto itself (one in the middle) gets every ramp once per such symmetry.
+      const self = images.filter((l) => l === id).length;
       const edge = edges(plateau);
       if (!edge.length) return;
       // Walk the edge in angle order around the plateau's middle, so picks spread out.
@@ -769,7 +871,7 @@ export class GameMap {
         const len = Math.floor(edge.length * share);
         spots = edge.filter((_, k) => (k - from + edge.length) % edge.length >= len);
       }
-      const want = shelf ? Math.max(1, Math.min(40, Math.round(spots.length / (self ? 2 * RAMP_EVERY : RAMP_EVERY)))) : 1;
+      const want = shelf ? Math.max(1, Math.min(40, Math.round(spots.length / (self * RAMP_EVERY)))) : 1;
       let made = 0;
       for (let k = 0; k < want; k++) {
         const first = made === 0;
@@ -786,7 +888,7 @@ export class GameMap {
         }
       }
       // No usable edge: flatten the plateau instead of leaving it sealed off.
-      if (!made) for (const i of plateau) this.level[i] = this.level[mirror(i)] = 0;
+      if (!made) for (const i of plateau) for (const j of this.orbit(i)) this.level[j] = 0;
     });
   }
 }

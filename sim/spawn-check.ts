@@ -1,5 +1,5 @@
-// Checks random spawns over many seeds: symmetric maps, both bases on rock with a vehicle route between them,
-// starting yards and units placed. Usage: npx tsx sim/spawn-check.ts [seeds per size]
+// Checks random spawns over many seeds: maps symmetric under all their symmetries (spots 2/4/8 by size), every spot
+// on rock with a vehicle route to all the others, the two bases at different spots, starting yards and units placed. Usage: npx tsx sim/spawn-check.ts [seeds per size]
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
 import { findPath } from '../src/game/pathfinding';
@@ -14,17 +14,23 @@ for (const size of [64, 96, 128] as const) {
     const m = g.map, N = m.size, [a, b] = m.bases;
     spots.add(`${a.cx},${a.cz}`);
     const d = Math.hypot(a.cx - b.cx, a.cz - b.cz); dmin = Math.min(dmin, d); dmax = Math.max(dmax, d);
-    for (let i = 0; i < N * N; i++) {
-      const j = m.idx(N - 1 - (i % N), N - 1 - ((i / N) | 0));
-      if (m.tiles[i] !== m.tiles[j] || m.level[i] !== m.level[j] || m.ramp[i] !== m.ramp[j] || Math.abs(m.spice[i] - m.spice[j]) > 1e-3) { asym++; break; }
+    const syms = (m as unknown as { syms: object[]; image(x: number, z: number, s: object): { cx: number; cz: number } });
+    sym: for (const s of syms.syms) {
+      for (let i = 0; i < N * N; i++) {
+        const c = syms.image(i % N, (i / N) | 0, s);
+        const j = m.idx(c.cx, c.cz);
+        if (m.tiles[i] !== m.tiles[j] || m.level[i] !== m.level[j] || m.ramp[i] !== m.ramp[j] || Math.abs(m.spice[i] - m.spice[j]) > 1e-3) { asym++; break sym; }
+      }
     }
     const yards = g.buildings.filter((x) => x.type === 'conyard').length;
-    const onRock = m.bases.every((c) => m.tiles[m.idx(c.cx, c.cz)] === ROCK);
+    const onRock = m.spots.every((c) => m.tiles[m.idx(c.cx, c.cz)] === ROCK) && m.spots.length === ({ 64: 2, 96: 4, 128: 8 } as const)[size];
     // Route check on a fresh map: in the game, the base centers are covered by the Construction Yards.
     const bare = new GameMap(size, seed);
-    const path = findPath(bare, m.center(a.cx), m.center(a.cz), m.center(b.cx), m.center(b.cz), 'vehicle');
-    const end = path[path.length - 1];
-    const route = !!end && Math.hypot(end.x - m.center(b.cx), end.z - m.center(b.cz)) <= 4;
+    const route = a !== b && bare.spots.every((c) => {
+      const path = findPath(bare, m.center(m.spots[0].cx), m.center(m.spots[0].cz), m.center(c.cx), m.center(c.cz), 'vehicle');
+      const end = path[path.length - 1];
+      return c === bare.spots[0] || (!!end && Math.hypot(end.x - m.center(c.cx), end.z - m.center(c.cz)) <= 4);
+    });
     const units = g.units.filter((u) => m.passable(m.cellOf(u.x), m.cellOf(u.z))).length;
     if (yards !== 2 || !onRock || !route || units !== 8) {
       if (++bad <= 5) console.log('bad', size, seed, { yards, onRock, route, units });

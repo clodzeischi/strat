@@ -6,6 +6,8 @@ export const TILE = 2;
 export const MAP_SIZES = [64, 96, 128] as const;
 export type MapSize = (typeof MAP_SIZES)[number];
 export const MAP_SIZE_NAMES: Record<MapSize, string> = { 64: 'Small', 96: 'Medium', 128: 'Large' };
+/** Spawn spots per map size: the two players start at two of them at random (more players later). */
+export const MAP_SPOTS: Record<MapSize, number> = { 64: 2, 96: 4, 128: 8 };
 
 export const PLAYER: Team = 0;
 export const ENEMY: Team = 1;
