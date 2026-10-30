@@ -15,6 +15,9 @@ function check(ok: boolean, what: string): void {
 }
 
 const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['corrino', 'atreides']);
+// All on one level, so following is checked on open ground rather than through whichever ramps the map has.
+g.map.level.fill(0);
+g.map.ramp.fill(0);
 const run = (seconds: number, each?: () => void) => {
   for (let t = 0; t < seconds; t += 0.05) {
     g.update(0.05);

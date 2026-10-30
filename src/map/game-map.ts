@@ -1,4 +1,4 @@
-import { MAP_SPOTS, SPICE_MAX, TILE, type MapSize } from '../config';
+import { MAP_SPOTS, SPICE_FIELDS, TILE, type FieldKind, type MapSize } from '../config';
 import { blur, fbm, hash, percentile, valueNoise } from './noise';
 import { CLIFF, HIGH_Y, LARGE, NARROW, NORMAL, RAMP_WIDTH, ROCK, SAND, SPICE, SURFACE_RES, type Cell, type MoveClass } from './tiles';
 import { hypot } from '../game/hypot';
@@ -12,10 +12,26 @@ const RAMP_EVERY = 6;
 const RAMP_GAP = 1;
 /** Rock areas with at least this many rock tiles stand as raised shelves. */
 const SHELF_MIN = 50;
-/** One desert mesa per half this many map tiles (4 on the 64 map, 16 on the 128), in sets copied by symmetry. */
-const MESA_AREA = 2000;
+/** One desert mesa per half this many map tiles (2 on the 64 map, 8 on the 128), in sets copied by symmetry. */
+const MESA_AREA = 4000;
 /** Share of a rock shelf's edge left as cliff, as a range: one unbroken stretch, the rest opened up by ramps. */
 const SHELF_CLIFF = [0.3, 0.45];
+
+/** Terrain noise feature size in tiles: bigger is calmer, fewer and larger formations. */
+const TERRAIN_SCALE = 11;
+/** Share of the map that's rock formations, and of that the outcrops (impassable) in their highest parts. */
+const ROCK_SHARE = 0.09;
+const CLIFF_SHARE = 0.03;
+/** Rock formations smaller than this many tiles are cleared to sand. */
+const FORMATION_MIN = 40;
+/** Chance of a massif in the middle of the map, and its radius as a share of the map width. */
+const MASSIF_CHANCE = 0.5;
+const MASSIF_RADIUS = 0.085;
+/** Home fields lie this many degrees off the line from the spot toward the middle. */
+const HOME_SIDE = 28;
+
+/** Tiles of open sand kept between two spice fields. */
+const FIELD_GAP = 5;
 
 /** Tiles kept between a base center and the map edge. */
 const BASE_MARGIN = 10;
@@ -91,6 +107,8 @@ export class GameMap {
   surfaceBottom = 0;
   /** Building id occupying each cell, 0 if free. */
   occupied: Int32Array;
+  /** The spice fields as laid out (their spice runs out as it's harvested; the list stays). */
+  fields: { cx: number; cz: number; kind: FieldKind }[] = [];
   /** Every spawn spot (a base plateau, with its home field), in symmetry order. */
   spots: Cell[];
   /** Base centers for team 0 and team 1: two of the spots, picked from the seed. */
@@ -541,7 +559,6 @@ export class GameMap {
     const N = this.size;
     const total = N * N;
     const h = new Array<number>(total);
-    const s = new Array<number>(total);
     const baseDist = new Array<number>(total);
     this.level.fill(0);
     this.ramp.fill(0);
@@ -553,28 +570,48 @@ export class GameMap {
       for (let cx = 0; cx < N; cx++) {
         const i = this.idx(cx, cz);
         const hs: number[] = [];
-        const ss: number[] = [];
         for (const sym of this.syms) {
           const { cx: x, cz: z } = this.image(cx, cz, sym);
-          hs.push(fbm(x / 7, z / 7, seed));
-          ss.push(fbm(x / 5 + 50, z / 5 + 50, seed + 9));
+          hs.push(fbm(x / TERRAIN_SCALE, z / TERRAIN_SCALE, seed));
         }
         // Summed in sorted order, so every image of a cell gets exactly the same value.
         h[i] = sumSorted(hs) / G;
-        s[i] = sumSorted(ss) / G;
         baseDist[i] = Math.min(...this.spots.map((b) => hypot(cx - b.cx, cz - b.cz)));
       }
     }
 
-    const cliffT = percentile(h, 0.08);
-    const rockT = percentile(h, 0.2);
+    // Each spot's home field: toward the middle and off to one side, its ground kept open sand (placeFields puts
+    // the field itself in there, as close to the plateau as it fits).
+    const mid = (N - 1) / 2;
+    const b0 = this.spots[0];
+    const toMid = dm.atan2(mid - b0.cz, mid - b0.cx) + (HOME_SIDE * Math.PI) / 180;
+    const homeR = BASE_RADIUS + SPICE_FIELDS.L.radius + 4;
+    const home0 = { cx: Math.round(b0.cx + dm.cos(toMid) * homeR), cz: Math.round(b0.cz + dm.sin(toMid) * homeR) };
+    const homes = this.syms.map((sym) => this.image(home0.cx, home0.cz, sym));
+    // Some maps get a massif in the middle: no way through, so attacks pick a side of it.
+    const massif = hash(9, 9, seed) < MASSIF_CHANCE ? MASSIF_RADIUS * N : 0;
+
+    // Open desert, with a few large rock formations (and outcrops in their highest parts).
+    const cliffT = percentile(h, CLIFF_SHARE);
+    const rockT = percentile(h, ROCK_SHARE);
     for (let i = 0; i < total; i++) {
+      const x = i % N;
+      const z = (i / N) | 0;
       const wobble = (h[i] - 0.5) * 6;
+      const fromMid = hypot(x - mid, z - mid) + (h[i] - 0.5) * 8;
+      const homeGround = homes.some((c) => hypot(x - c.cx, z - c.cz) < SPICE_FIELDS.L.radius + 5);
       let t = SAND;
-      if (baseDist[i] < BASE_RADIUS + wobble) t = ROCK;
+      if (baseDist[i] < BASE_RADIUS + (homeGround ? Math.min(wobble, 0) : wobble)) t = ROCK;
+      else if (homeGround) t = SAND;
+      else if (massif && fromMid < massif) t = CLIFF;
+      else if (massif && fromMid < massif + 1.5) t = ROCK;
       else if (h[i] > cliffT) t = CLIFF;
       else if (h[i] > rockT) t = ROCK;
       this.tiles[i] = t;
+    }
+    // Small formations go: rock and outcrops come in a few big pieces, not scattered about.
+    for (const list of this.regions((i) => this.tiles[i] === ROCK || this.tiles[i] === CLIFF).cells) {
+      if (list.length < FORMATION_MIN && list.every((i) => baseDist[i] >= BASE_RADIUS + 4)) for (const i of list) this.tiles[i] = SAND;
     }
 
     // High ground. Every sizeable rock area (with the outcrops in it) is a raised shelf, the bases' included;
@@ -587,40 +624,7 @@ export class GameMap {
     this.placeMesas(seed, baseDist);
     this.removeSmallRegions(24);
 
-    // Spice in sandy areas away from bases.
-    const sandSpice: number[] = [];
-    for (let i = 0; i < total; i++) if (this.tiles[i] === SAND && baseDist[i] > 12) sandSpice.push(s[i]);
-    const spiceT = percentile(sandSpice, 0.28);
-    for (let i = 0; i < total; i++) {
-      if (this.tiles[i] === SAND && baseDist[i] > 12 && s[i] > spiceT) {
-        this.tiles[i] = SPICE;
-        this.spice[i] = Math.min(SPICE_MAX, 200 + (s[i] - spiceT) * 3000);
-      }
-    }
-
-    // A guaranteed spice field near each spot, toward the map center: worked out for spot 0, copied to the others.
-    {
-      const b = this.spots[0];
-      const mid = (N - 1) / 2;
-      const len = hypot(mid - b.cx, mid - b.cz) || 1;
-      const ux = (mid - b.cx) / len;
-      const uz = (mid - b.cz) / len;
-      // Off to one side of the line toward the middle (as the original corner bases had it).
-      const fx = b.cx + Math.round(ux * 11.6 - uz * 6);
-      const fz = b.cz + Math.round(uz * 11.6 + ux * 6);
-      for (let dz = -4; dz <= 4; dz++) {
-        for (let dx = -4; dx <= 4; dx++) {
-          const x = fx + dx;
-          const z = fz + dz;
-          if (!this.inBounds(x, z) || dx * dx + dz * dz > 16) continue;
-          if (baseDist[this.idx(x, z)] < 9.6) continue;
-          for (const i of this.orbit(this.idx(x, z))) {
-            this.tiles[i] = SPICE;
-            this.spice[i] = SPICE_MAX * (1 - hypot(dx, dz) / 6);
-          }
-        }
-      }
-    }
+    if (!this.placeFields(seed)) return false;
 
     this.placeRamps(seed);
 
@@ -663,6 +667,118 @@ export class GameMap {
       const t = this.tiles[i];
       const detail = t === ROCK ? 0.3 : t === CLIFF ? 1.6 + hash(i, 3, seed) * 1.4 : t === SPICE ? 0.06 : 0;
       this.heights[i] = this.ramp[i] ? HIGH_Y / 2 : this.level[i] * HIGH_Y + detail;
+    }
+    return true;
+  }
+
+  /**
+   * The spice fields: a large one by every spot (its home field, toward the middle and off to one side), then sets
+   * of medium and small ones out in the desert, copied under the map's symmetries. Fields sit on open low sand,
+   * clear of rock and plateau edges. False if a home field doesn't fit.
+   */
+  private placeFields(seed: number): boolean {
+    const N = this.size;
+    const total = N * N;
+    // Chebyshev distance from each cell to the nearest one that isn't open low sand (capped): room for a field.
+    const room = new Uint8Array(total).fill(255);
+    const queue: number[] = [];
+    for (let i = 0; i < total; i++) {
+      const x = i % N;
+      const z = (i / N) | 0;
+      if (this.tiles[i] !== SAND || this.level[i] || x === 0 || z === 0 || x === N - 1 || z === N - 1) {
+        room[i] = 0;
+        queue.push(i);
+      }
+    }
+    for (let k = 0; k < queue.length; k++) {
+      const i = queue[k];
+      if (room[i] >= 12) continue;
+      for (let dz = -1; dz <= 1; dz++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const x = (i % N) + dx;
+          const z = ((i / N) | 0) + dz;
+          if (!this.inBounds(x, z)) continue;
+          const j = this.idx(x, z);
+          if (room[j] > room[i] + 1) {
+            room[j] = room[i] + 1;
+            queue.push(j);
+          }
+        }
+      }
+    }
+    const taken: { cx: number; cz: number; r: number }[] = [];
+    // A field's cells around (cx, cz): a lumpy disc. Null if it doesn't fit, or is too near another field.
+    const disc = (cx: number, cz: number, kind: FieldKind): { i: number; w: number }[] | null => {
+      const r = SPICE_FIELDS[kind].radius;
+      if (taken.some((t) => hypot(t.cx - cx, t.cz - cz) < t.r + r + FIELD_GAP)) return null;
+      const out: { i: number; w: number }[] = [];
+      const R = Math.ceil(r + 1);
+      for (let dz = -R; dz <= R; dz++) {
+        for (let dx = -R; dx <= R; dx++) {
+          const x = cx + dx;
+          const z = cz + dz;
+          const d = hypot(dx, dz);
+          if (d > r + (fbm(x / 2 + 300, z / 2 + 300, seed + 71) - 0.5) * 1.6) continue;
+          if (!this.inBounds(x, z) || room[this.idx(x, z)] < 3) return null;
+          out.push({ i: this.idx(x, z), w: 1 - 0.55 * (d / (r + 1)) ** 2 }); // richest in the middle
+        }
+      }
+      return out;
+    };
+    // Lays a field and its images, its spice shared out to the total; false if an image overlaps another.
+    const lay = (cx: number, cz: number, kind: FieldKind): boolean => {
+      const cells = disc(cx, cz, kind);
+      if (!cells) return false;
+      const r = SPICE_FIELDS[kind].radius;
+      const centers = this.syms.map((sym) => this.image(cx, cz, sym));
+      for (let a = 0; a < centers.length; a++) {
+        for (let b = a + 1; b < centers.length; b++) if (hypot(centers[a].cx - centers[b].cx, centers[a].cz - centers[b].cz) < 2 * r + FIELD_GAP) return false;
+      }
+      const sum = cells.reduce((t, c) => t + c.w, 0);
+      for (const { i, w } of cells) {
+        for (const j of this.orbit(i)) {
+          this.tiles[j] = SPICE;
+          this.spice[j] = (SPICE_FIELDS[kind].spice * w) / sum;
+        }
+      }
+      for (const c of centers) {
+        taken.push({ cx: c.cx, cz: c.cz, r });
+        this.fields.push({ cx: c.cx, cz: c.cz, kind });
+      }
+      return true;
+    };
+    this.fields = [];
+
+    // Home field: toward the middle, off to one side, as close to the plateau as it fits.
+    const b = this.spots[0];
+    const mid = (N - 1) / 2;
+    const toMid = dm.atan2(mid - b.cz, mid - b.cx);
+    let home = false;
+    const L = SPICE_FIELDS.L.radius;
+    for (let d = BASE_RADIUS + L + 2; d <= BASE_RADIUS + L + 10 && !home; d++) {
+      for (const off of [HOME_SIDE, HOME_SIDE + 12, HOME_SIDE - 12, HOME_SIDE + 24, HOME_SIDE - 24]) {
+        const a = toMid + (off * Math.PI) / 180;
+        if (lay(Math.round(b.cx + dm.cos(a) * d), Math.round(b.cz + dm.sin(a) * d), 'L')) {
+          home = true;
+          break;
+        }
+      }
+    }
+    if (!home) return false;
+
+    // Out in the desert: medium fields toward the middle (contested), small ones anywhere away from the bases.
+    for (const kind of ['M', 'S'] as const) {
+      const def = SPICE_FIELDS[kind];
+      let made = 0;
+      for (let k = 0; k < 600 && made < def.sets; k++) {
+        const cx = Math.floor(hash(k, kind === 'M' ? 81 : 82, seed) * N);
+        const cz = Math.floor(hash(k, kind === 'M' ? 83 : 84, seed) * N);
+        const fromSpot = Math.min(...this.spots.map((p) => hypot(p.cx - cx, p.cz - cz)));
+        if (fromSpot < def.fromSpot) continue;
+        // The first tries keep medium fields toward the middle; if none fits there, anywhere will do.
+        if (kind === 'M' && k < 300 && hypot(cx - mid, cz - mid) > 0.36 * N) continue;
+        if (lay(cx, cz, kind)) made++;
+      }
     }
     return true;
   }

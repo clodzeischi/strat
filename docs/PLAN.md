@@ -94,6 +94,15 @@ The rush is the biggest loss: the AI used to watch it build at home. Tried and d
 
 Side bias: fixed, see the AI section (spawn side decided mirror matches).
 
+**Spawn spots, fields and calmer terrain: done (branch `map-generation`, 2026-10-30).**
+- **Spawn spots:** Small has 2, Medium 4, Large 8 (`MAP_SPOTS`). The map is symmetric so that every spot sees the same terrain: a half turn for 2, quarter turns for 4, quarter turns plus mirror images for 8. The two players start at two spots picked at random from the seed, so on Medium and Large they can be next door or across the map, and must scout to find each other. Every spot has its plateau and home field, so the empty ones are ready-made expansions. On Large, pairs one quarter turn apart are only near-fair (one's neighbour is clockwise, the other's counter-clockwise); every other pairing is exactly symmetric.
+- **AI:** `Intel` rules a spot out once it's been seen with no enemy structure near it; until the base is found, `enemyBase()` is the nearest spot still in question, and the scout goes round them nearest first.
+- **Base plateau:** radius 9.1 (was 8.5), about 15% more area.
+- **Spice fields** (`SPICE_FIELDS`), replacing the noise patches: an L home field by every spot (26000 spice, radius 5: about 7 minutes for the AI's 6-7 harvesters, measured 5.5-8.7, mean 6.9), plus one set each of M (20000, radius 4, toward the contested middle) and S (10000, radius 2.8) copied to every spot. Fields sit on open low sand, clear of rock and plateau edges. Small maps hold about 100k spice in all, under half the old ~214k.
+- **Terrain:** calmer noise (feature size 11 tiles, was 7), 9% rock with 3% outcrop (was 20% / 8%), formations under 40 tiles cleared, half as many mesas. Half the maps get a massif in the middle (radius 8.5% of the map width) that attacks have to go round on one side or the other.
+- **Measured, 64 maps, Hard vs Hard:** team 0 won 42% of decided games (46% on the old maps, within noise); 14 games hit the 30-minute cap (8 on the old maps), as the scarcer spice runs out.
+- Still to do: real 3-8 player matches (the game has two teams everywhere); a way to build next to a far field (Outpost or MCV, see section 4).
+
 - `MAP_SIZE` becomes a per-game value instead of a constant.
 - Fairness by symmetry: point symmetry for 2 players, 4-fold rotational symmetry for 3-4 players (with 3 players, one slot is left empty). With symmetry, no player can get an elevation advantage.
 - Generate, then validate, then retry with the next seed. Checks:

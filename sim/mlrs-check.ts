@@ -5,6 +5,7 @@ import { Game } from '../src/game/game';
 import { applyCommand } from '../src/game/commands';
 import { UNITS, type Team } from '../src/config';
 import type { Unit } from '../src/entities';
+import { SAND } from '../src/map';
 
 let failures = 0;
 function check(ok: boolean, what: string): void {
@@ -22,6 +23,16 @@ function arena() {
   }
   g.update(0.05);
   const m = g.map;
+  // Flat open sand round the middle, so the runs check rockets, not the map's terrain there.
+  for (let z = 0; z < m.size; z++) {
+    for (let x = 0; x < m.size; x++) {
+      const i = m.idx(x, z);
+      if (Math.abs(x - m.size / 2) > 12 || Math.abs(z - m.size / 2) > 12 || m.occupied[i]) continue;
+      m.tiles[i] = SAND;
+      m.level[i] = 0;
+      m.ramp[i] = 0;
+    }
+  }
   const at = (dx: number, dz: number) => {
     const c = m.nearestCell(Math.round(m.size / 2 + dx), Math.round(m.size / 2 + dz), (x, z) => m.canEnter(x, z, 'vehicle'), 20)!;
     return { x: m.center(c.cx), z: m.center(c.cz) };
@@ -35,7 +46,8 @@ function arena() {
 /** Rocket hits on a target crossing in front of an MLRS for a few seconds, with or without a lock. */
 function crossing(lock: boolean, moving: boolean): number {
   const { g, at, step } = arena();
-  const p = at(-4, 0);
+  // Far enough out that the rockets fly a while: up close they land before even a fast target is out of the blast.
+  const p = at(-7, 0);
   const mlrs = g.spawnUnit('rocket', A, p.x, p.z, 0);
   const s = at(1, -4);
   const target = g.spawnUnit('razor', C, s.x, s.z);

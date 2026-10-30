@@ -49,6 +49,18 @@ export const HARVESTER = {
 
 export const SPICE_MAX = 500;
 
+export type FieldKind = 'S' | 'M' | 'L';
+/**
+ * Spice field sizes: radius in tiles, total spice, how many sets the map gets (each copied to every spot by the map's
+ * symmetry: 2, 4 or 8 fields a set), and how far from any spawn spot they must be. Every spot has one L, its home
+ * field, sized to last about 7 minutes; M fields lie toward the contested middle, S ones anywhere else.
+ */
+export const SPICE_FIELDS: Record<FieldKind, { radius: number; spice: number; sets: number; fromSpot: number }> = {
+  L: { radius: 5, spice: 26000, sets: 0, fromSpot: 0 },
+  M: { radius: 4, spice: 20000, sets: 1, fromSpot: 18 },
+  S: { radius: 2.8, spice: 10000, sets: 1, fromSpot: 18 },
+};
+
 /** Repairs cost this share of the unit's or building's price per full health bar. */
 export const REPAIR_COST = 0.4;
 /** Infantry heal this share of their health per second once they haven't been hit for INFANTRY_REGEN.delay seconds. */
