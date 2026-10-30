@@ -133,6 +133,48 @@ export function findPath(map: GameMap, sx: number, sz: number, gx: number, gz: n
   return smooth(map, { x: sx, z: sz }, cells, cls);
 }
 
+/**
+ * Dijkstra from a point over the cells `cls` can cross: the goal cell (an index) the shortest drive away, or null if
+ * none can be reached. `goal` gives a cell's extra cost in tiles (0 for a plain goal), or null if it isn't one.
+ */
+export function nearestByPath(map: GameMap, sx: number, sz: number, goal: (i: number) => number | null, cls: MoveClass = 'vehicle'): number | null {
+  const N = map.size;
+  const NN = N * N;
+  const cx0 = map.cellOf(sx);
+  const cz0 = map.cellOf(sz);
+  if (!map.inBounds(cx0, cz0)) return null;
+  const g = new Float64Array(NN).fill(Infinity);
+  const closed = new Uint8Array(NN);
+  const heap = new MinHeap();
+  const start = map.idx(cx0, cz0);
+  g[start] = 0;
+  heap.push(start, 0);
+  while (heap.size) {
+    const cur = heap.pop();
+    // Entries past the grid are goals reached, queued at their cost plus extra.
+    if (cur >= NN) return cur - NN;
+    if (closed[cur]) continue;
+    closed[cur] = 1;
+    const extra = goal(cur);
+    if (extra !== null) heap.push(cur + NN, g[cur] + extra);
+    const cx = cur % N;
+    const cz = (cur / N) | 0;
+    for (const [dx, dz, cost] of DIRS) {
+      const nx = cx + dx;
+      const nz = cz + dz;
+      if (!map.inBounds(nx, nz) || !map.canStep(cx, cz, nx, nz, cls)) continue;
+      const ni = map.idx(nx, nz);
+      if (closed[ni]) continue;
+      const ng = g[cur] + cost;
+      if (ng < g[ni]) {
+        g[ni] = ng;
+        heap.push(ni, ng);
+      }
+    }
+  }
+  return null;
+}
+
 /** True if a straight segment stays on cells this class can cross (with a little clearance), never jumping a level edge. */
 export function lineClear(map: GameMap, a: Point, b: Point, cls: MoveClass = 'vehicle'): boolean {
   const d = hypot(b.x - a.x, b.z - a.z);

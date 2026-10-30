@@ -458,7 +458,7 @@ export class Unit extends Entity {
     if (this.order.kind !== 'harvest') return null;
     if (this.hstate === 'toSpice' && this.spiceCell) return { x: game.map.center(this.spiceCell.cx), z: game.map.center(this.spiceCell.cz) };
     if (this.hstate === 'toRefinery') {
-      if (!this.refinery || this.refinery.dead) this.refinery = game.nearestBuilding(this.team, 'refinery', this.x, this.z);
+      if (!this.refinery || this.refinery.dead) this.refinery = game.refineryFor(this);
       const dock = this.dockAt(game);
       if (!dock) return null;
       return { x: game.map.center(dock.cell.cx), z: game.map.center(dock.cell.cz) };
@@ -469,7 +469,7 @@ export class Unit extends Entity {
   /** Harvester under fire: abandon the field and head home to the refinery. Returns false if it's already there. */
   retreat(game: Game): boolean {
     if (this.order.kind !== 'harvest' || this.hstate === 'unload') return false;
-    const ref = game.nearestBuilding(this.team, 'refinery', this.x, this.z);
+    const ref = game.refineryFor(this);
     if (!ref || hypot(ref.x - this.x, ref.z - this.z) < 8 * TILE) return false;
     this.hstate = 'toRefinery';
     this.refinery = ref;
@@ -1205,7 +1205,7 @@ export class Unit extends Entity {
       }
       case 'toRefinery': {
         if (!this.refinery || this.refinery.dead) {
-          this.refinery = game.nearestBuilding(this.team, 'refinery', this.x, this.z);
+          this.refinery = game.refineryFor(this);
           if (!this.refinery) break; // wait until a refinery exists
           this.setDockPath(game);
         }

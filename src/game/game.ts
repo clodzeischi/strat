@@ -12,7 +12,7 @@ import { Building, Carryall, distTo, facingToward, moveClassOf, repairable, SALV
 import { CLIFF, GameMap, ROCK, SAND, SPICE, type Cell, type MoveClass } from '../map';
 import { mat } from '../materials/lambert';
 import { makeRiddenWorm, type RiddenWormModel } from '../models';
-import { cellsAround, findPath, type Point } from './pathfinding';
+import { cellsAround, findPath, nearestByPath, type Point } from './pathfinding';
 import { Terrain } from '../render/terrain';
 import { Hasher, mulberry32 } from './rng';
 import { Vision, VISION_EVERY } from './vision';
@@ -474,35 +474,65 @@ export class Game {
     return best ?? this.dockCell(b);
   }
 
+  /** The refinery a returning harvester heads for: the one with a dock the shortest drive away. */
+  refineryFor(h: Unit): Building | null {
+    return this.nearestDock(h, null)?.ref ?? null;
+  }
+
   /**
-   * A refinery dock for this harvester: the nearest open cell along any side, preferring one no other harvester is
-   * using or heading to. `out` is the way out from the wall, which the harvester backs in against.
+   * A refinery dock for this harvester: the open cell in the middle of a side that's the shortest drive away,
+   * preferring one no other harvester is using or heading to. `out` is the way out from the wall, which the harvester
+   * backs in against.
    */
   dockFor(h: Unit, ref: Building): { cell: Cell; out: { dx: number; dz: number } } {
+    const d = this.nearestDock(h, ref);
+    return d ?? { cell: this.dockCell(ref), out: ref.doorStep() };
+  }
+
+  /** The nearest dock by drive at this refinery (or, with null, at any of the harvester's team's), else the nearest as the crow flies. */
+  private nearestDock(h: Unit, only: Building | null): { ref: Building; cell: Cell; out: { dx: number; dz: number } } | null {
     const m = this.map;
     const taken = new Set<number>();
     for (const u of this.units) {
-      if (u !== h && u.dock?.ref === ref && (u.hstate === 'toRefinery' || u.hstate === 'unload')) taken.add(m.idx(u.dock!.cell.cx, u.dock!.cell.cz));
+      if (u !== h && u.dock && (u.hstate === 'toRefinery' || u.hstate === 'unload')) taken.add(m.idx(u.dock.cell.cx, u.dock.cell.cz));
     }
-    let best: { cell: Cell; out: { dx: number; dz: number } } | null = null;
+    type Dock = { ref: Building; cell: Cell; out: { dx: number; dz: number }; extra: number };
+    const docks = new Map<number, Dock>();
+    const add = (d: Dock) => {
+      const i = m.idx(d.cell.cx, d.cell.cz);
+      const had = docks.get(i);
+      if (!had || d.extra < had.extra) docks.set(i, d);
+    };
+    for (const ref of this.buildings) {
+      if (ref.dead || ref.type !== 'refinery' || ref.team !== h.team || (only && ref !== only)) continue;
+      let any = false;
+      for (const side of ref.perimeter()) {
+        if (side.out.dx && side.out.dz) continue; // not the corners: backing in is against a wall
+        // One dock in the middle of each side, so harvesters at neighboring docks don't bump each other.
+        const along = side.out.dx ? side.cell.cz - ref.cz : side.cell.cx - ref.cx;
+        if (along !== Math.floor(ref.size / 2)) continue;
+        const { cx, cz } = side.cell;
+        if (!this.besideOk(ref, cx, cz, 'vehicle')) continue;
+        // A dock in use counts as further away, so harvesters spread around the refinery but still queue if all are busy.
+        add({ ref, cell: side.cell, out: side.out, extra: taken.has(m.idx(cx, cz)) ? 12 : 0 });
+        any = true;
+      }
+      if (!any) add({ ref, cell: this.dockCell(ref), out: ref.doorStep(), extra: 0 });
+    }
+    if (!docks.size) return null;
+    const i = nearestByPath(m, h.x, h.z, (i) => docks.get(i)?.extra ?? null);
+    if (i !== null) return docks.get(i)!;
+    // None reachable (boxed in, say): the nearest as the crow flies, as if the way were open.
+    let best: Dock | null = null;
     let bestD = Infinity;
-    for (const side of ref.perimeter()) {
-      if (side.out.dx && side.out.dz) continue; // not the corners: backing in is against a wall
-      // One dock in the middle of each side, so harvesters at neighboring docks don't bump each other.
-      const along = side.out.dx ? side.cell.cz - ref.cz : side.cell.cx - ref.cx;
-      if (along !== Math.floor(ref.size / 2)) continue;
-      const { cx, cz } = side.cell;
-      if (!this.besideOk(ref, cx, cz, 'vehicle')) continue;
-      // A dock in use counts as further away, so harvesters spread around the refinery but still queue if all are busy.
-      const d = hypot(m.center(cx) - h.x, m.center(cz) - h.z) + (taken.has(m.idx(cx, cz)) ? 12 * TILE : 0);
-      if (d < bestD - 1e-6) {
-        bestD = d;
-        best = side;
+    for (const d of docks.values()) {
+      const dist = hypot(m.center(d.cell.cx) - h.x, m.center(d.cell.cz) - h.z) + d.extra * TILE;
+      if (dist < bestD - 1e-6) {
+        bestD = dist;
+        best = d;
       }
     }
-    if (best) return best;
-    const cell = this.dockCell(ref);
-    return { cell, out: ref.doorStep() };
+    return best;
   }
 
   /** Whether a unit may move from where it is to a nearby point without crossing a level edge or blocked cell. */
@@ -529,18 +559,30 @@ export class Game {
     return range * (diff >= 1 ? 1 + HIGH_GROUND_RANGE : diff <= -1 ? 1 - HIGH_GROUND_RANGE : 1);
   }
 
+  /**
+   * Spice for a harvester: the cell the shortest drive away within 40 cells of (cx, cz), preferring one no teammate
+   * is heading to or working. Ties go toward the map's middle, as with nearestCell.
+   */
   findSpice(cx: number, cz: number, self: Unit): Cell | null {
+    const m = this.map;
     const claimed = new Set<number>();
     for (const u of this.units) {
       if (u !== self && u.team === self.team && u.spiceCell && (u.hstate === 'toSpice' || u.hstate === 'harvest')) {
-        claimed.add(this.map.idx(u.spiceCell.cx, u.spiceCell.cz));
+        claimed.add(m.idx(u.spiceCell.cx, u.spiceCell.cz));
       }
     }
-    const isSpice = (x: number, z: number) => this.map.inBounds(x, z) && this.map.tile(x, z) === SPICE;
-    return (
-      this.map.nearestCell(cx, cz, (x, z) => isSpice(x, z) && !claimed.has(this.map.idx(x, z)), 40) ??
-      this.map.nearestCell(cx, cz, isSpice, 40)
-    );
+    const N = m.size;
+    const mid = (N - 1) / 2;
+    const i = nearestByPath(m, self.x, self.z, (i) => {
+      const x = i % N;
+      const z = (i / N) | 0;
+      if (m.tiles[i] !== SPICE || Math.max(Math.abs(x - cx), Math.abs(z - cz)) > 40) return null;
+      return (claimed.has(i) ? 1e6 : 0) + ((x - mid) ** 2 + (z - mid) ** 2) * 1e-7;
+    });
+    if (i !== null) return { cx: i % N, cz: (i / N) | 0 };
+    // None reachable: the nearest as the crow flies, as before.
+    const isSpice = (x: number, z: number) => m.inBounds(x, z) && m.tile(x, z) === SPICE;
+    return m.nearestCell(cx, cz, (x, z) => isSpice(x, z) && !claimed.has(m.idx(x, z)), 40) ?? m.nearestCell(cx, cz, isSpice, 40);
   }
 
   canPlace(type: BuildingType, team: Team, cx: number, cz: number): boolean {
