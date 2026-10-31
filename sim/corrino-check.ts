@@ -162,7 +162,7 @@ function arena(): { g2: Game; at: (dx: number, dz: number) => { x: number; z: nu
   // its death doesn't pull the turret back mid-turn.)
   if (!sitter.dead) { sitter.hp = 0; (g2 as unknown as { kill(e: unknown, by: null): void }).kill(sitter, null); }
   const side = at(12, -6);
-  g2.spawnUnit('trooper', C, side.x - 3, side.z).hp = 1e6;
+  g2.spawnUnit('trooper', C, side.x - 6, side.z).hp = 1e6; // clear of the blast: a computer player holds fire on its own side
   const flank = g2.spawnUnit('tank', A, side.x, side.z);
   flank.hp = 1e6;
   arty.target = flank;

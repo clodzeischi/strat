@@ -437,6 +437,7 @@ export class Game {
       let score = d + penalty;
       const w = seeker && this.weaponFor(seeker, e);
       if (seeker && !w) return; // e.g. an aircraft and no anti-air weapon
+      if (seeker && w && this.holdsFire(seeker, e, w)) return; // a computer player's blast would catch its own side
       if (w) {
         const ratio = THREE.MathUtils.clamp(Math.max(MIN_HIT, weaponDamage(w, e) - armorOf(e)) / w.damage - 1, -1, 2);
         score -= ratio * 4;
@@ -1116,7 +1117,33 @@ export class Game {
   }
 
   /** `secondary`: shot by a unit's second gun, which starts from its own muzzle if the model has one. */
+  /**
+   * Whether a shot with `w` at `target` would catch any of `u`'s side in its blast (blast and impact: splash hits friend
+   * and foe; aircraft are above an unguided shell's).
+   */
+  endangersAllies(u: Shooter, target: Entity, w: WeaponDef): boolean {
+    if (!(w.splash > 0) || w.cone) return false;
+    const r = w.splash + 0.5;
+    const overhead = !!w.unguided && !target.tags.includes('air');
+    for (const e of this.units) {
+      if (e === u || e.dead || e.carrier || !this.allied(e.team, u.team) || (overhead && e.def.air)) continue;
+      if (distTo(e, target.x, target.z) <= r) return true;
+    }
+    for (const b of this.buildings) if (!b.dead && this.allied(b.team, u.team) && distTo(b, target.x, target.z) <= r) return true;
+    return false;
+  }
+
+  /** A computer player never fires a blast into its own side (people must mind that themselves). */
+  holdsFire(u: Shooter, target: Entity, w: WeaponDef): boolean {
+    return !this.teams[u.team].human && this.endangersAllies(u, target, w);
+  }
+
   fire(u: Shooter, target: Entity, w: WeaponDef, secondary = false): void {
+    if (this.holdsFire(u, target, w)) {
+      // Look for something else to shoot (nearestEnemy passes over targets like this one).
+      if (u.target === target) u.target = null;
+      return;
+    }
     let mult = 1;
     if (u instanceof Unit && u.def.hides) {
       // Striking out of hiding: Ambush adds damage for a few seconds; either way the shooter comes out of the sand.
@@ -2515,6 +2542,8 @@ export class Game {
       ...this.buildings.filter((b) => near(b) && this.onSandFootprint(b)),
     ];
     if (!victims.length) return;
+    // A computer player's rider holds the worm back rather than let it bite its own side.
+    if (!this.teams[w.team].human && victims.some((v) => this.allied(v.team, w.team))) return;
     w.nextBite = this.time + WORM.biteEvery;
     w.bitAt = this.time;
     for (const v of victims) {

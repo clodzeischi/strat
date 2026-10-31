@@ -1,5 +1,6 @@
 // Checks area damage hits friend and foe alike (not the unit that set it off), and that a unit caught in its own
-// side's blast doesn't turn on the ally who fired.
+// side's blast doesn't turn on the ally who fired; a computer player never fires a blast into its own side (a person
+// may).
 // Usage: npx tsx sim/friendly-fire-check.ts
 import * as THREE from 'three';
 import { UNITS } from '../src/config';
@@ -32,6 +33,29 @@ check('and our own trooper next to it', friend.hp < friend.maxHp || friend.dead)
 check('but not one outside the blast', far.hp === far.maxHp);
 check('the one who fired is never caught in it', (() => { g.blast(shooter.x, shooter.z, shell, 1, shooter); return shooter.hp === shooter.maxHp; })());
 check("our trooper doesn't turn on the ally who fired", friend.dead || friend.target !== shooter);
+
+// A computer player's Soulcrusher holds a shell that would land on its own trooper; a person's fires it.
+for (const human of [false, true]) {
+  g.teams[0].human = human;
+  const foe2 = g.spawnUnit('infantry', 1, 50, 80, 0);
+  const friend2 = g.spawnUnit('infantry', 0, 51, 80, 0);
+  const lone = g.spawnUnit('infantry', 1, 70, 80, 0);
+  const who = human ? 'a person' : 'a computer player';
+  check(`${who}: ${human ? 'fires' : 'holds'} a shell that would hit its own trooper`, g.holdsFire(shooter, foe2, shell) === !human);
+  g.fire(shooter, foe2, { ...shell, unguided: false, speed: 0, cannon: true });
+  check(`${who}: ${human ? 'the shot goes off' : 'no shot goes off'}`, (foe2.hp < foe2.maxHp) === human);
+  check(`${who}: still free to shell an enemy standing alone`, !g.holdsFire(shooter, lone, shell));
+  // (A Mortar, set up, picks its own targets: its rockets burst on what they hit. Both enemies in range, the lone one further.)
+  const mortar = g.spawnUnit('mortar', 0, 42, 80, 0);
+  (mortar as { deployState: string }).deployState = 'deployed';
+  lone.x = 48;
+  lone.z = 88;
+  g.vision.update(g.units, g.buildings, g.ticks);
+  const pick = g.nearestEnemy(0, mortar.x, mortar.z, 14, mortar);
+  check(`${who}: a Mortar goes for ${human ? 'the nearer enemy' : 'the lone enemy, not the one by its trooper'}`, pick === (human ? foe2 : lone), pick ? `${pick.x}` : 'none');
+  for (const u of [foe2, friend2, lone, mortar]) u.dead = true;
+  g.update(0.01);
+}
 
 if (failures) {
   console.log(`${failures} failed`);

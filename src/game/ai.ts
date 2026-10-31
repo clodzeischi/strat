@@ -996,8 +996,9 @@ export class AI {
     const m = g.map;
     const danger: { x: number; z: number }[] = [
       ...g.worms.map((w) => ({ x: w.lairX, z: w.lairZ })),
-      // An enemy's ridden worm we can see (ours never eats us).
-      ...g.ridden.filter((w) => g.hostile(w.team, this.team) && g.sees(this.team, w.rider)).map((w) => ({ x: w.x, z: w.z })),
+      // A ridden worm we can see, unless a computer player on our side rides it (it holds the worm back from us; a
+      // person's worm bites whatever is in its way).
+      ...g.ridden.filter((w) => !(g.allied(w.team, this.team) && !g.teams[w.team].human) && g.sees(this.team, w.rider)).map((w) => ({ x: w.x, z: w.z })),
     ];
     // Harvesters get going as soon as a Thumper is heard: they're slow, and the worm hears them however still.
     const drums: { x: number; z: number }[] = [...danger];
@@ -1150,7 +1151,7 @@ export class AI {
       if (!c) continue;
       const x = m.center(c.cx);
       const z = m.center(c.cz);
-      // Clear of our own structures on the sand: a ridden worm never bites its own side, but one whose rider is killed
+      // Clear of our own structures on the sand: our rider holds the worm back from them, but one whose rider is killed
       // before it comes up hunts wild round the Thumper, so not right next to them.
       if (ownSand.some((b) => hypot(b.x - x, b.z - z) < WORM.bite + 2 * TILE)) continue;
       // Not where the enemy has guns at hand: they'd destroy the Thumper before the worm comes.
@@ -1503,8 +1504,17 @@ export class AI {
     if (u.detonateAt !== null || (u.hp + u.shields) / (u.maxHp + u.maxShields) > 0.2) return;
     const w = u.def.detonate!.weapon;
     let value = 0;
-    for (const e of g.units) if (g.hostile(e.team, this.team) && !e.dead && !e.def.air && g.sees(this.team, e) && distTo(e, u.x, u.z) < w.splash * 0.7) value += e.def.cost;
-    for (const b of g.buildings) if (g.hostile(b.team, this.team) && !b.dead && g.sees(this.team, b) && distTo(b, u.x, u.z) < w.splash * 0.7) value += BUILDINGS[b.type].cost;
+    // What it would take with it, less what of our own side it would (the blast hits everyone), counted double.
+    for (const e of g.units) {
+      if (e === u || e.dead || e.def.air || e.carrier) continue;
+      if (g.hostile(e.team, this.team) && g.sees(this.team, e) && distTo(e, u.x, u.z) < w.splash * 0.7) value += e.def.cost;
+      else if (g.allied(e.team, this.team) && distTo(e, u.x, u.z) < w.splash) value -= 2 * e.def.cost;
+    }
+    for (const b of g.buildings) {
+      if (b.dead) continue;
+      if (g.hostile(b.team, this.team) && g.sees(this.team, b) && distTo(b, u.x, u.z) < w.splash * 0.7) value += BUILDINGS[b.type].cost;
+      else if (g.allied(b.team, this.team) && distTo(b, u.x, u.z) < w.splash) value -= 2 * BUILDINGS[b.type].cost;
+    }
     if (value >= u.def.cost * 0.6) g.startDetonation(u);
   }
 
@@ -1520,7 +1530,11 @@ export class AI {
     // Where enemies come by: near their harvesters and refineries, or right under enemy ground units.
     const spot = g.units.some((e) => g.hostile(e.team, this.team) && !e.dead && !e.def.air && g.sees(this.team, e) && hypot(e.x - u.x, e.z - u.z) < (e.type === 'harvester' ? 10 : 6) * TILE)
       || g.buildings.some((b) => g.hostile(b.team, this.team) && (b.type === 'refinery' || b.type === 'camp') && g.sees(this.team, b) && distTo(b, u.x, u.z) < 6 * TILE);
-    if (spot) g.layMine(u);
+    // Not under our own side's feet: a mine's blast hits everyone near it.
+    const splash = u.def.mines!.weapon.splash;
+    const ours = g.units.some((e) => e !== u && g.allied(e.team, this.team) && !e.dead && !e.def.air && !e.carrier && hypot(e.x - u.x, e.z - u.z) < splash + 1)
+      || g.buildings.some((b) => g.allied(b.team, this.team) && !b.dead && distTo(b, u.x, u.z) < splash + 1);
+    if (spot && !ours) g.layMine(u);
   }
 
   /**
