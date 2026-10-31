@@ -190,7 +190,7 @@ Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with I
 <tr><th align="left">Armor</th><td>1</td></tr>
 <tr><th align="left">Attributes</th><td>Mechanical, Light</td></tr>
 <tr><th align="left">Speed</th><td>1.75 tiles/s</td></tr>
-<tr><th align="left">Sight</th><td>9 tiles</td></tr>
+<tr><th align="left">Sight</th><td>8 tiles</td></tr>
 <tr><th align="left">Carryall space</th><td>6 of 6</td></tr>
 </table>
 

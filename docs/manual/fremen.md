@@ -97,7 +97,7 @@ Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infant
 
 | Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
 |---|---|---|---|---|---|
-| Main | 7 (+3 vs biological) | 0.55 | 12.73 | 2.25 | hits aircraft |
+| Main | 7 (+3 vs biological) | 0.55 | 12.73 | 2.5 | hits aircraft |
 
 **Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider)
 

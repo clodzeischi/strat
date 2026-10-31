@@ -141,7 +141,7 @@ The Emperor's elite. Close-quarters fighters: tear through infantry and shoot do
 
 | Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
 |---|---|---|---|---|---|
-| Main | 18 (+18 vs biological) | 0.75 | 24 | 2.75 | hits aircraft for 24 |
+| Main | 18 (+18 vs biological) | 0.75 | 24 | 2.5 | hits aircraft for 24 |
 
 **Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
@@ -213,7 +213,7 @@ Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, bu
 | Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
 |---|---|---|---|---|---|
 | Main gun | 60 (+40 vs armored) | 2 | 30 | 5 | ground only; splash 0.75 tiles |
-| Machine gun | 8 (+4 vs biological) | 0.2 | 40 | 4.5 | ground only |
+| Machine gun | 8 (+4 vs biological) | 0.2 | 40 | 3 | ground only |
 | Self-destruct | 500 (+300 vs structure) | – | – | – | ground only; splash 4.5 tiles; Weapons upgrades don't change it |
 
 **Strong against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/sardaukar.png" width="32" align="absmiddle" alt=""> [Sardaukar](#sardaukar) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)

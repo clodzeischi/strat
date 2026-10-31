@@ -47,7 +47,8 @@ function arena() {
 function crossing(lock: boolean, moving: boolean): number {
   const { g, at, step } = arena();
   // Far enough out that the rockets fly a while: up close they land before even a fast target is out of the blast.
-  const p = at(-7, 0);
+  // A lock needs the target in sight (16), so locked rockets fly from a little closer.
+  const p = at(lock ? -5 : -7, 0);
   const mlrs = g.spawnUnit('rocket', A, p.x, p.z, 0);
   const s = at(1, -4);
   const target = g.spawnUnit('razor', C, s.x, s.z);

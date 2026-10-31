@@ -29,7 +29,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.',
   },
   rocket: {
-    name: 'MLRS', producer: 'factory', cost: 510, buildTime: 13, hp: 265, armor: 1, speed: 3.5, turnRate: 2.5, radius: 1.0, sight: 18,
+    name: 'MLRS', producer: 'factory', cost: 510, buildTime: 13, hp: 265, armor: 1, speed: 3.5, turnRate: 2.5, radius: 1.0, sight: 16,
     turret: true, infantry: false, tags: ['mechanical', 'light'], requires: ['factory2'],
     weapon: { range: 15, minRange: 6, damage: 44, bonus: { structure: 30 }, airDamage: 60, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 4, air: true, unguided: true, sound: 'launch_large' },
     lockOn: { duration: 8, cooldown: 20 },
@@ -58,7 +58,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   sardaukar: {
     name: 'Sardaukar', producer: 'barracks', cost: 260, buildTime: 9, hp: 180, shields: 100, armor: 1, speed: 3.15, turnRate: 12, radius: 0.5, sight: 10,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks2'],
-    weapon: { range: 5.5, minRange: 0, damage: 18, bonus: { biological: 18 }, airDamage: 24, cooldown: 0.75, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'coax_mg' },
+    weapon: { range: 5, minRange: 0, damage: 18, bonus: { biological: 18 }, airDamage: 24, cooldown: 0.75, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'coax_mg' },
     desc: "The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and MLRS.",
   },
   razor: {
@@ -72,7 +72,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu', 'fab2'],
     weapon: { range: 10, minRange: 0, damage: 60, bonus: { armored: 40 }, cooldown: 2, projectile: 'shell', speed: 0, splash: 1.5, cannon: true, sound: 'heavy_laser' },
     holdFire: true,
-    secondary: { range: 9, minRange: 0, damage: 8, bonus: { biological: 4 }, cooldown: 0.2, projectile: 'bullet', speed: 0, splash: 0, sound: 'devastator_coax' },
+    secondary: { range: 6, minRange: 0, damage: 8, bonus: { biological: 4 }, cooldown: 0.2, projectile: 'bullet', speed: 0, splash: 0, sound: 'devastator_coax' },
     detonate: { delay: 2.5, weapon: { range: 0, minRange: 0, damage: 500, bonus: { structure: 300 }, step: 0, cooldown: 0, projectile: 'shell', speed: 0, splash: 9 } },
     desc: "Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, but only fires standing still; its machine gun cuts down infantry, even on the move. Can self-destruct in a huge blast. Weak vs aircraft, MLRS and massed troopers.",
   },
@@ -101,7 +101,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   warrior: {
     name: 'Fremen Warrior', producer: 'barracks', cost: 80, buildTime: 3.5, hp: 70, speed: 3.15, turnRate: 12, radius: 0.45, sight: 11,
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
-    weapon: { range: 4.5, minRange: 0, damage: 7, bonus: { biological: 3 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
+    weapon: { range: 5, minRange: 0, damage: 7, bonus: { biological: 3 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
     desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles, flamers and structures. Goes through rites to become a Fedaykin or a Fremen Mortar.',
   },
   fedaykin: {
