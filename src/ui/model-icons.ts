@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BUILDINGS, FACTIONS, TEAM_COLORS, maxLevel, type Faction, type Team, type UnitType } from '../config';
+import { FACTIONS, TEAM_COLORS, maxLevel, type Faction, type Team, type UnitType } from '../config';
 import { hasBuildingModel, hasUnitModel, makeBuildingModel, makeUnitModel, type UpgradeLook } from '../models';
 import { TO_SUN } from '../render/shadows';
 import { setModelIcons, type IconKey } from './icons';
@@ -40,7 +40,7 @@ export function renderModelIcons(faction: Faction, team: Team): void {
   const shots: Shot[] = [];
   for (const t of f.train) if (t && hasUnitModel(t, faction)) shots.push({ key: t, make: unit(t) });
   for (const t of f.build) {
-    if (t && hasBuildingModel(t, faction)) shots.push({ key: t, make: () => makeBuildingModel(t, faction, color, BUILDINGS[t].size).group });
+    if (t && hasBuildingModel(t, faction)) shots.push({ key: t, make: () => makeBuildingModel(t, faction, color).group });
   }
   for (const slot of f.research) {
     if (!slot) continue;
@@ -51,7 +51,7 @@ export function renderModelIcons(faction: Faction, team: Team): void {
         shots.push({
           key: `${t}${level}` as IconKey,
           make: () => {
-            const m = makeBuildingModel(t, faction, color, BUILDINGS[t].size);
+            const m = makeBuildingModel(t, faction, color);
             if (m.level2) m.level2.visible = true;
             if (m.level3 && level >= 3) m.level3.visible = true;
             return m.group;

@@ -83,7 +83,7 @@ export class Building extends Entity {
     this.x = (cx + def.size / 2) * TILE;
     this.z = (cz + def.size / 2) * TILE;
     this.y = groundY;
-    const model = makeBuildingModel(type, faction, TEAM_COLORS[team], def.size);
+    const model = makeBuildingModel(type, faction, TEAM_COLORS[team]);
     this.spinner = model.spinner;
     this.level2 = model.level2;
     this.level3 = model.level3;

@@ -1,8 +1,6 @@
 import * as THREE from 'three';
-import { TILE, type BuildingType, type Faction, type UnitType } from '../config';
-import { CONCRETE } from '../materials/palette';
+import { type BuildingType, type Faction, type UnitType } from '../config';
 import { cloneBuildingModel, cloneUnitModel } from './gltf';
-import { box } from './parts';
 import type { BuildingModel, UnitBlueprint, UnitModel, UpgradeKit, UpgradeLook } from './types';
 import { carryall } from './units/carryall';
 import { harvester } from './units/harvester';
@@ -43,16 +41,19 @@ export function makeUnitModel(type: UnitType, faction: Faction, color: number): 
 
 /**
  * A building's Blender model (docs/model-spec.md): centered on its footprint, already turned and sized, so it is
- * drawn as it is. Unless the model is bare (a `bare` property on `body`: Fremen bring their own ground), it stands
- * on a concrete slab. Without a loaded model (headless sims and the server, or a file that failed to load) the
+ * drawn as it is. Unless the model is bare (a `bare` property on `body`: Fremen bring their own ground), it was built on
+ * top of a slab `SLAB` high and is lowered onto the ground. Without a loaded model (headless sims and the server, or a file that failed to load) the
  * building is an empty node.
  */
-export function makeBuildingModel(type: BuildingType, faction: Faction, color: number, size: number): BuildingModel {
+/** The height of the concrete slab buildings were modelled on (docs/model-spec.md); no longer drawn. */
+const SLAB = 0.3;
+
+export function makeBuildingModel(type: BuildingType, faction: Faction, color: number): BuildingModel {
   const group = new THREE.Group();
   const model = cloneBuildingModel(type, faction, color);
   if (!model) return { group, spinner: null, level2: null, level3: null, smoke: [], muzzle: null };
-  const w = size * TILE - 0.3;
-  if (!model.getObjectByName('body')?.userData.bare) box(group, w, 0.3, w, CONCRETE, 0, 0.15, 0);
+  // Models are built standing on a 0.3 m slab the game no longer draws: they're lowered onto the ground instead.
+  if (!model.getObjectByName('body')?.userData.bare) model.position.y -= SLAB;
   group.add(model);
   const level2 = model.getObjectByName('level2') ?? null;
   const level3 = model.getObjectByName('level3') ?? null;

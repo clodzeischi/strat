@@ -53,7 +53,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 
 ### Buildings
 
-A building fills a square of `size × 2 m`. Unless it is **bare**, the game adds a plain 0.3 m concrete slab, `size × 2 − 0.3` m wide, square to the map (N-S). The slab has no team color, so the structure must carry readable team markings. **Start the structure at Z = 0.3 and leave the slab out of the model.** Bare buildings stand on the sand and include their own base. A Blender model is bare when its `body` has a custom property `bare` (any non-zero value; export with Custom Properties on). Fremen buildings are bare: Fremen can build on dunes, and a building sits at the ground height of its center, so a bare base reaches about 1 m below Z = 0 as a skirt and never floats over a dip.
+A building fills a square of `size × 2 m`. Unless it is **bare**, it is laid out on an imagined 0.3 m slab, `size × 2 − 0.3` m wide, square to the map (N-S): **start the structure at Z = 0.3 and leave the slab out of the model.** The game draws no slab (dropped 2026-10-30) and lowers the model 0.3 m onto the ground, so the structure must carry its own readable team markings. Bare buildings stand on the sand and include their own base. A Blender model is bare when its `body` has a custom property `bare` (any non-zero value; export with Custom Properties on). Fremen buildings are bare: Fremen can build on dunes, and a building sits at the ground height of its center, so a bare base reaches about 1 m below Z = 0 as a skirt and never floats over a dip.
 
 **The model is a drop-in: the game doesn't turn or scale it.** Buildings look turned 45° on the map, as in StarCraft, but only the structure is turned, and that turn is baked in Blender:
 
