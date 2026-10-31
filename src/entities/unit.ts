@@ -225,7 +225,7 @@ export class Unit extends Entity {
 
   constructor(id: number, team: Team, readonly type: UnitType, x: number, z: number, heading = 0, readonly faction: Faction = 'atreides') {
     const def = unitDef(faction, type);
-    super(id, team, def.hp, shieldsFor(faction, def), Math.max(1.2, def.radius * 1.8), def.infantry ? 1.6 : 2.0, def.radius + 0.25);
+    super(id, team, def.hp, shieldsFor(faction, def), Math.max(1.2, def.radius * 1.8), def.infantry ? 2.6 : 2.0, def.radius + 0.25);
     this.def = def;
     this.radius = def.radius;
     this.moveClass = moveClassOf(def);
@@ -257,6 +257,13 @@ export class Unit extends Entity {
     this.animLast.x = x;
     this.animLast.z = z;
     this.root.add(this.body);
+  }
+
+  /** Shots and blasts go for the chest of a soldier (about 1.8 m tall), the middle of anything else. */
+  override aimPoint(): THREE.Vector3 {
+    const p = super.aimPoint();
+    if (this.def.infantry) p.y += 0.5;
+    return p;
   }
 
   get name(): string {
@@ -482,7 +489,7 @@ export class Unit extends Entity {
   startFall(game: Game, x: number, y: number, z: number): void {
     const m = game.map;
     const cell = m.nearestCell(m.cellOf(x), m.cellOf(z), (cx, cz) => m.canEnter(cx, cz, this.moveClass), 16) ?? { cx: m.cellOf(x), cz: m.cellOf(z) };
-    const chute = makeParachute(TEAM_COLORS[this.team], this.def.infantry ? 1 : 1.9);
+    const chute = makeParachute(TEAM_COLORS[this.team], this.def.infantry ? 1.5 : 1.9);
     this.root.add(chute);
     this.root.visible = true;
     chute.userData.full = chute.scale.x;

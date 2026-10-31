@@ -118,7 +118,7 @@ The scariest thing on the field, and rare: a Sardaukar siege engine about 1.5× 
 
 ### Harkonnen Trooper (`trooper`)
 
-Former masters, now imperial levy: a slow, heavily armoured giant about 0.9 m tall (1.2× the Atreides trooper) and much broader, so he reads bigger at RTS zoom. Hand-shaped by the user over a generated block-out.
+Former masters, now imperial levy: a slow, heavily armoured giant about 2.2 m tall (1.2× the Atreides trooper) and much broader, so he reads bigger at RTS zoom. Hand-shaped by the user over a generated block-out.
 - **Body:** dark power armour, a small helmet sunk into the shoulders with a team crest, a dark chest with a team stripe, purple on the arms and legs, a team-coloured banner hanging from the belt.
 - **`armor1`:** only the shoulder pads, in a subdued team colour.
 - **Weapons:** a fat hand-held rocket launcher carried two-handed at the waist (`weapons0`); `weapons1` adds a top housing and a cyan optic. Skinned to `hand.R`, `muzzle` at the tube tip.
@@ -126,7 +126,7 @@ Former masters, now imperial levy: a slow, heavily armoured giant about 0.9 m ta
 
 ### Sardaukar (`sardaukar`)
 
-The Emperor's elite: tall and lean, about 0.82 m, between the Atreides and the Harkonnen trooper. Neutral and disciplined, never showy. The concept art gives him a blade; in game he's a close-range gunner that also shoots aircraft, so he carries a carbine and the blade stays sheathed. The first character built to [low-poly-style.md](low-poly-style.md) (about 410 tris with every tier): welded shells, then hand-tweaked by the user.
+The Emperor's elite: tall and lean, about 2.0 m, between the Atreides and the Harkonnen trooper. Neutral and disciplined, never showy. The concept art gives him a blade; in game he's a close-range gunner that also shoots aircraft, so he carries a carbine and the blade stays sheathed. The first character built to [low-poly-style.md](low-poly-style.md) (about 410 tris with every tier): welded shells, then hand-tweaked by the user.
 - **Body:** battle-worn light plate over a dark undersuit, a tall helmet with a dark T visor and a purple crown, a scarf, short cape and ragged tabard in the dark team shade, a sheathed blade on the left hip.
 - **`armor1`:** layered pauldrons with a team rim, and knee guards.
 - **Weapons:** a compact carbine (`weapons0`); `weapons1` adds a cyan optic, a fore grip and a purple barrel shroud. Skinned to `hand.R`, `muzzle` at the barrel tip.
@@ -208,7 +208,7 @@ As in the films: a stake you drive into the sand, with a weight that winds up an
 
 ### Fremen Warrior (`warrior`)
 
-The stealthy desert fighter, after the concept's Fremen infantry: lean and a little shorter than the Sardaukar (about 0.78 m), in a form-fitting stillsuit. No hood and no robe. About 370 tris for the body, 500 with every tier shown.
+The stealthy desert fighter, after the concept's Fremen infantry: lean and a little shorter than the Sardaukar (about 1.85 m), in a form-fitting stillsuit. No hood and no robe. About 370 tris for the body, 500 with every tier shown.
 - **Body:** the stillsuit in Fremen slate with paler ribbing on the chest, belly, knees, shins and forearms; leather boots, gloves and belt with two pouches; a fitted head cover with dark goggle lenses (steel rims) and a face mask below them; a scarf in the dark team shade round the neck; a team armband on each upper arm; a short front flap in the dark team shade; a crysknife with a milk-white grip on the left hip.
 - **Backpack:** the stillsuit pack with a bedroll across its top. Seen from above it's what says Fremen.
 - **`armor1`:** pale scavenged shoulder pads with a team-shade rim, and knee guards.

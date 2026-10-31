@@ -20,8 +20,6 @@ const FILES = [
 ];
 
 const scenes = new Map<string, THREE.Object3D>();
-/** Infantry are modelled ~0.75 m tall (docs/model-spec.md) and drawn this much bigger, so they read on screen. */
-const INFANTRY_SCALE = 1.6;
 /** Animated (skinned) models' actions by name: `idle`, `walk`, `shoot`, `die`. */
 const clips = new Map<string, THREE.AnimationClip[]>();
 let paletteMat: THREE.MeshLambertMaterial | null = null;
@@ -168,15 +166,12 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
   const model = cloneModel(`units/${type}.${faction}`, color);
   if (!model) return null;
   const body = new THREE.Group();
-  const scale = UNITS[type].infantry ? INFANTRY_SCALE : 1;
-  model.scale.setScalar(scale);
   body.add(model);
   // `laser` empties become the game's fading laser-sight beam along the empty's +X, `len` (custom property) long.
   // One hung on a bone (infantry) names the part it shows with in its `part` property.
   const lasers: THREE.Object3D[] = [];
   model.traverse((o) => { if (o.name.startsWith('laser')) lasers.push(o); });
-  // Beams keep their length and thickness on scaled-up infantry.
-  for (const l of lasers) laser(l, 0, 0, 0, (l.userData.len ?? 1) / scale, 0.025 / scale);
+  for (const l of lasers) laser(l, 0, 0, 0, l.userData.len ?? 1, 0.025);
   const laserParts = lasers.filter((l) => l.userData.part).map((l) => ({ l, part: model.getObjectByName(l.userData.part) }));
   const turret = model.getObjectByName('turret') ?? null;
   const muzzle = model.getObjectByName('muzzle') ?? new THREE.Object3D();

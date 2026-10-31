@@ -29,10 +29,12 @@ This is how the Corrino Sardaukar was made (October 2026). The user approved eve
 
 ## 1. Model: low-poly shells
 
-1. **Start from the faction's last infantry `.blend`:** "save as" the new name and delete the old actions. That keeps `kit.py` (the palette swatches and `uv_of`), the materials and the 17-bone rig. Adjust the bone positions for the new height first. The model is drawn 1.6× in game, and these are the sizes:
-   - Atreides: 0.75 m;
-   - Sardaukar: 0.82 m;
-   - Harkonnen: 0.90 m.
+1. **Start from the faction's last infantry `.blend`:** "save as" the new name and delete the old actions. That keeps `kit.py` (the palette swatches and `uv_of`), the materials and the 17-bone rig. Adjust the bone positions for the new height first. The game draws it as built (1 m = 1 game unit), and these are the heights:
+   - Atreides and Fremen: 1.8 m;
+   - Sardaukar: 2.0 m;
+   - Harkonnen: 2.2 m.
+
+   (Until 2026-10-30 infantry was built at 1/2.4 of this and the game scaled it up 1.6×. The files were rescaled ×2.4 then, so the numbers in the table below are from that time.)
 2. **Build it with `shells.py`, in the A pose on that rig, following `docs/low-poly-style.md`:**
    - **Shells:** pelvis, torso and head are welded shells. Legs and arms are separate shells whose open ends sink into the pelvis and torso, so they cost nothing.
    - **Rings:** irregular 4–6 point rings, with a ridge on the silhouette and vertices only at joints and where the outline turns.
@@ -75,7 +77,7 @@ The game's rules for actions:
 | shoot | "Torso slightly turned clockwise, weapon shouldered, left hand supporting the front, wider bracing stance" | Hips −12°, shoulders −24°, head counter-yawed onto the target. Cycle = weapon cooldown (0.75 s = 11 frames): kick on frame 2, settled by frame 7. |
 | die | "Fall to his knees, lean on his weapon, pause, collapse" | 31 frames, played once: hit, knees, gun planted muzzle-down with the left hand on the knee, ~0.8 s sagging pause, topple, prone. |
 
-**Walk cadence:** fast units slip. Distance covered per cycle = 4 × stride reach × 1.6 (draw scale), compared with `speed` × cycle time. The Sardaukar (speed 2.6) covers about 70% of the ground at 8 frames and about 92% at 6 frames. Give the user the numbers and let them choose; they took 8.
+**Walk cadence:** fast units slip. Distance covered per cycle = 4 × stride reach, compared with `speed` × cycle time. At the old draw size the Sardaukar (speed 2.6) covered about 70% of the ground at 8 frames and about 92% at 6 frames; at today's size, 8 frames covers about 104%. Give the user the numbers and let them choose; they took 8.
 
 ## 3. Check, export, playtest
 
