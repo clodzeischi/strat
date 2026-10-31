@@ -24,6 +24,6 @@ export const ACK_LINES = 4;
  */
 export const SOUNDS = [
   'light_mg', 'heavy_mg', 'coax_mg', 'devastator_coax', 'single_shot', 'small_laser', 'heavy_laser', 'auto_laser',
-  'sky_raider_fire', 'launch_small', 'launch_large', 'explosion_small', 'explosion_med', 'explosion_Large', 'click', 'win',
+  'sky_raider_fire', 'flame', 'launch_small', 'launch_large', 'explosion_small', 'explosion_med', 'explosion_Large', 'click', 'win',
 ] as const;
 export type Sound = (typeof SOUNDS)[number];

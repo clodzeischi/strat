@@ -16,6 +16,7 @@ const MIX: Record<Sound, { volume: number; max: number }> = {
   heavy_laser: { volume: 0.8, max: 2 },
   auto_laser: { volume: 0.55, max: 3 },
   sky_raider_fire: { volume: 0.65, max: 2 },
+  flame: { volume: 1, max: 3 },
   launch_small: { volume: 0.5, max: 3 },
   launch_large: { volume: 0.6, max: 2 },
   explosion_small: { volume: 0.6, max: 4 },
