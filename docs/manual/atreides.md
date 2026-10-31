@@ -86,7 +86,7 @@ Speed and sight in tiles. Damage is per hit before armor, plus the bonus against
 <tr><th align="left">Health</th><td>120</td></tr>
 <tr><th align="left">Armor</th><td>0</td></tr>
 <tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.2 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.5 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>5 tiles</td></tr>
 <tr><th align="left">Carryall space</th><td>1 of 6</td></tr>
 </table>

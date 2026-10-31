@@ -96,7 +96,7 @@ Speed and sight in tiles. Damage is per hit before armor, plus the bonus against
 <tr><th align="left">Shields</th><td>80</td></tr>
 <tr><th align="left">Armor</th><td>0</td></tr>
 <tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.05 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.25 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>5 tiles</td></tr>
 </table>
 
@@ -130,7 +130,7 @@ Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehi
 <tr><th align="left">Shields</th><td>100</td></tr>
 <tr><th align="left">Armor</th><td>1</td></tr>
 <tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.3 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.57 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>5 tiles</td></tr>
 </table>
 

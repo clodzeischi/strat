@@ -84,7 +84,7 @@ Speed and sight in tiles. Damage is per hit before armor, plus the bonus against
 <tr><th align="left">Health</th><td>70</td></tr>
 <tr><th align="left">Armor</th><td>0</td></tr>
 <tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.5 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.57 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>5.5 tiles</td></tr>
 </table>
 
@@ -119,7 +119,7 @@ Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infant
 <tr><th align="left">Health</th><td>120</td></tr>
 <tr><th align="left">Armor</th><td>0</td></tr>
 <tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.3 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.57 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>4.5 tiles</td></tr>
 </table>
 
@@ -181,7 +181,7 @@ A Fremen rider on a cloth wing, riding the desert winds. The fastest thing in th
 <tr><th align="left">Health</th><td>230</td></tr>
 <tr><th align="left">Armor</th><td>1</td></tr>
 <tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.5 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.57 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>5.5 tiles</td></tr>
 </table>
 
@@ -216,7 +216,7 @@ Elite fighters with weirding modules: sonic blasts that hit everything in a narr
 <tr><th align="left">Health</th><td>120</td></tr>
 <tr><th align="left">Armor</th><td>0</td></tr>
 <tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.4 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.57 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>6 tiles</td></tr>
 </table>
 
@@ -253,7 +253,7 @@ A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the
 <tr><th align="left">Health</th><td>280</td></tr>
 <tr><th align="left">Armor</th><td>1</td></tr>
 <tr><th align="left">Attributes</th><td>Biological, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.6 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.57 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>5.5 tiles</td></tr>
 </table>
 
