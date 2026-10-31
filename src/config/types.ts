@@ -57,6 +57,8 @@ export interface WeaponDef {
   cone?: number;
   /** Can only hit targets with one of these tags (the Sandrider's crysknife: infantry). */
   only?: Tag[];
+  /** A gun that hits at once like a bullet but draws no tracer: a muzzle flash, then a burst where it hits. */
+  cannon?: boolean;
   /** Passes straight through shields to health (sound: the Fedaykin's weirding modules; a slow blade). */
   pierce?: boolean;
   /** The sound of a shot (none for a flamethrower, or for blasts that aren't fired, like mines). */

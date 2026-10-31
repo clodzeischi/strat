@@ -1113,11 +1113,14 @@ export class Game {
       this.flame(u, target, w, mult, from);
       return;
     }
-    this.effects.flash(from, w.projectile === 'bullet' ? 0.15 : 0.35);
+    this.effects.flash(from, w.projectile === 'bullet' && !w.cannon ? 0.15 : 0.35);
     if (w.projectile === 'bullet') {
       to.x += (Math.random() - 0.5) * 0.5;
       to.z += (Math.random() - 0.5) * 0.5;
-      this.effects.tracer(from, to);
+      if (w.cannon) {
+        this.effects.explosion(to, 0.6);
+        this.onSound('explosion_small', to.x, to.z);
+      } else this.effects.tracer(from, to);
       this.damage(target, w, mult, u);
       return;
     }

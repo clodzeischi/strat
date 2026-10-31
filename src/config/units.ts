@@ -24,7 +24,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   tank: {
     name: 'Tank', producer: 'factory', cost: 425, buildTime: 9, hp: 725, armor: 3, speed: 3.5, turnRate: 2.5, radius: 1.1, sight: 13,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory'],
-    weapon: { range: 9, minRange: 0, damage: 22, bonus: { mechanical: 22 }, cooldown: 1.4, projectile: 'shell', speed: 32, splash: 0, sound: 'single_shot' },
+    weapon: { range: 9, minRange: 0, damage: 22, bonus: { mechanical: 22 }, cooldown: 1.4, projectile: 'bullet', speed: 0, splash: 0, cannon: true, sound: 'single_shot' },
     lift: 6,
     desc: 'Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.',
   },
