@@ -40,20 +40,14 @@ export function makeUnitModel(type: UnitType, faction: Faction, color: number): 
 }
 
 /**
- * A building's Blender model (docs/model-spec.md): centered on its footprint, already turned and sized, so it is
- * drawn as it is. Unless the model is bare (a `bare` property on `body`: Fremen bring their own ground), it was built on
- * top of a slab `SLAB` high and is lowered onto the ground. Without a loaded model (headless sims and the server, or a file that failed to load) the
+ * A building's Blender model (docs/model-spec.md): centered on its footprint at ground level, already turned and sized,
+ * so it is drawn as it is. Without a loaded model (headless sims and the server, or a file that failed to load) the
  * building is an empty node.
  */
-/** The height of the concrete slab buildings were modelled on (docs/model-spec.md); no longer drawn. */
-const SLAB = 0.3;
-
 export function makeBuildingModel(type: BuildingType, faction: Faction, color: number): BuildingModel {
   const group = new THREE.Group();
   const model = cloneBuildingModel(type, faction, color);
   if (!model) return { group, spinner: null, level2: null, level3: null, smoke: [], muzzle: null };
-  // Models are built standing on a 0.3 m slab the game no longer draws: they're lowered onto the ground instead.
-  if (!model.getObjectByName('body')?.userData.bare) model.position.y -= SLAB;
   group.add(model);
   const level2 = model.getObjectByName('level2') ?? null;
   const level3 = model.getObjectByName('level3') ?? null;

@@ -53,18 +53,18 @@ How to build a unit or building model in Blender so it drops into the game as a 
 
 ### Buildings
 
-A building fills a square of `size × 2 m`. Unless it is **bare**, it is laid out on an imagined 0.3 m slab, `size × 2 − 0.3` m wide, square to the map (N-S): **start the structure at Z = 0.3 and leave the slab out of the model.** The game draws no slab (dropped 2026-10-30) and lowers the model 0.3 m onto the ground, so the structure must carry its own readable team markings. Bare buildings stand on the sand and include their own base. A Blender model is bare when its `body` has a custom property `bare` (any non-zero value; export with Custom Properties on). Fremen buildings are bare: Fremen can build on dunes, and a building sits at the ground height of its center, so a bare base reaches about 1 m below Z = 0 as a skirt and never floats over a dip.
+A building fills a square of `size × 2 m`. It is laid out on a plot `size × 2 − 0.3` m wide, square to the map (N-S), and **stands on the ground at Z = 0**, like a unit: the game draws it exactly where the model puts it, with no slab or offset (the concrete slab was dropped 2026-10-30, and the older models were moved down onto Z = 0 on 2026-10-31). The structure carries its own readable team markings. Fremen buildings stand on the sand and include their own base: Fremen can build on dunes, and a building sits at the ground height of its center, so their base reaches about 1 m below Z = 0 as a skirt and never floats over a dip. (Their `body` still carries a `bare` custom property from the slab days; the game ignores it.)
 
 **The model is a drop-in: the game doesn't turn or scale it.** Buildings look turned 45° on the map, as in StarCraft, but only the structure is turned, and that turn is baked in Blender:
 
-1. Build the structure square to the axes, filling the slab width, front facing −Y.
+1. Build the structure square to the axes, filling the plot width, front facing −Y.
 2. Rotate it +45° about Z.
-3. Scale it by 0.707 (1/√2) on all axes, scaling from the slab top (Z = 0.3). The turned square then fits inside the slab. Don't scale X and Y alone: it stretches the building upward.
+3. Scale it by 0.707 (1/√2) on all axes, scaling from the ground (Z = 0). The turned square then fits inside the plot. Don't scale X and Y alone: it stretches the building upward.
 4. Apply transforms.
 
 After the turn, a front built facing −Y points SE on screen, and one built facing −X points SW.
 
-| Size | Slab width | Square before the turn |
+| Size | Plot width | Square before the turn |
 |---|---|---|
 | 1 | 1.7 m | 1.7 m |
 | 2 | 3.7 m | 3.7 m |

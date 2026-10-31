@@ -911,7 +911,7 @@ export class Input {
     const c = this.placementCell(p, type);
     this.grid.update(type, this.team, c.cx, c.cz);
     this.ghost.visible = true;
-    // The shape of the slab, square to the map.
+    // The building's plot (docs/model-spec.md), square to the map.
     const k = size * TILE - 0.3;
     this.ghost.scale.set(k, 1.2, k);
     const x = (c.cx + size / 2) * TILE;
