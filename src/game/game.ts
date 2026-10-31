@@ -442,20 +442,27 @@ export class Game {
     return best;
   }
 
-  /** Where units leave a building and harvesters dock: the nearest open cell in front, on the building's level. */
+  /**
+   * Where units leave a building and harvesters dock: the nearest open cell in front, on the building's level, with
+   * room to drive on from (not a pocket the building walls in).
+   */
   dockCell(b: Building): Cell {
     const f = b.frontCell();
     const m = this.map;
     const level = m.level[m.idx(b.cx, b.cz)];
-    return m.nearestCell(f.cx, f.cz, (x, z) => m.canEnter(x, z, 'vehicle') && (m.ramp[m.idx(x, z)] !== 0 || m.level[m.idx(x, z)] === level), 16) ?? f;
+    const ok = (x: number, z: number) => m.canEnter(x, z, 'vehicle') && (m.ramp[m.idx(x, z)] !== 0 || m.level[m.idx(x, z)] === level);
+    return m.nearestCell(f.cx, f.cz, (x, z) => ok(x, z) && m.roomy(x, z, 'vehicle'), 16) ?? m.nearestCell(f.cx, f.cz, ok, 16) ?? f;
   }
 
-  /** Whether a unit of this class can stand on a cell next to a building: open, and on its level (or a ramp). */
+  /**
+   * Whether a unit of this class can stand on a cell next to a building: open, on its level (or a ramp), and with room
+   * to go on from there (not a pocket walled in by cliffs and the building).
+   */
   private besideOk(b: Building, cx: number, cz: number, cls: MoveClass): boolean {
     const m = this.map;
     if (!m.inBounds(cx, cz) || !m.canEnter(cx, cz, cls)) return false;
     const i = m.idx(cx, cz);
-    return m.ramp[i] !== 0 || m.level[i] === m.level[m.idx(b.cx, b.cz)];
+    return (m.ramp[i] !== 0 || m.level[i] === m.level[m.idx(b.cx, b.cz)]) && m.roomy(cx, cz, cls);
   }
 
   /** Where a unit built here comes out: the open cell around the building nearest to (x, z), its rally point. */

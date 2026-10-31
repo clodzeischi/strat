@@ -1,5 +1,5 @@
 import {
-  BUILDINGS, FACTIONS, RIDE, THUMPER, TILE, UNITS, UPGRADES, WORM, levelDef,
+  BUILDINGS, FACTIONS, PRODUCERS, RIDE, THUMPER, TILE, UNITS, UPGRADES, WORM, levelDef,
   type BuildingType, type Faction, type LevelUpType, type Producer, type Req, type Team, type UnitType, type UpgradeType,
 } from '../config';
 import { Building, type Entity, type Unit } from '../entities';
@@ -77,7 +77,7 @@ export interface AIProfile {
   fund: number;
   /** Defenders sent against an attack, as a multiple of the attackers' strength. */
   defenseMargin: number;
-  /** Offers to surrender when it has lost its production and its income for good. */
+  /** Offers to surrender once it has lost (see SURRENDER). */
   surrender: boolean;
   /**
    * Trike raids on enemy harvesters: group size, first raid and time between raids (seconds). With `hunt`, raids pick
@@ -164,6 +164,15 @@ export function power(u: Unit): number {
   return u.def.weapon ? u.def.cost * ((u.hp + u.shields) / (u.maxHp + u.maxShields)) : 0;
 }
 
+/**
+ * When to offer to surrender (times in seconds of game time, the same on every difficulty). Any one reason will do,
+ * once it has held for `hold`: the base is gone (no hub and nothing to train units in), the income is gone (less than
+ * `starved` credits a minute delivered over the last `window`, and no way to buy it back), or the side is
+ * overwhelmed (everything it has worth under `crushed` of what it knows the enemy has, for `crushedHold`). A refused
+ * offer is made again, `reoffer` later at the soonest, if things have got much worse since.
+ */
+const SURRENDER = { hold: 20, window: 120, starved: 150, smallArmy: 1500, starvedHold: 60, crushed: 0.25, crushedHold: 60, reoffer: 120 };
+
 /** Enemies this close to one of our buildings are attacking the base. */
 const BASE_RADIUS = 14 * TILE;
 /** Enemies this close to one of our harvesters are hunting it. */
@@ -209,7 +218,7 @@ export interface Wave {
  * A scripted opponent. It plays by the same rules as a person: everything it knows about the enemy comes from what
  * its side has seen (`Intel`), so it has to scout. Priorities, in order: keep an income (rebuild refineries and harvesters first), meet each
  * attack with enough force to beat it and bring the defenders home afterwards, then build counters to the enemy
- * army, raid and attack in waves. When its production and income are gone for good, it offers to surrender.
+ * army, raid and attack in waves. Once it has lost (its base, its income, or by far the bigger side), it offers to surrender.
  */
 export class AI {
   private thinkTimer = 2;
@@ -260,11 +269,16 @@ export class AI {
   private watching = false;
   private nextScoutTime: number;
 
-  /** Consecutive thinks (seconds) the position has looked hopeless. */
-  private hopelessFor = 0;
-  /** When we last ran out of income with no way to buy it back (Infinity while the economy works). */
-  private brokeSince = Infinity;
-  surrenderOffered = false;
+  /** Since when some reason to give up has held (Infinity while none does). */
+  private hopelessSince = Infinity;
+  /** Since when the income has been gone with no way to buy it back (Infinity while it works). */
+  private starvedSince = Infinity;
+  /** Since when we've been overwhelmed (see SURRENDER). */
+  private crushedSince = Infinity;
+  /** Spice delivered so far, sampled each think, for the income over the last SURRENDER.window. */
+  private incomeLog: { t: number; spice: number }[] = [];
+  /** The last offer to surrender: when, whether we still had a hub, and what we were worth. */
+  private lastOffer: { t: number; hub: boolean; worth: number } | null = null;
 
   /** This faction's names for the AI's plans. */
   protected readonly kit: FactionKit;
@@ -1796,38 +1810,86 @@ export class AI {
 
   // ---- Surrender --------------------------------------------------------------
 
-  /**
-   * Lost for good: no income and no way to buy it back (a harvester needs a refinery and a factory, a refinery needs
-   * a construction yard), or nothing left to build units with; and an army well short of the enemy's as far as we
-   * know it, or, three minutes on, too small to win the game with anyway (a few infantry holding a bunker).
-   */
-  private hopeless(): boolean {
+  /** Credits a minute actually delivered (harvesters unloading, camps extracting) over the last SURRENDER.window. */
+  private incomeRate(): number {
+    const g = this.game;
+    const now = { t: g.time, spice: this.ts.stats.spiceHarvested };
+    this.incomeLog.push(now);
+    while (this.incomeLog.length > 1 && this.incomeLog[1].t <= now.t - SURRENDER.window) this.incomeLog.shift();
+    const from = this.incomeLog[0];
+    // Too early in the game to judge: not starved.
+    if (now.t - from.t < SURRENDER.window * 0.9) return Infinity;
+    return ((now.spice - from.spice) / (now.t - from.t)) * 60;
+  }
+
+  /** Everything we have, priced: the army (by `power`) and the structures (cost by health left). */
+  private worth(): number {
+    let w = this.ownPower();
+    for (const b of this.game.buildings) if (b.team === this.team && !b.dead) w += BUILDINGS[b.type].cost * (b.hp / b.maxHp);
+    return w;
+  }
+
+  /** What we know the enemy has: the army we've seen of late, and every structure we've seen and not seen destroyed. */
+  private enemyWorth(): number {
+    let w = this.intel.armyPower();
+    for (const s of this.intel.buildings.values()) w += BUILDINGS[s.type as BuildingType].cost;
+    return w;
+  }
+
+  /** Enough to start an income again: a harvester (with a refinery and factory), a refinery, or a Fremen crew. */
+  private canBuyIncome(): boolean {
     const g = this.game;
     const t = this.team;
     const credits = this.ts.credits;
-    const fremen = this.camps;
-    const income = fremen
-      ? g.buildings.some((b) => b.team === t && b.type === 'camp' && !b.dry) || g.count(t, 'crew') > 0
-      : g.count(t, 'harvester') > 0 && g.has(t, 'refinery');
-    const canBuyIncome = fremen
+    return this.camps
       ? (g.has(t, 'barracks') && credits >= UNITS.crew.cost) || (g.hasHub(t) && credits >= BUILDINGS.barracks.cost + UNITS.crew.cost)
       : (g.has(t, 'refinery') && g.has(t, this.kit.factory) && credits >= UNITS.harvester.cost) || (g.hasHub(t) && credits >= BUILDINGS.refinery.cost);
-    const canProduce = g.hasHub(t) || g.has(t, 'barracks') || g.has(t, this.kit.factory);
-    if ((income || canBuyIncome) && canProduce) {
-      this.brokeSince = Infinity;
-      return false;
-    }
-    this.brokeSince = Math.min(this.brokeSince, g.time);
+  }
+
+  /**
+   * Why we've lost, if we have (see SURRENDER): the base gone, the income gone, or overwhelmed. It goes by what we
+   * have and earn, not by what's left standing: a lone camp or harvester across the map doesn't keep us in the game.
+   */
+  private lostBecause(): 'base' | 'starved' | 'crushed' | null {
+    const g = this.game;
+    const t = g.time;
     const own = this.ownPower();
-    return own < this.intel.armyPower() * 0.5 || (g.time - this.brokeSince > 180 && own < 1500);
+    const enemyArmy = this.intel.armyPower();
+    // No hub to build with and nothing to train units in: no way back, unless the army can still win it.
+    const producing = g.hasHub(this.team) || g.buildings.some((b) => b.team === this.team && !b.dead && (PRODUCERS as BuildingType[]).includes(b.type));
+    const base = !producing && own <= Math.max(enemyArmy, SURRENDER.smallArmy);
+    // The income is gone at once when nothing is left to earn it (no harvester and refinery, no camp or crew), and
+    // also when what does earn has dwindled to a trickle (a camp on a field run dry, a harvester far from home).
+    const gatherers = this.camps
+      ? g.buildings.some((b) => b.team === this.team && b.type === 'camp' && !b.dry) || g.count(this.team, 'crew') > 0
+      : g.count(this.team, 'harvester') > 0 && g.has(this.team, 'refinery');
+    const starvedNow = (!gatherers || this.incomeRate() < SURRENDER.starved) && !this.canBuyIncome();
+    this.starvedSince = starvedNow ? Math.min(this.starvedSince, t) : Infinity;
+    // And losing: well behind in army, or broke a while with a small one. While harvesters or camps are still at work
+    // (just earning little), also worth less than the enemy: a slow start or a lost skirmish isn't a lost game.
+    const worth = this.worth();
+    const enemyWorth = this.enemyWorth();
+    const starved = starvedNow && (!gatherers || worth < enemyWorth)
+      && (own < enemyArmy * 0.5 || (t - this.starvedSince >= SURRENDER.starvedHold && own < SURRENDER.smallArmy));
+    const crushedNow = worth < enemyWorth * SURRENDER.crushed;
+    this.crushedSince = crushedNow ? Math.min(this.crushedSince, t) : Infinity;
+    const crushed = t - this.crushedSince >= SURRENDER.crushedHold;
+    return base ? 'base' : starved ? 'starved' : crushed ? 'crushed' : null;
   }
 
   private considerSurrender(): void {
-    if (!this.profile.surrender || this.surrenderOffered || this.game.winner !== null) return;
-    this.hopelessFor = this.hopeless() ? this.hopelessFor + 1 : 0;
-    if (this.hopelessFor < 15) return;
-    this.surrenderOffered = true; // offered once; if it's turned down, fight on to the end
-    this.game.offerSurrender(this.team);
+    const g = this.game;
+    if (!this.profile.surrender || g.winner !== null) return;
+    const reason = this.lostBecause();
+    this.hopelessSince = reason ? Math.min(this.hopelessSince, g.time) : Infinity;
+    if (g.time - this.hopelessSince < SURRENDER.hold) return;
+    // Turned down before: ask again only once things have got much worse (the hub lost, or half our worth gone).
+    const hub = g.hasHub(this.team);
+    const worth = this.worth();
+    const o = this.lastOffer;
+    if (o && (g.time - o.t < SURRENDER.reoffer || !((o.hub && !hub) || worth <= o.worth * 0.5))) return;
+    this.lastOffer = { t: g.time, hub, worth };
+    g.offerSurrender(this.team);
   }
 
   /**

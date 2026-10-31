@@ -551,6 +551,32 @@ export class GameMap {
     return null;
   }
 
+  /**
+   * Whether a unit of this class standing on the cell can get anywhere: at least `min` cells reachable from it. False
+   * in a pocket (a spur of high ground walled in by cliffs and a building), where a unit would be stuck for good.
+   */
+  roomy(cx: number, cz: number, cls: MoveClass, min = 200): boolean {
+    if (!this.canEnter(cx, cz, cls)) return false;
+    const N = this.size;
+    const seen = new Set<number>([this.idx(cx, cz)]);
+    const queue = [this.idx(cx, cz)];
+    for (let k = 0; k < queue.length && seen.size < min; k++) {
+      const i = queue[k];
+      const x0 = i % N;
+      const z0 = (i / N) | 0;
+      for (const [dx, dz] of DIR4) {
+        const x = x0 + dx;
+        const z = z0 + dz;
+        if (!this.inBounds(x, z)) continue;
+        const j = this.idx(x, z);
+        if (seen.has(j) || !this.canStep(x0, z0, x, z, cls)) continue;
+        seen.add(j);
+        queue.push(j);
+      }
+    }
+    return seen.size >= min;
+  }
+
   nearestPassable(cx: number, cz: number, fx = cx, fz = cz): Cell | null {
     return this.nearestCell(cx, cz, (x, z) => this.passable(x, z), 16, fx, fz);
   }

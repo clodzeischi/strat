@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { profileFor } from '../src/game/ai';
 import { BRUTAL_PROFILE, createAI } from '../src/game/brutal';
-import { TILE, type Team } from '../src/config';
+import { TILE, type Faction, type Team } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 import { Building, type Entity, type Unit } from '../src/entities';
 
@@ -24,8 +24,8 @@ function check(ok: boolean, label: string, detail = ''): void {
 interface Setup { g: Game; ai: Brain; offers: number }
 
 /** A game where only the AI plays, for `warmup` seconds. The player's base can't be destroyed and has no units. */
-function setup(warmup = 420, waves = false): Setup {
-  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, SEED);
+function setup(warmup = 420, waves = false, aiFaction: Faction = 'atreides'): Setup {
+  const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, SEED, ['atreides', aiFaction]);
   const ai: Brain = createAI(g, AI_TEAM, DIFFICULTY);
   const s: Setup = { g, ai, offers: 0 };
   g.onSurrenderOffer = () => s.offers++;
@@ -218,6 +218,75 @@ console.log(`seed ${SEED}, ${DIFFICULTY}\n`);
   check(s.offers === 1 && s.g.winner === null, 'turned down: no second offer, game goes on');
   s.g.acceptSurrender(AI_TEAM);
   check(s.g.winner === PLAYER_TEAM && s.g.surrendered === AI_TEAM, 'accepting ends the game as a win');
+}
+
+// 6b-6e. The reasons to give up, each on its own (see SURRENDER in ai.ts). The player's army is in the AI's sight,
+// holding its fire, so it knows what it's up against and isn't wiped out before it can offer.
+/** Kills the AI's things that `doomed` picks, keeps `armed` armed units, and parks `n` of the player's tanks by `near`. */
+function wreck(s: Setup, doomed: (e: Unit | Building) => boolean, armed: number, n: number, near: () => Entity | undefined): void {
+  const armies = new Set<Entity>(army(s.g, AI_TEAM));
+  for (const e of [...s.g.units, ...s.g.buildings]) if (e.team === AI_TEAM && !armies.has(e) && doomed(e as Unit | Building)) kill(s.g, e);
+  for (const u of army(s.g, AI_TEAM).slice(armed)) kill(s.g, u);
+  const at = near() ?? army(s.g, AI_TEAM)[0];
+  // Packed round the spot, 5-9 tiles out, so they're all in its sight.
+  const m = s.g.map;
+  const cells: { cx: number; cz: number }[] = [];
+  for (let r = 5; r <= 9 && cells.length < n; r++) {
+    for (let dz = -r; dz <= r; dz++) for (let dx = -r; dx <= r; dx++) {
+      const cx = m.cellOf(at.x) + dx;
+      const cz = m.cellOf(at.z) + dz;
+      if (Math.max(Math.abs(dx), Math.abs(dz)) === r && (dx + dz) % 2 === 0 && m.inBounds(cx, cz) && m.canEnter(cx, cz, 'vehicle')) cells.push({ cx, cz });
+    }
+  }
+  for (const c of cells.slice(0, n)) {
+    const t = s.g.spawnUnit('tank', PLAYER_TEAM, m.center(c.cx), m.center(c.cz));
+    t.cooldown = 1e9;
+    t.command(s.g, { kind: 'hold' });
+  }
+}
+
+// Base razed, but a refinery and its harvesters still earning: income doesn't keep it in a lost game.
+{
+  const s = setup();
+  wreck(s, (e) => ['conyard', 'factory', 'barracks', 'hitech', 'bunker', 'turret'].includes(e.type), 3, 8, () => s.g.buildings.find((b) => b.team === AI_TEAM && b.type === 'refinery'));
+  const t0 = s.g.time;
+  run(s, 90, () => s.offers > 0);
+  check(s.offers === 1 && s.g.count(AI_TEAM, 'harvester') > 0, 'base razed, harvesters still working: offers to surrender', s.offers ? `after ${Math.round(s.g.time - t0)}s` : 'no offer');
+}
+
+// Fremen with the Sietch and everything that trains units gone, one Spice Camp left across the map.
+{
+  const s = setup(420, false, 'fremen');
+  const camps = s.g.buildings.filter((b) => b.team === AI_TEAM && b.type === 'camp');
+  wreck(s, (e) => e !== camps[camps.length - 1], 2, 8, () => camps[camps.length - 1]);
+  const t0 = s.g.time;
+  run(s, 90, () => s.offers > 0);
+  check(s.offers === 1, 'Fremen down to a far Spice Camp: offers to surrender', s.offers ? `after ${Math.round(s.g.time - t0)}s, ${camps.length} camp(s) at the start` : 'no offer');
+}
+
+// Starved: the base stands, but no harvester, no refinery and no credits to buy either back.
+{
+  const s = setup();
+  wreck(s, (e) => e.type === 'harvester' || e.type === 'refinery', 3, 8, () => conyard(s.g));
+  s.g.teams[AI_TEAM].credits = 0;
+  const t0 = s.g.time;
+  run(s, 240, () => s.offers > 0);
+  check(s.offers === 1 && s.g.hasHub(AI_TEAM), 'starved, base still standing: offers to surrender', s.offers ? `after ${Math.round(s.g.time - t0)}s` : 'no offer');
+  // Turned down; then it loses its Construction Yard too, and asks again (two minutes after the first offer at the soonest).
+  const t1 = s.g.time;
+  kill(s.g, conyard(s.g));
+  run(s, 180, () => s.offers > 1);
+  check(s.offers === 2 && s.g.time - t1 >= 115, 'turned down, then the yard lost: offers again', s.offers > 1 ? `${Math.round(s.g.time - t1)}s after the first` : 'no second offer');
+}
+
+// Overwhelmed: a hub and a working refinery left, but up against many times its worth, an army it can't dent.
+{
+  const s = setup();
+  wreck(s, (e) => !['conyard', 'refinery', 'harvester'].includes(e.type), 0, 70, () => conyard(s.g));
+  for (const u of s.g.units) if (u.team === PLAYER_TEAM) Object.assign(u, { hp: 1e6, maxHp: 1e6 });
+  const t0 = s.g.time;
+  run(s, 150, () => s.offers > 0);
+  check(s.offers === 1 && s.g.hasHub(AI_TEAM), 'overwhelmed with its economy running: offers to surrender', s.offers ? `after ${Math.round(s.g.time - t0)}s` : 'no offer');
 }
 
 // 7-8. Hard keeps its army alive: vehicles back from a fight get repaired at home (nobody leaves a fight for it),
