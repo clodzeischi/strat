@@ -626,6 +626,8 @@ function frame(now: number): void {
 
   if (mode === 'title') {
     updateTitleCam(dt);
+    // The match isn't running, but the troops below still breathe (their idles are already playing).
+    for (const u of game.units) u.animate(dt);
     shadows.fit(titleCam, titleFog.far);
     renderer.render(scene, titleCam);
   } else {
