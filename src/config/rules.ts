@@ -130,3 +130,16 @@ export const CARRYALL = {
   ferryMin: 6, // tiles: harvester trips shorter than this aren't worth a lift
   rescueAt: 0.67, // a ferried harvester hit below this share of its health is flown out of the fight
 };
+
+/**
+ * A Carryall shot down in flight doesn't just vanish: it keeps going the way it was flying, rolls over to one side and
+ * sinks in a straight line until it hits the ground, where it blows up on whatever enemies are under it.
+ */
+export const CRASH = {
+  sink: 3.5, // metres a second it loses
+  minSpeed: 3, // forward speed at least this (one shot down hovering still drifts on)
+  roll: 1.1, // radians it has rolled over by after falling `rollDrop` metres
+  rollDrop: 3,
+  pitch: -0.3, // nose down
+  weapon: { range: 0, minRange: 0, damage: 150, bonus: {}, step: 0, cooldown: 0, projectile: 'shell', speed: 0, splash: 3.5 } as WeaponDef,
+};

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {
-  AMBUSH, BUILD_RANGE, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
+  AMBUSH, BUILD_RANGE, BUILDINGS, CAMP_FULL, CRASH, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, START_CREDITS, MIN_HIT, STRUCTURE, WEAPON_STEP,
   RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
   type Faction, type LevelUpType, type MapSize, type Producer, type Req, type Side,
@@ -108,6 +108,23 @@ interface Mine {
   trigger: number;
   weapon: WeaponDef;
   mesh: THREE.Mesh;
+}
+
+/** A Carryall shot down in flight, going down in a straight line (CRASH). Vehicles it carried hang on to the end. */
+interface Crash {
+  c: Carryall;
+  x: number;
+  y: number;
+  z: number;
+  vx: number;
+  vz: number;
+  /** Height it was hit at, and which way it rolls over (+1 / -1). */
+  top: number;
+  side: number;
+  hang: { u: Unit; off: THREE.Vector3 }[];
+  /** Drawing: its position at the last tick and this one. */
+  from: THREE.Vector3;
+  to: THREE.Vector3;
 }
 
 /** A planted Thumper drumming for a worm. */
@@ -254,6 +271,7 @@ export class Game {
   private projectiles: Projectile[] = [];
   /** Mines on the ground, oldest first. Nobody's are hidden: they're area denial, not traps. */
   mines: Mine[] = [];
+  crashes: Crash[] = [];
   /** Thumpers drumming for a worm, and the wild Sandworms they called. */
   private drums: Drum[] = [];
   worms: Sandworm[] = [];
@@ -1305,6 +1323,8 @@ export class Game {
     // Whoever saw it go, or made the kill, knows it's gone.
     for (const ts of this.teams) if (this.hostile(ts.team, e.team) && (this.vision.sees(ts.team, e) || (attacker && this.allied(attacker.team, ts.team)))) this.witnessed[ts.team].add(e.id);
     e.dead = true;
+    // A Carryall hit in flight goes down in a crash (updateCrashes) and keeps its model until it lands.
+    const crash = e instanceof Carryall && e.y > this.map.surfaceAt(e.x, e.z) + 1 ? this.startCrash(e) : null;
     const victim = this.teams[e.team].stats;
     const killer = attacker && this.hostile(attacker.team, e.team) ? this.teams[attacker.team] : null;
     if (e instanceof Building) {
@@ -1322,7 +1342,7 @@ export class Game {
     // The local player keeps seeing a structure they knew about until they look again.
     if (e instanceof Building && e.known && !this.shown(e)) this.ghosts.push(e);
     else if (e instanceof Unit && e.anim && !this.wormBiting) this.layCorpse(e);
-    else this.scene.remove(e.root);
+    else if (!crash) this.scene.remove(e.root);
     if (e instanceof Building) {
       this.clearFootprint(e);
       this.unloadBunker(e); // whoever was inside gets out
@@ -1343,10 +1363,14 @@ export class Game {
         else {
           p.hp = 0;
           this.kill(p, attacker);
-          this.effects.explosion(new THREE.Vector3(p.x, this.map.surfaceAt(p.x, p.z) + 0.5, p.z), 1.6);
+          if (crash) {
+            // It stays hooked on, going down with the Carryall.
+            this.scene.add(p.root);
+            crash.hang.push({ u: p, off: p.root.position.clone().sub(e.root.position) });
+          } else this.effects.explosion(new THREE.Vector3(p.x, this.map.surfaceAt(p.x, p.z) + 0.5, p.z), 1.6);
         }
       }
-      this.effects.explosion(new THREE.Vector3(e.x, this.map.surfaceAt(e.x, e.z) + 0.5, e.z), 1.8);
+      if (!crash) this.effects.explosion(new THREE.Vector3(e.x, this.map.surfaceAt(e.x, e.z) + 0.5, e.z), 1.8);
     }
   }
 
@@ -1456,6 +1480,62 @@ export class Game {
       this.onSound('explosion_Large', u.x, u.z);
       u.hp = 0;
       this.kill(u, null);
+    }
+  }
+
+  // ---- Crashes --------------------------------------------------------------
+
+  private startCrash(c: Carryall): Crash {
+    const speed = Math.max(c.airspeed, CRASH.minSpeed);
+    const at = new THREE.Vector3(c.x, c.y, c.z);
+    const crash: Crash = {
+      c, x: c.x, y: c.y, z: c.z, vx: dm.cos(c.heading) * speed, vz: dm.sin(c.heading) * speed,
+      top: c.y, side: c.id % 2 ? 1 : -1, hang: [], from: at, to: at.clone(),
+    };
+    c.bar.visible = false;
+    this.crashes.push(crash);
+    return crash;
+  }
+
+  /** Shot-down Carryalls go on in a straight line, sinking, until they hit the ground and blow up on enemies there. */
+  private updateCrashes(dt: number): void {
+    const size = this.map.worldSize();
+    this.crashes = this.crashes.filter((c) => {
+      c.x = THREE.MathUtils.clamp(c.x + c.vx * dt, 0, size);
+      c.z = THREE.MathUtils.clamp(c.z + c.vz * dt, 0, size);
+      c.y -= CRASH.sink * dt;
+      c.from.copy(c.to);
+      c.to.set(c.x, c.y, c.z);
+      const ground = this.map.surfaceAt(c.x, c.z);
+      if (c.y > ground + 0.4) return true;
+      this.blast(c.x, c.z, CRASH.weapon, 1, null, c.c.team);
+      const at = new THREE.Vector3(c.x, ground + 0.5, c.z);
+      this.effects.explosion(at, 2.6);
+      for (let k = 0; k < 4; k++) {
+        const a = (k / 4) * Math.PI * 2 + c.side;
+        this.effects.explosion(new THREE.Vector3(c.x + dm.cos(a) * 1.4, ground + 0.4, c.z + dm.sin(a) * 1.4), 1.5);
+      }
+      this.onSound('explosion_Large', c.x, c.z);
+      this.scene.remove(c.c.root);
+      for (const h of c.hang) this.scene.remove(h.u.root);
+      return false;
+    });
+  }
+
+  /** Drawing a crash between ticks: rolling over, nose down, trailing smoke, whatever it carried still hanging on. */
+  private drawCrashes(dt: number, alpha: number): void {
+    for (const c of this.crashes) {
+      const p = c.c.root.position.lerpVectors(c.from, c.to, alpha);
+      const f = THREE.MathUtils.smoothstep(c.top - p.y, 0, CRASH.rollDrop);
+      c.c.crashPose(c.side * CRASH.roll * f, CRASH.pitch * f);
+      const shown = this.revealAll || this.allied(c.c.team, this.localTeam) || this.vision.seesAt(this.localTeam, p.x, p.z);
+      c.c.root.visible = shown;
+      for (const h of c.hang) {
+        h.u.root.position.copy(p).add(h.off);
+        h.u.root.visible = shown;
+      }
+      if (shown && Math.random() < dt * 25) this.effects.soot(p.clone().add(new THREE.Vector3(Math.random() - 0.5, 0.3, Math.random() - 0.5)));
+      if (shown && Math.random() < dt * 4) this.effects.flash(p.clone().add(new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5)), 0.4);
     }
   }
 
@@ -2591,6 +2671,7 @@ export class Game {
     this.updateCamps(dt);
     this.updateRites();
     this.updateDetonations();
+    this.updateCrashes(dt);
     this.updateMines();
     this.updateDrums();
     this.updateWorms(dt);
@@ -2629,6 +2710,7 @@ export class Game {
     for (const u of this.units) u.interpolate(alpha);
     for (const u of this.units) if (u.root.visible) u.animate(dt);
     this.drawCorpses(dt);
+    this.drawCrashes(dt, alpha);
     for (const p of this.projectiles) {
       p.mesh.position.lerpVectors(p.from, p.to, alpha);
       p.mesh.visible = this.revealAll || this.vision.seesAt(this.localTeam, p.mesh.position.x, p.mesh.position.z);
@@ -2689,6 +2771,7 @@ export class Game {
     for (const u of this.units) h.int(DEPLOY_CODE[u.deployState]).num(u.detonateAt ?? -1).num(u.lockUntil).num(u.stillSince).int(+u.hidden).int(u.detected).int(u.queue.length).num(u.rite?.until ?? -1);
     for (const b of this.buildings) h.int(b.id).num(b.hp).num(b.shields).int(b.rallyUnit?.id ?? -1);
     for (const m of this.mines) h.int(m.team).num(m.x).num(m.z);
+    for (const c of this.crashes) h.num(c.x).num(c.y).num(c.z);
     for (const d of this.drums) h.int(d.b.id).num(d.due);
     for (const w of this.worms) h.num(w.x).num(w.z).num(w.nextBite).int(w.target?.id ?? -1);
     for (const u of this.units) if (u.def.thumper) h.num(u.nextThumper).int(+!!u.mount);

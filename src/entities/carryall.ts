@@ -154,6 +154,16 @@ export class Carryall extends Unit {
     if (h.retreat(game)) t.rescue = true;
   }
 
+  /** Forward speed now, for a crash to carry on with. */
+  get airspeed(): number {
+    return this.speedNow;
+  }
+
+  /** Drawing a crash: rolled over by `roll` (from the bank it was in when hit), nose down by `pitch`. */
+  crashPose(roll: number, pitch: number): void {
+    this.body.rotation.set(this.bank + roll, -this.heading, this.pitch + pitch, 'YXZ');
+  }
+
   /** Destroyed in the air: everyone aboard is released (the game decides their fate). */
   releaseAll(): Unit[] {
     const out = this.load;
