@@ -963,6 +963,37 @@ body.in-menu #hud {
   color: var(--muted);
 }
 
+.mp-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.mp-slots:empty {
+  display: none;
+}
+
+.mp-side-head {
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.mp-slot {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  background: rgba(20, 15, 10, 0.6);
+  border: 1px solid var(--bar-edge);
+}
+
+.mp-slot span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .mp-status:empty {
   display: none;
 }

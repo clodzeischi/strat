@@ -1,5 +1,5 @@
 import { FACTION_LIST, FACTIONS, MAP_SIZE_NAMES, MAP_SIZES, UNITS, type Faction, type MapSize, type Side, type Team } from '../config';
-import type { RoomInfo } from '../net/protocol';
+import type { RoomInfo, SlotInfo } from '../net/protocol';
 import type { Difficulty, Game, TeamStats } from '../game/game';
 import { heroTitle } from '../game/heroes';
 
@@ -16,8 +16,12 @@ export interface MenuHandlers {
   onSurrenderAnswer: (accept: boolean) => void;
   /** Multiplayer page opened (connect and list games) or closed. */
   onLobby: (open: boolean) => void;
-  onHost: (name: string, size: MapSize, faction: Faction) => void;
-  onJoin: (code: string, name: string, faction: Faction) => void;
+  /** Host a game: in a 2v2, `difficulty` is the computer players' in the empty places. */
+  onHost: (name: string, size: MapSize, faction: Faction, mode: MatchMode, difficulty: Difficulty) => void;
+  /** Join an open game; in a 2v2, on the host's side or against it. */
+  onJoin: (code: string, name: string, faction: Faction, side: 'with' | 'against') => void;
+  /** The host starts a 2v2 that isn't full yet. */
+  onStart: () => void;
   onCancelHost: () => void;
   /** Online: give up the match. */
   onSurrender: () => void;
@@ -44,6 +48,7 @@ const FACTION_KEY = 'strat.faction';
 const ENEMY_KEY = 'strat.enemy';
 const MODE_KEY = 'strat.mode';
 const ALLY_KEY = 'strat.ally';
+const MP_DIFF_KEY = 'strat.mpDifficulty';
 
 /** A computer player's faction, or a random one each game. */
 export type EnemyChoice = Faction | 'random';
@@ -74,6 +79,15 @@ export function loadEnemy(): EnemyChoice {
 
 export function loadAlly(): EnemyChoice {
   return loadChoice(ALLY_KEY, 'random');
+}
+
+function loadMpDifficulty(): Difficulty {
+  try {
+    const v = localStorage.getItem(MP_DIFF_KEY);
+    return v === 'hard' || v === 'brutal' ? v : 'normal';
+  } catch {
+    return 'normal';
+  }
 }
 
 export function loadMode(): MatchMode {
@@ -205,6 +219,8 @@ export class Menus {
   enemy = loadEnemy();
   mode = loadMode();
   ally = loadAlly();
+  /** Online 2v2: the computer players' difficulty. */
+  mpDifficulty = loadMpDifficulty();
   volumes = loadVolumes();
 
   constructor(private h: MenuHandlers) {
@@ -247,12 +263,17 @@ export class Menus {
           this.showMapSize();
         }
       } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize, this.faction, this.enemy, this.mode, this.ally);
-      else if (btn.dataset.join) this.h.onJoin(btn.dataset.join, this.playerName, this.faction);
+      else if (btn.dataset.mpdiff) {
+        this.mpDifficulty = btn.dataset.mpdiff as Difficulty;
+        save(MP_DIFF_KEY, this.mpDifficulty);
+        this.showFaction();
+      } else if (btn.dataset.join) this.h.onJoin(btn.dataset.join, this.playerName, this.faction, btn.dataset.side === 'with' ? 'with' : 'against');
+      else if (btn.dataset.action === 'start') this.h.onStart();
       else if (btn.dataset.action === 'play') this.page('difficulty');
       else if (btn.dataset.action === 'multiplayer') {
         this.page('multiplayer');
         this.h.onLobby(true);
-      } else if (btn.dataset.action === 'host') this.h.onHost(this.playerName, this.mapSize, this.faction);
+      } else if (btn.dataset.action === 'host') this.h.onHost(this.playerName, this.mapSize, this.faction, this.mode, this.mpDifficulty);
       else if (btn.dataset.action === 'cancel-host') this.h.onCancelHost();
       else if (btn.dataset.watch) this.h.onWatch({ key: btn.dataset.watch });
       else if (btn.dataset.action === 'replays') {
@@ -336,7 +357,8 @@ export class Menus {
     for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-enemy]')) b.classList.toggle('picked', b.dataset.enemy === this.enemy);
     for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-ally]')) b.classList.toggle('picked', b.dataset.ally === this.ally);
     for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-mode]')) b.classList.toggle('picked', b.dataset.mode === this.mode);
-    for (const el of this.title.querySelectorAll<HTMLElement>('.ally-pick')) el.hidden = this.mode !== '2v2';
+    for (const el of this.title.querySelectorAll<HTMLElement>('.ally-pick, .mp-ai-pick')) el.hidden = this.mode !== '2v2';
+    for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-mpdiff]')) b.classList.toggle('picked', b.dataset.mpdiff === this.mpDifficulty);
   }
 
   private setMode(mode: MatchMode): void {
@@ -376,9 +398,36 @@ export class Menus {
 
   /** Multiplayer page: the open games on the server. */
   showRooms(rooms: RoomInfo[]): void {
-    this.rooms.innerHTML = rooms.length
-      ? rooms.map((r) => `<button class="mbtn diff" data-join="${r.code}">${escapeHtml(r.host)} <span>${FACTIONS[r.faction]?.name ?? ''} · ${MAP_SIZE_NAMES[r.size]} map · ${r.code}</span></button>`).join('')
-      : '<p class="note">No open games yet. Host one, or wait for someone to.</p>';
+    const entry = (r: RoomInfo): string => {
+      const what = `${FACTIONS[r.faction]?.name ?? ''} · ${MAP_SIZE_NAMES[r.size]} map · ${r.mode === '2v2' ? '2 vs 2' : '1 vs 1'} · ${r.code}`;
+      if (r.mode !== '2v2') return `<button class="mbtn diff" data-join="${r.code}">${escapeHtml(r.host)} <span>${what}</span></button>`;
+      // A 2v2: a button per side with room left.
+      const sides = [r.open.with && ['with', `With ${escapeHtml(r.host)}`], r.open.against && ['against', `Against ${escapeHtml(r.host)}`]].filter(Boolean) as string[][];
+      return sides.map(([side, label]) => `<button class="mbtn diff" data-join="${r.code}" data-side="${side}">${label} <span>${what}</span></button>`).join('');
+    };
+    this.rooms.innerHTML = rooms.length ? rooms.map(entry).join('') : '<p class="note">No open games yet. Host one, or wait for someone to.</p>';
+  }
+
+  /** In a room being filled (hosting it or joined): who's in, and for the host of a 2v2, the Start button. */
+  showRoom(room: { code: string; mode: '1v1' | '2v2'; slots: (SlotInfo | null)[]; you: number; host: boolean }): void {
+    document.getElementById('mp-code')!.textContent = room.code;
+    const team = room.mode === '2v2';
+    document.getElementById('mp-wait-head')!.textContent = team ? 'Gathering players' : 'Waiting for an opponent';
+    document.getElementById('mp-wait-note')!.innerHTML = !room.host
+      ? 'Waiting for the host to start the game.'
+      : team
+        ? `Your game <b>${room.code}</b> is listed under Open games. Start it whenever you like: the computer takes the empty places. It starts by itself once all four are taken.`
+        : `Your game <b>${room.code}</b> is listed under Open games for anyone on this server. It starts as soon as someone joins.`;
+    const side = (s: number) => room.slots.map((x, t) => ({ x, t })).filter(({ t }) => t % 2 === s);
+    const line = ({ x, t }: { x: SlotInfo | null; t: number }) =>
+      x ? `${escapeHtml(x.name)}${t === room.you ? ' (you)' : ''} <span>${FACTIONS[x.faction].name}</span>` : '<em>Open (computer)</em>';
+    document.getElementById('mp-slots')!.innerHTML = team
+      ? [0, 1].map((s) => `<div class="mp-side"><div class="mp-side-head">${s === room.you % 2 ? 'Your side' : 'Against'}</div>${side(s).map((e) => `<div class="mp-slot">${line(e)}</div>`).join('')}</div>`).join('')
+      : '';
+    const start = this.title.querySelector<HTMLElement>('[data-action="start"]')!;
+    start.hidden = !(team && room.host);
+    (start as HTMLButtonElement).disabled = room.slots.filter(Boolean).length < 2;
+    this.page('hosting');
   }
 
   /** A line under the multiplayer page (connection trouble, errors). */

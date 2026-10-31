@@ -273,38 +273,56 @@ function startOnline(m: MatchInfo): void {
   };
   client.connect().then(
     () => {
-      showNetWait(`Waiting for ${opponentName}…`);
+      showNetWait(people.size > 2 ? 'Waiting for the other players…' : `Waiting for ${opponentName}…`);
       client.send({ t: 'resume', code: m.code, token: m.token });
     },
     () => endGame("Couldn't reach the game server"),
   );
 }
 
+/** Online: the people still in the match (by team), this screen's included. */
+const people = new Set<Team>(match ? game.teams.filter((t) => !match.ai?.[t.team]).map((t) => t.team) : []);
+
 function onMatchMessage(msg: ServerMsg): void {
   switch (msg.t) {
     case 'go': {
-      if (lockstep) return;
-      session = new Match(game, game.teams.map(() => null), game.localTeam, net);
+      if (lockstep || !match) return;
+      session = new Match(game, match.ai ?? game.teams.map(() => null), game.localTeam, net, [...people].filter((t) => t !== game.localTeam));
       lockstep = session.lockstep;
       const ls = lockstep;
-      ls.onDesync = (tick) => {
-        console.error(`Desync with ${opponentName} at tick ${tick}`);
-        hud.showMessage(`Out of sync with ${opponentName} (tick ${tick}): your screens may no longer show the same game.`);
+      ls.onDesync = (tick, team) => {
+        console.error(`Desync with ${match.names[team]} at tick ${tick}`);
+        hud.showMessage(`Out of sync with ${match.names[team]} (tick ${tick}): your screens may no longer show the same game.`);
       };
       showNetWait('');
       beginPlay();
-      hud.showMessage(`Online against ${opponentName}. ${firstSteps()}`);
+      const allies = match.names.filter((_, t) => t !== game.localTeam && game.allied(t as Team, game.localTeam));
+      hud.showMessage(`Online against ${opponentName}${allies.length ? `, with ${allies.join(' & ')}` : ''}. ${firstSteps()}`);
       break;
     }
     case 'cmds':
       lockstep?.receive(msg.team, msg.tick, msg.cmds);
       break;
     case 'hash':
-      lockstep?.receiveHash(msg.tick, msg.hash);
+      lockstep?.receiveHash(msg.team, msg.tick, msg.hash);
       break;
-    case 'left':
-      if (mode !== 'ended') endGame(`${opponentName} left the game`);
+    case 'left': {
+      if (mode === 'ended' || !match) break;
+      const name = match.names[msg.team];
+      people.delete(msg.team);
+      if (!lockstep || !session) {
+        endGame(`${name} left the game`);
+        break;
+      }
+      // Their side plays on with a person: the computer takes over their base (on every machine from the same tick).
+      // Otherwise their side has nobody left, and the game is over.
+      const from = lockstep.drop(msg.team, msg.tick);
+      if (game.teamsOn(game.sideOf(msg.team)).some((t) => people.has(t))) {
+        session.takeOver(msg.team, match.takeover ?? 'normal', from);
+        hud.showMessage(`${name} left the game. The computer takes over for them.`);
+      } else endGame(`${name} left the game`);
       break;
+    }
     case 'error':
       if (mode !== 'ended') endGame(msg.text);
       break;
@@ -445,6 +463,7 @@ function setPaused(paused: boolean): void {
 function lobbyMessage(msg: ServerMsg): void {
   if (msg.t === 'rooms') menus.showRooms(msg.rooms);
   else if (msg.t === 'hosted') menus.showHosting(msg.code);
+  else if (msg.t === 'room') menus.showRoom(msg);
   else if (msg.t === 'error') menus.setLobbyStatus(msg.text);
   else if (msg.t === 'match') {
     // Paired: reload into the match (a fresh page builds the agreed map).
@@ -514,8 +533,9 @@ const menus = new Menus({
       net = null;
     }
   },
-  onHost: (name, size, faction) => net?.send({ t: 'host', name, size, faction, version: PROTOCOL_VERSION }),
-  onJoin: (code, name, faction) => net?.send({ t: 'join', code, name, faction, version: PROTOCOL_VERSION }),
+  onHost: (name, size, faction, mode, difficulty) => net?.send({ t: 'host', name, size, faction, mode, difficulty, version: PROTOCOL_VERSION }),
+  onJoin: (code, name, faction, side) => net?.send({ t: 'join', code, name, faction, side, version: PROTOCOL_VERSION }),
+  onStart: () => net?.send({ t: 'start' }),
   onCancelHost: () => {
     net?.send({ t: 'cancel' });
     menus.page('multiplayer');
@@ -618,7 +638,7 @@ function frame(now: number): void {
     } else if (running && lockstep) {
       input.update(dt);
       if (!input.paused) alpha = lockstep.advance(Math.min(rawDt, 0.25));
-      if (online) showNetWait(lockstep.waiting > 0.5 ? `Waiting for ${opponentName}…` : '');
+      if (online) showNetWait(lockstep.waiting > 0.5 ? (people.size > 2 ? 'Waiting for the other players…' : `Waiting for ${opponentName}…`) : '');
       if (game.winner !== null) {
         if (online) endGame(game.surrendered === null ? '' : game.surrendered === game.localTeam ? 'You surrendered' : `${opponentName} surrendered`);
         else {

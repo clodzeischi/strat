@@ -20,10 +20,11 @@ export interface RecordedCommand {
  * Runs the simulation at a fixed rate and feeds it commands at agreed ticks.
  *
  * Offline, commands run on the next tick. Online (deterministic lockstep), each player's commands are scheduled
- * `NET_DELAY` ticks ahead and sent to the other player, every tick, even when empty; a tick only runs once the
- * other player's batch for it has arrived, so both machines apply the same commands at the same ticks and stay in
- * step. Only commands cross the network, never unit positions. Every `HASH_EVERY` ticks both send a checksum of
- * the game state, to catch a desync as soon as it happens.
+ * `NET_DELAY` ticks ahead and sent to the other players, every tick, even when empty; a tick only runs once every
+ * other person's batch for it has arrived, so all machines apply the same commands at the same ticks and stay in
+ * step. (Computer players run on every machine alike, so they send nothing.) Only commands cross the network,
+ * never unit positions. Every `HASH_EVERY` ticks everyone sends a checksum of the game state, to catch a desync as
+ * soon as it happens. A player who leaves is dropped from a given tick on (see `drop`).
  */
 export class Lockstep {
   /** Every command applied so far, for replays. */
@@ -34,23 +35,45 @@ export class Lockstep {
   onTick: () => void = () => {};
   /** Called after each step, with the game at the tick just run. */
   onStepped: () => void = () => {};
-  /** Called once with the first tick at which the two machines' games differ. */
-  onDesync: (tick: number) => void = () => {};
+  /** Called once with the first tick at which this machine's game differs from another player's (that team). */
+  onDesync: (tick: number, team: Team) => void = () => {};
   readonly delay: number;
 
   private queued: Command[] = [];
   /** Commands per tick, per team. */
   private batches = new Map<number, Command[][]>();
-  /** Ticks the other player's batch has arrived for. */
-  private arrived = new Set<number>();
-  private latestRemote = -1;
+  /** Per tick, the remote teams whose batch for it has arrived. */
+  private arrived = new Map<number, Set<Team>>();
+  /** Per remote team, the latest tick it has sent commands for. */
+  private latest = new Map<Team, number>();
+  /** Teams that left: the last tick they sent commands for. */
+  private dropped = new Map<Team, number>();
   private ownHashes = new Map<number, number>();
-  private remoteHashes = new Map<number, number>();
+  /** Per tick, the other players' checksums. */
+  private remoteHashes = new Map<number, Map<Team, number>>();
   private desynced = false;
   private acc = 0;
 
-  constructor(readonly game: Game, readonly team: Team, private net: { send(msg: ClientMsg): void } | null = null) {
+  /** `remotes`: online, the other people's teams, whose commands come over the network. */
+  constructor(readonly game: Game, readonly team: Team, private net: { send(msg: ClientMsg): void } | null = null, private remotes: Team[] = []) {
     this.delay = net ? NET_DELAY : 0;
+    for (const t of remotes) this.latest.set(t, -1);
+  }
+
+  /**
+   * A player left: their commands up to `lastTick` still run (everyone has them), and from the next tick on nobody
+   * waits for them. Returns the first tick without them (what a computer player taking over starts at).
+   */
+  drop(team: Team, lastTick: number): number {
+    this.dropped.set(team, lastTick);
+    // Before `delay` nobody waits for anyone, so no machine can be past that yet either.
+    return Math.max(lastTick + 1, this.delay);
+  }
+
+  /** The remote teams still to send their commands for a tick. */
+  private missing(tick: number): Team[] {
+    const got = this.arrived.get(tick);
+    return this.remotes.filter((t) => tick <= (this.dropped.get(t) ?? Infinity) && !got?.has(t));
   }
 
   /** Gives a command for this player. */
@@ -63,22 +86,26 @@ export class Lockstep {
     for (const r of record) (this.batch(r.tick)[r.team] ??= []).push(r.cmd);
   }
 
-  /** The other player's commands for a tick. */
+  /** Another player's commands for a tick. */
   receive(team: Team, tick: number, cmds: Command[]): void {
     this.batch(tick)[team] = cmds;
-    this.arrived.add(tick);
-    this.latestRemote = Math.max(this.latestRemote, tick);
+    let got = this.arrived.get(tick);
+    if (!got) this.arrived.set(tick, (got = new Set()));
+    got.add(team);
+    this.latest.set(team, Math.max(this.latest.get(team) ?? -1, tick));
   }
 
-  receiveHash(tick: number, hash: number): void {
-    this.remoteHashes.set(tick, hash);
+  receiveHash(team: Team, tick: number, hash: number): void {
+    let got = this.remoteHashes.get(tick);
+    if (!got) this.remoteHashes.set(tick, (got = new Map()));
+    got.set(team, hash);
     this.compare(tick);
   }
 
   /** Runs one tick if it can. Returns false while waiting for the other player. */
   step(): boolean {
     const tick = this.game.ticks;
-    if (this.net && tick >= this.delay && !this.arrived.has(tick)) return false;
+    if (this.net && tick >= this.delay && this.missing(tick).length) return false;
     const at = tick + this.delay;
     const mine = this.queued;
     this.queued = [];
@@ -118,8 +145,10 @@ export class Lockstep {
   advance(dt: number, maxBehind = TICK * 8): number {
     // A long stall (offline: a tab that was hidden) doesn't try to run minutes of game in one frame.
     this.acc = Math.min(this.acc + dt, maxBehind);
-    // Fallen behind the other player (a slow frame): run a little faster until caught up.
-    if (this.net && this.latestRemote - this.delay - this.game.ticks > 2) this.acc += TICK * 0.5;
+    // Fallen behind the other players (a slow frame): run a little faster until caught up.
+    let latest = Infinity;
+    for (const [t, tick] of this.latest) if (!this.dropped.has(t)) latest = Math.min(latest, tick);
+    if (this.net && latest !== Infinity && latest - this.delay - this.game.ticks > 2) this.acc += TICK * 0.5;
     while (this.acc >= TICK) {
       if (!this.step()) {
         this.waiting += dt;
@@ -140,13 +169,18 @@ export class Lockstep {
 
   private compare(tick: number): void {
     const a = this.ownHashes.get(tick);
-    const b = this.remoteHashes.get(tick);
-    if (a === undefined || b === undefined) return;
-    this.ownHashes.delete(tick);
-    this.remoteHashes.delete(tick);
-    if (a !== b && !this.desynced) {
-      this.desynced = true;
-      this.onDesync(tick);
+    const got = this.remoteHashes.get(tick);
+    if (a === undefined || !got) return;
+    for (const [team, b] of got) {
+      if (a !== b && !this.desynced) {
+        this.desynced = true;
+        this.onDesync(tick, team);
+      }
+    }
+    // Done with this tick once every player still in the game has reported (comparing twice is harmless).
+    if (this.remotes.every((t) => this.dropped.has(t) || got.has(t))) {
+      this.ownHashes.delete(tick);
+      this.remoteHashes.delete(tick);
     }
   }
 }

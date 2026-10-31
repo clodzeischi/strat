@@ -21,6 +21,8 @@ export interface Replay {
   sides?: Side[];
   /** Each team's computer player (its difficulty), or null for a person. */
   ai: (Difficulty | null)[];
+  /** Computer players that took over for people who left, from a tick on. */
+  takeovers?: Takeover[];
   names: string[];
   commands: RecordedCommand[];
   /** `game.hash()` at ticks 0, REPLAY_HASH_EVERY, 2 × REPLAY_HASH_EVERY, … */
@@ -34,6 +36,13 @@ export interface Replay {
   date: string;
 }
 
+/** A computer player taking a team over from a tick on (its person left). */
+export interface Takeover {
+  team: Team;
+  tick: number;
+  ai: Difficulty;
+}
+
 /**
  * Runs a match's simulation: the lockstep, the computer players and a recording of it. The browser, the sims and
  * replay playback all go through this, so a replay is played back exactly as it was recorded.
@@ -41,6 +50,8 @@ export interface Replay {
 export class Match {
   readonly lockstep: Lockstep;
   readonly ais: (AI | null)[];
+  /** Takeovers so far, and ones scheduled for a tick still to come. */
+  readonly takeovers: Takeover[] = [];
   readonly hashes: number[] = [];
   /** Playback: the first tick at which the game no longer matches the recording, if it has drifted. */
   driftedAt: number | null = null;
@@ -54,8 +65,12 @@ export class Match {
    * `ai`: each team's computer player, or null for a person. `team`: the side this screen plays (online: whose
    * commands it sends). With `net`, it's an online match.
    */
-  constructor(readonly game: Game, readonly ai: (Difficulty | null)[], team: Team = 0, net: ConstructorParameters<typeof Lockstep>[2] = null) {
-    this.lockstep = new Lockstep(game, team, net);
+  /** `remotes`: online, the other people's teams. */
+  constructor(
+    readonly game: Game, readonly ai: (Difficulty | null)[], team: Team = 0, net: ConstructorParameters<typeof Lockstep>[2] = null,
+    remotes: Team[] = [],
+  ) {
+    this.lockstep = new Lockstep(game, team, net, remotes);
     this.ais = ai.map((d, t) => (d ? createAI(game, t as Team, d) : null));
     ai.forEach((d, t) => (game.teams[t].human = !d));
     // When a computer player offers to surrender to another computer player, it's accepted (a person answers with
@@ -71,6 +86,11 @@ export class Match {
     };
     this.lockstep.onTick = () => {
       if (this.endedAt === null && game.ticks % REPLAY_HASH_EVERY === 0) this.checkpoint();
+      for (const k of this.takeovers) {
+        if (k.tick !== game.ticks) continue;
+        this.ais[k.team] = createAI(game, k.team, k.ai);
+        game.teams[k.team].human = false;
+      }
       for (const a of this.ais) a?.update(TICK);
     };
   }
@@ -80,7 +100,16 @@ export class Match {
     const m = new Match(game, replay.ai);
     m.expected = replay.hashes;
     m.lockstep.play(replay.commands);
+    for (const k of replay.takeovers ?? []) m.takeOver(k.team, k.ai, k.tick);
     return m;
+  }
+
+  /**
+   * A computer player takes a team over from `tick` on (online: its person left; every machine schedules the same
+   * tick, see `Lockstep.drop`).
+   */
+  takeOver(team: Team, ai: Difficulty, tick: number): void {
+    this.takeovers.push({ team, tick, ai });
   }
 
   /** Runs one tick (offline). */
@@ -92,7 +121,8 @@ export class Match {
   replay(names: string[]): Replay {
     const g = this.game;
     return {
-      v: 1, seed: g.map.seed, size: g.map.size as MapSize, factions: g.teams.map((t) => t.faction), sides: g.teams.map((t) => t.side), ai: this.ai, names,
+      v: 1, seed: g.map.seed, size: g.map.size as MapSize, factions: g.teams.map((t) => t.faction), sides: g.teams.map((t) => t.side), ai: this.ai,
+      takeovers: this.takeovers.filter((k) => k.tick < (this.endedAt ?? Infinity)), names,
       commands: this.lockstep.record.filter((c) => c.tick < (this.endedAt ?? Infinity)), hashes: this.hashes, ticks: this.endedAt ?? g.ticks, winner: g.winner, surrendered: g.surrendered,
       date: new Date().toISOString(),
     };
