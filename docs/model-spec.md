@@ -40,7 +40,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 | `carryall` | Carryall | Atreides | 1.4 | | armor | aircraft |
 | `trooper` | Harkonnen Trooper | Corrino | 0.45 | | weapons, armor | animated |
 | `sardaukar` | Sardaukar | Corrino | 0.5 | | weapons, armor | animated |
-| `razor` | Razor | Corrino | 0.85 | | weapons, armor | |
+| `razor` | Razor | Corrino | 0.95 | | weapons, armor | |
 | `devastator` | Devastator | Corrino | 1.4 | yes | weapons, armor | `crow` with `muzzle2` for the secondary gun |
 | `raider` | Sky Raider | Corrino | 1.0 | | weapons, armor | aircraft; `wing_N` and `jet_N` |
 | `artillery` | Soulcrusher | Corrino | 1.1 | yes | weapons, armor | deploy animation |

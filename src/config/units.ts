@@ -62,7 +62,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: "The Emperor's elite. Close-quarters fighters: tear through infantry and shoot down aircraft. Weak vs trikes and MLRS.",
   },
   razor: {
-    name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 135, shields: 80, armor: 1, speed: 6, turnRate: 5, radius: 0.85, sight: 11,
+    name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 135, shields: 80, armor: 1, speed: 6, turnRate: 5, radius: 0.95, sight: 11,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['fab'],
     weapon: { range: 4, minRange: 0, damage: 10, bonus: { biological: 12 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, cone: 0.35 },
     desc: 'Dune buggy with a flamethrower that burns everything in front of it. Shreds infantry. Weak vs tanks.',
