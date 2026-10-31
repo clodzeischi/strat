@@ -3,7 +3,7 @@ import {
   AMBUSH, BUILD_RANGE, BUILDINGS, CAMP_FULL, CAMP_SEARCH, CAMP_UPGRADE, FACTIONS, FLAME_RANGE, FREMEN_REGEN, HIDE, HIGH_GROUND_RANGE, INFANTRY_REGEN,
   LEVEL_UP_ORDER, NITRO, PLAYER, PRODUCERS, QUEUE_MAX, REPAIR_COST, SELF_REPAIR_RATE, SHIELD_REGEN, START_CREDITS, MIN_HIT, STRUCTURE, WEAPON_STEP,
   RIDE, TEAM_COLORS, THUMPER, TILE, UNITS, UPGRADES, WORM, factionLevelUps, factionUpgrades, levelDef, maxLevel, parseReq, reqName, unitDef,
-  type Faction, type LevelUpType, type MapSize, type Producer, type Req,
+  type Faction, type LevelUpType, type MapSize, type Producer, type Req, type Side,
   type Announcement, type BuildingType, type Sound, type ProjectileKind, type Team,
   type Tag, type UnitDef, type UpgradeLine, type WeaponDef, type UnitType, type UpgradeType,
 } from '../config';
@@ -50,6 +50,8 @@ export type Shooter = Unit | Building;
 
 export interface TeamState {
   team: Team;
+  /** The side it fights on: its allies share it (and their sight). */
+  side: Side;
   faction: Faction;
   stats: TeamStats;
   /** This team's unit with the most kills so far (may be dead). */
@@ -219,8 +221,9 @@ export class Game {
   buildings: Building[] = [];
   teams: TeamState[];
   time = 0;
-  winner: Team | null = null;
-  /** The team that surrendered, when the game ended that way. */
+  /** The side that won (in a 1v1, the same number as the winning team). */
+  winner: Side | null = null;
+  /** The team that surrendered (for its whole side), when the game ended that way. */
   surrendered: Team | null = null;
   /** Called when a computer opponent offers to surrender; answer with `acceptSurrender` or ignore it to play on. */
   onSurrenderOffer: (team: Team) => void = () => {};
@@ -238,7 +241,7 @@ export class Game {
   /** Drawing only: show the whole map, fog or not (single player with ?reveal, and after the game). */
   revealAll = false;
   /** Per team: ids of enemy entities it saw destroyed. */
-  private witnessed: Set<number>[] = [new Set(), new Set()];
+  private witnessed: Set<number>[];
   /** Drawing only: enemy structures destroyed out of the local player's sight, still shown where they were last seen. */
   private ghosts: Building[] = [];
   /** Simulation steps run so far. */
@@ -268,14 +271,16 @@ export class Game {
   constructor(
     readonly scene: THREE.Scene, private camera: THREE.Camera, size: MapSize = 64, seed = 7,
     factions: Faction[] = ['atreides', 'atreides'],
+    /** Each team's side; by default teams alternate (a 2v2 is 0 and 2 against 1 and 3). */
+    sides: Side[] = factions.map((_, i) => (i % 2) as Side),
   ) {
-    this.map = new GameMap(size, seed);
+    this.map = new GameMap(size, seed, factions.length);
     this.random = mulberry32(seed * 2654435761 + 12345);
     this.terrain = new Terrain(this.map);
     scene.add(this.terrain.mesh);
     this.effects = new Effects(scene);
-    this.teams = ([0, 1] as Team[]).map((team) => ({
-      team, faction: factions[team] ?? 'atreides', credits: START_CREDITS, human: false, upgrades: new Set<UpgradeType>(), hero: null,
+    this.teams = factions.map((faction, i) => ({
+      team: i as Team, side: sides[i], faction, credits: START_CREDITS, human: false, upgrades: new Set<UpgradeType>(), hero: null,
       stats: {
         unitsBuilt: 0, unitsLost: 0, unitsKilled: 0, structuresBuilt: 0, structuresLost: 0, structuresDestroyed: 0,
         spiceHarvested: 0, creditsSpent: 0,
@@ -283,7 +288,8 @@ export class Game {
       building: null, queues: { barracks: [], factory: [], hitech: [], fab: [], perch: [] }, research: null,
       spawnTurn: { barracks: 0, factory: 0, hitech: 0, fab: 0, perch: 0 }, levelUps: {},
     }));
-    this.vision = new Vision(this.map, this.teams.length);
+    this.witnessed = this.teams.map(() => new Set<number>());
+    this.vision = new Vision(this.map, this.teams.map((t) => t.side));
     this.effects.visibleAt = (x, z) => this.revealAll || this.vision.seesAt(this.localTeam, x, z);
     this.setupStart();
     this.vision.update(this.units, this.buildings, 0);
@@ -404,7 +410,7 @@ export class Game {
     let best: Entity | null = null;
     let bestScore = Infinity;
     const consider = (e: Entity, penalty: number) => {
-      if (e.team === team || e.dead || (e instanceof Unit && e.carrier) || !this.vision.sees(team, e)) return;
+      if (this.allied(e.team, team) || e.dead || (e instanceof Unit && e.carrier) || !this.vision.sees(team, e)) return;
       if (only === 'ground' && e.tags.includes('air')) return;
       const d = distTo(e, x, z);
       if (d > range) return;
@@ -873,7 +879,7 @@ export class Game {
   /** A Carryall just set down or dropped a unit: warn the other side if it landed near their base. */
   onDrop(carrier: Unit, u: Unit): void {
     for (const ts of this.teams) {
-      if (ts.team === carrier.team || this.time - this.lastDropAlert < 12) continue;
+      if (this.allied(ts.team, carrier.team) || this.time - this.lastDropAlert < 12) continue;
       if (this.buildings.some((b) => b.team === ts.team && !b.dead && hypot(b.x - u.x, b.z - u.z) < 22 * TILE)) {
         if (ts.team === this.localTeam) this.lastDropAlert = this.time;
         this.notifyTeam(ts.team, 'Enemy airdrop detected!', 'enemy_airdrop_detected', u);
@@ -1129,7 +1135,7 @@ export class Game {
     const aim = dm.atan2(target.z - u.z, target.x - u.x);
     const reach = this.rangeFor(u, w, target) + 0.3;
     const burn = (e: Entity) => {
-      if (e === target || e.team === u.team || e.dead || e.tags.includes('air') || (e instanceof Unit && e.carrier)) return;
+      if (e === target || this.allied(e.team, u.team) || e.dead || e.tags.includes('air') || (e instanceof Unit && e.carrier)) return;
       if (distTo(e, u.x, u.z) > reach) return;
       const off = dm.atan2(e.z - u.z, e.x - u.x) - aim;
       if (Math.abs(dm.atan2(dm.sin(off), dm.cos(off))) <= w.cone!) this.damage(e, w, mult, u);
@@ -1185,7 +1191,7 @@ export class Game {
           // The target takes the full hit; anything else in the blast takes half, fading toward the edge, so one
           // rocket into a tight group doesn't do full damage to every unit in it.
           const victims = [...this.units, ...this.buildings].filter(
-            (e) => e.team !== p.owner.team && !e.dead && distTo(e, p.x, p.z) <= splash,
+            (e) => this.hostile(e.team, p.owner.team) && !e.dead && distTo(e, p.x, p.z) <= splash,
           );
           for (const v of victims) {
             const share = v === p.target ? 1 : SPLASH_SHARE * (1 - distTo(v, p.x, p.z) / splash / 2);
@@ -1205,7 +1211,7 @@ export class Game {
     target.lastHurt = this.time;
     if (target instanceof Unit && target.def.hides) this.unhide(target);
     // Whoever fires is seen by the side it hits for a moment, so units below a cliff can shoot back.
-    if (attacker && attacker.team !== target.team) this.vision.reveal(target.team, attacker.x, attacker.z, this.ticks);
+    if (attacker && this.hostile(attacker.team, target.team)) this.vision.reveal(target.team, attacker.x, attacker.z, this.ticks);
     let dmg = upgradedHit(w, target, attacker ? this.tier(attacker.team, 'weapons') : 0) * mult;
     const armor = armorOf(target) + this.tier(target.team, 'armor');
     if (target.shields > 0 && !w.pierce) {
@@ -1236,7 +1242,7 @@ export class Game {
    */
   blast(x: number, z: number, w: WeaponDef, mult: number, owner: Shooter | null, team: Team = owner!.team, direct?: number): void {
     const victims = [...this.units, ...this.buildings].filter(
-      (e) => e.team !== team && !e.dead && !e.tags.includes('air') && !(e instanceof Unit && (e.carrier || e.falling)) && distTo(e, x, z) <= w.splash,
+      (e) => this.hostile(e.team, team) && !e.dead && !e.tags.includes('air') && !(e instanceof Unit && (e.carrier || e.falling)) && distTo(e, x, z) <= w.splash,
     );
     // With `direct`: the one thing nearest the impact, if within it, takes the full hit; the rest of the blast the
     // splash share (as a guided rocket's target and bystanders do).
@@ -1261,7 +1267,7 @@ export class Game {
   /** Locks a unit that can (MLRS) on to an enemy its side sees: it attacks it, with shots homing in, for a while. */
   lockOn(u: Unit, target: Entity): boolean {
     const d = u.def.lockOn;
-    if (!d || u.dead || u.carrier || this.time < u.nextLock || target.dead || target.team === u.team || !this.sees(u.team, target) || !this.weaponFor(u, target)) return false;
+    if (!d || u.dead || u.carrier || this.time < u.nextLock || target.dead || this.allied(target.team, u.team) || !this.sees(u.team, target) || !this.weaponFor(u, target)) return false;
     u.lockTarget = target;
     u.lockUntil = this.time + d.duration;
     u.nextLock = this.time + d.cooldown;
@@ -1277,10 +1283,10 @@ export class Game {
 
   private kill(e: Entity, attacker: Shooter | null): void {
     // Whoever saw it go, or made the kill, knows it's gone.
-    for (const ts of this.teams) if (ts.team !== e.team && (this.vision.sees(ts.team, e) || attacker?.team === ts.team)) this.witnessed[ts.team].add(e.id);
+    for (const ts of this.teams) if (this.hostile(ts.team, e.team) && (this.vision.sees(ts.team, e) || (attacker && this.allied(attacker.team, ts.team)))) this.witnessed[ts.team].add(e.id);
     e.dead = true;
     const victim = this.teams[e.team].stats;
-    const killer = attacker && attacker.team !== e.team ? this.teams[attacker.team] : null;
+    const killer = attacker && this.hostile(attacker.team, e.team) ? this.teams[attacker.team] : null;
     if (e instanceof Building) {
       victim.structuresLost++;
       if (killer) killer.stats.structuresDestroyed++;
@@ -1410,7 +1416,7 @@ export class Game {
     const d = u.def.detonate;
     if (!d || u.dead || u.detonateAt !== null || u.carrier) return;
     u.detonateAt = this.time + d.delay;
-    for (const ts of this.teams) if (ts.team !== u.team && this.vision.sees(ts.team, u)) this.notifyTeam(ts.team, `Enemy ${u.name} is about to self-destruct!`, 'enemy_unit_about_to_selfdestruct', u);
+    for (const ts of this.teams) if (this.hostile(ts.team, u.team) && this.vision.sees(ts.team, u)) this.notifyTeam(ts.team, `Enemy ${u.name} is about to self-destruct!`, 'enemy_unit_about_to_selfdestruct', u);
   }
 
   private updateDetonations(): void {
@@ -1460,7 +1466,7 @@ export class Game {
     for (const m of [...this.mines]) {
       if (this.time < m.armedAt) continue;
       const hit = this.units.some(
-        (u) => u.team !== m.team && !u.dead && !u.def.air && !u.carrier && !u.falling && hypot(u.x - m.x, u.z - m.z) - u.radius <= m.trigger,
+        (u) => this.hostile(u.team, m.team) && !u.dead && !u.def.air && !u.carrier && !u.falling && hypot(u.x - m.x, u.z - m.z) - u.radius <= m.trigger,
       );
       if (!hit) continue;
       this.removeMine(m);
@@ -1564,7 +1570,7 @@ export class Game {
       u.detected = 0;
       if (!u.hidden) continue;
       for (const ts of this.teams) {
-        if (ts.team === u.team) continue;
+        if (this.allied(ts.team, u.team)) continue;
         const near = this.units.some((e) => e.team === ts.team && !e.dead && !e.carrier && hypot(e.x - u.x, e.z - u.z) - e.radius - u.radius <= HIDE.detect)
           || this.buildings.some((b) => b.team === ts.team && !b.dead && distTo(b, u.x, u.z) <= HIDE.detect);
         if (near) u.detected |= 1 << ts.team;
@@ -1979,7 +1985,7 @@ export class Game {
       if (this.time >= d.nextReveal) {
         d.nextReveal += THUMPER.revealEvery;
         for (const ts of this.teams) {
-          if (ts.team === b.team) continue;
+          if (this.allied(ts.team, b.team)) continue;
           const near = (e: Entity) => e.team === ts.team && !e.dead && hypot(e.x - b.x, e.z - b.z) <= THUMPER.hear;
           if (!this.units.some((u) => near(u) && !u.carrier) && !this.buildings.some(near)) continue;
           this.vision.reveal(ts.team, b.x, b.z, this.ticks);
@@ -2295,7 +2301,7 @@ export class Game {
 
   /** Whether the ridden worm goes after this on its own: an enemy on the sand within reach of it, moving or not (not dug in). */
   private riddenPrey(w: RiddenWorm, e: Entity | null): e is Entity {
-    if (!e || e.dead || e.team === w.team || w.unreachable.has(e.id)) return false;
+    if (!e || e.dead || this.allied(e.team, w.team) || w.unreachable.has(e.id)) return false;
     if (e instanceof Unit) {
       if (e.def.air || e.carrier || e.falling || e.mount || e.hidden) return false;
       return this.onWormGround(e.x, e.z) && hypot(e.x - w.x, e.z - w.z) <= RIDE.hunt;
@@ -2330,7 +2336,7 @@ export class Game {
         gx = o.target.x;
         gz = o.target.z;
         w.target = null;
-      } else if (o.kind === 'attack' && !o.target.dead && o.target.team !== w.team) {
+      } else if (o.kind === 'attack' && !o.target.dead && this.hostile(o.target.team, w.team)) {
         gx = o.target.x;
         gz = o.target.z;
         w.target = o.target;
@@ -2398,7 +2404,7 @@ export class Game {
   /** The ridden worm's maw: every enemy on the sand within WORM.bite of its head, every WORM.biteEvery s. */
   private riddenBite(w: RiddenWorm): void {
     if (this.time < w.nextBite) return;
-    const near = (e: Entity) => !e.dead && e.team !== w.team && distTo(e, w.x, w.z) <= WORM.bite;
+    const near = (e: Entity) => !e.dead && this.hostile(e.team, w.team) && distTo(e, w.x, w.z) <= WORM.bite;
     const victims: Entity[] = [
       ...this.units.filter((u) => near(u) && !u.def.air && !u.carrier && !u.falling && !u.mount && !u.hidden && this.onWormGround(u.x, u.z)),
       ...this.buildings.filter((b) => near(b) && this.onSandFootprint(b)),
@@ -2499,7 +2505,27 @@ export class Game {
   acceptSurrender(team: Team): void {
     if (this.winner !== null) return;
     this.surrendered = team;
-    this.winner = (1 - team) as Team;
+    this.winner = (1 - this.teams[team].side) as Side;
+  }
+
+  /** The side a team fights on. */
+  sideOf(team: Team): Side {
+    return this.teams[team].side;
+  }
+
+  /** Whether two teams are on the same side (a team is its own ally). */
+  allied(a: Team, b: Team): boolean {
+    return this.teams[a].side === this.teams[b].side;
+  }
+
+  /** Whether two teams fight each other. */
+  hostile(a: Team, b: Team): boolean {
+    return this.teams[a].side !== this.teams[b].side;
+  }
+
+  /** The teams on a side. */
+  teamsOn(side: Side): Team[] {
+    return this.teams.filter((t) => t.side === side).map((t) => t.team);
   }
 
   // ---- Simulation -----------------------------------------------------------
@@ -2563,7 +2589,8 @@ export class Game {
     this.victoryTimer -= dt;
     if (this.winner === null && this.victoryTimer <= 0) {
       this.victoryTimer = 1;
-      const alive = (t: Team) => this.units.some((u) => u.team === t) || this.buildings.some((b) => b.team === t);
+      // A side is beaten once every team on it has nothing left.
+      const alive = (s: Side) => this.units.some((u) => this.teams[u.team].side === s) || this.buildings.some((b) => this.teams[b.team].side === s);
       if (!alive(0)) this.winner = 1;
       else if (!alive(1)) this.winner = 0;
     }
@@ -2601,7 +2628,7 @@ export class Game {
 
   /** Whether the local player's screen shows an entity now: their own, or anything their side sees. */
   shown(e: Entity): boolean {
-    if (this.revealAll || e.team === this.localTeam) return true;
+    if (this.revealAll || this.allied(e.team, this.localTeam)) return true;
     if (e instanceof Unit && e.carrier instanceof Unit) return this.shown(e.carrier);
     return this.vision.sees(this.localTeam, e);
   }
@@ -2652,7 +2679,7 @@ export class Game {
       const a = us[i];
       for (let j = i + 1; j < us.length; j++) {
         const b = us[j];
-        if (a.team === b.team && (walksThrough(a, b) || walksThrough(b, a))) continue;
+        if (this.allied(a.team, b.team) && (walksThrough(a, b) || walksThrough(b, a))) continue;
         // Dug-in units (deployed Soulcrushers) and units holding position don't budge: whoever bumps into them moves aside.
         const aFixed = a.deployState !== 'mobile' || a.order.kind === 'hold' || a.order.kind === 'dig';
         const bFixed = b.deployState !== 'mobile' || b.order.kind === 'hold' || b.order.kind === 'dig';

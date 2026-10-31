@@ -91,7 +91,7 @@ function closeRoom(room: Room): void {
 function leave(c: Client): void {
   const room = c.room;
   if (!room) return;
-  if (room.state !== 'open' && c.team !== null) send(room.players[(1 - c.team) as Team], { t: 'left', team: c.team });
+  if (room.state !== 'open' && c.team !== null) send(room.players[(1 - c.team) as 0 | 1], { t: 'left', team: c.team });
   closeRoom(room);
 }
 
@@ -136,7 +136,7 @@ function onMessage(c: Client, msg: ClientMsg): void {
       for (const [p, team] of [[host, 0], [c, 1]] as [Client, Team][]) {
         p.room = null;
         p.team = null;
-        const match: MatchInfo = { code: room.code, token: room.tokens[team], team, seed: room.seed, size: room.size, names: room.names, factions: room.factions };
+        const match: MatchInfo = { code: room.code, token: room.tokens[team as 0 | 1], team, seed: room.seed, size: room.size, names: room.names, factions: room.factions };
         send(p, { t: 'match', match });
       }
       room.timer = setTimeout(() => {
@@ -166,7 +166,7 @@ function onMessage(c: Client, msg: ClientMsg): void {
     case 'hash': {
       const room = c.room;
       if (!room || room.state !== 'playing' || c.team === null) return;
-      const other = room.players[(1 - c.team) as Team];
+      const other = room.players[(1 - c.team) as 0 | 1];
       if (msg.t === 'cmds') send(other, { t: 'cmds', team: c.team, tick: msg.tick, cmds: msg.cmds });
       else send(other, { t: 'hash', team: c.team, tick: msg.tick, hash: msg.hash });
       return;
@@ -217,7 +217,7 @@ wss.on('connection', (ws) => {
     clients.delete(c);
     // A matched player's page closes its socket to reload into the match: that's not leaving.
     if (c.room && c.room.state !== 'matched') leave(c);
-    else if (c.room && c.team !== null) c.room.players[c.team] = null;
+    else if (c.room && c.team !== null) c.room.players[c.team as 0 | 1] = null;
   });
 });
 

@@ -684,7 +684,7 @@ export class AI {
   private rushSuspected(): boolean {
     const barracks = this.intel.structures('barracks').length;
     // Against Fremen, their camps play the part of refineries.
-    const refineries = this.intel.structures(FACTIONS[this.game.teams[1 - this.team].faction].camps ? 'camp' : 'refinery').length;
+    const refineries = this.intel.structures(FACTIONS[this.intel.enemyFaction()].camps ? 'camp' : 'refinery').length;
     return barracks >= 2 || (barracks >= 1 && refineries === 0 && this.game.time > 60 && this.game.time - this.intel.lastBaseSeen < 60);
   }
 
@@ -983,7 +983,7 @@ export class AI {
     const danger: { x: number; z: number }[] = [
       ...g.worms.map((w) => ({ x: w.lairX, z: w.lairZ })),
       // An enemy's ridden worm we can see (ours never eats us).
-      ...g.ridden.filter((w) => w.team !== this.team && g.sees(this.team, w.rider)).map((w) => ({ x: w.x, z: w.z })),
+      ...g.ridden.filter((w) => g.hostile(w.team, this.team) && g.sees(this.team, w.rider)).map((w) => ({ x: w.x, z: w.z })),
     ];
     // Harvesters get going as soon as a Thumper is heard: they're slow, and the worm hears them however still.
     const drums: { x: number; z: number }[] = [...danger];
@@ -991,7 +991,7 @@ export class AI {
       if (b.type !== 'thumper' || b.dead) continue;
       const due = g.drumDue(b.team);
       // Ours we know about; the enemy's, once we hear or see them.
-      if (due === null || (b.team !== this.team && !g.sees(this.team, b))) continue;
+      if (due === null || (g.hostile(b.team, this.team) && !g.sees(this.team, b))) continue;
       drums.push({ x: b.x, z: b.z });
       if (due < 3) danger.push({ x: b.x, z: b.z });
     }
@@ -1465,7 +1465,7 @@ export class AI {
   private useArtillery(u: Unit): void {
     const g = this.game;
     const w = u.def.deploy!.weapon;
-    const enemies = [...g.units, ...g.buildings].filter((e) => e.team !== this.team && !e.dead && !e.tags.includes('air') && g.sees(this.team, e));
+    const enemies = [...g.units, ...g.buildings].filter((e) => g.hostile(e.team, this.team) && !e.dead && !e.tags.includes('air') && g.sees(this.team, e));
     const near = (r: number) => enemies.some((e) => e instanceof Building ? false : distTo(e, u.x, u.z) < r && !!(e as Unit).def.weapon);
     const inReach = enemies.some((e) => {
       const d = distTo(e, u.x, u.z);
@@ -1489,8 +1489,8 @@ export class AI {
     if (u.detonateAt !== null || (u.hp + u.shields) / (u.maxHp + u.maxShields) > 0.2) return;
     const w = u.def.detonate!.weapon;
     let value = 0;
-    for (const e of g.units) if (e.team !== this.team && !e.dead && !e.def.air && g.sees(this.team, e) && distTo(e, u.x, u.z) < w.splash * 0.7) value += e.def.cost;
-    for (const b of g.buildings) if (b.team !== this.team && !b.dead && g.sees(this.team, b) && distTo(b, u.x, u.z) < w.splash * 0.7) value += BUILDINGS[b.type].cost;
+    for (const e of g.units) if (g.hostile(e.team, this.team) && !e.dead && !e.def.air && g.sees(this.team, e) && distTo(e, u.x, u.z) < w.splash * 0.7) value += e.def.cost;
+    for (const b of g.buildings) if (g.hostile(b.team, this.team) && !b.dead && g.sees(this.team, b) && distTo(b, u.x, u.z) < w.splash * 0.7) value += BUILDINGS[b.type].cost;
     if (value >= u.def.cost * 0.6) g.startDetonation(u);
   }
 
@@ -1504,8 +1504,8 @@ export class AI {
     const g = this.game;
     if (g.time < u.nextMine) return;
     // Where enemies come by: near their harvesters and refineries, or right under enemy ground units.
-    const spot = g.units.some((e) => e.team !== this.team && !e.dead && !e.def.air && g.sees(this.team, e) && hypot(e.x - u.x, e.z - u.z) < (e.type === 'harvester' ? 10 : 6) * TILE)
-      || g.buildings.some((b) => b.team !== this.team && (b.type === 'refinery' || b.type === 'camp') && g.sees(this.team, b) && distTo(b, u.x, u.z) < 6 * TILE);
+    const spot = g.units.some((e) => g.hostile(e.team, this.team) && !e.dead && !e.def.air && g.sees(this.team, e) && hypot(e.x - u.x, e.z - u.z) < (e.type === 'harvester' ? 10 : 6) * TILE)
+      || g.buildings.some((b) => g.hostile(b.team, this.team) && (b.type === 'refinery' || b.type === 'camp') && g.sees(this.team, b) && distTo(b, u.x, u.z) < 6 * TILE);
     if (spot) g.layMine(u);
   }
 
@@ -1824,6 +1824,8 @@ export class AI {
 
   private considerSurrender(): void {
     if (!this.profile.surrender || this.surrenderOffered || this.game.winner !== null) return;
+    // With an ally still fighting, it plays on to the end: its side hasn't lost.
+    if (this.game.teamsOn(this.game.sideOf(this.team)).length > 1) return;
     this.hopelessFor = this.hopeless() ? this.hopelessFor + 1 : 0;
     if (this.hopelessFor < 15) return;
     this.surrenderOffered = true; // offered once; if it's turned down, fight on to the end

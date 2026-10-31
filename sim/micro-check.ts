@@ -11,7 +11,7 @@ type Army = [UnitType, number][];
 function fight(a: Army, b: Army, microOn: Team | null, seed: number, ups: [UpgradeType[], UpgradeType[]] = [[], []], bunkers = 0): [number, number] {
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, seed);
   for (const u of [...g.units]) { u.hp = 0; (g as any).kill(u, null); }
-  for (const t of [0, 1] as Team[]) for (const up of ups[t]) g.teams[t].upgrades.add(up);
+  for (const t of [0, 1] as const) for (const up of ups[t]) g.teams[t].upgrades.add(up);
   const m = g.map;
   const mid = m.size / 2;
   const spawn = (team: Team, list: Army, cz: number) => {

@@ -257,7 +257,7 @@ export class BrutalAI extends AI {
       const free = units.filter((u) => !this.holding.has(u));
       // Where the wave is going: the attack-move most of its moving units have.
       const goal = free.map((u) => u.order).find((o): o is Extract<typeof o, { kind: 'amove' }> => o.kind === 'amove');
-      const contact = units.some((u) => u.target || g.units.some((e) => e.team !== this.team && !e.dead && !e.carrier && e.def.weapon && g.sees(this.team, e) && hypot(e.x - u.x, e.z - u.z) < 12 * TILE));
+      const contact = units.some((u) => u.target || g.units.some((e) => g.hostile(e.team, this.team) && !e.dead && !e.carrier && e.def.weapon && g.sees(this.team, e) && hypot(e.x - u.x, e.z - u.z) < 12 * TILE));
       if (!goal || contact || units.length < 3) {
         for (const u of units) if (this.holding.has(u)) this.release(u, goal);
         continue;
@@ -380,7 +380,7 @@ export class BrutalAI extends AI {
     this.carryallIds = alive;
     // Not while the base is under attack: the cargo is needed at home, and loading up in a fight gets it shot.
     const busy = this.defenses.some((d) => d.base);
-    const drops = this.opts.dropsVsAI || g.teams.some((t) => t.team !== this.team && t.human);
+    const drops = this.opts.dropsVsAI || g.teams.some((t) => g.hostile(t.team, this.team) && t.human);
     for (const c of this.carryalls()) {
       if (this.ops.has(c) || c.load.length) continue;
       if (busy) {

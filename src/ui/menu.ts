@@ -1,10 +1,11 @@
-import { FACTION_LIST, FACTIONS, MAP_SIZE_NAMES, MAP_SIZES, UNITS, type Faction, type MapSize, type Team } from '../config';
+import { FACTION_LIST, FACTIONS, MAP_SIZE_NAMES, MAP_SIZES, UNITS, type Faction, type MapSize, type Side, type Team } from '../config';
 import type { RoomInfo } from '../net/protocol';
 import type { Difficulty, Game, TeamStats } from '../game/game';
 import { heroTitle } from '../game/heroes';
 
 export interface MenuHandlers {
-  onPlay: (difficulty: Difficulty, size: MapSize, faction: Faction, enemy: EnemyChoice) => void;
+  /** Start a game against the computer: in a 2v2, `ally` is the computer ally's faction, `enemy` both enemies'. */
+  onPlay: (difficulty: Difficulty, size: MapSize, faction: Faction, enemy: EnemyChoice, mode: MatchMode, ally: EnemyChoice) => void;
   onResume: () => void;
   onRestart: () => void;
   onQuit: () => void;
@@ -41,24 +42,45 @@ const SIZE_KEY = 'strat.mapSize';
 const NAME_KEY = 'strat.name';
 const FACTION_KEY = 'strat.faction';
 const ENEMY_KEY = 'strat.enemy';
+const MODE_KEY = 'strat.mode';
+const ALLY_KEY = 'strat.ally';
 
-/** The computer opponent's faction, or a random one each game. */
+/** A computer player's faction, or a random one each game. */
 export type EnemyChoice = Faction | 'random';
+/** One against one, or two (you and a computer ally) against two. */
+export type MatchMode = '1v1' | '2v2';
 
-export function loadEnemy(): EnemyChoice {
+function loadChoice(key: string, fallback: EnemyChoice): EnemyChoice {
   try {
-    const v = localStorage.getItem(ENEMY_KEY);
-    return v === 'random' || FACTION_LIST.includes(v as Faction) ? (v as EnemyChoice) : 'atreides';
+    const v = localStorage.getItem(key);
+    return v === 'random' || FACTION_LIST.includes(v as Faction) ? (v as EnemyChoice) : fallback;
   } catch {
-    return 'atreides';
+    return fallback;
   }
 }
 
-function saveEnemy(v: EnemyChoice): void {
+/** Remembers a menu choice (if storage is unavailable, it just won't persist). */
+function save(key: string, v: string): void {
   try {
-    localStorage.setItem(ENEMY_KEY, v);
+    localStorage.setItem(key, v);
   } catch {
     // Storage unavailable: the choice just won't persist.
+  }
+}
+
+export function loadEnemy(): EnemyChoice {
+  return loadChoice(ENEMY_KEY, 'atreides');
+}
+
+export function loadAlly(): EnemyChoice {
+  return loadChoice(ALLY_KEY, 'random');
+}
+
+export function loadMode(): MatchMode {
+  try {
+    return localStorage.getItem(MODE_KEY) === '2v2' ? '2v2' : '1v1';
+  } catch {
+    return '1v1';
   }
 }
 
@@ -73,11 +95,7 @@ export function loadFaction(): Faction {
 }
 
 function saveFaction(v: Faction): void {
-  try {
-    localStorage.setItem(FACTION_KEY, v);
-  } catch {
-    // Storage unavailable: the choice just won't persist.
-  }
+  save(FACTION_KEY, v);
 }
 
 /** The map size picked last time, so the menu remembers it. */
@@ -185,6 +203,8 @@ export class Menus {
   mapSize = loadMapSize();
   faction = loadFaction();
   enemy = loadEnemy();
+  mode = loadMode();
+  ally = loadAlly();
   volumes = loadVolumes();
 
   constructor(private h: MenuHandlers) {
@@ -204,6 +224,8 @@ export class Menus {
       if (btn.dataset.size) {
         this.mapSize = Number(btn.dataset.size) as MapSize;
         saveMapSize(this.mapSize);
+        // A 2v2 needs four spawn spots: Small has two.
+        if (this.mapSize < 96 && this.mode === '2v2') this.setMode('1v1');
         this.showMapSize();
       } else if (btn.dataset.faction) {
         this.faction = btn.dataset.faction as Faction;
@@ -211,9 +233,20 @@ export class Menus {
         this.showFaction();
       } else if (btn.dataset.enemy) {
         this.enemy = btn.dataset.enemy as EnemyChoice;
-        saveEnemy(this.enemy);
+        save(ENEMY_KEY, this.enemy);
         this.showFaction();
-      } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize, this.faction, this.enemy);
+      } else if (btn.dataset.ally) {
+        this.ally = btn.dataset.ally as EnemyChoice;
+        save(ALLY_KEY, this.ally);
+        this.showFaction();
+      } else if (btn.dataset.mode) {
+        this.setMode(btn.dataset.mode as MatchMode);
+        if (this.mode === '2v2' && this.mapSize < 96) {
+          this.mapSize = 96;
+          saveMapSize(this.mapSize);
+          this.showMapSize();
+        }
+      } else if (btn.dataset.difficulty) this.h.onPlay(btn.dataset.difficulty as Difficulty, this.mapSize, this.faction, this.enemy, this.mode, this.ally);
       else if (btn.dataset.join) this.h.onJoin(btn.dataset.join, this.playerName, this.faction);
       else if (btn.dataset.action === 'play') this.page('difficulty');
       else if (btn.dataset.action === 'multiplayer') {
@@ -301,6 +334,15 @@ export class Menus {
   private showFaction(): void {
     for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-faction]')) b.classList.toggle('picked', b.dataset.faction === this.faction);
     for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-enemy]')) b.classList.toggle('picked', b.dataset.enemy === this.enemy);
+    for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-ally]')) b.classList.toggle('picked', b.dataset.ally === this.ally);
+    for (const b of this.title.querySelectorAll<HTMLButtonElement>('[data-mode]')) b.classList.toggle('picked', b.dataset.mode === this.mode);
+    for (const el of this.title.querySelectorAll<HTMLElement>('.ally-pick')) el.hidden = this.mode !== '2v2';
+  }
+
+  private setMode(mode: MatchMode): void {
+    this.mode = mode;
+    save(MODE_KEY, mode);
+    this.showFaction();
   }
 
   private currentPage = 'main';
@@ -366,23 +408,29 @@ export class Menus {
     this.surrender.hidden = !open;
   }
 
-  /** `opponent`: the other player's name online, or null against the computer. */
-  showEnd(game: Game, apm: number, opponent: string | null = null, note = '', canSave = true): void {
+  /**
+   * `names`: what to call each team in the table (online: the players' names; offline: You, Ally, Enemy). `online`:
+   * the match was against people, so there's no Play again.
+   */
+  showEnd(game: Game, apm: number, names: string[], online = false, note = '', canSave = true): void {
     const PLAYER = game.localTeam;
-    const ENEMY = (1 - PLAYER) as Team;
-    const won = game.winner === PLAYER;
+    const side = game.sideOf(PLAYER);
+    const won = game.winner === side;
     const result = this.end.querySelector('.result')!;
     result.textContent = won ? 'Victory' : 'Defeat';
     result.className = `result ${won ? 'victory' : 'defeat'}`;
-    const how = note ? `${note}  ·  ` : game.surrendered === ENEMY ? 'Enemy surrendered  ·  ' : game.surrendered === PLAYER ? 'You surrendered  ·  ' : '';
-    const vs = `${FACTIONS[game.teams[PLAYER].faction].name} vs ${FACTIONS[game.teams[ENEMY].faction].name}`;
-    const against = `${opponent === null ? `${DIFFICULTY_NAMES[game.difficulty]} AI` : `Online vs ${opponent}`}  ·  ${vs}`;
-    this.end.querySelector<HTMLElement>('[data-action="restart"]')!.hidden = opponent !== null;
+    const s = game.surrendered;
+    const how = note ? `${note}  ·  ` : s === PLAYER ? 'You surrendered  ·  ' : s !== null && game.allied(s, PLAYER) ? 'Your ally surrendered  ·  ' : s !== null ? 'Enemy surrendered  ·  ' : '';
+    // You first, then your allies, then the enemies.
+    const order = [PLAYER, ...game.teamsOn(side).filter((t) => t !== PLAYER), ...game.teamsOn((1 - side) as Side)];
+    const sideNames = (x: Side) => game.teamsOn(x).map((t) => FACTIONS[game.teams[t].faction].name).join(' & ');
+    const vs = `${sideNames(side)} vs ${sideNames((1 - side) as Side)}`;
+    const others = order.slice(1).filter((t) => game.hostile(t, PLAYER)).map((t) => names[t]);
+    const against = `${online ? `Online vs ${others.join(' & ')}` : `${DIFFICULTY_NAMES[game.difficulty]} AI`}  ·  ${vs}`;
+    this.end.querySelector<HTMLElement>('[data-action="restart"]')!.hidden = online;
     this.end.querySelector<HTMLElement>('[data-action="save-replay"]')!.hidden = !canSave;
     this.end.querySelector('.sub')!.textContent = `${how}${formatTime(game.time)}  ·  ${against}  ·  ${MAP_SIZE_NAMES[game.map.size as MapSize]} map  ·  seed ${game.map.seed}`;
 
-    const you = game.teams[PLAYER];
-    const foe = game.teams[ENEMY];
     const rows: [string, (s: TeamStats, t: Team) => string | number][] = [
       ['Units built', (s) => s.unitsBuilt],
       ['Units lost', (s) => s.unitsLost],
@@ -395,9 +443,10 @@ export class Menus {
       ['Upgrades researched', (_, t) => game.teams[t].upgrades.size],
       ['APM', (_, t) => (t === PLAYER ? Math.round(apm) : '—')],
     ];
+    const cls = (t: Team) => (t === PLAYER ? 'you' : game.allied(t, PLAYER) ? 'ally' : 'foe');
     this.end.querySelector('.stats')!.innerHTML =
-      `<tr><th></th><th class="you">You</th><th class="foe">${opponent ? escapeHtml(opponent) : 'Enemy'}</th></tr>` +
-      rows.map(([label, f]) => `<tr><td>${label}</td><td>${f(you.stats, PLAYER)}</td><td>${f(foe.stats, ENEMY)}</td></tr>`).join('');
+      `<tr><th></th>${order.map((t) => `<th class="${cls(t)}">${escapeHtml(names[t])}</th>`).join('')}</tr>` +
+      rows.map(([label, f]) => `<tr><td>${label}</td>${order.map((t) => `<td>${f(game.teams[t].stats, t)}</td>`).join('')}</tr>`).join('');
 
     const card = (team: Team, label: string, cls: string): string => {
       const u = game.teams[team].hero;
@@ -407,7 +456,11 @@ export class Menus {
       return `<div class="hero ${cls}"><div class="label">${label}</div><div class="name">${t.rank} ${t.name}</div>` +
         `<div class="epithet">"${t.epithet}"</div><div class="detail">${UNITS[u.type].name} · ${u.kills} kill${u.kills === 1 ? '' : 's'} · ${fate}</div></div>`;
     };
-    this.end.querySelector('.heroes')!.innerHTML = card(PLAYER, 'Hero of the battle', 'you') + card(ENEMY, opponent ? `${escapeHtml(opponent)}'s nemesis` : 'Enemy nemesis', 'foe');
+    // The enemy's hero: whichever enemy unit made the most kills.
+    const foes = game.teamsOn((1 - side) as Side);
+    const nemesis = foes.reduce((a, t) => ((game.teams[t].hero?.kills ?? -1) > (game.teams[a].hero?.kills ?? -1) ? t : a), foes[0]);
+    const nemesisLabel = online ? `${escapeHtml(names[nemesis])}'s nemesis` : 'Enemy nemesis';
+    this.end.querySelector('.heroes')!.innerHTML = card(PLAYER, 'Hero of the battle', 'you') + card(nemesis, nemesisLabel, 'foe');
     this.end.hidden = false;
   }
 }

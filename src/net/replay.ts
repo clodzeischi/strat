@@ -1,4 +1,4 @@
-import { FACTION_LIST, MAP_SIZES, type Faction, type MapSize, type Team } from '../config';
+import { FACTION_LIST, MAP_SIZES, type Faction, type MapSize, type Side, type Team } from '../config';
 import type { AI } from '../game/ai';
 import { createAI } from '../game/brutal';
 import type { Difficulty, Game } from '../game/game';
@@ -17,6 +17,8 @@ export interface Replay {
   seed: number;
   size: MapSize;
   factions: Faction[];
+  /** Each team's side (a 2v2: [0, 1, 0, 1]). Missing in older replays, which were all 1v1. */
+  sides?: Side[];
   /** Each team's computer player (its difficulty), or null for a person. */
   ai: (Difficulty | null)[];
   names: string[];
@@ -25,7 +27,8 @@ export interface Replay {
   hashes: number[];
   /** How long the match ran, and how it ended. */
   ticks: number;
-  winner: Team | null;
+  /** The side that won. */
+  winner: Side | null;
   surrendered: Team | null;
   /** When it was played (ISO date), for the file list. */
   date: string;
@@ -59,7 +62,7 @@ export class Match {
     // the 'acceptSurrender' command instead).
     const offer = game.onSurrenderOffer;
     game.onSurrenderOffer = (t) => {
-      if (this.ais[1 - t]) game.acceptSurrender(t);
+      if (game.teams.every((o) => !game.hostile(o.team, t) || this.ais[o.team])) game.acceptSurrender(t);
       else offer(t);
     };
     // A frame can run a tick or two past the end before the screen notices: the recording stops at the end.
@@ -89,7 +92,7 @@ export class Match {
   replay(names: string[]): Replay {
     const g = this.game;
     return {
-      v: 1, seed: g.map.seed, size: g.map.size as MapSize, factions: g.teams.map((t) => t.faction), ai: this.ai, names,
+      v: 1, seed: g.map.seed, size: g.map.size as MapSize, factions: g.teams.map((t) => t.faction), sides: g.teams.map((t) => t.side), ai: this.ai, names,
       commands: this.lockstep.record.filter((c) => c.tick < (this.endedAt ?? Infinity)), hashes: this.hashes, ticks: this.endedAt ?? g.ticks, winner: g.winner, surrendered: g.surrendered,
       date: new Date().toISOString(),
     };
@@ -110,15 +113,18 @@ export class Match {
 export function parseReplay(text: string): Replay {
   const r = JSON.parse(text) as Replay;
   const ok = r && r.v === 1 && Number.isInteger(r.seed) && (MAP_SIZES as readonly number[]).includes(r.size)
-    && Array.isArray(r.factions) && r.factions.length === 2 && r.factions.every((f) => FACTION_LIST.includes(f))
-    && Array.isArray(r.ai) && r.ai.length === 2 && r.ai.every((d) => d === null || d === 'normal' || d === 'hard' || d === 'brutal')
+    && Array.isArray(r.factions) && (r.factions.length === 2 || r.factions.length === 4) && r.factions.every((f) => FACTION_LIST.includes(f))
+    && Array.isArray(r.ai) && r.ai.length === r.factions.length && r.ai.every((d) => d === null || d === 'normal' || d === 'hard' || d === 'brutal')
+    && (r.sides === undefined || (Array.isArray(r.sides) && r.sides.length === r.factions.length && r.sides.every((s) => s === 0 || s === 1)))
     && Array.isArray(r.commands) && Array.isArray(r.hashes) && Number.isInteger(r.ticks);
   if (!ok) throw new Error('Not a replay file');
-  r.names = Array.isArray(r.names) ? r.names.map(String) : ['', ''];
+  r.names = Array.isArray(r.names) ? r.names.map(String) : r.factions.map(() => '');
+  r.sides ??= r.factions.map((_, i) => (i % 2) as Side);
   return r;
 }
 
 /** A short file name for a replay: e.g. strat-fremen-vs-corrino-2026-10-09.json. */
 export function replayFileName(r: Replay): string {
-  return `strat-${r.factions[0]}-vs-${r.factions[1]}-${r.date.slice(0, 10)}.json`;
+  const side = (s: Side) => r.factions.filter((_, i) => (r.sides?.[i] ?? i % 2) === s).join('-');
+  return `strat-${side(0)}-vs-${side(1)}-${r.date.slice(0, 10)}.json`;
 }

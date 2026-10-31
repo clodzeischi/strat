@@ -41,8 +41,14 @@ export class Vision {
   private readonly N: number;
   private reveals: { team: Team; cx: number; cz: number; until: number }[] = [];
 
-  constructor(private map: GameMap, teams: number) {
+  /** Per team, the bit mask of the teams on its side (allies share what they see). */
+  private readonly allies: number[];
+
+  /** `sides`: each team's side. Teams on the same side see what any of them sees. */
+  constructor(private map: GameMap, private sides: readonly number[]) {
     const N = (this.N = map.size);
+    const teams = sides.length;
+    this.allies = sides.map((s) => sides.reduce((m, o, t) => (o === s ? m | (1 << t) : m), 0));
     const grid = () => Array.from({ length: teams }, () => new Uint8Array(N * N));
     this.visible = grid();
     this.inRange = grid();
@@ -51,9 +57,9 @@ export class Vision {
     for (let i = 0; i < N * N; i++) this.heights[i] = map.ramp[i] ? RAMP : map.level[i] ? HIGH : LOW;
   }
 
-  /** Whether `team` can see the entity now. A team always sees its own. */
+  /** Whether `team` can see the entity now. A team always sees its own, and its allies'. */
   sees(team: Team, e: Entity): boolean {
-    if (e.team === team) return true;
+    if (this.sides[e.team] === this.sides[team]) return true;
     if (e instanceof Building) {
       for (let z = e.cz; z < e.cz + e.size; z++) for (let x = e.cx; x < e.cx + e.size; x++) if (this.visible[team][z * this.N + x]) return true;
       return false;
@@ -61,7 +67,7 @@ export class Vision {
     const u = e as Unit;
     if (u.carrier) return false;
     // Fremen dug into the sand: only seen by a side with something right next to them.
-    if (u.hidden && !(u.detected & (1 << team))) return false;
+    if (u.hidden && !(u.detected & this.allies[team])) return false;
     const i = this.cellIndex(u.x, u.z);
     if (i < 0) return false;
     return (u.def.air ? this.inRange : this.visible)[team][i] === 1;
@@ -109,6 +115,17 @@ export class Vision {
           if (!this.map.inBounds(x, z)) continue;
           this.visible[r.team][z * this.N + x] = 1;
           this.inRange[r.team][z * this.N + x] = 1;
+        }
+      }
+    }
+    // Allies pool what they see, so each one's view is the side's.
+    for (let t = 0; t < this.visible.length; t++) {
+      for (let o = t + 1; o < this.visible.length; o++) {
+        if (this.sides[o] !== this.sides[t]) continue;
+        for (const grid of [this.visible, this.inRange]) {
+          const a = grid[t];
+          const b = grid[o];
+          for (let i = 0; i < a.length; i++) a[i] = b[i] = a[i] | b[i];
         }
       }
     }

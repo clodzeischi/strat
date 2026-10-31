@@ -11,8 +11,9 @@ export const MAP_SPOTS: Record<MapSize, number> = { 64: 2, 96: 4, 128: 8 };
 
 export const PLAYER: Team = 0;
 export const ENEMY: Team = 1;
-export const TEAM_COLORS = [0x3d7be0, 0xd8402f];
-export const TEAM_CSS = ['#3d7be0', '#d8402f'];
+/** Team colors: blue and red, then (in a 2v2) green with the blue side and orange with the red. */
+export const TEAM_COLORS = [0x3d7be0, 0xd8402f, 0x3fa34d, 0xe08a1c];
+export const TEAM_CSS = ['#3d7be0', '#d8402f', '#3fa34d', '#e08a1c'];
 
 export const START_CREDITS = 2500;
 /** How far a new structure may stand from one of the team's own: tiles of gap, edge to edge (a faction may set its own). */

@@ -886,6 +886,10 @@ body.in-menu #hud {
   color: #f08a78;
 }
 
+.stats .ally {
+  color: #86d090;
+}
+
 .heroes {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -1087,6 +1091,14 @@ body.replay #idle-btn {
 
 .rp-stats th.t1 {
   color: #ff6f5f;
+}
+
+.rp-stats th.t2 {
+  color: #6fd27c;
+}
+
+.rp-stats th.t3 {
+  color: #ffa54a;
 }
 
 .rp-note {

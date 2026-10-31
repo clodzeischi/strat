@@ -1,4 +1,4 @@
-import type { Faction, MapSize, Team } from '../config';
+import type { Faction, MapSize, Side, Team } from '../config';
 import type { Command } from '../game/commands';
 
 /** Bumped whenever the messages or the simulation change in a way that would split two different builds apart. */
@@ -21,8 +21,11 @@ export interface MatchInfo {
   team: Team;
   seed: number;
   size: MapSize;
-  names: [string, string];
-  factions: [Faction, Faction];
+  /** Per team. */
+  names: string[];
+  factions: Faction[];
+  /** Each team's side (missing: teams alternate). */
+  sides?: Side[];
 }
 
 export type ClientMsg =

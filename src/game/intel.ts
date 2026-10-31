@@ -1,4 +1,4 @@
-import { FACTIONS, TILE, type BuildingType, type Team, type UnitType } from '../config';
+import { FACTIONS, TILE, type BuildingType, type Faction, type Team, type UnitType } from '../config';
 import type { Unit } from '../entities';
 import type { Game } from './game';
 import { hypot } from './hypot';
@@ -56,7 +56,7 @@ export class Intel {
     const g = this.game;
     const t = g.time;
     for (const u of g.units) {
-      if (u.team === this.team || u.dead || u.carrier || !g.sees(this.team, u)) continue;
+      if (g.allied(u.team, this.team) || u.dead || u.carrier || !g.sees(this.team, u)) continue;
       this.units.set(u.id, {
         id: u.id, team: u.team, type: u.type, x: u.x, z: u.z, seen: t, harvester: u.type === 'harvester', placed: true,
         power: u.def.weapon ? u.def.cost * ((u.hp + u.shields) / (u.maxHp + u.maxShields)) : 0,
@@ -64,7 +64,7 @@ export class Intel {
       if (u.def.infantry && g.teams[u.team].upgrades.has('rockets')) this.enemyRockets = true;
     }
     for (const b of g.buildings) {
-      if (b.team === this.team || b.dead || !g.sees(this.team, b)) continue;
+      if (g.allied(b.team, this.team) || b.dead || !g.sees(this.team, b)) continue;
       this.buildings.set(b.id, { id: b.id, team: b.team, type: b.type, x: b.x, z: b.z, seen: t, harvester: b.type === 'camp', placed: true, power: 0 });
       this.lastBaseSeen = t;
     }
@@ -105,11 +105,14 @@ export class Intel {
    * from our base, each the nearest of those left (straight line), as a scout would go round them.
    */
   candidateSpots(): { x: number; z: number }[] {
-    const m = this.game.map;
+    const g = this.game;
+    const m = g.map;
     const own = m.bases[this.team];
     let at = { x: m.center(own.cx), z: m.center(own.cz) };
+    // Our side's own spots are known (allies know where each other started).
+    const ours = m.bases.filter((_, t) => g.allied(t as Team, this.team));
     const left = m.spots
-      .filter((c, k) => !this.cleared.has(k) && (c.cx !== own.cx || c.cz !== own.cz))
+      .filter((c, k) => !this.cleared.has(k) && !ours.some((o) => o.cx === c.cx && o.cz === c.cz))
       .map((c) => ({ x: m.center(c.cx), z: m.center(c.cz) }));
     const out: { x: number; z: number }[] = [];
     while (left.length) {
@@ -150,20 +153,42 @@ export class Intel {
   }
 
   /**
-   * Where the enemy base is, as far as we know: its hub (Construction Yard, Sietch), or the middle of the structures we've seen;
-   * with none seen, the nearest spawn spot not yet seen empty (with only two spots, simply the other one).
+   * Where the enemy base is, as far as we know (with two enemies, the one nearest us): its hub (Construction Yard,
+   * Sietch), or the middle of that enemy's structures we've seen; with none seen, the nearest spawn spot not yet
+   * seen empty (with only two spots, simply the other one).
    */
   enemyBase(): { x: number; z: number } {
+    const g = this.game;
+    const m = g.map;
+    const own = m.bases[this.team];
+    const home = { x: m.center(own.cx), z: m.center(own.cz) };
     const known = [...this.buildings.values()];
-    const hub = FACTIONS[this.game.teams[(1 - this.team) as Team].faction].hub;
-    const yard = known.find((s) => s.type === hub);
-    if (yard) return { x: yard.x, z: yard.z };
-    if (known.length) return { x: known.reduce((a, s) => a + s.x, 0) / known.length, z: known.reduce((a, s) => a + s.z, 0) / known.length };
+    if (known.length) {
+      // The enemy whose structure is nearest our base, and its hub if we've seen it.
+      const near = known.reduce((a, s) => (hypot(s.x - home.x, s.z - home.z) < hypot(a.x - home.x, a.z - home.z) ? s : a));
+      const theirs = known.filter((s) => s.team === near.team);
+      const yard = theirs.find((s) => s.type === FACTIONS[g.teams[near.team].faction].hub);
+      if (yard) return { x: yard.x, z: yard.z };
+      return { x: theirs.reduce((a, s) => a + s.x, 0) / theirs.length, z: theirs.reduce((a, s) => a + s.z, 0) / theirs.length };
+    }
     const spot = this.candidateSpots()[0];
     if (spot) return spot;
-    const m = this.game.map;
-    const start = m.bases[(1 - this.team) as Team] ?? m.bases[0];
+    const start = m.bases[this.enemies()[0]] ?? m.bases[0];
     return { x: m.center(start.cx), z: m.center(start.cz) };
+  }
+
+  /** The teams we fight. */
+  enemies(): Team[] {
+    return this.game.teams.filter((t) => this.game.hostile(t.team, this.team)).map((t) => t.team);
+  }
+
+  /** The faction of the enemy we're going after (whose base `enemyBase` is), or the first enemy's. */
+  enemyFaction(): Faction {
+    const g = this.game;
+    const base = this.enemyBase();
+    let best: Sighting | null = null;
+    for (const s of this.buildings.values()) if (!best || hypot(s.x - base.x, s.z - base.z) < hypot(best.x - base.x, best.z - base.z)) best = s;
+    return g.teams[best ? best.team : this.enemies()[0]].faction;
   }
 
   /**
