@@ -198,7 +198,7 @@ Dune buggy with a flamethrower that burns everything in front of it. Shreds infa
 <tr><th align="left">Shields</th><td>320</td></tr>
 <tr><th align="left">Armor</th><td>3</td></tr>
 <tr><th align="left">Attributes</th><td>Mechanical, Armored</td></tr>
-<tr><th align="left">Speed</th><td>1.2 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.25 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>6 tiles</td></tr>
 </table>
 
@@ -305,7 +305,7 @@ Light ornithopter for scouting and raids. Rockets strong vs armor. Lays mines th
 <tr><th align="left">Shields</th><td>110</td></tr>
 <tr><th align="left">Armor</th><td>2</td></tr>
 <tr><th align="left">Attributes</th><td>Mechanical, Armored</td></tr>
-<tr><th align="left">Speed</th><td>1.4 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.25 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>6 tiles</td></tr>
 </table>
 

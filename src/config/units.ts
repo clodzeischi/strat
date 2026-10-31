@@ -68,7 +68,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Dune buggy with a flamethrower that burns everything in front of it. Shreds infantry. Weak vs tanks.',
   },
   devastator: {
-    name: 'Devastator', producer: 'fab', cost: 800, buildTime: 16, hp: 720, shields: 320, armor: 3, speed: 2.4, turnRate: 1.6, radius: 1.4, sight: 12,
+    name: 'Devastator', producer: 'fab', cost: 800, buildTime: 16, hp: 720, shields: 320, armor: 3, speed: 2.5, turnRate: 1.6, radius: 1.4, sight: 12,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu', 'fab2'],
     weapon: { range: 10, minRange: 0, damage: 60, bonus: { armored: 40 }, cooldown: 2, projectile: 'shell', speed: 28, splash: 1.5, sound: 'heavy_laser' },
     holdFire: true,
@@ -87,7 +87,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Light ornithopter for scouting and raids. Rockets strong vs armor. Lays mines that wreck infantry and wear down harvesters. Weak vs anti-air.',
   },
   artillery: {
-    name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 200, shields: 110, armor: 2, speed: 2.8, turnRate: 2, radius: 1.1, sight: 12,
+    name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 200, shields: 110, armor: 2, speed: 2.5, turnRate: 2, radius: 1.1, sight: 12,
     turret: true, holdFire: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu'],
     weapon: { range: 8, minRange: 0, damage: 14, bonus: { structure: 12 }, cooldown: 1.5, projectile: 'shell', speed: 26, splash: 0, sound: 'single_shot' },
     deploy: {
