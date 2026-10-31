@@ -114,6 +114,17 @@ Side bias: fixed, see the AI section (spawn side decided mirror matches).
 - Show the seed so a map can be replayed.
 - Fairness test with the sim harness: across a few hundred seeds, each side should win about 50%.
 
+## 3b. 2v2 **Done (branch `teams`, 2026-10-30)**
+
+- **Teams and sides:** `Team` is 0-3 and every team has a `side` (0 or 1); in a 2v2 teams alternate, 0 and 2 against 1 and 3 (blue and green against red and orange). `game.allied` / `game.hostile` replace the old "other team" checks: targeting, splash, mines, worms, alerts and right-click attacks all spare allies. `game.winner` is the winning side (in a 1v1 the same number as the team, so 1v1 games, sims and replays are unchanged: a full AI game hashes the same as on main).
+- **Shared vision:** each team's sight is pooled with its allies' after every vision update (hidden Fremen too).
+- **Victory:** a side loses once every team on it has nothing left. In a 2v2 the AI doesn't offer to surrender while an ally fights on; a person's surrender concedes for their side.
+- **AI:** `Intel` ignores allies, rules out allied spawn spots, and goes after the enemy base nearest its own. The two AIs of a side don't coordinate yet (each defends itself and attacks the nearest enemy).
+- **Skirmish:** Mode (1 vs 1 / 2 vs 2, Medium or Large) and Ally on the Play page; you and a computer ally against two computer players.
+- **Online:** a 2v2 room has four places: joiners pick the host's side or the other; the host starts it (or it starts once full), and computer players at the host's chosen difficulty fill the rest. Lockstep waits for every remote person. Someone who leaves is dropped from the tick after the last commands the server relayed for them: if their side still has a person, the computer takes their base over from that tick on every machine (recorded in the replay as a takeover); otherwise the game ends and the other side wins. Protocol 5.
+- **Checks:** `sim/teams-check.ts` (four AIs: no allied damage, shared sight, a side wins), `sim/netplay-2v2-check.ts` (three people and a computer player through the real server, one leaving halfway: no desync, same takeover tick, the replay rebuilds the game).
+- Still to do: the two AIs of a side helping each other (defending the ally, attacking together); free-for-all and more than four players.
+
 ## 4. Expansion mechanic (proposal)
 
 Problem: in a Dune-style game nothing forces players to leave their base, so a defended plateau could turtle forever.
