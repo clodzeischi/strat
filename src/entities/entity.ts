@@ -62,7 +62,7 @@ export abstract class Entity {
     // More segments for bigger rings (buildings) so they stay round.
     const ringGeo = new THREE.RingGeometry(ringRadius - 0.15, ringRadius, Math.max(24, Math.round(ringRadius * 8)));
     ringGeo.rotateX(-Math.PI / 2);
-    this.ring = new THREE.Mesh(ringGeo, ringMats[team === 0 ? 0 : 1]);
+    this.ring = new THREE.Mesh(ringGeo, ringMats[team % 2]); // by side: teams alternate sides
     this.ring.position.y = 0.08;
     this.ring.visible = false;
     this.root.add(this.ring);

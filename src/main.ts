@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { RTSCamera } from './render/camera';
-import { FACTION_LIST, FACTIONS, MAP_SIZES, TILE, type Faction, type MapSize, type Team } from './config';
+import { FACTION_LIST, FACTIONS, MAP_SIZES, TILE, type Faction, type MapSize, type Side, type Team } from './config';
 import { Game, type Difficulty } from './game/game';
 import { loadModels } from './models';
 import { Input } from './ui/input';
-import { loadEnemy, loadFaction, loadMapSize, Menus, type Channel, type EnemyChoice, type ReplayEntry } from './ui/menu';
+import { loadAlly, loadEnemy, loadFaction, loadMapSize, loadMode, Menus, type Channel, type EnemyChoice, type MatchMode, type ReplayEntry } from './ui/menu';
 import { ReplayViewer, type ReplayView } from './ui/replay-viewer';
 import { ViewShadows } from './render/shadows';
 import { CommandCard } from './ui/command-card';
@@ -46,19 +46,19 @@ scene.add(sun, sun.target);
 // an online match: the page reloads into it once the server has paired two players.
 const AUTOSTART_KEY = 'strat.autostart';
 const MATCH_KEY = 'strat.match';
-interface Autostart { difficulty: Difficulty; size: MapSize; seed: number; faction: Faction; enemy: Faction }
+/** The next game against the computer: every team's faction, the player's first (four of them make a 2v2). */
+interface Autostart { difficulty: Difficulty; size: MapSize; seed: number; factions: Faction[] }
 function readAutostart(): Autostart | null {
   try {
     const raw = sessionStorage.getItem(AUTOSTART_KEY);
     sessionStorage.removeItem(AUTOSTART_KEY);
-    const [difficulty, size, seed, faction, enemy] = (raw ?? '').split(':');
+    const [difficulty, size, seed, list] = (raw ?? '').split(':');
+    const factions = (list ?? '').split(',') as Faction[];
     const okDifficulty = difficulty === 'normal' || difficulty === 'hard' || difficulty === 'brutal';
     const okSize = (MAP_SIZES as readonly number[]).includes(Number(size));
     const okSeed = seed !== '' && Number.isInteger(Number(seed));
-    const okFaction = FACTION_LIST.includes(faction as Faction) && FACTION_LIST.includes(enemy as Faction);
-    return okDifficulty && okSize && okSeed && okFaction
-      ? { difficulty, size: Number(size) as MapSize, seed: Number(seed), faction: faction as Faction, enemy: enemy as Faction }
-      : null;
+    const okFactions = (factions.length === 2 || factions.length === 4) && factions.every((f) => FACTION_LIST.includes(f));
+    return okDifficulty && okSize && okSeed && okFactions ? { difficulty, size: Number(size) as MapSize, seed: Number(seed), factions } : null;
   } catch {
     return null;
   }
@@ -103,25 +103,26 @@ const mapSize = match?.size ?? watching?.size ?? autostart?.size ?? loadMapSize(
 // Every visit gets a new map; Restart keeps the seed so the same map comes back.
 const mapSeed = match?.seed ?? watching?.seed ?? autostart?.seed ?? urlSeed() ?? randomSeed();
 
-// The player's faction and the computer opponent's ('random' is rolled once per page, so Restart keeps it).
-const playerFaction = autostart?.faction ?? loadFaction();
-const rollEnemy = (c: EnemyChoice): Faction => (c === 'random' ? FACTION_LIST[Math.floor(Math.random() * FACTION_LIST.length)] : c);
-const enemyFaction = autostart?.enemy ?? rollEnemy(loadEnemy());
-const factions: Faction[] = match?.factions ?? watching?.factions ?? [playerFaction, enemyFaction];
+// Every team's faction, the player's first ('random' is rolled once per page, so Restart keeps it). In a 2v2 teams
+// alternate sides: the player and the ally (team 2) against teams 1 and 3.
+const roll = (c: EnemyChoice): Faction => (c === 'random' ? FACTION_LIST[Math.floor(Math.random() * FACTION_LIST.length)] : c);
+const lineup = (faction: Faction, enemy: EnemyChoice, mode: MatchMode, ally: EnemyChoice): Faction[] =>
+  mode === '2v2' ? [faction, roll(enemy), roll(ally), roll(enemy)] : [faction, roll(enemy)];
+const factions: Faction[] = match?.factions ?? watching?.factions ?? autostart?.factions ?? lineup(loadFaction(), loadEnemy(), loadMapSize() >= 96 ? loadMode() : '1v1', loadAlly());
+const sides: Side[] = match?.sides ?? watching?.sides ?? factions.map((_, i) => (i % 2) as Side);
 
 // Blender models must be in before the first building is made. A unit model that fails keeps its procedural one; a
 // building that fails is drawn empty.
 await loadModels();
 
 const rts = new RTSCamera(mapSize * TILE);
-const game = new Game(scene, rts.camera, mapSize, mapSeed, factions);
+const game = new Game(scene, rts.camera, mapSize, mapSeed, factions, sides);
 game.localTeam = match?.team ?? 0;
 // Card icons for whatever the player's faction has Blender models of, in their team color.
 renderModelIcons(factions[game.localTeam] ?? 'atreides', game.localTeam);
 // `?reveal` lifts the fog of war on screen, offline only (for testing). The title fly-over shows the whole map.
 const revealParam = !match && new URLSearchParams(location.search).has('reveal');
 game.revealAll = true;
-const ENEMY = (1 - game.localTeam) as Team;
 
 // The sun's shadow map follows whatever the active camera is looking at.
 const shadows = new ViewShadows(sun);
@@ -214,7 +215,17 @@ const netWaitEl = document.getElementById('netwait')!;
 /** Online: the connection to the game server (also used by the multiplayer menu). */
 let net: NetClient | null = null;
 const online = match !== null;
-const opponentName = match ? match.names[ENEMY] : null;
+const opponentName = match ? match.names.filter((_, t) => game.hostile(t as Team, game.localTeam)).join(' & ') : null;
+/** What the end screen calls each team: online, the players' names; offline, You, Ally and Enemy. */
+function teamLabels(): string[] {
+  if (match) return match.names;
+  const enemies = game.teams.filter((t) => game.hostile(t.team, game.localTeam));
+  return game.teams.map((t) => {
+    if (t.team === game.localTeam) return 'You';
+    if (game.allied(t.team, game.localTeam)) return 'Ally';
+    return enemies.length > 1 ? `Enemy ${enemies.indexOf(t) + 1}` : 'Enemy';
+  });
+}
 
 /** The opening build hint for the local player's faction. */
 function firstSteps(): string {
@@ -239,12 +250,11 @@ function beginPlay(): void {
 
 function startGame(difficulty: Difficulty): void {
   game.difficulty = difficulty;
-  const ai: (Difficulty | null)[] = [null, null];
-  ai[ENEMY] = difficulty;
+  const ai = game.teams.map((t) => (t.team === game.localTeam ? null : difficulty));
   session = new Match(game, ai, game.localTeam);
   lockstep = session.lockstep;
   beginPlay();
-  hud.showMessage(`${firstSteps()} Destroy the red base.`);
+  hud.showMessage(game.teams.length > 2 ? `${firstSteps()} With your green ally, destroy the red and orange bases.` : `${firstSteps()} Destroy the red base.`);
 }
 
 /** Online: the page has reloaded into a match; reconnect, and start when both players are back. */
@@ -263,38 +273,56 @@ function startOnline(m: MatchInfo): void {
   };
   client.connect().then(
     () => {
-      showNetWait(`Waiting for ${opponentName}…`);
+      showNetWait(people.size > 2 ? 'Waiting for the other players…' : `Waiting for ${opponentName}…`);
       client.send({ t: 'resume', code: m.code, token: m.token });
     },
     () => endGame("Couldn't reach the game server"),
   );
 }
 
+/** Online: the people still in the match (by team), this screen's included. */
+const people = new Set<Team>(match ? game.teams.filter((t) => !match.ai?.[t.team]).map((t) => t.team) : []);
+
 function onMatchMessage(msg: ServerMsg): void {
   switch (msg.t) {
     case 'go': {
-      if (lockstep) return;
-      session = new Match(game, [null, null], game.localTeam, net);
+      if (lockstep || !match) return;
+      session = new Match(game, match.ai ?? game.teams.map(() => null), game.localTeam, net, [...people].filter((t) => t !== game.localTeam));
       lockstep = session.lockstep;
       const ls = lockstep;
-      ls.onDesync = (tick) => {
-        console.error(`Desync with ${opponentName} at tick ${tick}`);
-        hud.showMessage(`Out of sync with ${opponentName} (tick ${tick}): your screens may no longer show the same game.`);
+      ls.onDesync = (tick, team) => {
+        console.error(`Desync with ${match.names[team]} at tick ${tick}`);
+        hud.showMessage(`Out of sync with ${match.names[team]} (tick ${tick}): your screens may no longer show the same game.`);
       };
       showNetWait('');
       beginPlay();
-      hud.showMessage(`Online against ${opponentName}. ${firstSteps()}`);
+      const allies = match.names.filter((_, t) => t !== game.localTeam && game.allied(t as Team, game.localTeam));
+      hud.showMessage(`Online against ${opponentName}${allies.length ? `, with ${allies.join(' & ')}` : ''}. ${firstSteps()}`);
       break;
     }
     case 'cmds':
       lockstep?.receive(msg.team, msg.tick, msg.cmds);
       break;
     case 'hash':
-      lockstep?.receiveHash(msg.tick, msg.hash);
+      lockstep?.receiveHash(msg.team, msg.tick, msg.hash);
       break;
-    case 'left':
-      if (mode !== 'ended') endGame(`${opponentName} left the game`);
+    case 'left': {
+      if (mode === 'ended' || !match) break;
+      const name = match.names[msg.team];
+      people.delete(msg.team);
+      if (!lockstep || !session) {
+        endGame(`${name} left the game`);
+        break;
+      }
+      // Their side plays on with a person: the computer takes over their base (on every machine from the same tick).
+      // Otherwise their side has nobody left, and the game is over.
+      const from = lockstep.drop(msg.team, msg.tick);
+      if (game.teamsOn(game.sideOf(msg.team)).some((t) => people.has(t))) {
+        session.takeOver(msg.team, match.takeover ?? 'normal', from);
+        hud.showMessage(`${name} left the game. The computer takes over for them.`);
+      } else endGame(`${name} left the game`);
       break;
+    }
     case 'error':
       if (mode !== 'ended') endGame(msg.text);
       break;
@@ -403,21 +431,21 @@ function saveReplay(): void {
 /** Online games end early when the other player leaves or the connection drops: whoever's still here wins. */
 function endGame(note: string): void {
   showNetWait('');
-  if (game.winner === null && mode !== 'connecting') game.winner = game.localTeam;
+  if (game.winner === null && mode !== 'connecting') game.winner = game.sideOf(game.localTeam);
   finishMatch();
   mode = 'ended';
   game.revealAll = true;
   menus.setPaused(false);
-  menus.showEnd(game, input.actions / Math.max(1, game.time / 60), opponentName, note);
+  menus.showEnd(game, input.actions / Math.max(1, game.time / 60), teamLabels(), true, note);
   gameMusic.stop();
-  if (game.winner === game.localTeam) sounds.ui('win');
+  if (game.winner === game.sideOf(game.localTeam)) sounds.ui('win');
   net?.close();
 }
 
 /** Restart, Quit and a new map size reload the page for a clean match; with `next` set, the title is skipped. */
 function reload(next: Autostart | null): void {
   try {
-    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}:${next.seed}:${next.faction}:${next.enemy}`);
+    if (next) sessionStorage.setItem(AUTOSTART_KEY, `${next.difficulty}:${next.size}:${next.seed}:${next.factions.join(',')}`);
   } catch {
     // Without session storage, Restart falls back to the title screen.
   }
@@ -435,6 +463,7 @@ function setPaused(paused: boolean): void {
 function lobbyMessage(msg: ServerMsg): void {
   if (msg.t === 'rooms') menus.showRooms(msg.rooms);
   else if (msg.t === 'hosted') menus.showHosting(msg.code);
+  else if (msg.t === 'room') menus.showRoom(msg);
   else if (msg.t === 'error') menus.setLobbyStatus(msg.text);
   else if (msg.t === 'match') {
     // Paired: reload into the match (a fresh page builds the agreed map).
@@ -469,14 +498,17 @@ function openLobby(): void {
 
 const menus = new Menus({
   // A different map size or faction needs a fresh page (the map and starting units are built at load).
-  onPlay: (difficulty, size, faction, enemy) => {
-    // 'random' accepts whichever faction this page rolled.
-    const same = size === game.map.size && faction === playerFaction && (enemy === 'random' || enemy === enemyFaction);
+  onPlay: (difficulty, size, faction, enemy, mode, ally) => {
+    // The game on this page will do if it's the same size and line-up ('random' accepts whatever this page rolled).
+    const want = lineup(faction, enemy, mode, ally);
+    const fits = (choice: EnemyChoice, t: number) => choice === 'random' || choice === factions[t];
+    const same = size === game.map.size && want.length === factions.length && factions[0] === faction
+      && fits(enemy, 1) && (want.length === 2 || (fits(ally, 2) && fits(enemy, 3)));
     if (same) startGame(difficulty);
-    else reload({ difficulty, size, seed: urlSeed() ?? randomSeed(), faction, enemy: rollEnemy(enemy) });
+    else reload({ difficulty, size, seed: urlSeed() ?? randomSeed(), factions: want });
   },
   onResume: () => setPaused(false),
-  onRestart: () => (watching ? watchReplay(watching) : reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed, faction: playerFaction, enemy: enemyFaction })),
+  onRestart: () => (watching ? watchReplay(watching) : reload({ difficulty: game.difficulty, size: mapSize, seed: mapSeed, factions })),
   onQuit: () => {
     net?.send({ t: 'leave' });
     reload(null);
@@ -501,8 +533,9 @@ const menus = new Menus({
       net = null;
     }
   },
-  onHost: (name, size, faction) => net?.send({ t: 'host', name, size, faction, version: PROTOCOL_VERSION }),
-  onJoin: (code, name, faction) => net?.send({ t: 'join', code, name, faction, version: PROTOCOL_VERSION }),
+  onHost: (name, size, faction, mode, difficulty) => net?.send({ t: 'host', name, size, faction, mode, difficulty, version: PROTOCOL_VERSION }),
+  onJoin: (code, name, faction, side) => net?.send({ t: 'join', code, name, faction, side, version: PROTOCOL_VERSION }),
+  onStart: () => net?.send({ t: 'start' }),
   onCancelHost: () => {
     net?.send({ t: 'cancel' });
     menus.page('multiplayer');
@@ -535,7 +568,7 @@ function previewVolume(channel: Channel): void {
 }
 // The game waits for the player's answer, like the pause menu.
 game.onSurrenderOffer = (team) => {
-  if (team !== ENEMY || mode !== 'playing') return;
+  if (!game.hostile(team, game.localTeam) || mode !== 'playing') return;
   mode = 'offer';
   menus.setSurrenderOffer(true);
 };
@@ -605,16 +638,16 @@ function frame(now: number): void {
     } else if (running && lockstep) {
       input.update(dt);
       if (!input.paused) alpha = lockstep.advance(Math.min(rawDt, 0.25));
-      if (online) showNetWait(lockstep.waiting > 0.5 ? `Waiting for ${opponentName}…` : '');
+      if (online) showNetWait(lockstep.waiting > 0.5 ? (people.size > 2 ? 'Waiting for the other players…' : `Waiting for ${opponentName}…`) : '');
       if (game.winner !== null) {
         if (online) endGame(game.surrendered === null ? '' : game.surrendered === game.localTeam ? 'You surrendered' : `${opponentName} surrendered`);
         else {
           finishMatch();
           mode = 'ended';
           game.revealAll = true;
-          menus.showEnd(game, input.actions / Math.max(1, game.time / 60));
+          menus.showEnd(game, input.actions / Math.max(1, game.time / 60), teamLabels());
           gameMusic.stop();
-          if (game.winner === game.localTeam) sounds.ui('win');
+          if (game.winner === game.sideOf(game.localTeam)) sounds.ui('win');
         }
       }
     } else if (mode === 'ended') {

@@ -111,7 +111,7 @@ export class GameMap {
   fields: { cx: number; cz: number; kind: FieldKind }[] = [];
   /** Every spawn spot (a base plateau, with its home field), in symmetry order. */
   spots: Cell[];
-  /** Base centers for team 0 and team 1: two of the spots, picked from the seed. */
+  /** Base centers by team: as many of the spots as there are players, picked from the seed. */
   bases: Cell[];
   /** The map's symmetries (see SYMMETRIES): every spot looks the same. */
   private syms: Sym[];
@@ -119,7 +119,8 @@ export class GameMap {
   version = 0;
 
   /** `size` is tiles per side. */
-  constructor(readonly size = 64, readonly seed = 7) {
+  /** `size` is tiles per side; `players` take that many of the spawn spots (no more than there are). */
+  constructor(readonly size = 64, readonly seed = 7, players = 2) {
     const N = size;
     this.tiles = new Uint8Array(N * N);
     this.spice = new Float32Array(N * N);
@@ -135,11 +136,15 @@ export class GameMap {
       this.spots = this.pickSpots(seed + attempt * 101);
       if (this.generate(seed + attempt * 101)) break;
     }
-    // Players start at two different spots at random: next door or across the map.
+    // Players start at different spots at random: next door or across the map. Two players draw as they always
+    // have (so a 1v1 seed keeps its spawns); more draw the rest from what's left.
     const n = this.spots.length;
     const a = Math.floor(hash(5, 6, seed) * n);
     const b = (a + 1 + Math.floor(hash(7, 8, seed) * (n - 1))) % n;
-    this.bases = [this.spots[a], this.spots[b]];
+    const order = [a, b];
+    const left = this.spots.map((_, k) => k).filter((k) => k !== a && k !== b);
+    for (let p = 2; p < Math.min(players, n); p++) order.push(left.splice(Math.floor(hash(9 + p, 10, seed) * left.length), 1)[0]);
+    this.bases = order.map((k) => this.spots[k]);
     this.buildSurface(seed);
   }
 

@@ -2,7 +2,10 @@
 
 import type { Sound } from './audio';
 
-export type Team = 0 | 1;
+/** A player's slot in the match: 0-1 in a 1v1, 0-3 in a 2v2. */
+export type Team = 0 | 1 | 2 | 3;
+/** Which of the two sides a team fights on: in a 2v2, teams 0 and 2 against 1 and 3. */
+export type Side = 0 | 1;
 
 /**
  * Atreides: today's roster (the Terran of the game). Corrino: slower, dearer, tougher, with shields (the Protoss).

@@ -38,9 +38,9 @@ export class Micro {
     const g = this.game;
     // Let go of units that are gone, or that the AI (or the unit itself) has given another order since.
     for (const [u, h] of [...this.held]) if (u.dead || u.carrier || !units.includes(u) || (u.order !== h.mine && u.order.kind !== 'idle')) this.held.delete(u);
-    const enemies = g.units.filter((e) => e.team !== this.team && !e.dead && !e.carrier && !e.falling && g.sees(this.team, e));
+    const enemies = g.units.filter((e) => g.hostile(e.team, this.team) && !e.dead && !e.carrier && !e.falling && g.sees(this.team, e));
     const threats = enemies.filter((e) => e.def.weapon);
-    const bunkers = g.buildings.filter((b) => b.team !== this.team && !b.dead && b.occupants.length && g.sees(this.team, b));
+    const bunkers = g.buildings.filter((b) => g.hostile(b.team, this.team) && !b.dead && b.occupants.length && g.sees(this.team, b));
     // Fire already committed to each enemy this round, so others spread out instead of overkilling it.
     const committed = new Map<Entity, number>();
     for (const u of units) {

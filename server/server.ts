@@ -1,7 +1,7 @@
 // Strat game server: serves the built game (dist/) and relays online matches over a WebSocket at /ws.
 //
-// It's a lobby plus a relay. It pairs two players, hands both the same map seed, then passes each player's
-// commands and checksums to the other. It never runs the game itself (each browser runs the full simulation, in
+// It's a lobby plus a relay. It fills a room (two players, or four in a 2v2 with computer players in the empty
+// places), hands everyone the same map seed, then passes each player's commands and checksums to the others. It never runs the game itself (each browser runs the full simulation, in
 // lockstep), so it needs next to no CPU or memory: a Raspberry Pi is plenty.
 //
 // Usage: npm run build && npm run serve        (PORT=8080 by default)
@@ -12,8 +12,9 @@ import { extname, join, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes, randomInt } from 'node:crypto';
 import { WebSocketServer, type WebSocket } from 'ws';
-import { FACTION_LIST, type Faction, type MapSize, type Team } from '../src/config';
-import { PROTOCOL_VERSION, type ClientMsg, type MatchInfo, type RoomInfo, type ServerMsg } from '../src/net/protocol';
+import { FACTION_LIST, type Faction, type MapSize, type Side, type Team } from '../src/config';
+import type { Difficulty } from '../src/game/game';
+import { PROTOCOL_VERSION, type ClientMsg, type MatchInfo, type RoomInfo, type RoomMode, type ServerMsg, type SlotInfo } from '../src/net/protocol';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const DIST = resolve(process.env.DIST ?? fileURLToPath(new URL('../dist', import.meta.url)));
@@ -30,16 +31,30 @@ interface Client {
   team: Team | null;
 }
 
+/** A place in a room: a team in the match. */
+interface Slot {
+  /** The person's connection (null for a computer player, a free place, or while the page reloads). */
+  client: Client | null;
+  human: boolean;
+  name: string;
+  faction: Faction;
+  token: string;
+  /** The last tick this player sent commands for. */
+  lastTick: number;
+  /** Left for good. */
+  gone: boolean;
+}
+
 interface Room {
   code: string;
   size: MapSize;
-  names: [string, string];
-  factions: [Faction, Faction];
+  mode: RoomMode;
+  /** Who plays the empty places of a 2v2, and takes over for a person who leaves it. */
+  difficulty: Difficulty;
   state: 'open' | 'matched' | 'playing';
   seed: number;
-  tokens: [string, string];
-  /** Connected players by team (the host alone while open; empty while both pages reload). */
-  players: [Client | null, Client | null];
+  /** By team: 2 for a 1v1, 4 for a 2v2 (teams alternate sides: 0 and 2 against 1 and 3). */
+  slots: Slot[];
   timer: NodeJS.Timeout | null;
 }
 
@@ -50,13 +65,31 @@ function send(c: Client | null, msg: ServerMsg): void {
   if (c && c.ws.readyState === c.ws.OPEN) c.ws.send(JSON.stringify(msg));
 }
 
+const emptySlot = (): Slot => ({ client: null, human: false, name: '', faction: 'atreides', token: '', lastTick: -1, gone: false });
+const sideOf = (team: number): Side => (team % 2) as Side;
+
+/** The free place a joiner takes: in a 2v2, on the host's side (team 2) or against it (1, then 3). */
+function freeSlot(room: Room, side: 'with' | 'against'): number {
+  const order = room.mode === '1v1' ? [1] : side === 'with' ? [2] : [1, 3];
+  return order.find((t) => !room.slots[t].human) ?? -1;
+}
+
 function roomList(): RoomInfo[] {
-  return [...rooms.values()].filter((r) => r.state === 'open').map((r) => ({ code: r.code, host: r.names[0], size: r.size, faction: r.factions[0] }));
+  return [...rooms.values()].filter((r) => r.state === 'open').map((r) => ({
+    code: r.code, host: r.slots[0].name, size: r.size, faction: r.slots[0].faction, mode: r.mode,
+    open: { with: freeSlot(r, 'with') >= 0, against: freeSlot(r, 'against') >= 0 },
+  }));
 }
 
 function broadcastRooms(): void {
   const msg: ServerMsg = { t: 'rooms', rooms: roomList() };
   for (const c of clients) if (c.lobby) send(c, msg);
+}
+
+/** Tells everyone in an open room who's in it so far. */
+function sendRoom(room: Room): void {
+  const slots: (SlotInfo | null)[] = room.slots.map((s, t) => (s.human ? { name: s.name, faction: s.faction, human: true, side: sideOf(t) } : null));
+  room.slots.forEach((s, t) => send(s.client, { t: 'room', code: room.code, mode: room.mode, slots, you: t as Team, host: t === 0 }));
 }
 
 /** Four letters, without ones that are easy to mix up. */
@@ -77,22 +110,85 @@ function cleanFaction(v: unknown): Faction {
   return FACTION_LIST.includes(v as Faction) ? (v as Faction) : 'atreides';
 }
 
+function cleanDifficulty(v: unknown): Difficulty {
+  return v === 'hard' || v === 'brutal' ? v : 'normal';
+}
+
+const DIFFICULTY_NAMES: Record<Difficulty, string> = { normal: 'Normal', hard: 'Hard', brutal: 'Brutal' };
+
 function closeRoom(room: Room): void {
   if (room.timer) clearTimeout(room.timer);
   rooms.delete(room.code);
-  for (const p of room.players) if (p) {
-    p.room = null;
-    p.team = null;
+  for (const s of room.slots) if (s.client) {
+    s.client.room = null;
+    s.client.team = null;
   }
   broadcastRooms();
 }
 
-/** A player is gone for good: the other one is told, and the room closes. */
+/**
+ * Seats computer players in the empty places and hands every person the match. Their pages reload into it and
+ * come back with their token (see 'resume').
+ */
+function startMatch(room: Room): void {
+  room.state = 'matched';
+  room.seed = randomInt(1_000_000);
+  for (const s of room.slots) {
+    if (s.human) s.token = randomBytes(12).toString('hex');
+    else {
+      s.name = `${DIFFICULTY_NAMES[room.difficulty]} AI`;
+      s.faction = FACTION_LIST[randomInt(FACTION_LIST.length)];
+    }
+  }
+  const names = room.slots.map((s) => s.name);
+  const factions = room.slots.map((s) => s.faction);
+  const sides = room.slots.map((_, t) => sideOf(t));
+  const ai = room.slots.map((s) => (s.human ? null : room.difficulty));
+  room.slots.forEach((s, t) => {
+    if (!s.human) return;
+    const p = s.client;
+    s.client = null;
+    if (p) {
+      p.room = null;
+      p.team = null;
+    }
+    const match: MatchInfo = { code: room.code, token: s.token, team: t as Team, seed: room.seed, size: room.size, names, factions, sides, ai, takeover: room.difficulty };
+    send(p, { t: 'match', match });
+  });
+  room.timer = setTimeout(() => {
+    for (const s of room.slots) send(s.client, { t: 'error', text: 'Not everyone arrived.' });
+    closeRoom(room);
+  }, RESUME_TIMEOUT);
+  broadcastRooms();
+  log(`${room.code}: ${room.slots.map((s) => s.name).join(' vs ')} (${room.mode}), ${room.size} map, seed ${room.seed}`);
+}
+
+/**
+ * A player is gone for good. In an open room, the host leaving closes it and anyone else frees their place. In a
+ * match, the others are told from which tick on they're gone; the room closes once no person is left.
+ */
 function leave(c: Client): void {
   const room = c.room;
-  if (!room) return;
-  if (room.state !== 'open' && c.team !== null) send(room.players[(1 - c.team) as Team], { t: 'left', team: c.team });
-  closeRoom(room);
+  const team = c.team;
+  c.room = null;
+  c.team = null;
+  if (!room || team === null) return;
+  const slot = room.slots[team];
+  if (room.state === 'open') {
+    if (team === 0) {
+      for (const s of room.slots) if (s.client && s.client !== c) send(s.client, { t: 'error', text: 'The host closed the game.' });
+      closeRoom(room);
+      return;
+    }
+    room.slots[team] = emptySlot();
+    sendRoom(room);
+    broadcastRooms();
+    return;
+  }
+  slot.gone = true;
+  slot.client = null;
+  for (const s of room.slots) send(s.client, { t: 'left', team, tick: slot.lastTick });
+  if (room.slots.every((s) => !s.human || s.gone)) closeRoom(room);
 }
 
 function onMessage(c: Client, msg: ClientMsg): void {
@@ -104,61 +200,63 @@ function onMessage(c: Client, msg: ClientMsg): void {
     case 'host': {
       if (msg.version !== PROTOCOL_VERSION) return send(c, { t: 'error', text: 'This page is out of date. Reload it to get the server\'s version of the game.' });
       if (c.room) leave(c);
+      const size = MAP_SIZES.includes(msg.size) ? msg.size : 64;
+      // A 2v2 needs four spawn spots: not on Small.
+      const mode: RoomMode = msg.mode === '2v2' && size >= 96 ? '2v2' : '1v1';
       const room: Room = {
-        code: newCode(), size: MAP_SIZES.includes(msg.size) ? msg.size : 64, names: [cleanName(msg.name), ''],
-        factions: [cleanFaction(msg.faction), 'atreides'], state: 'open',
-        seed: 0, tokens: ['', ''], players: [c, null], timer: null,
+        code: newCode(), size, mode, difficulty: cleanDifficulty(msg.difficulty), state: 'open', seed: 0,
+        slots: Array.from({ length: mode === '2v2' ? 4 : 2 }, emptySlot), timer: null,
       };
+      room.slots[0] = { ...emptySlot(), client: c, human: true, name: cleanName(msg.name), faction: cleanFaction(msg.faction) };
       rooms.set(room.code, room);
       c.room = room;
       c.team = 0;
       send(c, { t: 'hosted', code: room.code });
+      sendRoom(room);
       broadcastRooms();
       return;
     }
     case 'cancel':
-      if (c.room?.state === 'open') closeRoom(c.room);
+      if (c.room?.state === 'open') leave(c);
       return;
     case 'join': {
       if (msg.version !== PROTOCOL_VERSION) return send(c, { t: 'error', text: 'This page is out of date. Reload it to get the server\'s version of the game.' });
       const room = rooms.get(String(msg.code).toUpperCase());
       if (!room || room.state !== 'open') return send(c, { t: 'error', text: 'That game is no longer open.' });
-      if (room.players[0] === c) return send(c, { t: 'error', text: 'That\'s your own game. Wait for someone else to join it.' });
+      if (room.slots.some((s) => s.client === c)) return send(c, { t: 'error', text: 'You\'re already in that game.' });
+      const team = freeSlot(room, msg.side === 'with' ? 'with' : 'against');
+      if (team < 0) return send(c, { t: 'error', text: 'That side is full.' });
       if (c.room) leave(c);
-      room.names[1] = cleanName(msg.name);
-      room.factions[1] = cleanFaction(msg.faction);
-      room.state = 'matched';
-      room.seed = randomInt(1_000_000);
-      room.tokens = [randomBytes(12).toString('hex'), randomBytes(12).toString('hex')];
-      const host = room.players[0]!;
-      // Both pages reload into the match and come back with their token (see 'resume').
-      room.players = [null, null];
-      for (const [p, team] of [[host, 0], [c, 1]] as [Client, Team][]) {
-        p.room = null;
-        p.team = null;
-        const match: MatchInfo = { code: room.code, token: room.tokens[team], team, seed: room.seed, size: room.size, names: room.names, factions: room.factions };
-        send(p, { t: 'match', match });
+      room.slots[team] = { ...emptySlot(), client: c, human: true, name: cleanName(msg.name), faction: cleanFaction(msg.faction) };
+      c.room = room;
+      c.team = team as Team;
+      // A 1v1 starts as soon as someone joins; a 2v2 when the host says so, or once every place has a person.
+      if (room.mode === '1v1' || room.slots.every((s) => s.human)) startMatch(room);
+      else {
+        sendRoom(room);
+        broadcastRooms();
       }
-      room.timer = setTimeout(() => {
-        for (const p of room.players) send(p, { t: 'error', text: 'The other player never arrived.' });
-        closeRoom(room);
-      }, RESUME_TIMEOUT);
-      broadcastRooms();
-      log(`${room.code}: ${room.names[0]} vs ${room.names[1]}, ${room.size} map, seed ${room.seed}`);
+      return;
+    }
+    case 'start': {
+      const room = c.room;
+      if (!room || room.state !== 'open' || c.team !== 0) return;
+      if (room.slots.filter((s) => s.human).length < 2) return send(c, { t: 'error', text: 'Wait for at least one other player to join.' });
+      startMatch(room);
       return;
     }
     case 'resume': {
       const room = rooms.get(msg.code);
-      const team = room ? room.tokens.indexOf(msg.token) : -1;
+      const team = room ? room.slots.findIndex((s) => s.human && s.token === msg.token) : -1;
       if (!room || team < 0 || room.state !== 'matched') return send(c, { t: 'error', text: 'That match is over.' });
-      room.players[team] = c;
+      room.slots[team].client = c;
       c.room = room;
       c.team = team as Team;
-      if (room.players[0] && room.players[1]) {
+      if (room.slots.every((s) => !s.human || s.client)) {
         if (room.timer) clearTimeout(room.timer);
         room.timer = null;
         room.state = 'playing';
-        for (const p of room.players) send(p, { t: 'go' });
+        for (const s of room.slots) send(s.client, { t: 'go' });
       }
       return;
     }
@@ -166,9 +264,12 @@ function onMessage(c: Client, msg: ClientMsg): void {
     case 'hash': {
       const room = c.room;
       if (!room || room.state !== 'playing' || c.team === null) return;
-      const other = room.players[(1 - c.team) as Team];
-      if (msg.t === 'cmds') send(other, { t: 'cmds', team: c.team, tick: msg.tick, cmds: msg.cmds });
-      else send(other, { t: 'hash', team: c.team, tick: msg.tick, hash: msg.hash });
+      const team = c.team;
+      if (msg.t === 'cmds') room.slots[team].lastTick = Math.max(room.slots[team].lastTick, msg.tick);
+      const out: ServerMsg = msg.t === 'cmds' ? { t: 'cmds', team, tick: msg.tick, cmds: msg.cmds } : { t: 'hash', team, tick: msg.tick, hash: msg.hash };
+      room.slots.forEach((s, t) => {
+        if (t !== team) send(s.client, out);
+      });
       return;
     }
     case 'leave':
@@ -217,7 +318,7 @@ wss.on('connection', (ws) => {
     clients.delete(c);
     // A matched player's page closes its socket to reload into the match: that's not leaving.
     if (c.room && c.room.state !== 'matched') leave(c);
-    else if (c.room && c.team !== null) c.room.players[c.team] = null;
+    else if (c.room && c.team !== null) c.room.slots[c.team].client = null;
   });
 });
 

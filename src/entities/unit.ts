@@ -1020,7 +1020,7 @@ export class Unit extends Entity {
       return;
     }
     const rep = this.def.repair!;
-    const calm = !game.units.some((e) => e.team !== this.team && !e.dead && !e.carrier && e.def.weapon && game.sees(this.team, e) && hypot(e.x - this.x, e.z - this.z) < this.def.sight + 4 * TILE);
+    const calm = !game.units.some((e) => game.hostile(e.team, this.team) && !e.dead && !e.carrier && e.def.weapon && game.sees(this.team, e) && hypot(e.x - this.x, e.z - this.z) < this.def.sight + 4 * TILE);
     if (calm) {
       if (!this.escortJob && this.scanTimer <= 0) {
         this.scanTimer = 0.8 + game.random() * 0.4;

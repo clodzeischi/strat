@@ -44,9 +44,11 @@ export class ReplayViewer {
   constructor(private game: Game, private match: Match, private replay: Replay, private isPaused: () => boolean, private setPausedFlag: (p: boolean) => void) {
     const f = replay.factions.map((x) => FACTIONS[x].name);
     const who = replay.names.map((n, t) => (n ? `${f[t]}: ${n}` : '')).filter(Boolean).join(' · ');
+    const sides = replay.sides ?? replay.factions.map((_, i) => i % 2);
+    const sideNames = (s: number) => f.filter((_, t) => sides[t] === s).join(' & ');
     this.el.id = 'replay-bar';
     this.el.innerHTML = `
-      <div class="rp-head"><span class="rp-tag">REPLAY</span> ${f[0]} <span class="rp-vs">vs</span> ${f[1]}</div>
+      <div class="rp-head"><span class="rp-tag">REPLAY</span> ${sideNames(0)} <span class="rp-vs">vs</span> ${sideNames(1)}</div>
       <div class="rp-who">${esc(who)}</div>
       <div class="rp-row">
         <button class="rp-btn rp-play" title="Pause / play (P)">❚❚</button>
@@ -55,9 +57,8 @@ export class ReplayViewer {
       </div>
       <div class="rp-row rp-speeds">${SPEEDS.map((s) => `<button class="rp-btn" data-speed="${s}">${s === 0.5 ? '½' : s}×</button>`).join('')}</div>
       <div class="rp-row rp-views">
-        <button class="rp-btn" data-view="all">Both</button>
-        <button class="rp-btn" data-view="0">${f[0]}</button>
-        <button class="rp-btn" data-view="1">${f[1]}</button>
+        <button class="rp-btn" data-view="all">${f.length > 2 ? 'All' : 'Both'}</button>
+        ${f.map((name, t) => `<button class="rp-btn" data-view="${t}">${name}</button>`).join('\n        ')}
       </div>
       <table class="rp-stats"></table>
       <div class="rp-note"></div>`;
@@ -148,8 +149,9 @@ export class ReplayViewer {
     let note = '';
     if (this.target !== null) note = `Fast-forwarding to ${clock(this.target)}…`;
     else if (g.winner !== null) {
-      const win = FACTIONS[g.teams[g.winner].faction].name;
-      note = g.surrendered !== null ? `${FACTIONS[g.teams[g.surrendered].faction].name} surrendered. ${win} win.` : `${win} win.`;
+      const side = (s: number) => g.teams.filter((t) => t.side === s).map((t) => FACTIONS[t.faction].name).join(' & ');
+      const win = side(g.winner);
+      note = g.surrendered !== null ? `${side(g.sideOf(g.surrendered))} surrendered. ${win} win.` : `${win} win.`;
     } else if (this.done) note = 'End of the recording.';
     this.noteEl.textContent = [note, this.drift].filter(Boolean).join(' ');
 
@@ -171,7 +173,8 @@ export class ReplayViewer {
       ['Upgrades', (t) => g.teams[t].upgrades.size],
     ];
     const head = this.replay.factions.map((f, t) => `<th class="t${t}">${FACTIONS[f].name}</th>`).join('');
-    this.statsEl.innerHTML = `<tr><th></th>${head}</tr>` + rows.map(([l, f]) => `<tr><td>${l}</td><td>${f(0)}</td><td>${f(1)}</td></tr>`).join('');
+    const cols = g.teams.map((t) => t.team);
+    this.statsEl.innerHTML = `<tr><th></th>${head}</tr>` + rows.map(([l, f]) => `<tr><td>${l}</td>${cols.map((t) => `<td>${f(t)}</td>`).join('')}</tr>`).join('');
   }
 }
 

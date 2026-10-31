@@ -668,7 +668,7 @@ export class Input {
       this.lockMode = false;
       const t = this.pick(p.x, p.y);
       const mlrs = this.lockReady();
-      if (t && t.team !== this.team && mlrs.length) {
+      if (t && this.game.hostile(t.team, this.team) && mlrs.length) {
         this.issue({ c: 'lock', units: mlrs.map((u) => u.id), target: t.id });
         this.onAck('attack');
       } else this.game.onMessage('Lock On needs an enemy you can see.', 'lockon_needs_visible_target');
@@ -746,8 +746,8 @@ export class Input {
       return;
     }
     this.issue({ c: 'go', units: units.map((u) => u.id), x: point.x, z: point.z, target: target?.id ?? null, attack: attackMove, queue: this.queueing });
-    this.onAck(attackMove || (target && target.team !== team) ? 'attack' : 'move');
-    if (target && target.team !== team) g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xff5040);
+    this.onAck(attackMove || (target && g.hostile(target.team, team)) ? 'attack' : 'move');
+    if (target && g.hostile(target.team, team)) g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xff5040);
     else if (target && target.hp < target.maxHp && repairable(target) && units.some((u) => u.def.repair)) {
       g.effects.marker(new THREE.Vector3(target.x, target.y, target.z), 0xffd27a);
     } else if (target && (target instanceof Carryall || target instanceof Building || target instanceof Unit || units.some((u) => u instanceof Carryall))) {
@@ -927,7 +927,7 @@ export class Input {
     else if (this.attackMode || this.dropMode || this.rallyMode || this.rallyAllMode || this.lockMode || this.thumpMode) cursor = 'crosshair';
     else if (this.mouse.inside && this.ownUnits().length) {
       const t = this.pick(this.mouse.x, this.mouse.y);
-      if (t && t.team !== this.team) cursor = 'crosshair';
+      if (t && this.game.hostile(t.team, this.team)) cursor = 'crosshair';
       else cursor = 'pointer';
     }
     this.canvas.style.cursor = cursor;

@@ -195,7 +195,7 @@ export function applyCommand(game: Game, team: Team, cmd: Command): void {
     case 'surrender':
       return game.acceptSurrender(team);
     case 'acceptSurrender':
-      if (game.surrenderOffers.has((1 - team) as Team)) game.acceptSurrender((1 - team) as Team);
+      for (const t of game.surrenderOffers) if (game.hostile(t, team)) return game.acceptSurrender(t);
       return;
   }
 }
@@ -214,7 +214,7 @@ function busy(u: Unit): boolean {
  */
 function queueGo(game: Game, units: Unit[], x: number, z: number, target: Entity | null, attack: boolean, team: Team): void {
   if (!units.length) return;
-  if (target && (target.dead || target.team === team || !game.sees(team, target))) target = null;
+  if (target && (target.dead || game.allied(target.team, team) || !game.sees(team, target))) target = null;
   const rest: Unit[] = [];
   for (const u of units) {
     if (target && game.weaponFor(u, target)) u.queue.push({ kind: 'attack', target });
@@ -274,7 +274,7 @@ function go(game: Game, selected: Unit[], x: number, z: number, target: Entity |
   }
   // Attacking with a group: Repair Vehicles follow behind its longest-range unit rather than charge in.
   const armed = units.filter((u) => u.def.weapon);
-  if ((attack || (target && target.team !== team)) && armed.length) {
+  if ((attack || (target && game.hostile(target.team, team))) && armed.length) {
     const mechs = units.filter((u) => u.def.repair && !u.def.weapon);
     const goal = target ?? { x, z };
     for (const u of mechs) u.command(game, { kind: 'escort', group: [...armed], x: goal.x, z: goal.z });
@@ -286,7 +286,7 @@ function go(game: Game, selected: Unit[], x: number, z: number, target: Entity |
     for (const u of units) if (u !== target) u.command(game, { kind: 'follow', target });
     return;
   }
-  if (target && target.team !== team) {
+  if (target && game.hostile(target.team, team)) {
     const rest: Unit[] = [];
     for (const u of units) {
       if (game.weaponFor(u, target)) u.command(game, { kind: 'attack', target });

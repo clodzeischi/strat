@@ -123,10 +123,10 @@ function scripted(g: Game, ls: Lockstep, team: Team): () => void {
 const sides = matches.map((m, i) => {
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), m.size, m.seed);
   g.localTeam = m.team;
-  const ls = new Lockstep(g, m.team, conns[i]);
+  const ls = new Lockstep(g, m.team, conns[i], [(1 - m.team) as Team]);
   conns[i].onGame = (msg) => {
     if (msg.t === 'cmds') ls.receive(msg.team, msg.tick, msg.cmds);
-    else if (msg.t === 'hash') ls.receiveHash(msg.tick, msg.hash);
+    else if (msg.t === 'hash') ls.receiveHash(msg.team, msg.tick, msg.hash);
   };
   let desync = -1;
   ls.onDesync = (tick) => (desync = tick);

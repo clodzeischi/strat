@@ -61,6 +61,20 @@
             <button class="sbtn" data-faction="corrino">Corrino <span>Slow, shielded</span></button>
             <button class="sbtn" data-faction="fremen">Fremen <span>Swift, hidden</span></button>
           </div>
+          <div class="page-head">Mode</div>
+          <div class="size-pick">
+            <button class="sbtn" data-mode="1v1">1 vs 1 <span>You against one AI</span></button>
+            <button class="sbtn" data-mode="2v2">2 vs 2 <span>You and an AI ally, Medium or Large</span></button>
+          </div>
+          <div class="ally-pick" hidden>
+            <div class="page-head">Ally</div>
+            <div class="size-pick">
+              <button class="sbtn" data-ally="atreides">Atreides</button>
+              <button class="sbtn" data-ally="corrino">Corrino</button>
+              <button class="sbtn" data-ally="fremen">Fremen</button>
+              <button class="sbtn" data-ally="random">Random</button>
+            </div>
+          </div>
           <div class="page-head">Enemy</div>
           <div class="size-pick">
             <button class="sbtn" data-enemy="atreides">Atreides</button>
@@ -90,6 +104,19 @@
             <button class="sbtn" data-faction="corrino">Corrino <span>Slow, shielded</span></button>
             <button class="sbtn" data-faction="fremen">Fremen <span>Swift, hidden</span></button>
           </div>
+          <div class="page-head">Mode</div>
+          <div class="size-pick">
+            <button class="sbtn" data-mode="1v1">1 vs 1 <span>Two players</span></button>
+            <button class="sbtn" data-mode="2v2">2 vs 2 <span>Up to four, the computer fills in</span></button>
+          </div>
+          <div class="mp-ai-pick" hidden>
+            <div class="page-head">Computer players</div>
+            <div class="size-pick">
+              <button class="sbtn" data-mpdiff="normal">Normal</button>
+              <button class="sbtn" data-mpdiff="hard">Hard</button>
+              <button class="sbtn" data-mpdiff="brutal">Brutal</button>
+            </div>
+          </div>
           <button class="mbtn" data-action="host">Host game</button>
           <div class="page-head">Open games</div>
           <div id="mp-rooms" class="mp-rooms"><p class="note">Connecting…</p></div>
@@ -98,9 +125,11 @@
         </div>
 
         <div class="menu-page" data-page="hosting" hidden>
-          <div class="page-head">Waiting for an opponent</div>
-          <p class="note">Your game <b id="mp-code"></b> is listed under Open games for anyone on this server. It starts as soon as someone joins.</p>
-          <button class="mbtn back" data-action="cancel-host">Cancel</button>
+          <div class="page-head" id="mp-wait-head">Waiting for an opponent</div>
+          <p class="note" id="mp-wait-note">Your game <b id="mp-code"></b> is listed under Open games for anyone on this server. It starts as soon as someone joins.</p>
+          <div id="mp-slots" class="mp-slots"></div>
+          <button class="mbtn" data-action="start" hidden>Start <span>The computer takes the empty places</span></button>
+          <button class="mbtn back" data-action="cancel-host">Leave</button>
         </div>
 
         <div class="menu-page" data-page="replays" hidden>

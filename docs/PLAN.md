@@ -114,6 +114,17 @@ Side bias: fixed, see the AI section (spawn side decided mirror matches).
 - Show the seed so a map can be replayed.
 - Fairness test with the sim harness: across a few hundred seeds, each side should win about 50%.
 
+## 3b. 2v2 **Done (branch `teams`, 2026-10-30)**
+
+- **Teams and sides:** `Team` is 0-3 and every team has a `side` (0 or 1); in a 2v2 teams alternate, 0 and 2 against 1 and 3 (blue and green against red and orange). `game.allied` / `game.hostile` replace the old "other team" checks: targeting, splash, mines, worms, alerts and right-click attacks all spare allies. `game.winner` is the winning side (in a 1v1 the same number as the team, so 1v1 games, sims and replays are unchanged: a full AI game hashes the same as on main).
+- **Shared vision:** each team's sight is pooled with its allies' after every vision update (hidden Fremen too).
+- **Victory:** a side loses once every team on it has nothing left. In a 2v2 a side's AIs offer to surrender together, once each one still in the game has given up (a person ally never has); a person's surrender concedes for their side.
+- **AI:** `Intel` ignores allies, rules out allied spawn spots, and goes after the enemy base nearest its own. The two AIs of a side don't coordinate yet (each defends itself and attacks the nearest enemy).
+- **Skirmish:** Mode (1 vs 1 / 2 vs 2, Medium or Large) and Ally on the Play page; you and a computer ally against two computer players.
+- **Online:** a 2v2 room has four places: joiners pick the host's side or the other; the host starts it (or it starts once full), and computer players at the host's chosen difficulty fill the rest. Lockstep waits for every remote person. Someone who leaves is dropped from the tick after the last commands the server relayed for them: if their side still has a person, the computer takes their base over from that tick on every machine (recorded in the replay as a takeover); otherwise the game ends and the other side wins. Protocol 5.
+- **Checks:** `sim/teams-check.ts` (four AIs: no allied damage, shared sight, a side wins), `sim/netplay-2v2-check.ts` (three people and a computer player through the real server, one leaving halfway: no desync, same takeover tick, the replay rebuilds the game).
+- Still to do: the two AIs of a side helping each other (defending the ally, attacking together); free-for-all and more than four players.
+
 ## 4. Expansion mechanic (proposal)
 
 Problem: in a Dune-style game nothing forces players to leave their base, so a defended plateau could turtle forever.
@@ -375,7 +386,7 @@ Later, separately: hand-to-hand fighting for the other Fremen and for the Sardau
 - **Defense sized to the attack.** Enemy combat units near our buildings (14 tiles) or harvesters (10 tiles) are grouped into attacks, each scored by strength (cost × health left). Each attack gets about 1.5× its strength in defenders, nearest first: a lone trike draws a few units, a real attack draws everyone at home. Waves out in the field are only called back when the base itself is hit. When an attack has been gone for 4 seconds, its defenders return to a rally point in front of the base.
 - **Income first.** Below 2 harvesters, or with no refinery, getting income back comes before army and tech. Without a factory, it builds a refinery (which comes with a harvester) instead of a factory plus a harvester. Lost opening buildings are rebuilt before more units. Once the base is up, it keeps one harvester's price (800) in reserve so it can always replace one.
 - **Waves.** Unchanged in size and timing, plus: a wave that loses 70% of its strength falls back instead of trickling in, survivors push on to the next target, and if a full wave hasn't formed 90 s after one was due, a half-size wave goes so the pressure keeps up.
-- **Surrender.** When it has no income and no way to buy it back (or nothing left to build units with), and its army is under half the enemy's, for 15 seconds, it offers to surrender, once. The game pauses for the answer. Declining plays on to the end.
+- **Surrender.** It offers when, for 20 seconds, its base is gone (no hub, nothing to train units in), its income is gone (nothing to earn with, or under 150 a minute over 2 minutes, with no way to buy more) or it is overwhelmed (worth under a quarter of what it knows the enemy has, for a minute). The game pauses for the answer. Turned down, it asks again once things are much worse (hub lost or half its worth gone), at most every 2 minutes. `sim/surrender-audit.ts` plays games out ignoring offers to see whether they came too soon.
 - Against the old Normal it won 17 of 32 games (random maps), so it's about as strong; wave size and timing, the knobs that set its pressure, are unchanged. 14 of its 15 losses ended in a surrender rather than being wiped out. In 16 games against itself every game was decided (no stalemates), 15 by surrender.
 
 **Hard, first version (done).** `HARD_PROFILE` in `src/game/ai.ts`, picked from the menu. Tuned on random maps (`MAPS=random sim/run.sh`, 40-80 games per row, against Normal):
