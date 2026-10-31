@@ -1204,17 +1204,20 @@ export class Game {
     for (const e of this.units) burn(e);
     for (const e of this.buildings) burn(e);
     this.damage(target, w, mult, u);
-    // Drawn as a gout of fire toward the target, or for a weirding module (which pierces) a pale ripple of sound kicking
+    // Drawn as a jet of fire toward the target, or for a weirding module (which pierces) a pale ripple of sound kicking
     // up sand (visual only, so Math.random is fine).
     const to = target.aimPoint();
+    if (!w.pierce) {
+      this.effects.flameJet(from, to, w.cone!);
+      this.effects.flash(from, 0.4);
+      return;
+    }
     for (let k = 1; k <= 4; k++) {
       const p = from.clone().lerp(to, k / 4);
       p.x += (Math.random() - 0.5) * 0.5 * k;
       p.z += (Math.random() - 0.5) * 0.5 * k;
-      if (w.pierce) this.effects.trail(p, k < 3 ? 0xe8f0ff : 0xd8c49a, 0.5 + k * 0.25);
-      else this.effects.puff(p, k < 3 ? 0xffd060 : 0xff6a20);
+      this.effects.trail(p, k < 3 ? 0xe8f0ff : 0xd8c49a, 0.5 + k * 0.25);
     }
-    if (!w.pierce) this.effects.flash(from, 0.3);
   }
 
   private updateProjectiles(dt: number): void {

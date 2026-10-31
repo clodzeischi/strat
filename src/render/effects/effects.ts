@@ -73,6 +73,44 @@ export class Effects {
     this.glow.spawn({ x: p.x, y: p.y, z: p.z, vx, vz, drag: 3, life: rand(0.1, 0.16), size: [0.12, 0.04], color: [0xff5cc8, 0x701040], alpha: [0.9, 0] });
   }
 
+  /**
+   * A flamethrower burst from a to b: a stream of fire fanning out over the cone (radians either side), a flare and
+   * flames licking up where it lands, then dark smoke. Lasts about as long as the Razor's cooldown, so it reads as a jet.
+   */
+  flameJet(a: THREE.Vector3, b: THREE.Vector3, cone: number): void {
+    if (!this.visibleAt(a.x, a.z) && !this.visibleAt(b.x, b.z)) return;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const dz = b.z - a.z;
+    const len = Math.max(0.5, Math.hypot(dx, dz));
+    const yaw = Math.atan2(dz, dx);
+    for (let k = 0; k < 26; k++) {
+      const th = yaw + rand(-cone, cone) * 0.7;
+      const speed = (len / 0.45) * rand(0.75, 1.15);
+      const s = rand(0, 0.25);
+      this.glow.spawn({
+        x: a.x + Math.cos(th) * s, y: a.y, z: a.z + Math.sin(th) * s,
+        vx: Math.cos(th) * speed, vy: (dy / len) * speed + rand(-0.3, 0.6), vz: Math.sin(th) * speed, gravity: -2,
+        life: (len / speed) * rand(0.9, 1.15), size: [rand(0.07, 0.12), rand(0.4, 0.6) + len * 0.04],
+        color: [0xfff2b0, 0xff4a10], alpha: [1, 0.35],
+      });
+    }
+    this.glow.spawn({ x: b.x, y: b.y, z: b.z, life: 0.3, size: [0.5, 0.9], color: [0xffb050, 0x801800], alpha: [0.9, 0] });
+    for (let k = 0; k < 6; k++) {
+      this.glow.spawn({
+        x: b.x + rand(-0.4, 0.4), y: b.y - 0.2, z: b.z + rand(-0.4, 0.4), vx: rand(-0.4, 0.4), vy: rand(1.5, 3), vz: rand(-0.4, 0.4), drag: 1,
+        life: rand(0.35, 0.65), size: [rand(0.25, 0.4), 0.08], color: [0xffa040, 0x701400], alpha: [0.95, 0],
+      });
+    }
+    for (let k = 0; k < 2; k++) {
+      this.smoke.spawn({
+        x: b.x + rand(-0.3, 0.3), y: b.y + 0.3, z: b.z + rand(-0.3, 0.3), vx: rand(-0.3, 0.3), vy: rand(1, 1.6), vz: rand(-0.3, 0.3), drag: 0.8,
+        life: rand(1, 1.6), size: [0.3, rand(0.9, 1.2)], color: [0x2a2420, 0x5a524a], alpha: [0.55, 0],
+      });
+    }
+    this.lights.flare(b, 0.55);
+  }
+
   tracer(a: THREE.Vector3, b: THREE.Vector3): void {
     if (!this.visibleAt(a.x, a.z) && !this.visibleAt(b.x, b.z)) return;
     this.tracers.spawn(a, b);
