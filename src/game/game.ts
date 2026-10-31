@@ -37,7 +37,7 @@ export interface TeamStats {
   creditsSpent: number;
 }
 
-export type Difficulty = 'normal' | 'hard' | 'brutal';
+export type Difficulty = 'easy' | 'medium' | 'hard';
 
 /**
  * What an alert with a place on the map is about, for its minimap ping: an attack (red), the army in a fight
@@ -231,7 +231,7 @@ export class Game {
   readonly surrenderOffers = new Set<Team>();
   /** Computer players that have held a lost position long enough to give up (a side offers once all of it has). */
   readonly beaten = new Set<Team>();
-  difficulty: Difficulty = 'normal';
+  difficulty: Difficulty = 'easy';
   /** Called with notifications for the local player. */
   onMessage: (text: string, voice?: Announcement | null) => void = () => {};
   /** Called with notifications for the local player that have a place on the map (the HUD pings the minimap). */

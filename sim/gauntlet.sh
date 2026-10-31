@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # The AI against every scripted player strategy in sim/bots.ts, in parallel, with a summary table.
-# Usage: sim/gauntlet.sh <games-per-bot> [difficulty...]      (default: normal hard)
+# Usage: sim/gauntlet.sh <games-per-bot> [difficulty...]      (default: easy medium)
 cd "$(dirname "$0")/.."
 GAMES=${1:-20}; shift
-DIFFS=${@:-normal hard}
+DIFFS=${@:-easy medium}
 BOTS=$(npx tsx -e "import {BOTS} from './sim/bots'; console.log(Object.keys(BOTS).join(' '))")
 OUT=$(mktemp)
 CHUNK=10

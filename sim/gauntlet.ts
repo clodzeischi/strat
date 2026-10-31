@@ -2,7 +2,7 @@
 // Usage: npx tsx sim/gauntlet.ts <difficulty> <bot> <games> [offset]     prints one JSON line per game
 // All bots, in parallel: sim/gauntlet.sh <games-per-bot> [difficulty...]
 import * as THREE from 'three';
-import { createAI } from '../src/game/brutal';
+import { createAI } from '../src/game/hard-ai';
 import type { MapSize, Team } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 import { BOTS } from './bots';

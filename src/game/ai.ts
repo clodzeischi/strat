@@ -136,7 +136,7 @@ const BASE_MIX: Record<Matchup, number> = {
   mortar: 0, sandrider: 0,
 };
 
-export const NORMAL_PROFILE: AIProfile = {
+export const EASY_PROFILE: AIProfile = {
   opening: ['refinery', 'barracks', 'factory'], harvesters: 'perRefinery', extraRefinery: 'always', techArmy: 8, saveForOpening: false,
   minHarvesters: 2, fund: UNITS.harvester.cost, defenseMargin: 1.5, surrender: true,
   raids: { trikes: 3, start: 200, interval: 90, hunt: false }, initiative: 0, waveRetreat: 0.3, waveGate: 0.6, counterFocus: 3, goodLinesOnly: false, bunkers: 1,
@@ -144,19 +144,19 @@ export const NORMAL_PROFILE: AIProfile = {
 };
 
 /**
- * Hard: twice Normal's harvesters with both refineries early, attacks whenever its army at home is clearly stronger
+ * Medium: twice Easy's harvesters with both refineries early, attacks whenever its army at home is clearly stronger
  * than the enemy's (going for the economy), harasses harvesters with hit-and-run trike raids, and keeps its army
  * alive: Repair Vehicles at home, badly hurt units pulled out to be mended, and waves that pull back when outmatched. Tuned with `MAPS=random sim/run.sh`; see docs/PLAN.md.
  */
-export const HARD_PROFILE: AIProfile = {
-  ...NORMAL_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
+export const MEDIUM_PROFILE: AIProfile = {
+  ...EASY_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
   initiative: 1.2, waveRetreat: 0.5, waveGate: 0.9, counterFocus: 8, goodLinesOnly: true, bunkers: 2, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
   sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 }, scout: { first: 40, interval: 75 }, watch: true,
 };
 
-/** The AI profile for a difficulty. Brutal isn't built yet and plays as Hard. */
+/** The AI profile for Easy or Medium. Hard is its own class on top of Medium's profile (HardAI in hard-ai.ts). */
 export function profileFor(difficulty: Difficulty): AIProfile {
-  return difficulty === 'normal' ? NORMAL_PROFILE : HARD_PROFILE;
+  return difficulty === 'easy' ? EASY_PROFILE : MEDIUM_PROFILE;
 }
 
 /** Rough fighting strength: what the unit cost, scaled by the health (and shields) it has left. Unarmed units count for nothing. */
@@ -185,7 +185,7 @@ const LEASH = 22 * TILE;
 const DEFENSE_TIMEOUT = 4;
 
 /** 'garrison': on its way into one of our bunkers, or in it. */
-/** 'mend': pulled out of a fight to heal or be repaired; 'drop': on a Carryall operation (Brutal). */
+/** 'mend': pulled out of a fight to heal or be repaired; 'drop': on a Carryall operation (Hard). */
 /** 'thump': gone to plant a Thumper by the enemy's economy (and getting clear of the worm). */
 export type Role = 'home' | 'defend' | 'wave' | 'raid' | 'garrison' | 'scout' | 'mend' | 'drop' | 'thump' | 'rite';
 
@@ -285,7 +285,7 @@ export class AI {
   /** The structure that builds the others (Construction Yard, Sietch). */
   protected readonly hub: BuildingType;
 
-  constructor(protected game: Game, protected team: Team, protected profile: AIProfile = NORMAL_PROFILE) {
+  constructor(protected game: Game, protected team: Team, protected profile: AIProfile = EASY_PROFILE) {
     this.nextRaidTime = profile.raids.start;
     this.nextScoutTime = profile.scout.first;
     this.intel = new Intel(game, team);
@@ -773,8 +773,8 @@ export class AI {
    * Unit types worth building against the enemy's current army, with how much. Each type is scored by how it fares
    * against the enemy's unit types in measured equal-cost duels (matchups.ts, from sim/matchups.ts), weighted by
    * their share of the enemy army's value. Bad matchups count double: a unit the enemy has a hard counter for dies
-   * before it does its job, whatever else it would beat. Weights are exp(counterFocus x score), so Hard sticks
-   * closer to the best counter than Normal, on top of a combined-arms base mix (tanks and rocket launchers at the
+   * before it does its job, whatever else it would beat. Weights are exp(counterFocus x score), so Medium sticks
+   * closer to the best counter than Easy, on top of a combined-arms base mix (tanks and rocket launchers at the
    * core), and a type that's already much of our army gets picked less. With no enemy army yet, the base mix.
    */
   private counterWeights(): [UnitType, number][] {
@@ -1606,7 +1606,7 @@ export class AI {
     this.nextWaveTime = g.time + 60;
   }
 
-  /** A wave unit held back on purpose (Brutal: waiting for the rest of its wave to catch up). */
+  /** A wave unit held back on purpose (Hard: waiting for the rest of its wave to catch up). */
   protected waiting(_u: Unit): boolean {
     return false;
   }
@@ -1711,7 +1711,7 @@ export class AI {
   }
 
   /**
-   * Hard: once the scout has had its look, it parks outside the enemy base on the way toward the middle of the map
+   * Medium: once the scout has had its look, it parks outside the enemy base on the way toward the middle of the map
    * (out of reach of the base's own sight), where an army heading out has to pass. Returns false if not watching.
    */
   private toWatchPost(): boolean {

@@ -1,4 +1,4 @@
-// Micro on vs off: equal-cost armies meet in the open (like sim/duel.ts), one side driven by the Brutal AI's Micro,
+// Micro on vs off: equal-cost armies meet in the open (like sim/duel.ts), one side driven by the Hard AI's Micro,
 // the other plain attack-move; then the sides swap. Prints the value each side has left.
 // Usage: npx tsx sim/micro-check.ts [seed...]
 import * as THREE from 'three';

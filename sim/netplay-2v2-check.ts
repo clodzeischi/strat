@@ -61,7 +61,7 @@ class Conn {
 
 const [ada, bo, cy] = [new Conn(), new Conn(), new Conn()];
 await Promise.all([ada, bo, cy].map((c) => c.open()));
-ada.send({ t: 'host', name: 'Ada', size: 96, faction: 'atreides', mode: '2v2', difficulty: 'normal', version: PROTOCOL_VERSION });
+ada.send({ t: 'host', name: 'Ada', size: 96, faction: 'atreides', mode: '2v2', difficulty: 'easy', version: PROTOCOL_VERSION });
 const { code } = await ada.next('hosted');
 bo.send({ t: 'list' });
 const listed = (await bo.next('rooms')).rooms.find((r) => r.code === code);
@@ -81,7 +81,7 @@ const matches: MatchInfo[] = await Promise.all([ada, bo, cy].map(async (c) => (a
 const m0 = matches[0];
 check(matches.every((m) => m.seed === m0.seed && m.ai?.join() === m0.ai?.join()) && matches.map((m) => m.team).join() === '0,2,1',
   'everyone gets the same match, in their own place', `teams ${matches.map((m) => m.team).join(', ')}; ai ${m0.ai?.map((d) => d ?? '-').join(', ')}`);
-check(m0.ai?.[3] === 'normal' && m0.sides?.join() === '0,1,0,1', 'the computer takes the empty place, teams alternate sides');
+check(m0.ai?.[3] === 'easy' && m0.sides?.join() === '0,1,0,1', 'the computer takes the empty place, teams alternate sides');
 
 for (const c of [ada, bo, cy]) c.ws.close();
 const conns = [new Conn(), new Conn(), new Conn()];
@@ -136,7 +136,7 @@ const sides = matches.map((m, i) => {
     else if (msg.t === 'hash') ls.receiveHash(msg.team, msg.tick, msg.hash);
     else if (msg.t === 'left') {
       takeoverAt = ls.drop(msg.team, msg.tick);
-      match.takeOver(msg.team, m.takeover ?? 'normal', takeoverAt);
+      match.takeOver(msg.team, m.takeover ?? 'easy', takeoverAt);
     }
   };
   let desync = -1;

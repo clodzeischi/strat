@@ -1,4 +1,4 @@
-// Atreides counter table: equal-cost armies of two unit types meet in the open, both sides driven by Brutal's Micro
+// Atreides counter table: equal-cost armies of two unit types meet in the open, both sides driven by Hard's Micro
 // (kiting, focus fire), on a few maps with the sides swapped. Score: (value A has left - value B has left) / value
 // at the start, from -1 to +1, averaged with the mirrored fight. Done early (no upgrades) and late (both sides with
 // everything: Weapons/Armor cancel out, Infantry Rockets and Trike Nitro don't). Usage: npx tsx sim/ava-duels.ts [budget]

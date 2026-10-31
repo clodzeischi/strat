@@ -1,22 +1,22 @@
-// Build orders for the mirror balance passes (docs/balance-atreides.md, docs/balance-corrino.md): each is Brutal
+// Build orders for the mirror balance passes (docs/balance-atreides.md, docs/balance-corrino.md): each is Hard
 // (micro, mending, Carryall operations) playing a fixed plan instead of picking counters, so a round robin between them
-// shows whether one plan beats everything. 'std' is stock Brutal, which counters what it sees. A team plays its own
+// shows whether one plan beats everything. 'std' is stock Hard, which counters what it sees. A team plays its own
 // faction's plans (FACTION_STRATS).
-import { BRUTAL_OPTIONS, BRUTAL_PROFILE, BrutalAI, type BrutalOptions } from '../src/game/brutal';
-import { AI, HARD_PROFILE, KITS, power, type AIProfile } from '../src/game/ai';
+import { HARD_OPTIONS, HARD_PROFILE, HardAI, type HardOptions } from '../src/game/hard-ai';
+import { AI, MEDIUM_PROFILE, KITS, power, type AIProfile } from '../src/game/ai';
 import { TILE, UPGRADES, type Faction, type Team, type UnitType } from '../src/config';
 import type { Unit } from '../src/entities';
 import { hypot } from '../src/game/hypot';
 import type { Game } from '../src/game/game';
 
-const mix = (m: Partial<Record<UnitType, number>>) => ({ ...BRUTAL_PROFILE.mix, infantry: 0.1, trike: 0.1, tank: 0.1, rocket: 0.1, ...m });
+const mix = (m: Partial<Record<UnitType, number>>) => ({ ...HARD_PROFILE.mix, infantry: 0.1, trike: 0.1, tank: 0.1, rocket: 0.1, ...m });
 /** A fixed plan: its own unit mix, barely bent by what the enemy fields. */
-const plan = (p: Partial<AIProfile>): AIProfile => ({ ...BRUTAL_PROFILE, counterFocus: 1, ...p });
+const plan = (p: Partial<AIProfile>): AIProfile => ({ ...HARD_PROFILE, counterFocus: 1, ...p });
 const ALL = ['harvest', 'weapons1', 'armor1', 'weapons2', 'armor2'] as const;
 
 export interface Strat {
   profile: AIProfile;
-  opts?: Partial<BrutalOptions>;
+  opts?: Partial<HardOptions>;
   /** First wave not before this game time (seconds). */
   firstWave?: number;
   /** A trike death squad that hunts harvesters (see SquadAI): from Nitro on, or from this game time without it. */
@@ -31,21 +31,21 @@ export interface PressureOpts {
   squads: number;
   size: number;
   from: number;
-  /** The backup group's strength (credits of units) at most; the rest of the army stays with Brutal's waves. */
+  /** The backup group's strength (credits of units) at most; the rest of the army stays with Hard's waves. */
   backup: number;
 }
 
 /**
- * Brutal plus a trike death squad, scripted for the sims: from the moment Nitro is in (or a set time), six trikes leave
+ * Hard plus a trike death squad, scripted for the sims: from the moment Nitro is in (or a set time), six trikes leave
  * the AI's hands and do nothing but hunt harvesters. They drive to the least guarded harvester known, shoot every
  * harvester they see, go straight on to the next, and only turn for home when the guard around them outweighs them;
  * down to three, they go home and wait to be topped up to six. Counters land in `stats` (squad*).
  */
-class SquadAI extends BrutalAI {
+class SquadAI extends HardAI {
   private squad = new Set<Unit>();
   private regroup = true;
   private squadTimer = 0;
-  constructor(game: Game, team: Team, profile: AIProfile, opts: BrutalOptions, private readonly squadOpts: NonNullable<Strat['squad']>) {
+  constructor(game: Game, team: Team, profile: AIProfile, opts: HardOptions, private readonly squadOpts: NonNullable<Strat['squad']>) {
     super(game, team, profile, opts);
     Object.assign(this.stats, { squadKills: 0, squadLost: 0, squadOut: 0, squadStart: 0 });
   }
@@ -126,17 +126,17 @@ function defensesNear(ai: { intel: AI['intel'] }, p: { x: number; z: number }, t
 }
 
 /**
- * Brutal plus maximum pressure on the enemy economy, scripted for the sims. From `from` on, `squads` small squads of
+ * Hard plus maximum pressure on the enemy economy, scripted for the sims. From `from` on, `squads` small squads of
  * fast units each hunt a different harvester (SquadAI's hit and run: kill, on to the next, home when outgunned or
  * worn down, topped up there). Behind them, a backup group (up to `backup` credits of the army) waits out of reach of
  * the enemy's turrets and bunkers, and falls on any group that comes out to chase the squads, if it can beat it.
- * The rest of the army stays Brutal's. Counters land in `stats` (press*).
+ * The rest of the army stays Hard's. Counters land in `stats` (press*).
  */
-class PressureAI extends BrutalAI {
+class PressureAI extends HardAI {
   private squads: { units: Set<Unit>; regroup: boolean; prey: Unit | null }[] = [];
   private backup = new Set<Unit>();
   private timer = 0;
-  constructor(game: Game, team: Team, profile: AIProfile, opts: BrutalOptions, private readonly p: PressureOpts) {
+  constructor(game: Game, team: Team, profile: AIProfile, opts: HardOptions, private readonly p: PressureOpts) {
     super(game, team, profile, opts);
     for (let i = 0; i < p.squads; i++) this.squads.push({ units: new Set(), regroup: true, prey: null });
     Object.assign(this.stats, { pressHarv: 0, pressLost: 0, backupKills: 0, backupLost: 0, backupFights: 0 });
@@ -175,7 +175,7 @@ class PressureAI extends BrutalAI {
     const g = this.game;
     const rally = this.rally;
     if (g.time < this.p.from || !rally) return;
-    // Base attacked by more than the units at home can handle: everyone goes back to Brutal.
+    // Base attacked by more than the units at home can handle: everyone goes back to Hard.
     if ((this as unknown as { outgunned: boolean }).outgunned) {
       for (const sq of this.squads) for (const u of sq.units) this.giveBack(u, sq.units);
       for (const u of [...this.backup]) this.giveBack(u, this.backup);
@@ -325,7 +325,7 @@ class PressureAI extends BrutalAI {
 }
 
 export const STRATS: Record<string, Strat> = {
-  std: { profile: BRUTAL_PROFILE },
+  std: { profile: HARD_PROFILE },
   // Barracks first, infantry, early pressure, no tech.
   rush: {
     profile: plan({ opening: ['barracks', 'barracks', 'refinery', 'factory'], harvesters: 3, extraRefinery: 'never', techArmy: 40, mix: mix({ infantry: 3, trike: 0.4 }), initiative: 1 }),
@@ -343,17 +343,17 @@ export const STRATS: Record<string, Strat> = {
   tech: { profile: plan({ techArmy: 8, mix: mix({ rocket: 3, tank: 1.5 }), kit: { levels: ['factory', 'conyard'], research: [...ALL] } }) },
   // Bunkers, everything researched, no attacks before 14:00, then the big army.
   turtle: {
-    profile: plan({ bunkers: 3, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: mix({ tank: 2, rocket: 2, infantry: 0.6 }), kit: { levels: ['factory', 'conyard'], research: ['harvest', 'weapons1', 'armor1', 'rockets', 'weapons2', 'armor2', 'nitro'] } }),
+    profile: plan({ bunkers: 3, techArmy: 8, initiative: 0, raids: { ...HARD_PROFILE.raids, start: Infinity }, mix: mix({ tank: 2, rocket: 2, infantry: 0.6 }), kit: { levels: ['factory', 'conyard'], research: ['harvest', 'weapons1', 'armor1', 'rockets', 'weapons2', 'armor2', 'nitro'] } }),
     opts: { carryalls: 0, flank: false }, firstWave: 840,
   },
 };
 
-const cmix = (m: Partial<Record<UnitType, number>>) => ({ ...BRUTAL_PROFILE.mix, trooper: 0.1, sardaukar: 0.1, razor: 0.1, devastator: 0.1, raider: 0.1, artillery: 0.1, ...m });
+const cmix = (m: Partial<Record<UnitType, number>>) => ({ ...HARD_PROFILE.mix, trooper: 0.1, sardaukar: 0.1, razor: 0.1, devastator: 0.1, raider: 0.1, artillery: 0.1, ...m });
 const C_ALL = ['cHarvest', 'cWeapons', 'cArmor', 'cShields', 'flame'] as const;
 
 /** Corrino build orders (docs/balance-corrino.md). */
 export const CORRINO_STRATS: Record<string, Strat> = {
-  std: { profile: BRUTAL_PROFILE },
+  std: { profile: HARD_PROFILE },
   // Two Barracks first, troopers with some razors, early pressure, no tech.
   rush: {
     profile: plan({ opening: ['barracks', 'barracks', 'refinery', 'factory'], harvesters: 3, extraRefinery: 'never', techArmy: 40, mix: cmix({ trooper: 3, razor: 1 }), initiative: 1 }),
@@ -371,7 +371,7 @@ export const CORRINO_STRATS: Record<string, Strat> = {
   air: { profile: plan({ techArmy: 8, mix: cmix({ raider: 3, trooper: 1, razor: 0.3 }), kit: { levels: [], research: ['cHarvest', 'cWeapons', 'cShields', 'cArmor', 'flame'] } }) },
   // Turrets, everything researched, no attacks before 14:00, then Devastators, Soulcrushers and Sardaukar.
   turtle: {
-    profile: plan({ bunkers: 4, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
+    profile: plan({ bunkers: 4, techArmy: 8, initiative: 0, raids: { ...HARD_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
     opts: { flank: false }, firstWave: 840,
   },
 };
@@ -379,51 +379,51 @@ export const CORRINO_STRATS: Record<string, Strat> = {
 /** Variants for single tests, not in the round robin. */
 export const CORRINO_EXTRA: Record<string, Strat> = {
   // Maximum pressure on harvesters (PressureAI): two squads of four Razors hunting from 3:00, a backup group of up
-  // to 3,000 credits behind them punishing the defenders, the rest of the army Brutal's. Army: stock Brutal's picks.
-  press: { profile: BRUTAL_PROFILE, pressure: { unit: 'razor', squads: 2, size: 4, from: 180, backup: 3000 } },
+  // to 3,000 credits behind them punishing the defenders, the rest of the army Hard's. Army: stock Hard's picks.
+  press: { profile: HARD_PROFILE, pressure: { unit: 'razor', squads: 2, size: 4, from: 180, backup: 3000 } },
   // The same with a heavier Razor share, so the squads stay topped up.
-  pressr: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, razor: 2 } }, pressure: { unit: 'razor', squads: 2, size: 4, from: 180, backup: 3000 } },
+  pressr: { profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, razor: 2 } }, pressure: { unit: 'razor', squads: 2, size: 4, from: 180, backup: 3000 } },
   // Sky Raider squads (over cliffs; turrets can't hit them), three each, from Tleilaxu on.
   // Controls for pressair: its army without the pressure; and the pressure without the backup group.
-  airmix: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, raider: 2 } } },
-  pressairnb: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, raider: 2 } }, pressure: { unit: 'raider', squads: 2, size: 3, from: 180, backup: 0 } },
+  airmix: { profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, raider: 2 } } },
+  pressairnb: { profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, raider: 2 } }, pressure: { unit: 'raider', squads: 2, size: 3, from: 180, backup: 0 } },
   // Trooper squads (slow, but they hit harvesters hardest and outrange Troopers' prey), six each.
-  presstroop: { profile: BRUTAL_PROFILE, pressure: { unit: 'trooper', squads: 2, size: 6, from: 180, backup: 3000 } },
-  pressair: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, raider: 2 } }, pressure: { unit: 'raider', squads: 2, size: 3, from: 180, backup: 3000 } },
+  presstroop: { profile: HARD_PROFILE, pressure: { unit: 'trooper', squads: 2, size: 6, from: 180, backup: 3000 } },
+  pressair: { profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, raider: 2 } }, pressure: { unit: 'raider', squads: 2, size: 3, from: 180, backup: 3000 } },
   // An early razor rush off two Fabs, troopers alongside, no tech.
   razorrush: {
     profile: plan({ opening: ['refinery', 'barracks', 'factory', 'factory'], harvesters: 3, extraRefinery: 'never', techArmy: 40, mix: cmix({ razor: 3, trooper: 1 }), initiative: 1 }),
     firstWave: 150,
   },
-  // Stock Brutal that never attacks below its full wave gate, however long it's waited.
-  stdp: { profile: { ...BRUTAL_PROFILE, patience: 1 } },
-  // Stock Brutal that only attacks clearly stronger (1.3x what it knows of the enemy, and no initiative attacks), and not
+  // Stock Hard that never attacks below its full wave gate, however long it's waited.
+  stdp: { profile: { ...HARD_PROFILE, patience: 1 } },
+  // Stock Hard that only attacks clearly stronger (1.3x what it knows of the enemy, and no initiative attacks), and not
   // before 8:00.
-  stdlate: { profile: { ...BRUTAL_PROFILE, waveGate: 1.3, patience: 1, initiative: 0 }, firstWave: 480 },
-  // Stock Brutal with a heavier Soulcrusher share in its picks.
-  stdart: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, artillery: 1.5 } } },
-  // Stock Brutal's army and counter-picking, waiting like the turtle until 14:00 (no raids, no flanks).
-  stdpassive: { profile: { ...BRUTAL_PROFILE, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity } }, opts: { flank: false }, firstWave: 840 },
+  stdlate: { profile: { ...HARD_PROFILE, waveGate: 1.3, patience: 1, initiative: 0 }, firstWave: 480 },
+  // Stock Hard with a heavier Soulcrusher share in its picks.
+  stdart: { profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, artillery: 1.5 } } },
+  // Stock Hard's army and counter-picking, waiting like the turtle until 14:00 (no raids, no flanks).
+  stdpassive: { profile: { ...HARD_PROFILE, initiative: 0, raids: { ...HARD_PROFILE.raids, start: Infinity } }, opts: { flank: false }, firstWave: 840 },
   // The turtle's army (Devastators, Soulcrushers, Sardaukar, troopers, everything researched) attacking as usual.
   mixed: { profile: plan({ techArmy: 4, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }) },
   // The turtle's waiting without its turrets.
   passive: {
-    profile: plan({ techArmy: 4, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
+    profile: plan({ techArmy: 4, initiative: 0, raids: { ...HARD_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 1.5, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
     opts: { flank: false }, firstWave: 840,
   },
   // The turtle without Soulcrushers (and none from the siege rule).
   turtlenoart: {
-    profile: plan({ bunkers: 4, techArmy: 4, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 0, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
+    profile: plan({ bunkers: 4, techArmy: 4, initiative: 0, raids: { ...HARD_PROFILE.raids, start: Infinity }, mix: cmix({ devastator: 2, artillery: 0, sardaukar: 1, trooper: 1 }), kit: { levels: ['fab', 'barracks'], research: [...C_ALL] } }),
     opts: { flank: false }, firstWave: 840,
   },
 };
 
-const fmix = (m: Partial<Record<UnitType, number>>) => ({ ...BRUTAL_PROFILE.mix, warrior: 0.1, fedaykin: 0.1, ...m });
+const fmix = (m: Partial<Record<UnitType, number>>) => ({ ...HARD_PROFILE.mix, warrior: 0.1, fedaykin: 0.1, ...m });
 const F_ALL = ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2'] as const;
 
 /** Fremen build orders (docs/balance-fremen.md). */
 export const FREMEN_STRATS: Record<string, Strat> = {
-  std: { profile: BRUTAL_PROFILE },
+  std: { profile: HARD_PROFILE },
   // Three Barracks, Warriors only, early pressure, no tech.
   rush: {
     profile: plan({ opening: ['barracks', 'barracks', 'barracks'], harvesters: 2, techArmy: 40, mix: fmix({ warrior: 3, fedaykin: 0 }), initiative: 1, kit: { levels: [], research: [], siege: null, rider: undefined } }),
@@ -443,7 +443,7 @@ export const FREMEN_STRATS: Record<string, Strat> = {
   mass: { profile: plan({ techArmy: 8, mix: fmix({ warrior: 3, fedaykin: 0 }), kit: { levels: [], research: ['fHarvest', 'sandwalk'], siege: null, rider: undefined } }) },
   // Bunkers, everything researched, no attacks before 14:00, then a mixed army.
   turtle: {
-    profile: plan({ bunkers: 4, techArmy: 8, initiative: 0, raids: { ...BRUTAL_PROFILE.raids, start: Infinity }, mix: fmix({ fedaykin: 2, warrior: 1 }), kit: { research: [...F_ALL], siege: { unit: 'mortar', per: 3, max: 8 }, rider: { unit: 'sandrider', max: 3 } } }),
+    profile: plan({ bunkers: 4, techArmy: 8, initiative: 0, raids: { ...HARD_PROFILE.raids, start: Infinity }, mix: fmix({ fedaykin: 2, warrior: 1 }), kit: { research: [...F_ALL], siege: { unit: 'mortar', per: 3, max: 8 }, rider: { unit: 'sandrider', max: 3 } } }),
     opts: { flank: false }, firstWave: 840,
   },
 };
@@ -460,40 +460,40 @@ export const FREMEN_EXTRA: Record<string, Strat> = {
   fedamb: { profile: { ...FREMEN_STRATS.fed.profile, kit: { ...FREMEN_STRATS.fed.profile.kit, research: ['fHarvest', 'ambush', 'fWeapons', 'fArmor', 'stillsuit', 'sandwalk', 'fWeapons2', 'fArmor2'] } } },
   // The rider plan rushing Sietch III (with an army of 8, not 16): worse in every matchup (docs/balance-fremen.md).
   riderrush: { profile: { ...FREMEN_STRATS.rider.profile, kit: { ...FREMEN_STRATS.rider.profile.kit, topLevelArmy: 1 } } },
-  // Stock Brutal with no combat research: only Spice Mining and Sandwalk (what the combat upgrades are worth together).
-  stdeco: { profile: { ...BRUTAL_PROFILE, kit: { research: ['fHarvest', 'sandwalk'] } } },
+  // Stock Hard with no combat research: only Spice Mining and Sandwalk (what the combat upgrades are worth together).
+  stdeco: { profile: { ...HARD_PROFILE, kit: { research: ['fHarvest', 'sandwalk'] } } },
   // ... and with no research at all.
-  stdbare: { profile: { ...BRUTAL_PROFILE, kit: { research: [] } } },
-  // Stock Brutal with Spice Mining last.
-  stdnoh: { profile: { ...BRUTAL_PROFILE, kit: { research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2'] } } },
+  stdbare: { profile: { ...HARD_PROFILE, kit: { research: [] } } },
+  // Stock Hard with Spice Mining last.
+  stdnoh: { profile: { ...HARD_PROFILE, kit: { research: ['fHarvest', 'fWeapons', 'stillsuit', 'sandwalk', 'fArmor', 'ambush', 'fWeapons2', 'fArmor2'] } } },
 };
 
 export const FACTION_STRATS: Partial<Record<Faction, Record<string, Strat>>> = { atreides: STRATS, corrino: CORRINO_STRATS, fremen: FREMEN_STRATS };
 
-/** Not in the round robin: stock Brutal without its micro (kiting, focus fire), to see what control is worth. */
+/** Not in the round robin: stock Hard without its micro (kiting, focus fire), to see what control is worth. */
 export const EXTRA: Record<string, Strat> = {
-  nomicro: { profile: BRUTAL_PROFILE, opts: { micro: false } },
-  // Stock Brutal that goes for the economy: HQ Level 2 first and Harvesting before anything else.
-  eco: { profile: { ...BRUTAL_PROFILE, kit: { levels: ['conyard', 'factory'], research: ['harvest', 'rockets', 'weapons1', 'armor1', 'nitro', 'weapons2', 'armor2'] } } },
-  // Stock Brutal with an early Hi-Tech Factory, so its two Carryalls ferry harvesters from the first minutes.
-  air: { profile: BRUTAL_PROFILE, opts: { hitechAt: 150, hitechAtLarge: 150, hitechArmy: 0, hitechLead: 0, hitechSpare: 0 } },
-  airnf: { profile: BRUTAL_PROFILE, opts: { hitechAt: 150, hitechAtLarge: 150, hitechArmy: 0, hitechLead: 0, hitechSpare: 0, ferry: false } },
-  air5: { profile: BRUTAL_PROFILE, opts: { hitechAt: 300, hitechAtLarge: 300, hitechArmy: 6, hitechLead: 1, hitechSpare: 200 } },
-  air7: { profile: BRUTAL_PROFILE, opts: { hitechAt: 420, hitechAtLarge: 420, hitechArmy: 8, hitechLead: 1, hitechSpare: 200 } },
-  nolift: { profile: BRUTAL_PROFILE, opts: { lift: false } },
-  // Stock Brutal plus a death squad: Trike Nitro first, then six trikes kept out of the waves that do nothing but hunt
+  nomicro: { profile: HARD_PROFILE, opts: { micro: false } },
+  // Stock Hard that goes for the economy: HQ Level 2 first and Harvesting before anything else.
+  eco: { profile: { ...HARD_PROFILE, kit: { levels: ['conyard', 'factory'], research: ['harvest', 'rockets', 'weapons1', 'armor1', 'nitro', 'weapons2', 'armor2'] } } },
+  // Stock Hard with an early Hi-Tech Factory, so its two Carryalls ferry harvesters from the first minutes.
+  air: { profile: HARD_PROFILE, opts: { hitechAt: 150, hitechAtLarge: 150, hitechArmy: 0, hitechLead: 0, hitechSpare: 0 } },
+  airnf: { profile: HARD_PROFILE, opts: { hitechAt: 150, hitechAtLarge: 150, hitechArmy: 0, hitechLead: 0, hitechSpare: 0, ferry: false } },
+  air5: { profile: HARD_PROFILE, opts: { hitechAt: 300, hitechAtLarge: 300, hitechArmy: 6, hitechLead: 1, hitechSpare: 200 } },
+  air7: { profile: HARD_PROFILE, opts: { hitechAt: 420, hitechAtLarge: 420, hitechArmy: 8, hitechLead: 1, hitechSpare: 200 } },
+  nolift: { profile: HARD_PROFILE, opts: { lift: false } },
+  // Stock Hard plus a death squad: Trike Nitro first, then six trikes kept out of the waves that do nothing but hunt
   // harvesters, every 15 s whenever six are home. 'trikesquad': the same without Nitro.
-  deathsquad: { squad: { nitro: true }, profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, kit: { research: ['harvest', 'nitro', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
+  deathsquad: { squad: { nitro: true }, profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, trike: (HARD_PROFILE.mix.trike ?? 0) + 1 }, kit: { research: ['harvest', 'nitro', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
   // The same squad without Nitro, sent out at the time Nitro usually comes in (6:15).
-  slowsquad: { squad: { nitro: false, from: 375 }, profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, kit: { research: ['harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
-  nitrosquad: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, raids: { trikes: 6, start: 0, interval: 15, hunt: true }, kit: { research: ['harvest', 'nitro', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
-  trikesquad: { profile: { ...BRUTAL_PROFILE, mix: { ...BRUTAL_PROFILE.mix, trike: (BRUTAL_PROFILE.mix.trike ?? 0) + 1 }, raids: { trikes: 6, start: 0, interval: 15, hunt: true }, kit: { research: ['harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
-  // Stock Brutal that never builds Carryalls: what its usual (late) Carryalls are worth.
-  nocarry: { profile: BRUTAL_PROFILE, opts: { carryalls: 0 } },
+  slowsquad: { squad: { nitro: false, from: 375 }, profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, trike: (HARD_PROFILE.mix.trike ?? 0) + 1 }, kit: { research: ['harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
+  nitrosquad: { profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, trike: (HARD_PROFILE.mix.trike ?? 0) + 1 }, raids: { trikes: 6, start: 0, interval: 15, hunt: true }, kit: { research: ['harvest', 'nitro', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
+  trikesquad: { profile: { ...HARD_PROFILE, mix: { ...HARD_PROFILE.mix, trike: (HARD_PROFILE.mix.trike ?? 0) + 1 }, raids: { trikes: 6, start: 0, interval: 15, hunt: true }, kit: { research: ['harvest', 'rockets', 'weapons1', 'armor1', 'weapons2', 'armor2'] } } },
+  // Stock Hard that never builds Carryalls: what its usual (late) Carryalls are worth.
+  nocarry: { profile: HARD_PROFILE, opts: { carryalls: 0 } },
 };
 
 export function makeStrat(g: Game, team: Team, name: string): AI {
-  if (name === 'hard') return new AI(g, team, HARD_PROFILE);
+  if (name === 'hard') return new AI(g, team, MEDIUM_PROFILE);
   // '<plan>-eco': the plan researching only its economy (the Harvesting line); '<plan>-bare': no research at all;
   // '<plan>-notier': everything but the Weapons, Armor and Shields levels (what the levels are worth).
   const only = name.match(/^(\w+)-(eco|bare|notier)$/);
@@ -519,8 +519,8 @@ export function makeStrat(g: Game, team: Team, name: string): AI {
 }
 
 function makeStratFrom(g: Game, team: Team, s: Strat): AI {
-  const opts = { ...BRUTAL_OPTIONS, ...s.opts };
-  const ai = s.pressure ? new PressureAI(g, team, s.profile, opts, s.pressure) : s.squad ? new SquadAI(g, team, s.profile, opts, s.squad) : new BrutalAI(g, team, s.profile, opts);
+  const opts = { ...HARD_OPTIONS, ...s.opts };
+  const ai = s.pressure ? new PressureAI(g, team, s.profile, opts, s.pressure) : s.squad ? new SquadAI(g, team, s.profile, opts, s.squad) : new HardAI(g, team, s.profile, opts);
   if (s.firstWave !== undefined) (ai as unknown as { nextWaveTime: number }).nextWaveTime = s.firstWave;
   return ai;
 }

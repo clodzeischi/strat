@@ -48,7 +48,9 @@ const FACTION_KEY = 'strat.faction';
 const ENEMY_KEY = 'strat.enemy';
 const MODE_KEY = 'strat.mode';
 const ALLY_KEY = 'strat.ally';
-const MP_DIFF_KEY = 'strat.mpDifficulty';
+const MP_DIFF_KEY = 'strat.mpLevel';
+/** Before Normal, Hard and Brutal became Easy, Medium and Hard. */
+const OLD_MP_DIFF_KEY = 'strat.mpDifficulty';
 
 /** A computer player's faction, or a random one each game. */
 export type EnemyChoice = Faction | 'random';
@@ -81,12 +83,14 @@ export function loadAlly(): EnemyChoice {
   return loadChoice(ALLY_KEY, 'random');
 }
 
+const OLD_LEVELS: Record<string, Difficulty> = { normal: 'easy', hard: 'medium', brutal: 'hard' };
+
 function loadMpDifficulty(): Difficulty {
   try {
-    const v = localStorage.getItem(MP_DIFF_KEY);
-    return v === 'hard' || v === 'brutal' ? v : 'normal';
+    const v = localStorage.getItem(MP_DIFF_KEY) ?? OLD_LEVELS[localStorage.getItem(OLD_MP_DIFF_KEY) ?? ''];
+    return v === 'medium' || v === 'hard' ? v : 'easy';
   } catch {
-    return 'normal';
+    return 'easy';
   }
 }
 
@@ -201,7 +205,7 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-const DIFFICULTY_NAMES: Record<Difficulty, string> = { normal: 'Normal', hard: 'Hard', brutal: 'Brutal' };
+const DIFFICULTY_NAMES: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
 /** Title screen, in-game pause menu and end-of-game stats. */
 export class Menus {

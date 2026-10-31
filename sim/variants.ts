@@ -1,10 +1,10 @@
-import { HARD_PROFILE, type AIProfile } from '../src/game/ai';
+import { MEDIUM_PROFILE, type AIProfile } from '../src/game/ai';
 
-/** Candidate Hard economy profiles. Anything not set falls back to Normal. */
+/** Candidate Medium economy profiles. Anything not set falls back to Easy. */
 export const VARIANTS: Record<string, Partial<AIProfile>> = {
   normal: {},
-  hard: HARD_PROFILE,
-  // Normal's mass-infantry accident from the first run, kept as a reference point.
+  hard: MEDIUM_PROFILE,
+  // Easy's mass-infantry accident from the first run, kept as a reference point.
   'h4-nosave': { harvesters: 4, extraRefinery: 'threat' },
   'h3-threat': { harvesters: 3, extraRefinery: 'threat', saveForOpening: true },
   'h4-threat': { harvesters: 4, extraRefinery: 'threat', saveForOpening: true },
@@ -26,7 +26,7 @@ export const VARIANTS: Record<string, Partial<AIProfile>> = {
   'h10-2fac': { harvesters: 10, extraRefinery: 'never', saveForOpening: true, opening: ['refinery', 'barracks', 'factory', 'factory'] },
   'h12-2fac': { harvesters: 12, extraRefinery: 'never', saveForOpening: true, opening: ['refinery', 'barracks', 'factory', 'factory'] },
   'h10-2fac-threat': { harvesters: 10, extraRefinery: 'threat', saveForOpening: true, opening: ['refinery', 'barracks', 'factory', 'factory'] },
-  // Hard behavior on top of the h6-always economy (the best economy on random maps). HARD_PROFILE is hard-raid12.
+  // Medium behavior on top of the h6-always economy (the best economy on random maps). MEDIUM_PROFILE is hard-raid12.
   'hard-econ': { harvesters: 6, extraRefinery: 'always', saveForOpening: true },
   'hard-raid': { harvesters: 6, extraRefinery: 'always', saveForOpening: true, raids: { trikes: 3, start: 150, interval: 60, hunt: true } },
   'hard-init': { harvesters: 6, extraRefinery: 'always', saveForOpening: true, initiative: 1.5, waveRetreat: 0.5 },
@@ -35,10 +35,10 @@ export const VARIANTS: Record<string, Partial<AIProfile>> = {
   'hard-init-2': { harvesters: 6, extraRefinery: 'always', saveForOpening: true, initiative: 2, waveRetreat: 0.5 },
   'hard-noraid': { harvesters: 6, extraRefinery: 'always', saveForOpening: true, initiative: 1.2, waveRetreat: 0.5 },
   'hard-raid12': { harvesters: 6, extraRefinery: 'always', saveForOpening: true, raids: { trikes: 3, start: 150, interval: 60, hunt: true }, initiative: 1.2, waveRetreat: 0.5 },
-  // Keeping the army alive, on top of Hard (HARD_PROFILE matches hard-sustain).
-  'hard-sustain': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 } },
-  'hard-nosustain': { ...HARD_PROFILE, sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 } },
-  'hard-repair': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 0 } },
-  'hard-outmatch': { ...HARD_PROFILE, sustain: { repairPer: 0, maxRepair: 0, outmatched: 1.3 } },
-  'hard-sustain-2': { ...HARD_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 2 } },
+  // Keeping the army alive, on top of Medium (MEDIUM_PROFILE matches hard-sustain).
+  'hard-sustain': { ...MEDIUM_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 } },
+  'hard-nosustain': { ...MEDIUM_PROFILE, sustain: { repairPer: 0, maxRepair: 0, outmatched: 0 } },
+  'hard-repair': { ...MEDIUM_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 0 } },
+  'hard-outmatch': { ...MEDIUM_PROFILE, sustain: { repairPer: 0, maxRepair: 0, outmatched: 1.3 } },
+  'hard-sustain-2': { ...MEDIUM_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 2 } },
 };

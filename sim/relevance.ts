@@ -1,5 +1,5 @@
 // Mixed-army relevance test (docs/damage-redesign.md): is unit X worth having along, against each enemy composition?
-// Our reference army (REF shares of BUDGET credits) fights an enemy composition in the open, Brutal's Micro on both
+// Our reference army (REF shares of BUDGET credits) fights an enemy composition in the open, Hard's Micro on both
 // sides, siege units setting up as the AI sets them up. Two versions of our army: X at 25% of the value (the rest
 // scaled down in proportion), and without X (its share spread over the rest). Score of a fight: (our value left - theirs)
 // / starting value, health + shields, -1..+1. Delta = score with X - score without X, averaged over maps and sides.

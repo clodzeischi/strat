@@ -1,14 +1,14 @@
-// AI-vs-AI matches: a candidate profile against the stock Normal AI, alternating map sides.
+// AI-vs-AI matches: a candidate profile against the stock Easy AI, alternating map sides.
 // Usage: npx tsx sim/match.ts <variant> <games> [startSeed] [opponentVariant]
 import * as THREE from 'three';
-import { AI, NORMAL_PROFILE, type AIProfile } from '../src/game/ai';
+import { AI, EASY_PROFILE, type AIProfile } from '../src/game/ai';
 import { UNITS, type MapSize, type Team } from '../src/config';
 import { Game } from '../src/game/game';
 import { VARIANTS } from './variants';
 
 const [name, gamesArg, offsetArg, oppName = 'normal'] = process.argv.slice(2);
-const profile: AIProfile = { ...NORMAL_PROFILE, ...VARIANTS[name] };
-const opponent: AIProfile = { ...NORMAL_PROFILE, ...VARIANTS[oppName] };
+const profile: AIProfile = { ...EASY_PROFILE, ...VARIANTS[name] };
+const opponent: AIProfile = { ...EASY_PROFILE, ...VARIANTS[oppName] };
 const games = Number(gamesArg ?? 20);
 const offset = Number(offsetArg ?? 0);
 const MAX_TIME = 30 * 60;

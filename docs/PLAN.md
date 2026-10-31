@@ -10,12 +10,12 @@ Living plan for upcoming features and the AI difficulty work. Decisions are mark
 2. Elevation range modifier
 3. Procedural maps: sizes, up to 4 players, validation
 4. Expansion mechanic (MCV, home fields that run out)
-5. Hard AI (economy, recovery, harassment, chokepoint awareness), tuned across many generated maps
-6. Brutal AI, once units and numbers have settled. **Status: first version done** (micro, harassment and Carryall drops; see [AI difficulty plan](#ai-difficulty-plan))
+5. Medium AI (economy, recovery, harassment, chokepoint awareness), tuned across many generated maps
+6. Hard AI, once units and numbers have settled. **Status: first version done** (micro, harassment and Carryall drops; see [AI difficulty plan](#ai-difficulty-plan))
 7. Online multiplayer, so balance can be tested by people instead of only sims. **Status: 1v1 lockstep done** (self-hosted server, LAN or Raspberry Pi); see [MULTIPLAYER.md](MULTIPLAYER.md) for the design, the rules game code must now follow, and next steps (reconnect, replays, VPS).
 8. Factions: Atreides (today's roster) and Corrino. See [Factions](#6-factions).
 
-Brutal waits because timing builds and micro depend on exact numbers (speeds, ranges, build times), so every balance change would break them. Hard's general systems (rebuilding, value-based spending) read costs and stats from `src/config/`, so they survive changes.
+Hard waits because timing builds and micro depend on exact numbers (speeds, ranges, build times), so every balance change would break them. Medium's general systems (rebuilding, value-based spending) read costs and stats from `src/config/`, so they survive changes.
 
 ## 1. Elevation and ramps
 
@@ -69,14 +69,14 @@ Balance effect: rocket launchers below a cliff now need a spotter (a unit up top
 - **Structures:** remembered until their spot is seen empty.
 - **What it plans from:** strength, counters, threats, raids, wave targets and surrender judgments all use only this memory.
 - **Locating the enemy:** before it has seen anything, it assumes the enemy base is the mirror image of its own start (maps are point-symmetric). Once it has looked there and found nothing, it searches the map region it has gone longest without seeing.
-- **Scouting runs:** a trike, or infantry if there's no trike, visits the enemy base, then the spice field the enemy harvests, then the stalest region. Normal first scouts at 30 s, then every 150 s. Hard first scouts at 40 s, then every 75 s, twice as often in the first 4 minutes.
-- **Watch post (Hard):** after its look, Hard's scout parks 16 tiles outside the enemy base and watches for the army moving out.
+- **Scouting runs:** a trike, or infantry if there's no trike, visits the enemy base, then the spice field the enemy harvests, then the stalest region. Easy first scouts at 30 s, then every 150 s. Medium first scouts at 40 s, then every 75 s, twice as often in the first 4 minutes.
+- **Watch post (Medium):** after its look, Medium's scout parks 16 tiles outside the enemy base and watches for the army moving out.
 - **Reading a rush:** two barracks, or a barracks and no refinery a minute in, is read as an early attack, and the AI braces for it.
 - **Rush fix:** the rush response no longer cancels its own bunker.
 
-Cost of playing fair (gauntlet, 20 games each, Hard / Normal win %):
+Cost of playing fair (gauntlet, 20 games each, Medium / Easy win %):
 
-| Opponent | Hard | Normal |
+| Opponent | Medium | Easy |
 |---|---|---|
 | Airdrop | 95 | 30 |
 | Harass | 75 | 10 |
@@ -84,7 +84,7 @@ Cost of playing fair (gauntlet, 20 games each, Hard / Normal win %):
 | Rush | 50 | 25 |
 | Turtle | 60 | 5 |
 
-The rush is the biggest loss: the AI used to watch it build at home. Tried and dropped: holding the factory until the scout reports (Hard 3/20 against the rush), and keeping a harvester's price while rushed (7/20, no better). A dead economy with a few infantry holding a bunker is now surrendered after 3 minutes, instead of stalemating.
+The rush is the biggest loss: the AI used to watch it build at home. Tried and dropped: holding the factory until the scout reports (Medium 3/20 against the rush), and keeping a harvester's price while rushed (7/20, no better). A dead economy with a few infantry holding a bunker is now surrendered after 3 minutes, instead of stalemating.
 
 ## 3. Procedural maps
 
@@ -100,7 +100,7 @@ Side bias: fixed, see the AI section (spawn side decided mirror matches).
 - **Base plateau:** radius 9.1 (was 8.5), about 15% more area.
 - **Spice fields** (`SPICE_FIELDS`), replacing the noise patches: an L home field by every spot (26000 spice, radius 5: about 7 minutes for the AI's 6-7 harvesters, measured 5.5-8.7, mean 6.9), plus one set each of M (20000, radius 4, toward the contested middle) and S (10000, radius 2.8) copied to every spot. Fields sit on open low sand, clear of rock and plateau edges. Small maps hold about 100k spice in all, under half the old ~214k.
 - **Terrain:** calmer noise (feature size 11 tiles, was 7), 9% rock with 3% outcrop (was 20% / 8%), formations under 40 tiles cleared, half as many mesas. Half the maps get a massif in the middle (radius 8.5% of the map width) that attacks have to go round on one side or the other.
-- **Measured, 64 maps, Hard vs Hard:** team 0 won 42% of decided games (46% on the old maps, within noise); 14 games hit the 30-minute cap (8 on the old maps), as the scarcer spice runs out.
+- **Measured, 64 maps, Medium vs Medium:** team 0 won 42% of decided games (46% on the old maps, within noise); 14 games hit the 30-minute cap (8 on the old maps), as the scarcer spice runs out.
 - Still to do: real 3-8 player matches (the game has two teams everywhere); a way to build next to a far field (Outpost or MCV, see section 4).
 
 - `MAP_SIZE` becomes a per-game value instead of a constant.
@@ -208,7 +208,7 @@ Stage 2 abilities, as built:
 - **Razor flamethrower:** burns every enemy in a 40-degree cone within reach, not just its target.
 - **Devastator:** the machine gun fires at any ground enemy within 5, also on the move; the main gun only fires standing still. **Self-Destruct** (V): blows up 2.5 s later (blinking, and the enemy is told if it sees it), hitting every enemy within 9 units (500 damage at the center, half at the edge, +300 vs structures).
 - **Drop pods:** with an Imperial Barracks, new infantry land by pod on the Barracks' rally point when your side can see it (otherwise they walk out as usual). The enemy gets the airdrop warning near its base.
-- **Atreides MLRS: unguided rockets and Lock On** (D). Rockets fly at where the target was when fired (with the same red impact marker), so moving units can dodge; a rocket landing within 0.8 of something hits it squarely, and the rest of the blast takes the usual splash share. Against aircraft they always home in. Lock On, then click an enemy: the MLRS attacks it and its rockets home in on it for 8 s; recharges in 20 s. The AI (all levels) locks on to whatever unit its MLRS shoot at as soon as it can, and so do the duels behind the counter table. Check with `npx tsx sim/mlrs-check.ts`. Brutal vs Hard and Corrino vs Atreides win rates didn't change.
+- **Atreides MLRS: unguided rockets and Lock On** (D). Rockets fly at where the target was when fired (with the same red impact marker), so moving units can dodge; a rocket landing within 0.8 of something hits it squarely, and the rest of the blast takes the usual splash share. Against aircraft they always home in. Lock On, then click an enemy: the MLRS attacks it and its rockets home in on it for 8 s; recharges in 20 s. The AI (all levels) locks on to whatever unit its MLRS shoot at as soon as it can, and so do the duels behind the counter table. Check with `npx tsx sim/mlrs-check.ts`. Hard vs Medium and Corrino vs Atreides win rates didn't change.
 - **Sky Raider mines** (D): one every 15 s, at most 12 per side (the oldest goes). Visible to everyone; armed after 1 s; an enemy on the ground within 2.2 sets it off: 30 damage (+90 vs infantry, -10 vs armor) in a 4-unit blast.
 
 Equal-cost duels after stage 2 ($4500 a side; +1 Corrino wins untouched, -1 Atreides does). Artillery here fights mobile; deployed, see above:
@@ -224,26 +224,26 @@ Equal-cost duels after stage 2 ($4500 a side; +1 Corrino wins untouched, -1 Atre
 
 Open point: the Devastator beats Rocket Launchers in a straight fight; they only win by kiting with their longer range (17 against 10).
 
-**Stage 3: the AI plays Corrino.** The AI's plans are written in Atreides terms; a per-faction kit in `ai.ts` translates them (Fab for Factory, Auto Turret for Bunker, Razors raid and scout, a Repair Pad instead of Repair Vehicles, Tleilaxu Research before levelling up the Barracks and Fab, Corrino's research order). On top of that, Corrino-only behavior: damaged units at home park at a Repair Pad, damaged structures repair themselves, Artillery travels with the army (one per ten units, up to three) and deploys when there's something to shell, a Devastator about to die among enemies self-destructs, Sky Raiders mine harvester routes and enemy troops, and with an Imperial Barracks new infantry drop by pod next to a wave that's out and join it. The counter table (`src/game/matchups.ts`, from `sim/matchups.ts`) now covers all ten combat units of both factions, each fighting for its own side; refreshing it moved the Atreides numbers by at most 0.03 (Brutal vs Hard: 85% with it, 80% with the old one over 40 games, within noise).
+**Stage 3: the AI plays Corrino.** The AI's plans are written in Atreides terms; a per-faction kit in `ai.ts` translates them (Fab for Factory, Auto Turret for Bunker, Razors raid and scout, a Repair Pad instead of Repair Vehicles, Tleilaxu Research before levelling up the Barracks and Fab, Corrino's research order). On top of that, Corrino-only behavior: damaged units at home park at a Repair Pad, damaged structures repair themselves, Artillery travels with the army (one per ten units, up to three) and deploys when there's something to shell, a Devastator about to die among enemies self-destructs, Sky Raiders mine harvester routes and enemy troops, and with an Imperial Barracks new infantry drop by pod next to a wave that's out and join it. The counter table (`src/game/matchups.ts`, from `sim/matchups.ts`) now covers all ten combat units of both factions, each fighting for its own side; refreshing it moved the Atreides numbers by at most 0.03 (Hard vs Medium: 85% with it, 80% with the old one over 40 games, within noise).
 
 AI vs AI between the factions, 40 games each on random maps from both sides (Corrino win rate):
 
 | Corrino AI | Atreides AI | Corrino wins |
 |---|---|---|
-| Hard | Hard | 55% |
-| Brutal | Hard | 82% |
-| Hard | Brutal | 20% |
-| Brutal | Brutal | 30% |
-| Brutal | Brutal without micro | 80% |
-| Brutal without micro | Brutal without micro | 60% |
+| Medium | Medium | 55% |
+| Hard | Medium | 82% |
+| Medium | Hard | 20% |
+| Hard | Hard | 30% |
+| Hard | Hard without micro | 80% |
+| Hard without micro | Hard without micro | 60% |
 
-For reference, Atreides Brutal beats Atreides Hard 85% of the time. So at equal skill without micro the factions are close, with Corrino a little ahead; Brutal's micro (kiting and focus fire) is worth far more to Atreides against slow Corrino armies than the other way round. That fits Atreides as the faction that rewards APM, but the size of the swing (60% to 30%) is worth a decision: make Corrino tougher, give it ways to punish kiting (longer ranges, faster Razors), or teach the Corrino AI to stop chasing kiters. Carryalls are not the reason: Brutal Atreides without them does the same.
+For reference, Atreides Hard beats Atreides Medium 85% of the time. So at equal skill without micro the factions are close, with Corrino a little ahead; Hard's micro (kiting and focus fire) is worth far more to Atreides against slow Corrino armies than the other way round. That fits Atreides as the faction that rewards APM, but the size of the swing (60% to 30%) is worth a decision: make Corrino tougher, give it ways to punish kiting (longer ranges, faster Razors), or teach the Corrino AI to stop chasing kiters. Carryalls are not the reason: Hard Atreides without them does the same.
 
-**Resolved.** Switching Brutal's micro off piece by piece showed it was Atreides kiting (25% -> 60% for Corrino without it; focus fire and Corrino's own micro barely mattered), and nearly all of it was tanks kiting Harkonnen Troopers: tanks reached 10 against the Troopers' 7 and are much faster, so they backed off and shot forever. Fix: Trooper range 7 -> 9 (Brutal only kites what it outranges by more than one unit) with base damage 9 -> 8 to keep Hard even; and Brutal no longer kites Devastators and Soulcrushers, whose main guns only fire standing still. Now, 40 games each: Brutal vs Brutal 50%, Hard vs Hard 47% Corrino wins; MLRS still outrange and beat Troopers.
+**Resolved.** Switching Hard's micro off piece by piece showed it was Atreides kiting (25% -> 60% for Corrino without it; focus fire and Corrino's own micro barely mattered), and nearly all of it was tanks kiting Harkonnen Troopers: tanks reached 10 against the Troopers' 7 and are much faster, so they backed off and shot forever. Fix: Trooper range 7 -> 9 (Hard only kites what it outranges by more than one unit) with base damage 9 -> 8 to keep Medium even; and Hard no longer kites Devastators and Soulcrushers, whose main guns only fire standing still. Now, 40 games each: Hard vs Hard 50%, Medium vs Medium 47% Corrino wins; MLRS still outrange and beat Troopers.
 
 1. **Plumbing:** a faction per player (menu, lobby, AI), a roster per faction (units, buildings, upgrades, tech tree), shields and their regeneration, the Repair Pad. The six units go in using today's mechanics. Run the matchup sims for a first balance pass.
 2. **Special mechanics,** one at a time, re-running the matchup sims after each: drop pods, deployed Artillery firing at the ground, the flamethrower, the Devastator firing while moving and self-destructing, Sky Raider mines.
-3. **AI that can play Corrino** (Brutal is tuned for Atreides).
+3. **AI that can play Corrino** (Hard is tuned for Atreides).
 
 ### Fremen **Proposal, built** (numbers from the sims, open to playtesting)
 
@@ -278,7 +278,7 @@ The Zerg of the game: cheap, fast infantry that live in the open desert. Low tec
 
 **Status: built** (branch `fremen-mobility`). Check with `npx tsx sim/fremen-check.ts`. AI vs AI: `FACTIONS=fremen,corrino sim/faction-match.sh <games> <fremenLevel> <otherLevel>` (prints worm stats). Also `sim/unit-row.ts` and `sim/kill-tally.ts`. The counter table (`src/game/matchups.ts`) still has the old numbers with the Commando and Sandworm taken out; it hasn't been regenerated with the Mortar.
 
-**Balance, AI vs AI (Fremen win rate):** Hard vs Hard, 60 games each: 60% against Atreides, 50% against Corrino (with the worm at 8 s; 58% / 41% at 10 s). Brutal vs Brutal, 30 games: 66% and 60%. Fremen mirror: 26% of games time out at 30 minutes (66% before). Worms are called about twice a game and eat 1000-1300 credits of the enemy's (200-600 of the caller's own).
+**Balance, AI vs AI (Fremen win rate):** Medium vs Medium, 60 games each: 60% against Atreides, 50% against Corrino (with the worm at 8 s; 58% / 41% at 10 s). Hard vs Hard, 30 games: 66% and 60%. Fremen mirror: 26% of games time out at 30 minutes (66% before). Worms are called about twice a game and eat 1000-1300 credits of the enemy's (200-600 of the caller's own).
 
 What it took (this round), in order:
 - **Bug, also on main: the Fremen AI never researched or levelled up anything.** Production held credits at the tech reserve, tech waited for the reserve plus the 800 harvester fund, and camp income trickles in rather than arriving by the harvester load, so it never got there (which is also why the old Sandworm "hardly ever appeared"). Fremen keep no harvester fund now; they reach the Great Sietch around 3:00.
@@ -338,15 +338,15 @@ Warrior ─┬─ Fedaykin (Great Sietch) ── Sandrider (Sietch III)
 **Units:** Warrior, Spice Crew, Wind Glider, Fedaykin, Mortar, Sandrider. About 15 tech steps against Corrino's 13, and about 10-11k to max out against Corrino's 10.8k.
 
 **Stages** (each verified and committed on the branch):
-1. **Engine:** a hub per faction, Fremen start with a Sietch, three building levels, more Sietches allowed. Sim checks updated. **Done:** `FactionDef.hub`, `BuildingDef.levels` (a list of steps; `sietch3` requirements), the Sietch as hub (2000, 25 s, 1600 HP; Sietch III a placeholder that unlocks nothing yet), a placeholder level-3 kit. Losing the leading Sietch drops the team to the best level still standing. Check: `npx tsx sim/sietch-check.ts`. Interim AI: Fremen open with two Barracks, and the AI skips level-ups that unlock nothing it uses. 8 Hard games each: Fremen 50% vs Corrino, 50% vs Atreides.
-2. **Tech tree:** new requirements and research; the High Perch builds Gliders and heals; faster healing in the sand. **Done:** as in the table above (Great Sietch 1,000 / 35 s and needs a Barracks; Thumpers need it too, until the Sandrider takes them over). High Perch 600, 12 s, 700 HP, heals x2 within 10; dug in, x2; Stillsuits x2 on top. Fremen Weapons and Armor +2 (1,100 / 40 s). Check: `npx tsx sim/fremen-check.ts`. Interim AI: opens Barracks then High Perch. **Balance hit, expected:** Fremen vs Corrino, Hard, the same 12 games: main 41%, now 25%. Worms are called less than half as often (0.9 a game against 2.2): the AI spends about 3 minutes a game waiting for the Great Sietch to plant Thumpers, where it used to get them with the Sietch it built in its opening. Variants without Sietch III (`nol3`) or without the High Perch (`nowt`) don't help. Left for stages 6-7. Against Atreides, 50% (12 games; main was about 60%).
-3. **Rites:** a lockstep command, command-card buttons, dig-in and emerge, sim checks. **Done:** `UnitDef.rite` (Fedaykin from a Warrior, 140, 8 s; Mortar from a Warrior, 190, 10 s), `FactionDef.rites`, the `rite` command, rite buttons on the bottom row of a Warrior's Command tab. The unit digs straight in, can't move or fire, and comes out with its share of health and its kills; a move order or Stop calls it off with a refund; killed, nothing comes out. The AI makes Fedaykin and Mortars by rites from idle Warriors at home (walking them to sand first if need be), at most three at a time. Checks in `sim/fremen-check.ts`; `FACTIONS=fremen,corrino npx tsx sim/determinism.ts` for lockstep. Hard, 12 games: 25% vs Corrino, 33% vs Atreides; the AI gets half as many Fedaykin as it trained before (15 a game, from 32).
-4. **Sandrider:** zealot rush, the rider's Thumper, the ridden worm (segment chain, steering, irregular loop, wild on the rider's death). Placeholder art until approved. **Done:** the Sandrider (rite from a Fedaykin, 300, 12 s; 260 HP): crysknife 400 damage, infantry only (`WeaponDef.only`), through shields, every 1.6 s, and double speed closing on a target within 6 (`UnitDef.charge`). It is the only unit that plants Thumpers (one at a time per rider, Sietch III). If it's within 14 when the worm comes it rides it (`RIDE` in rules.ts): 40 s, steered by the rider's orders (move, or attack a unit), biting enemies within 4 of the head every 2.5 s, never its own side; idle, it hunts enemies moving on the sand within 16 or wanders an irregular loop (radius 6.5-10) round where it was last sent. Then it dives, the rider is set down and rests 60 s. Rider killed: the worm goes wild for the rest of its time. Drawn as a head, 10 rings and a tail laid along the head's trail; the rider is pinned to ring 2 (`makeRiddenWorm`). Placeholder Sandrider model (a Fedaykin with maker hooks and a crysknife). Sandrider vs Sardaukar is a one-stroke kill for now: to be settled with the Sardaukar's own melee. AI: keeps two Sandriders, plants by enemy economy and stays by the Thumper to ride; climbs to Sietch III only with an army of twice `techArmy`. Checks in `sim/fremen-check.ts`. **Balance, Hard, 12 games: 8% or 0% vs Corrino (two openings tried), 16% vs Atreides.** Worms come 0-0.6 times a game (2 on main): they now wait for Sietch III and a Sandrider. The AI also gets far fewer Fedaykin from rites than it used to train. Stages 6-7 have to fix this.
+1. **Engine:** a hub per faction, Fremen start with a Sietch, three building levels, more Sietches allowed. Sim checks updated. **Done:** `FactionDef.hub`, `BuildingDef.levels` (a list of steps; `sietch3` requirements), the Sietch as hub (2000, 25 s, 1600 HP; Sietch III a placeholder that unlocks nothing yet), a placeholder level-3 kit. Losing the leading Sietch drops the team to the best level still standing. Check: `npx tsx sim/sietch-check.ts`. Interim AI: Fremen open with two Barracks, and the AI skips level-ups that unlock nothing it uses. 8 Medium games each: Fremen 50% vs Corrino, 50% vs Atreides.
+2. **Tech tree:** new requirements and research; the High Perch builds Gliders and heals; faster healing in the sand. **Done:** as in the table above (Great Sietch 1,000 / 35 s and needs a Barracks; Thumpers need it too, until the Sandrider takes them over). High Perch 600, 12 s, 700 HP, heals x2 within 10; dug in, x2; Stillsuits x2 on top. Fremen Weapons and Armor +2 (1,100 / 40 s). Check: `npx tsx sim/fremen-check.ts`. Interim AI: opens Barracks then High Perch. **Balance hit, expected:** Fremen vs Corrino, Medium, the same 12 games: main 41%, now 25%. Worms are called less than half as often (0.9 a game against 2.2): the AI spends about 3 minutes a game waiting for the Great Sietch to plant Thumpers, where it used to get them with the Sietch it built in its opening. Variants without Sietch III (`nol3`) or without the High Perch (`nowt`) don't help. Left for stages 6-7. Against Atreides, 50% (12 games; main was about 60%).
+3. **Rites:** a lockstep command, command-card buttons, dig-in and emerge, sim checks. **Done:** `UnitDef.rite` (Fedaykin from a Warrior, 140, 8 s; Mortar from a Warrior, 190, 10 s), `FactionDef.rites`, the `rite` command, rite buttons on the bottom row of a Warrior's Command tab. The unit digs straight in, can't move or fire, and comes out with its share of health and its kills; a move order or Stop calls it off with a refund; killed, nothing comes out. The AI makes Fedaykin and Mortars by rites from idle Warriors at home (walking them to sand first if need be), at most three at a time. Checks in `sim/fremen-check.ts`; `FACTIONS=fremen,corrino npx tsx sim/determinism.ts` for lockstep. Medium, 12 games: 25% vs Corrino, 33% vs Atreides; the AI gets half as many Fedaykin as it trained before (15 a game, from 32).
+4. **Sandrider:** zealot rush, the rider's Thumper, the ridden worm (segment chain, steering, irregular loop, wild on the rider's death). Placeholder art until approved. **Done:** the Sandrider (rite from a Fedaykin, 300, 12 s; 260 HP): crysknife 400 damage, infantry only (`WeaponDef.only`), through shields, every 1.6 s, and double speed closing on a target within 6 (`UnitDef.charge`). It is the only unit that plants Thumpers (one at a time per rider, Sietch III). If it's within 14 when the worm comes it rides it (`RIDE` in rules.ts): 40 s, steered by the rider's orders (move, or attack a unit), biting enemies within 4 of the head every 2.5 s, never its own side; idle, it hunts enemies moving on the sand within 16 or wanders an irregular loop (radius 6.5-10) round where it was last sent. Then it dives, the rider is set down and rests 60 s. Rider killed: the worm goes wild for the rest of its time. Drawn as a head, 10 rings and a tail laid along the head's trail; the rider is pinned to ring 2 (`makeRiddenWorm`). Placeholder Sandrider model (a Fedaykin with maker hooks and a crysknife). Sandrider vs Sardaukar is a one-stroke kill for now: to be settled with the Sardaukar's own melee. AI: keeps two Sandriders, plants by enemy economy and stays by the Thumper to ride; climbs to Sietch III only with an army of twice `techArmy`. Checks in `sim/fremen-check.ts`. **Balance, Medium, 12 games: 8% or 0% vs Corrino (two openings tried), 16% vs Atreides.** Worms come 0-0.6 times a game (2 on main): they now wait for Sietch III and a Sandrider. The AI also gets far fewer Fedaykin from rites than it used to train. Stages 6-7 have to fix this.
 5. **Art, each approved in Blender first:** Sietch level 3, High Perch, Sandrider (with its riding pose), the surfaced worm. **Buildings done:** every Fremen building is a Blender model (Sietch with levels 2 and 3, Barracks, High Perch, Bunker, Spice Camp, Thumper; see art-direction.md), bare on a rock skirt where they can stand on dunes. The Windtrap became the High Perch, a glider roost. Left: the Sandrider and the surfaced worm.
 6. **AI:** rites, the new research order, High Perch, Sandriders and their worms.
 7. **Balance:** local AI-vs-AI sims, regenerate the counter table, update this section. Expect a dip at first: the wild worm was worth about 25 points of win rate, and the worm now waits for Sietch III.
 
-**Balance round 1 (2026-10-17), Hard AI vs Hard AI, the same maps from both sides:**
+**Balance round 1 (2026-10-17), Medium AI vs Medium AI, the same maps from both sides:**
 
 | Fremen vs | Win rate | Games | Notes |
 |---|---|---|---|
@@ -370,55 +370,57 @@ numbers and results: docs/damage-redesign.md.
 **Mirror balance (2026-10-25, branch `fvf-balance`):** docs/balance-fremen.md. Fedaykin got a sonic cone, Mortars a
 wider splash, Warriors are weak against structures, Sandriders 280 HP with a 220 / 10 s rite and go for valuable
 infantry, Fremen upgrades cheaper and stronger, and two AI bugs that kept Fremen Warriors out of every wave are fixed.
-Fremen now beat Atreides 93% and Corrino 75% (Hard vs Hard): a cross-faction pass is next.
+Fremen now beat Atreides 93% and Corrino 75% (Medium vs Medium): a cross-faction pass is next.
 
 Later, separately: hand-to-hand fighting for the other Fremen and for the Sardaukar.
 
 ## AI difficulty plan
 
+Names since 2026-10-30: Easy, Medium and Hard (they were Normal, Hard and Brutal; the AIs are the same, and this plan uses the new names throughout, measurements included). The balance logs in `docs/balance-*.md` and `docs/damage-redesign.md` keep the old ones.
+
 | Level | Intent |
 |---|---|
-| Normal | Plays steadily: builds an army and sends small waves. Keeps new players engaged but not stressed. This is today's AI and stays as the baseline. |
-| Hard | Strong economy, recovers from setbacks, small harassment, practices army compositions, starts taking the initiative. |
-| Brutal | Optimized timing builds, constant harassment, fast reactions, micro (rotating damaged units, picking squads to counter the player's formations), forcing the player to split attention. |
+| Easy | Plays steadily: builds an army and sends small waves. Keeps new players engaged but not stressed. This is today's AI and stays as the baseline. |
+| Medium | Strong economy, recovers from setbacks, small harassment, practices army compositions, starts taking the initiative. |
+| Hard | Optimized timing builds, constant harassment, fast reactions, micro (rotating damaged units, picking squads to counter the player's formations), forcing the player to split attention. |
 
-**Normal, revised after playtesting** (it used to fizzle out after the first serious attack). Check with `npx tsx sim/ai-check.ts`.
+**Easy, revised after playtesting** (it used to fizzle out after the first serious attack). Check with `npx tsx sim/ai-check.ts`.
 - **Defense sized to the attack.** Enemy combat units near our buildings (14 tiles) or harvesters (10 tiles) are grouped into attacks, each scored by strength (cost × health left). Each attack gets about 1.5× its strength in defenders, nearest first: a lone trike draws a few units, a real attack draws everyone at home. Waves out in the field are only called back when the base itself is hit. When an attack has been gone for 4 seconds, its defenders return to a rally point in front of the base.
 - **Income first.** Below 2 harvesters, or with no refinery, getting income back comes before army and tech. Without a factory, it builds a refinery (which comes with a harvester) instead of a factory plus a harvester. Lost opening buildings are rebuilt before more units. Once the base is up, it keeps one harvester's price (800) in reserve so it can always replace one.
 - **Waves.** Unchanged in size and timing, plus: a wave that loses 70% of its strength falls back instead of trickling in, survivors push on to the next target, and if a full wave hasn't formed 90 s after one was due, a half-size wave goes so the pressure keeps up.
 - **Surrender.** It offers when, for 20 seconds, its base is gone (no hub, nothing to train units in), its income is gone (nothing to earn with, or under 150 a minute over 2 minutes, with no way to buy more) or it is overwhelmed (worth under a quarter of what it knows the enemy has, for a minute). The game pauses for the answer. Turned down, it asks again once things are much worse (hub lost or half its worth gone), at most every 2 minutes. `sim/surrender-audit.ts` plays games out ignoring offers to see whether they came too soon.
-- Against the old Normal it won 17 of 32 games (random maps), so it's about as strong; wave size and timing, the knobs that set its pressure, are unchanged. 14 of its 15 losses ended in a surrender rather than being wiped out. In 16 games against itself every game was decided (no stalemates), 15 by surrender.
+- Against the old Easy it won 17 of 32 games (random maps), so it's about as strong; wave size and timing, the knobs that set its pressure, are unchanged. 14 of its 15 losses ended in a surrender rather than being wiped out. In 16 games against itself every game was decided (no stalemates), 15 by surrender.
 
-**Hard, first version (done).** `HARD_PROFILE` in `src/game/ai.ts`, picked from the menu. Tuned on random maps (`MAPS=random sim/run.sh`, 40-80 games per row, against Normal):
+**Medium, first version (done).** `MEDIUM_PROFILE` in `src/game/ai.ts`, picked from the menu. Tuned on random maps (`MAPS=random sim/run.sh`, 40-80 games per row, against Easy):
 
-| Variant | Win % vs Normal | What it adds |
+| Variant | Win % vs Easy | What it adds |
 |---|---|---|
 | 6 harvesters, second refinery right away | 83 | economy |
 | + attack when 1.2x stronger, fall back at half strength | 88 | initiative |
-| + hit-and-run trike raids | 76-87 | harassment (neutral against Normal, kept for feel) |
+| + hit-and-run trike raids | 76-87 | harassment (neutral against Easy, kept for feel) |
 | + build toward a target mix of counters | lost 30-40% head to head | dropped |
 
-The final profile wins 73-76% against Normal (60-80 games); Normal against itself, 47%.
+The final profile wins 73-76% against Easy (60-80 games); Easy against itself, 47%.
 
-What Hard does on top of Normal:
-- **Economy:** 6 harvesters and both refineries early (Normal: one harvester per refinery).
-- **Initiative:** besides Normal's wave timer, it attacks as soon as its army at home is 1.2x the enemy's whole army, and those waves go for refineries and harvesters first. Waves fall back at half strength (Normal: 30%).
+What Medium does on top of Easy:
+- **Economy:** 6 harvesters and both refineries early (Easy: one harvester per refinery).
+- **Initiative:** besides Easy's wave timer, it attacks as soon as its army at home is 1.2x the enemy's whole army, and those waves go for refineries and harvesters first. Waves fall back at half strength (Easy: 30%).
 - **Harassment:** 3-trike raids from 2:30, every minute, on the least protected harvester; on to the next one after a kill; home as soon as defenders close in or half the group is lost. It keeps 3 trikes for raids while there's a harvester worth hitting, and they stay out of waves.
 - **Repairs at home:** one Repair Vehicle per 6 combat vehicles (up to 3), kept at the rally point. Damaged vehicles that are home and idle (back from defending, or from a wave that fell back) drive over to be repaired; nobody leaves a fight for it (decided: Repair Vehicles have a purely defensive role). Infantry heal on their own.
 - **Re-assessing fights:** a wave pulls back (and waits 30 s to regroup) when the enemy strength around it is 1.3x its own, re-checked every second.
-- Defense, income recovery and surrender as on Normal (`DIFFICULTY=hard npx tsx sim/ai-check.ts`, which also checks repairs at home and pulling back).
+- Defense, income recovery and surrender as on Easy (`DIFFICULTY=medium npx tsx sim/ai-check.ts`, which also checks repairs at home and pulling back).
 
-Raids barely matter against Normal, whose defense now answers them in seconds; they are aimed at a human, who reacts slower. Repairs and pulling back were neutral in win rate too (measured with an earlier version that also pulled units below 35% health out of fights: 49-51% against Hard without them over 80 games; K/D 1.00 vs 0.95 against Normal), for the reason below. Next for Hard: chokepoint and high-ground awareness, Carryalls, and a reaction delay per difficulty.
+Raids barely matter against Easy, whose defense now answers them in seconds; they are aimed at a human, who reacts slower. Repairs and pulling back were neutral in win rate too (measured with an earlier version that also pulled units below 35% health out of fights: 49-51% against Medium without them over 80 games; K/D 1.00 vs 0.95 against Easy), for the reason below. Next for Medium: chokepoint and high-ground awareness, Carryalls, and a reaction delay per difficulty.
 
-**Spawn side decided mirror matches (fixed).** Hard against Hard, each of 20 maps played 6 times: on 15 maps one spawn won all 6, though overall the two teams won equally (mean deviation from 50% per map 0.44, chance level 0.16). Causes found and fixed: every building's door faced south (now toward the map's middle, with the model turned and the exit/dock cell on that side); the AI searched for building spots from the yard's corner in scan order (now scored from its center, ties broken in the base's own frame); `nearestCell` and `cellsAround` broke ties by scan order, so even the starting units stood on non-mirrored cells and blocked different building spots (ties now go to the cell nearer the middle, then by side); units always acted in creation order (now alternating each tick). After: both economies match to the credit for the first minutes, mean deviation 0.17, team 0 won 62 of 120. Check with `npx tsx sim/side-bias.ts` (a few maps still go 6-0, slightly more than chance would).
+**Spawn side decided mirror matches (fixed).** Medium against Medium, each of 20 maps played 6 times: on 15 maps one spawn won all 6, though overall the two teams won equally (mean deviation from 50% per map 0.44, chance level 0.16). Causes found and fixed: every building's door faced south (now toward the map's middle, with the model turned and the exit/dock cell on that side); the AI searched for building spots from the yard's corner in scan order (now scored from its center, ties broken in the base's own frame); `nearestCell` and `cellsAround` broke ties by scan order, so even the starting units stood on non-mirrored cells and blocked different building spots (ties now go to the cell nearer the middle, then by side); units always acted in creation order (now alternating each tick). After: both economies match to the credit for the first minutes, mean deviation 0.17, team 0 won 62 of 120. Check with `npx tsx sim/side-bias.ts` (a few maps still go 6-0, slightly more than chance would).
 
-**Hardening against player strategies (in progress).** `sim/bots.ts` has scripted "players" built on the AI's own economy code: a Barracks-first infantry **rush**, a **turtle** (tanks and rocket launchers at home, one all-in at 14:00), a trike **harass**er (4-trike hit-and-run raids every 25 s), a **rockets** tech rush and an airdrop (**drop**) player. They run Hard's economy, so they're strong opponents. `sim/gauntlet.sh 20` plays each against Normal and Hard on paired random maps. What it found and what changed (all in `src/game/ai.ts`):
+**Hardening against player strategies (in progress).** `sim/bots.ts` has scripted "players" built on the AI's own economy code: a Barracks-first infantry **rush**, a **turtle** (tanks and rocket launchers at home, one all-in at 14:00), a trike **harass**er (4-trike hit-and-run raids every 25 s), a **rockets** tech rush and an airdrop (**drop**) player. They run Medium's economy, so they're strong opponents. `sim/gauntlet.sh 20` plays each against Easy and Medium on paired random maps. What it found and what changed (all in `src/game/ai.ts`):
 - **Stacked savings:** the harvester fund (800) was added on top of the second-refinery reserve (800), so the AI built nothing for its army until 1,600 credits had piled up; an early rush walked in. Savings no longer stack. When the enemy army is 1.5x ours, only income-critical savings remain; when an attack on the base is stronger than everything we could send, nothing is saved.
 - **Early rush:** in the first five minutes, with the enemy army 1.5x ours, the AI calls off non-essential construction (full refund), skips harvesters past the first, research and level-ups, and builds up to three barracks and units.
 - **No room to build:** on a cramped rock shelf the AI started a building, couldn't place it, got a refund and retried every second, sitting on 20,000+ credits. It now checks for room before starting, falls back to a spot touching other buildings, and otherwise doesn't try that type again for 90 s.
 - **Counters from measured duels:** `sim/matchups.ts` plays equal-cost duels of every unit pair (with and without Infantry Rockets) and writes `src/game/matchups.ts`; the AI scores each unit type against the enemy's army from it. Bad matchups count double (a hard counter in their army kills the unit before it does its job), and a combined-arms base mix (tanks and rocket launchers at the core) with a diversity factor keeps the army from turning into one blob. Rerun `npx tsx sim/matchups.ts` after any change to unit stats. `sim/duel.ts` prints quick equal-cost duels.
-- **Lines:** Hard waits for the line of the unit it wants instead of filling idle barracks with infantry (before, cheap infantry made up most of its army whatever it faced).
-- **Waves:** a wave sets out only when it's at least 0.6x (Normal) / 0.9x (Hard) the enemy army, counting enemy units within 20 tiles of their own buildings 1.5x.
+- **Lines:** Medium waits for the line of the unit it wants instead of filling idle barracks with infantry (before, cheap infantry made up most of its army whatever it faced).
+- **Waves:** a wave sets out only when it's at least 0.6x (Easy) / 0.9x (Medium) the enemy army, counting enemy units within 20 tiles of their own buildings 1.5x.
 - **Leash:** units at home or defending that get more than 22 tiles from the rally point come straight back with a plain move. A kiting trike used to drag a defender 40 tiles out (`sim/ai-check.ts` checks it).
 
 
@@ -426,13 +428,13 @@ Raids barely matter against Normal, whose defense now answers them in seconds; t
 - **Infantry 60 -> 90 credits, build time 3 -> 4.5 s** (decided). At 60 nothing early beat massed infantry (even with trikes, +0.18 against tanks), so a Barracks-first rush beat any economic opening. At 90 infantry lose to trikes (-0.52) and tanks (-0.48) without Infantry Rockets, and still beat tanks with them (+0.65). 75 credits plays the same in the gauntlet and keeps infantry closer to even with trikes (-0.28), if that's preferred.
 - **Splash falls off** (`SPLASH_SHARE` in `game.ts`): the unit aimed at takes the full hit, others in the blast half, less toward the edge. Before, every unit within reach took full damage: one rocket volley into a column of tanks did 4-5x its damage, and tanks, the counter to rocket launchers, only broke even (+0.13; now +0.31).
 - Looked at and left alone: Infantry Rockets' anti-armor bonus (cutting it from 22 to 10 barely moves infantry vs tanks; tanks lack splash and are weak against infantry by design), rocket launcher range (14-15 instead of 17: +0.03), tagging rocket launchers light (lets trikes kill them, beyond the trike's raider role), refinery price (a second refinery earns about what one extra harvester does and costs 400 more: fair).
-- Hard vs bots after the pass: drop 100%, harass 70%, rockets 70% (was 10-15%), turtle 70% (was 15%), rush 25% (was 0%, and it now kills 3.8 units per unit lost). Hard vs Normal 88%.
+- Medium vs bots after the pass: drop 100%, harass 70%, rockets 70% (was 10-15%), turtle 70% (was 15%), rush 25% (was 0%, and it now kills 3.8 units per unit lost). Medium vs Easy 88%.
 - **Bunker** (decided; `sim/bunker-check.ts`): 400 credits, 2x2, 1,400 HP, needs a Barracks. Holds three infantry, who shoot from it with their own weapons and range (measured from its walls), including Infantry Rockets against armor, and can't be hurt inside; they get out with F, or alive when it falls. Tanks (range 10) still outrange infantry rockets (8), and rocket launchers (17) outrange everything, so a bunker line has an answer. Players right-click a bunker with infantry to fill it.
 - **Hotkeys on the left hand** (decided, as in Stormgate): A attack-move, S stop, D drop, F unload, Space base, ` pause. The camera pans with arrows, screen edges and middle-drag (WASD panning dropped, since those keys are commands now). Q W E R and Z X C V are free for production hotkeys later.
-- The AI keeps one (Normal) or two (Hard) bunkers at the front of its base and fills them with idle infantry. Under pressure (an early rush, or an enemy army well ahead of its own) it builds a bunker first, keeps only its minimum harvesters, and spends on the best unit a free production line can start right away instead of saving for an ideal one.
-- With bunkers, Hard beats the infantry rush 65% (was 25%) and Normal 50% (was 20%); the other matchups held (drop 100%, rockets 70%, harass 65%, turtle 55%), and Hard beats Normal 93%.
+- The AI keeps one (Easy) or two (Medium) bunkers at the front of its base and fills them with idle infantry. Under pressure (an early rush, or an enemy army well ahead of its own) it builds a bunker first, keeps only its minimum harvesters, and spends on the best unit a free production line can start right away instead of saving for an ideal one.
+- With bunkers, Medium beats the infantry rush 65% (was 25%) and Easy 50% (was 20%); the other matchups held (drop 100%, rockets 70%, harass 65%, turtle 55%), and Medium beats Easy 93%.
 
-**Brutal, first version (done).** `BrutalAI` in `src/game/brutal.ts` (a subclass of the AI, with Hard's economy and planning) and `Micro` in `src/game/micro.ts`. It adds what a strong player does with their hands:
+**Hard, first version (done).** `HardAI` in `src/game/hard-ai.ts` (a subclass of the AI, with Medium's economy and planning) and `Micro` in `src/game/micro.ts`. It adds what a strong player does with their hands:
 - **Kiting** (`Micro`): a turreted unit that outranges the enemies closing on it (tanks against infantry, rocket launchers against tanks, anything against a manned bunker it outranges) backs off while its turret keeps firing. Only against enemies it can keep away from (not trikes).
 - **Focus fire:** units shoot the target in range that dies to the fewest shots, dangerous ones first, and spread out once a target already has enough fire on it.
 - **Rotating damaged units out:** a unit under 35% health that's still being hit leaves the fight (vehicles to a Repair Vehicle, infantry home to heal) and rejoins the next wave. Only when nothing faster than it is chasing it and two healthy friends are nearby to take its place; otherwise it would just be shot in the back.
@@ -443,26 +445,26 @@ Raids barely matter against Normal, whose defense now answers them in seconds; t
   - *Sniping drops:* a rocket launcher is set down about 13 tiles from an enemy harvester, on the side away from their base, kites anything it outranges, and is lifted out as soon as more than it can handle closes in (or it's hurt, or there's nothing left to shoot), then goes on to the next harvester. A second Carryall with another launcher joins in on the same harvester from another side.
   - *Troop strikes:* six infantry dropped on a harvester guarded by less than half their strength, lifted out the same way. If the Carryall is hit on the way in, the troopers jump right there and draw the fire while it gets away.
   - Flights avoid known anti-air: if the straight line passes near infantry, rocket launchers or bunkers it has seen, the Carryall detours through a waypoint to one side; with no safe way in, it doesn't go. Idle Carryalls ferry the harvester with the longest trips and wait behind the base, not over the rally point (where they got shot down).
-- Faster reactions: it thinks every 0.5 s (Hard: 1 s), and runs micro, retreats and Carryall operations every 0.2 s.
+- Faster reactions: it thinks every 0.5 s (Medium: 1 s), and runs micro, retreats and Carryall operations every 0.2 s.
 - Economy tweaks: the army gathers 10 tiles out instead of 7 (in a cramped base the waiting army blocked harvester lanes) and a second Factory comes at 1,200 credits banked instead of 2,500.
 
-How it was measured (`sim/brutal.sh`, Brutal against Hard on paired random maps; `SEEDS=2000` for fresh maps; `sim/micro-check.ts` for equal-cost battles with micro on one side; `sim/snap.sh` runs a batch from a snapshot of the code so edits made meanwhile don't leak into it):
+How it was measured (`sim/hard.sh`, Hard against Medium on paired random maps; `SEEDS=2000` for fresh maps; `sim/micro-check.ts` for equal-cost battles with micro on one side; `sim/snap.sh` runs a batch from a snapshot of the code so edits made meanwhile don't leak into it):
 - Equal-cost battles, micro against plain attack-move (value left, own / enemy): tanks against infantry with Infantry Rockets 0% / 84% → 58% / 72%; rocket launchers against tanks 0% / 62% → 18% / 13%; tanks against infantry behind two bunkers 28% → 62% left.
-- Against Hard on 100 fresh small maps (200 games each): Hard through the Brutal class with every switch off 50% (the harness is fair); Hard plus micro only 60%; Brutal without air 72% (kill/death 1.56); without mending 60%; marching, the flank split and harvester retreat ±2% each (kept: they matter more against a person, who reacts slower than Hard's instant defense).
-- **Overfitting:** the first round of tuning used maps 1000-1039, where Brutal reached 80%; on maps 1040-1079 the same AI won 55%. Games are deterministic, so replaying the same maps doesn't average anything out. Check decisions on a fresh seed range.
-- **Air pays poorly against Hard.** A Hi-Tech Factory and two Carryalls cost 2,600 credits, and Hard answers anything near a harvester within seconds; a harvester takes 43 s to kill with one rocket launcher. Hi-Tech at 6:00: 63% on small maps (−9 against no air), 65% on medium (−11); from 10:00: 70% and 73% (no air: 72%, 76%). Large maps are the exception, where Carryalls cross distances ground units take long to: 80% with Hi-Tech at 6:00, 75% from 10:00, 70% without air (80 games each). So air comes at 10:00 on Small and Medium maps and 6:00 on Large ones. Things that didn't help: tanks instead of rocket launchers for sniping, timing troop strikes with waves (−2 to −4%), a unit mix leaning toward turreted units (neutral), holding outmatched fights longer (−7%), diving under rocket launchers' minimum range. Air is kept, from 10:00, for the pressure it puts on a person's attention, which the sims can't measure.
-- **Final:** Brutal beats Hard 71% (kill/death 1.55) on 100 small maps never used in tuning (`SEEDS=3000`, 200 games).
-- Against the scripted bots (`sim/gauntlet.sh 20 hard brutal`, measured with Hi-Tech at 6:00), Brutal / Hard: rush 65% / 50%, turtle 75% / 65%, harass 75% / 70%, rockets 65% / 65%, drop 90% / 95%; Brutal beats Normal 90%.
+- Against Medium on 100 fresh small maps (200 games each): Medium through the Hard class with every switch off 50% (the harness is fair); Medium plus micro only 60%; Hard without air 72% (kill/death 1.56); without mending 60%; marching, the flank split and harvester retreat ±2% each (kept: they matter more against a person, who reacts slower than Medium's instant defense).
+- **Overfitting:** the first round of tuning used maps 1000-1039, where Hard reached 80%; on maps 1040-1079 the same AI won 55%. Games are deterministic, so replaying the same maps doesn't average anything out. Check decisions on a fresh seed range.
+- **Air pays poorly against Medium.** A Hi-Tech Factory and two Carryalls cost 2,600 credits, and Medium answers anything near a harvester within seconds; a harvester takes 43 s to kill with one rocket launcher. Hi-Tech at 6:00: 63% on small maps (−9 against no air), 65% on medium (−11); from 10:00: 70% and 73% (no air: 72%, 76%). Large maps are the exception, where Carryalls cross distances ground units take long to: 80% with Hi-Tech at 6:00, 75% from 10:00, 70% without air (80 games each). So air comes at 10:00 on Small and Medium maps and 6:00 on Large ones. Things that didn't help: tanks instead of rocket launchers for sniping, timing troop strikes with waves (−2 to −4%), a unit mix leaning toward turreted units (neutral), holding outmatched fights longer (−7%), diving under rocket launchers' minimum range. Air is kept, from 10:00, for the pressure it puts on a person's attention, which the sims can't measure.
+- **Final:** Hard beats Medium 71% (kill/death 1.55) on 100 small maps never used in tuning (`SEEDS=3000`, 200 games).
+- Against the scripted bots (`sim/gauntlet.sh 20 medium hard`, measured with Hi-Tech at 6:00), Hard / Medium: rush 65% / 50%, turtle 75% / 65%, harass 75% / 70%, rockets 65% / 65%, drop 90% / 95%; Hard beats Easy 90%.
 
-Next for Brutal: rocket-launcher armies and turtles are its weakest matchups (kill/death below 1), and the early game (before tanks, where micro has little to work with) decides most of its losses.
+Next for Hard: rocket-launcher armies and turtles are its weakest matchups (kill/death below 1), and the early game (before tanks, where micro has little to work with) decides most of its losses.
 
-**Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `NORMAL_PROFILE` reproduces the original behavior.
+**Structure:** one AI driven by a per-difficulty `AIProfile` (settings and feature switches), not three separate AIs. The profile type exists in `src/game/ai.ts`; `EASY_PROFILE` reproduces the original behavior.
 
 **Spending decisions use value estimation (utility AI)**, scored in credits rather than vague weights. Example: a harvester is worth income per minute × expected lifetime × survival odds, minus its cost. This covers a small set of choices: harvester, army unit, tech, refinery, backup Construction Yard. Movement and combat stay scripted.
 
 **Reaction time instead of APM:** each level gets a reaction delay (around 2 s / 1 s / 0.3 s).
 
-**Open:** should Brutal get resource bonuses? Current recommendation: no. (The AI now plays under the fog of war, knowing only what its side has seen: `src/game/intel.ts`.)
+**Open:** should Hard get resource bonuses? Current recommendation: no. (The AI now plays under the fog of war, knowing only what its side has seen: `src/game/intel.ts`.)
 
 ## Simulation findings (single map, seed 7)
 
@@ -471,15 +473,15 @@ Harness in `sim/`: the game runs headless in Node at about 600× real time.
 - At the old price of 300, harvesters paid for themselves in under a minute, so more was always better (12+). **Harvester price raised to 800** (decided). Tests at 900 showed counts from 4 to 10 all viable, which gives a real trade-off.
 - A refinery adds no income: several harvesters unload at one refinery at the same time. One vs two refineries at equal harvester counts gave the same income.
 - Builds with a second refinery still won matches. Not yet explained: the likely cause is that the experiment also changed when tech spending starts. This needs re-testing.
-- **Re-tested on random maps (with the revised Normal):** building the second refinery right away beats building it only under threat or never, at every harvester count: 4 harvesters 85% vs 73%, 6 harvesters 83% vs 73% (threat) and 58% (never). Spice at 5 minutes jumps from about 8k to 11k. The free harvester that comes with it is the likely reason. Two factories instead lost badly (28%).
+- **Re-tested on random maps (with the revised Easy):** building the second refinery right away beats building it only under threat or never, at every harvester count: 4 harvesters 85% vs 73%, 6 harvesters 83% vs 73% (threat) and 58% (never). Spice at 5 minutes jumps from about 8k to 11k. The free harvester that comes with it is the likely reason. Two factories instead lost badly (28%).
 - **Open:** a refinery still includes a free harvester. At 800 that makes a refinery a 400-credit building plus a harvester. Options: raise the refinery to about 1,800-1,900, or drop the free harvester.
-- Normal loses to an early mass-infantry rush. Worth fixing in Normal, or worth using as an early aggression option for Hard.
+- Easy loses to an early mass-infantry rush. Worth fixing in Easy, or worth using as an early aggression option for Medium.
 - All of this was measured on one map. Re-run after procedural maps and the expansion changes.
 
 ### Running the sims
 
 ```sh
-sim/run.sh 10 4                        # every variant in sim/variants.ts vs Normal, 40 games each
+sim/run.sh 10 4                        # every variant in sim/variants.ts vs Easy, 40 games each
 sim/roundrobin.sh 20 h6-always h8-always h10-always   # variants vs each other
 HARV_COST=900 sim/roundrobin.sh 20 ...                # balance experiment with a price override
 npx tsx sim/economy.ts                 # economy only, no enemy

@@ -1,6 +1,6 @@
 // AI-vs-AI games played through the same Match the browser uses, each saved as a replay file. One JSON line per game.
 // Usage: npx tsx sim/replay-match.ts <faction>,<faction> <level>,<level> <games> [offset]
-//   e.g. SAVE=replays npx tsx sim/replay-match.ts fremen,corrino brutal,brutal 8      (map seeds 1000, 1001, …)
+//   e.g. SAVE=replays npx tsx sim/replay-match.ts fremen,corrino hard,hard 8      (map seeds 1000, 1001, …)
 // Each game's sides swap with the seed's parity, as in the other sims; SAVE=<dir> writes <dir>/<seed>-<winner>.json.
 // Watch one in the browser (title screen, Replays), or check it plays back the same: npx tsx sim/replay-check.ts <file>
 import * as THREE from 'three';
@@ -11,7 +11,7 @@ import { Match } from '../src/net/replay';
 
 const [factionsArg, levelsArg, gamesArg, offsetArg] = process.argv.slice(2);
 const pair = (factionsArg ?? 'fremen,corrino').split(',') as Faction[];
-const levels = (levelsArg ?? 'brutal,brutal').split(',') as Difficulty[];
+const levels = (levelsArg ?? 'hard,hard').split(',') as Difficulty[];
 const games = Number(gamesArg ?? 4);
 const offset = Number(offsetArg ?? 0);
 const MAX_TICKS = 30 * 60 * 20;

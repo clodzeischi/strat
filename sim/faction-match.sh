@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Corrino AI against Atreides AI in parallel (sim/faction-match.ts), with a summary.
-# Usage: sim/faction-match.sh <games> <corrinoLevel> <atreidesLevel>      e.g. sim/faction-match.sh 40 hard hard
+# Usage: sim/faction-match.sh <games> <corrinoLevel> <atreidesLevel>      e.g. sim/faction-match.sh 40 medium medium
 cd "$(dirname "$0")/.."
-GAMES=${1:-20}; C=${2:-hard}; A=${3:-hard}
+GAMES=${1:-20}; C=${2:-medium}; A=${3:-medium}
 OUT=$(mktemp)
 CHUNK=2
 for ((s = 0; s < GAMES; s += CHUNK)); do echo "$C $A $CHUNK $s"; done \

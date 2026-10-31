@@ -3,7 +3,7 @@
 // once every one of its computer players has given up (or is gone); and the game ends with one side the winner.
 // Usage: npx tsx sim/teams-check.ts
 import * as THREE from 'three';
-import { createAI } from '../src/game/brutal';
+import { createAI } from '../src/game/hard-ai';
 import { FACTIONS, type Faction, type MapSize, type Team } from '../src/config';
 import { Game } from '../src/game/game';
 
@@ -33,7 +33,7 @@ for (const [size, seed, factions] of games) {
   };
   const offers: Team[] = [];
   g.onSurrenderOffer = (t) => offers.push(t);
-  const ais = g.teams.map((t) => createAI(g, t.team, 'hard'));
+  const ais = g.teams.map((t) => createAI(g, t.team, 'medium'));
   let sharedSight = true;
   while (g.winner === null && g.time < 40 * 60) {
     g.update(0.05);

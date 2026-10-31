@@ -2,7 +2,7 @@
 // AI base draw out its infantry (rifles hit aircraft), not its tanks and trikes. Usage: npx tsx sim/ai-air-defense-check.ts
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
-import { AI, HARD_PROFILE } from '../src/game/ai';
+import { AI, MEDIUM_PROFILE } from '../src/game/ai';
 import type { Team } from '../src/config';
 import type { Unit } from '../src/entities';
 
@@ -15,7 +15,7 @@ function check(ok: boolean, what: string): void {
 const A: Team = 0;
 const C: Team = 1;
 const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 7, ['atreides', 'corrino']);
-const ai = new AI(g, A, HARD_PROFILE);
+const ai = new AI(g, A, MEDIUM_PROFILE);
 const yard = g.buildings.find((b) => b.team === A && b.type === 'conyard')!;
 for (const u of [...g.units]) {
   u.hp = 0;

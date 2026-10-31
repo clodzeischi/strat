@@ -15,7 +15,7 @@ const KITE_SPEED = 0.7;
 const SWITCH = 1.3;
 
 /**
- * Unit-level fighting for the Brutal AI, run several times a second over the units it's given:
+ * Unit-level fighting for the Hard AI, run several times a second over the units it's given:
  *  - Kiting: a turreted unit that outranges the enemies closing on it (tanks against infantry, rocket launchers
  *    against tanks) backs off while its turret keeps firing, so they never get their shots in.
  *  - Focus fire: units with several enemies in range shoot the one that dies to the fewest shots, dangerous ones

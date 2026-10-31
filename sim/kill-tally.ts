@@ -1,8 +1,8 @@
-// Who kills whom, by credits: a few Hard-vs-Hard games, tallied by victim and killer type, and where Fremen units die.
+// Who kills whom, by credits: a few Medium-vs-Medium games, tallied by victim and killer type, and where Fremen units die.
 // Usage: F=fremen,corrino npx tsx sim/kill-tally.ts
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
-import { createAI } from '../src/game/brutal';
+import { createAI } from '../src/game/hard-ai';
 import { Building, Unit } from '../src/entities';
 import type { Faction } from '../src/config';
 const fac = (process.env.F ?? 'fremen,atreides').split(',') as Faction[];
@@ -24,7 +24,7 @@ for (const seed of [1001, 1002, 1003, 1004]) {
     }
     kill(e, by);
   };
-  const ais = [createAI(g, 0, 'hard'), createAI(g, 1, 'hard')];
+  const ais = [createAI(g, 0, 'medium'), createAI(g, 1, 'medium')];
   while (g.winner === null && g.time < 1500) { g.update(0.05); for (const a of ais) a.update(0.05); }
   console.log(seed, 'winner', fac[g.winner ?? 0], Math.round(g.time));
 }

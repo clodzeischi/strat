@@ -1,7 +1,7 @@
 // The AI plays fair under fog of war: it knows only what its side has seen, so it scouts to find the enemy.
 // Usage: npx tsx sim/ai-fog-check.ts [difficulty] [seed]
 import * as THREE from 'three';
-import { createAI } from '../src/game/brutal';
+import { createAI } from '../src/game/hard-ai';
 import type { Team, UnitType } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 
@@ -11,7 +11,7 @@ function check(ok: boolean, label: string, detail = ''): void {
   console.log(`${ok ? 'ok  ' : 'FAIL'}  ${label}${detail ? `  (${detail})` : ''}`);
 }
 
-const difficulty = (process.argv[2] ?? 'normal') as Difficulty;
+const difficulty = (process.argv[2] ?? 'easy') as Difficulty;
 const seed = Number(process.argv[3] ?? 1003);
 const AI_TEAM: Team = 1;
 const PLAYER: Team = 0;

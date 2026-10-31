@@ -1,6 +1,6 @@
 import { BUILDINGS, CARRYALL, TILE, UNITS, type Team, type UnitType } from '../config';
 import { Carryall, distTo, type Unit } from '../entities';
-import { AI, HARD_PROFILE, power, profileFor, type AIProfile, type Role, type Wave } from './ai';
+import { AI, MEDIUM_PROFILE, power, profileFor, type AIProfile, type Role, type Wave } from './ai';
 import type { Difficulty, Game } from './game';
 import { hypot } from './hypot';
 import type { Sighting } from './intel';
@@ -8,16 +8,16 @@ import { Micro } from './micro';
 import * as dm from './dmath';
 
 /**
- * Brutal: Hard's economy and army planning, plus what a strong player does with their hands. Its units kite and
+ * Hard: Medium's economy and army planning, plus what a strong player does with their hands. Its units kite and
  * focus fire (`Micro`), badly hurt units leave the fight to heal and come back, waves march together, harvesters
  * run from raiders that would kill them, and Carryalls go to work: rocket launchers and paratroopers dropped on enemy
  * harvesters along routes clear of known anti-air, lifted out at the first sign of danger, with troopers jumping
  * early to draw the fire if their Carryall is hit on the way in, and fresh units flown out to an army in the field. Waves split, so a flanking group hits the economy
- * while the main army attacks, and more trike raids keep the pressure on. Tuned with `sim/brutal.sh`; see
+ * while the main army attacks, and more trike raids keep the pressure on. Tuned with `sim/hard.sh`; see
  * docs/PLAN.md.
  */
-export const BRUTAL_PROFILE: AIProfile = {
-  ...HARD_PROFILE,
+export const HARD_PROFILE: AIProfile = {
+  ...MEDIUM_PROFILE,
   raids: { trikes: 4, start: 120, interval: 45, hunt: true },
   sustain: { repairPer: 5, maxRepair: 3, outmatched: 1.3 },
   // Gathers further out (the army at home stays out of the harvesters' way) and adds a second factory sooner.
@@ -25,8 +25,8 @@ export const BRUTAL_PROFILE: AIProfile = {
   more: { barracks: 1500, factory: 1200 },
 };
 
-/** Brutal's switches, so the sims can measure each one. */
-export interface BrutalOptions {
+/** Hard's switches, so the sims can measure each one. */
+export interface HardOptions {
   /** Kiting and focus fire. */
   micro: boolean;
   /** Pull units below this share of health out of fights (0: never). */
@@ -56,7 +56,7 @@ export interface BrutalOptions {
   march: boolean;
   /** Waves split off a fast flanking group that goes for the economy. */
   flank: boolean;
-  /** Seconds between thinks (Hard: 1). */
+  /** Seconds between thinks (Medium: 1). */
   think: number;
   /**
    * The Hi-Tech Factory waits for this game time (on Small and Medium maps; `hitechAtLarge` on Large ones, where air
@@ -70,7 +70,7 @@ export interface BrutalOptions {
   hitechSpare: number;
 }
 
-export const BRUTAL_OPTIONS: BrutalOptions = {
+export const HARD_OPTIONS: HardOptions = {
   micro: true, mend: 0.35, harvesterRetreat: true, carryalls: 2, snipe: true, sniper: 'rocket', para: true, dropsVsAI: false, paraWithWave: false, ferry: true, lift: true, march: true, flank: true, think: 0.5,
   hitechAt: 600, hitechAtLarge: 360, hitechArmy: 10, hitechLead: 1.2, hitechSpare: 400,
 };
@@ -109,7 +109,7 @@ interface Op {
 }
 
 /** Outcome counters for the sims. */
-export interface BrutalStats {
+export interface HardStats {
   snipes: number;
   paras: number;
   /** Kills made by Carryall cargo while on an operation. */
@@ -127,7 +127,7 @@ export interface BrutalStats {
   flanks: number;
 }
 
-export class BrutalAI extends AI {
+export class HardAI extends AI {
   private micro: Micro;
   private fastTimer = 0;
   private ops = new Map<Carryall, Op>();
@@ -137,9 +137,9 @@ export class BrutalAI extends AI {
   private knownWaves = new Set<Wave>();
   /** Wave units waiting for the rest of their wave (see `marchWaves`). */
   private holding = new Set<Unit>();
-  readonly stats: BrutalStats = { snipes: 0, paras: 0, opKills: 0, opLosses: 0, extractions: 0, paraBails: 0, lifts: 0, lifted: 0, carryallsLost: 0, mends: 0, kites: 0, flanks: 0 };
+  readonly stats: HardStats = { snipes: 0, paras: 0, opKills: 0, opLosses: 0, extractions: 0, paraBails: 0, lifts: 0, lifted: 0, carryallsLost: 0, mends: 0, kites: 0, flanks: 0 };
 
-  constructor(game: Game, team: Team, profile: AIProfile = BRUTAL_PROFILE, readonly opts: BrutalOptions = BRUTAL_OPTIONS) {
+  constructor(game: Game, team: Team, profile: AIProfile = HARD_PROFILE, readonly opts: HardOptions = HARD_OPTIONS) {
     super(game, team, profile);
     this.micro = new Micro(game, team);
     this.thinkEvery = opts.think;
@@ -881,7 +881,7 @@ export class BrutalAI extends AI {
   }
 }
 
-/** The AI for a difficulty: Brutal is its own class, Normal and Hard differ only in their profile. */
+/** The AI for a difficulty: Hard is its own class, Easy and Medium differ only in their profile. */
 export function createAI(game: Game, team: Team, difficulty: Difficulty): AI {
-  return difficulty === 'brutal' ? new BrutalAI(game, team) : new AI(game, team, profileFor(difficulty));
+  return difficulty === 'hard' ? new HardAI(game, team) : new AI(game, team, profileFor(difficulty));
 }

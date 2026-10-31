@@ -1,12 +1,12 @@
 // Scripted "player" opponents for testing the AI against the strategies a person would use, instead of only against
 // itself. Each bot reuses the AI's economy and building code and overrides what it builds and how it uses its army.
-import { AI, HARD_PROFILE, NORMAL_PROFILE, type AIProfile } from '../src/game/ai';
+import { AI, MEDIUM_PROFILE, EASY_PROFILE, type AIProfile } from '../src/game/ai';
 import { Carryall, type Unit } from '../src/entities';
 import type { Team, UnitType } from '../src/config';
 import type { Game } from '../src/game/game';
 
-/** Bots never surrender, and keep Hard's economy unless they say otherwise. */
-const BASE: AIProfile = { ...HARD_PROFILE, surrender: false, initiative: 0, raids: { ...NORMAL_PROFILE.raids, start: Infinity }, sustain: NORMAL_PROFILE.sustain };
+/** Bots never surrender, and keep Medium's economy unless they say otherwise. */
+const BASE: AIProfile = { ...MEDIUM_PROFILE, surrender: false, initiative: 0, raids: { ...EASY_PROFILE.raids, start: Infinity }, sustain: EASY_PROFILE.sustain };
 
 abstract class Bot extends AI {
   /** Attackers that got where they were sent push on to the next building. */

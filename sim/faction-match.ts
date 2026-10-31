@@ -1,13 +1,13 @@
 // AI-vs-AI games between the factions: Corrino played by one AI level against Atreides played by another, each
 // random map played from both sides. One JSON line per game, with what the Corrino side built and which of its
 // abilities it used, so it's easy to see it plays the faction and not just its numbers.
-// Usage: npx tsx sim/faction-match.ts <corrinoLevel> <atreidesLevel> <games> [offset]      levels: normal, hard, brutal, brutal-noair, brutal-nomicro
+// Usage: npx tsx sim/faction-match.ts <corrinoLevel> <atreidesLevel> <games> [offset]      levels: easy, medium, hard, hard-noair, hard-nomicro
 // Other pairs: FACTIONS=fremen,corrino npx tsx sim/faction-match.ts <fremenLevel> <corrinoLevel> <games> [offset]
 // (the first faction is the one reported on, in the 'corrino' fields). In parallel: FACTIONS=... sim/faction-match.sh
 import * as THREE from 'three';
 import './tune';
 import './fremen-variants'; // FREMEN_VARIANT=<name> plays an alternative Fremen makeup
-import { BRUTAL_OPTIONS, BRUTAL_PROFILE, BrutalAI, createAI } from '../src/game/brutal';
+import { HARD_OPTIONS, HARD_PROFILE, HardAI, createAI } from '../src/game/hard-ai';
 import type { Difficulty } from '../src/game/game';
 import { Game } from '../src/game/game';
 import type { Faction, MapSize, Team, UnitType } from '../src/config';
@@ -26,12 +26,12 @@ for (let k = 0; k < games; k++) {
   const seed = 1000 + Math.floor(i / 2);
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, seed, factions);
   g.onSurrenderOffer = (t) => g.acceptSurrender(t);
-  // 'brutal-noair': Brutal without Carryalls (no snipes, drops or ferrying), to see what they're worth.
-  // 'brutal-nomicro': Brutal without kiting and focus fire.
-  const make = (t: Team, level: string) => level === 'brutal-noair'
-    ? new BrutalAI(g, t, BRUTAL_PROFILE, { ...BRUTAL_OPTIONS, carryalls: 0, snipe: false, para: false, ferry: false })
-    : level === 'brutal-nomicro'
-      ? new BrutalAI(g, t, BRUTAL_PROFILE, { ...BRUTAL_OPTIONS, micro: false })
+  // 'hard-noair': Hard without Carryalls (no snipes, drops or ferrying), to see what they're worth.
+  // 'hard-nomicro': Hard without kiting and focus fire.
+  const make = (t: Team, level: string) => level === 'hard-noair'
+    ? new HardAI(g, t, HARD_PROFILE, { ...HARD_OPTIONS, carryalls: 0, snipe: false, para: false, ferry: false })
+    : level === 'hard-nomicro'
+      ? new HardAI(g, t, HARD_PROFILE, { ...HARD_OPTIONS, micro: false })
       : createAI(g, t, level as Difficulty);
   const ais = ([0, 1] as Team[]).map((t) => make(t, t === corrino ? cLevel : aLevel));
   const built: Partial<Record<UnitType, number>> = {};

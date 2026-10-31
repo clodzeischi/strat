@@ -1,9 +1,9 @@
 // AI behavior checks: defense sized to the attack, defenders returning home, economy recovery and surrender.
 // The AI plays team 1 alone for a few minutes; the scenario then spawns attackers or destroys its buildings.
-// Usage: npx tsx sim/ai-check.ts [seed]      DIFFICULTY=hard (or brutal) checks that difficulty.
+// Usage: npx tsx sim/ai-check.ts [seed]      DIFFICULTY=medium (or hard) checks that difficulty.
 import * as THREE from 'three';
 import { profileFor } from '../src/game/ai';
-import { BRUTAL_PROFILE, createAI } from '../src/game/brutal';
+import { HARD_PROFILE, createAI } from '../src/game/hard-ai';
 import { TILE, type Faction, type Team } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 import { Building, type Entity, type Unit } from '../src/entities';
@@ -11,9 +11,9 @@ import { Building, type Entity, type Unit } from '../src/entities';
 const SEED = Number(process.argv[2] ?? 7);
 const AI_TEAM: Team = 1;
 const PLAYER_TEAM: Team = 0;
-const DIFFICULTY = (process.env.DIFFICULTY ?? 'normal') as Difficulty;
+const DIFFICULTY = (process.env.DIFFICULTY ?? 'easy') as Difficulty;
 type Brain = { update(dt: number): void };
-const PROFILE = DIFFICULTY === 'brutal' ? BRUTAL_PROFILE : profileFor(DIFFICULTY);
+const PROFILE = DIFFICULTY === 'hard' ? HARD_PROFILE : profileFor(DIFFICULTY);
 
 let failures = 0;
 function check(ok: boolean, label: string, detail = ''): void {
@@ -31,7 +31,7 @@ function setup(warmup = 420, waves = false, aiFaction: Faction = 'atreides'): Se
   g.onSurrenderOffer = () => s.offers++;
   for (const b of g.buildings) if (b.team === PLAYER_TEAM) Object.assign(b, { hp: 1e9, maxHp: 1e9 });
   for (const u of g.units) if (u.team === PLAYER_TEAM) kill(g, u);
-  // No attacks or scouting runs of its own (Hard attacks whenever it's stronger, and the player here has no army), so
+  // No attacks or scouting runs of its own (Medium attacks whenever it's stronger, and the player here has no army), so
   // the army stays home.
   if (!waves) Object.assign(ai, { nextWaveTime: Infinity, nextRaidTime: Infinity, nextScoutTime: Infinity, profile: { ...PROFILE, initiative: 0 } });
   run(s, warmup);
@@ -289,7 +289,7 @@ function wreck(s: Setup, doomed: (e: Unit | Building) => boolean, armed: number,
   check(s.offers === 1 && s.g.hasHub(AI_TEAM), 'overwhelmed with its economy running: offers to surrender', s.offers ? `after ${Math.round(s.g.time - t0)}s` : 'no offer');
 }
 
-// 7-8. Hard keeps its army alive: vehicles back from a fight get repaired at home (nobody leaves a fight for it),
+// 7-8. Medium keeps its army alive: vehicles back from a fight get repaired at home (nobody leaves a fight for it),
 // and an outmatched wave pulls back.
 if (PROFILE.sustain.repairPer) {
   {

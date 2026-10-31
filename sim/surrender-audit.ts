@@ -4,13 +4,13 @@
 // time limit) gave up too soon.
 // Usage: npx tsx sim/surrender-audit.ts [games=24] [firstSeed=1000] [difficulty=normal]
 import * as THREE from 'three';
-import { createAI } from '../src/game/brutal';
+import { createAI } from '../src/game/hard-ai';
 import { FACTION_LIST, type Faction, type MapSize, type Team } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 
 const games = Number(process.argv[2] ?? 24);
 const first = Number(process.argv[3] ?? 1000);
-const difficulty = (process.argv[4] ?? 'normal') as Difficulty;
+const difficulty = (process.argv[4] ?? 'easy') as Difficulty;
 const LIMIT = 30 * 60;
 
 let early = 0;

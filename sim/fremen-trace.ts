@@ -2,13 +2,13 @@
 // Usage: OPP=corrino npx tsx sim/fremen-trace.ts [games] [level]
 import * as THREE from 'three';
 import './fremen-variants';
-import { createAI } from '../src/game/brutal';
+import { createAI } from '../src/game/hard-ai';
 import { Game, type Difficulty } from '../src/game/game';
 import type { Faction, Team } from '../src/config';
 
 const opp = (process.env.OPP ?? 'corrino') as Faction;
 const games = Number(process.argv[2] ?? 2);
-const level = (process.argv[3] ?? 'hard') as Difficulty;
+const level = (process.argv[3] ?? 'medium') as Difficulty;
 for (let i = 0; i < games; i++) {
   const f = (i % 2) as Team;
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 1000 + (i >> 1), f === 0 ? ['fremen', opp] : [opp, 'fremen']);

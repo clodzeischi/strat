@@ -1,6 +1,6 @@
 // Plays replay files back headlessly and checks they rebuild the recorded game: every stored checksum matches and
 // the match ends the same way. Usage: npx tsx sim/replay-check.ts [file.json...]
-// With no files it records a fresh Brutal-vs-Brutal game in this build and checks that replay instead, then lists how
+// With no files it records a fresh Hard-vs-Hard game in this build and checks that replay instead, then lists how
 // the bundled replays (src/public/replays) fare: those were recorded on older builds, so drifting there is reported
 // but isn't a failure (the viewer warns about it).
 import * as THREE from 'three';
@@ -27,10 +27,10 @@ if (files.length) {
 } else {
   // Record a game the way the browser does (through Match), round-trip it through JSON, play it back.
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), 64, 1000, ['fremen', 'corrino']);
-  g.difficulty = 'brutal';
-  const m = new Match(g, ['brutal', 'brutal']);
+  g.difficulty = 'hard';
+  const m = new Match(g, ['hard', 'hard']);
   while (g.winner === null && g.ticks < 20 * 60 * 6) m.step();
-  const r = parseReplay(JSON.stringify(m.replay(['Brutal AI', 'Brutal AI'])));
+  const r = parseReplay(JSON.stringify(m.replay(['Hard AI', 'Hard AI'])));
   if (!check(`fresh recording (seed 1000, ${r.commands.length} commands)`, r, true)) failures++;
   const dir = 'src/public/replays';
   const index = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8')) as { file: string }[];

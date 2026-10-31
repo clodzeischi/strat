@@ -111,10 +111,10 @@ function cleanFaction(v: unknown): Faction {
 }
 
 function cleanDifficulty(v: unknown): Difficulty {
-  return v === 'hard' || v === 'brutal' ? v : 'normal';
+  return v === 'medium' || v === 'hard' ? v : 'easy';
 }
 
-const DIFFICULTY_NAMES: Record<Difficulty, string> = { normal: 'Normal', hard: 'Hard', brutal: 'Brutal' };
+const DIFFICULTY_NAMES: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
 function closeRoom(room: Room): void {
   if (room.timer) clearTimeout(room.timer);

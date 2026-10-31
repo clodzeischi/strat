@@ -2,7 +2,7 @@
 // Usage: npx tsx sim/side-bias.ts [maps=20] [repeats=6] [firstSeed=1000] [difficulty=hard]
 // Prints one JSON line per map: { seed, team0 wins, games }, then the mean deviation from 50%.
 import * as THREE from 'three';
-import { createAI } from '../src/game/brutal';
+import { createAI } from '../src/game/hard-ai';
 import type { MapSize, Team } from '../src/config';
 import { Game, type Difficulty } from '../src/game/game';
 
@@ -10,7 +10,7 @@ const [mapsArg, repsArg, firstArg, diffArg] = process.argv.slice(2);
 const maps = Number(mapsArg ?? 20);
 const reps = Number(repsArg ?? 6);
 const first = Number(firstArg ?? 1000);
-const difficulty = (diffArg ?? 'hard') as Difficulty;
+const difficulty = (diffArg ?? 'medium') as Difficulty;
 let dev = 0;
 for (let m = 0; m < maps; m++) {
   const seed = first + m;

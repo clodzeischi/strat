@@ -54,7 +54,7 @@ function readAutostart(): Autostart | null {
     sessionStorage.removeItem(AUTOSTART_KEY);
     const [difficulty, size, seed, list] = (raw ?? '').split(':');
     const factions = (list ?? '').split(',') as Faction[];
-    const okDifficulty = difficulty === 'normal' || difficulty === 'hard' || difficulty === 'brutal';
+    const okDifficulty = difficulty === 'easy' || difficulty === 'medium' || difficulty === 'hard';
     const okSize = (MAP_SIZES as readonly number[]).includes(Number(size));
     const okSeed = seed !== '' && Number.isInteger(Number(seed));
     const okFactions = (factions.length === 2 || factions.length === 4) && factions.every((f) => FACTION_LIST.includes(f));
@@ -65,7 +65,7 @@ function readAutostart(): Autostart | null {
 }
 // Watching a replay: the page reloads into it (the map is built at load), with where to start and how.
 const REPLAY_KEY = 'strat.replay';
-const DIFFICULTY_NAMES: Record<Difficulty, string> = { normal: 'Normal', hard: 'Hard', brutal: 'Brutal' };
+const DIFFICULTY_NAMES: Record<Difficulty, string> = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 /** The last game played on this browser, kept to watch again. */
 const LAST_REPLAY_KEY = 'strat.lastReplay';
 interface ReplayStart { replay: Replay; seek: number; speed: number; view: ReplayView }
@@ -318,7 +318,7 @@ function onMatchMessage(msg: ServerMsg): void {
       // Otherwise their side has nobody left, and the game is over.
       const from = lockstep.drop(msg.team, msg.tick);
       if (game.teamsOn(game.sideOf(msg.team)).some((t) => people.has(t))) {
-        session.takeOver(msg.team, match.takeover ?? 'normal', from);
+        session.takeOver(msg.team, match.takeover ?? 'easy', from);
         hud.showMessage(`${name} left the game. The computer takes over for them.`);
       } else endGame(`${name} left the game`);
       break;
@@ -337,7 +337,7 @@ function showNetWait(text: string): void {
 /** Watches a replay, from `seek` (in ticks). */
 function startReplay(w: ReplayStart): void {
   const r = w.replay;
-  game.difficulty = r.ai.find((d) => d) ?? 'normal';
+  game.difficulty = r.ai.find((d) => d) ?? 'easy';
   // A person's answer to a surrender offer is in the recording; nobody is asked again.
   game.onSurrenderOffer = () => {};
   session = Match.playback(game, r);

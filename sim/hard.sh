@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Brutal variants (sim/brutal-match.ts) against an opponent, in parallel, with a summary table.
-# Usage: sim/brutal.sh <games> <opponent[,opponent...]> variant...
+# Hard variants (sim/hard-match.ts) against an opponent, in parallel, with a summary table.
+# Usage: sim/hard.sh <games> <opponent[,opponent...]> variant...
 cd "$(dirname "$0")/.."
-GAMES=${1:-20}; OPPS=${2:-hard}; shift 2
-VARS=${@:-brutal}
+GAMES=${1:-20}; OPPS=${2:-medium}; shift 2
+VARS=${@:-hard}
 OUT=$(mktemp)
 CHUNK=5
 for o in ${OPPS//,/ }; do for v in $VARS; do for ((s = 0; s < GAMES; s += CHUNK)); do echo "$v $o $CHUNK $s"; done; done; done \
-  | xargs -P "$(nproc)" -L1 sh -c 'npx tsx sim/brutal-match.ts $0 $1 $2 $3' >> "$OUT"
+  | xargs -P "$(nproc)" -L1 sh -c 'npx tsx sim/hard-match.ts $0 $1 $2 $3' >> "$OUT"
 python3 - "$OUT" <<'PY'
 import json, sys
 from collections import defaultdict

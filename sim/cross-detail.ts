@@ -4,7 +4,7 @@
 // Usage: FACTIONS=fremen,atreides npx tsx sim/cross-detail.ts <level> <games> [offset]
 import * as THREE from 'three';
 import './tune';
-import { createAI } from '../src/game/brutal';
+import { createAI } from '../src/game/hard-ai';
 import { Game, type Difficulty } from '../src/game/game';
 import { Building, Unit } from '../src/entities';
 import { LEVEL_UP_ORDER, type Faction, type MapSize, type Team, type UnitType } from '../src/config';
@@ -19,7 +19,7 @@ for (let k = 0; k < games; k++) {
   const side = (n % 2) as Team; // the first faction's team
   const g = new Game(new THREE.Scene(), new THREE.PerspectiveCamera(), Number(process.env.SIZE ?? 64) as MapSize, 1000 + Math.floor(n / 2), side === 0 ? factions : [factions[1], factions[0]]);
   g.onSurrenderOffer = (t) => g.acceptSurrender(t);
-  const ais = ([0, 1] as Team[]).map((t) => createAI(g, t, (level ?? 'hard') as Difficulty));
+  const ais = ([0, 1] as Team[]).map((t) => createAI(g, t, (level ?? 'medium') as Difficulty));
   const built: Partial<Record<UnitType, number>>[] = [{}, {}];
   const kills: Record<string, number>[] = [{}, {}];
   const deaths: Record<string, number>[] = [{}, {}];

@@ -3,7 +3,7 @@ import type { Command } from '../game/commands';
 import type { Difficulty } from '../game/game';
 
 /** Bumped whenever the messages or the simulation change in a way that would split two different builds apart. */
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 /** One against one, or two against two (people and computer players). */
 export type RoomMode = '1v1' | '2v2';

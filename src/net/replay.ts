@@ -1,6 +1,6 @@
 import { FACTION_LIST, MAP_SIZES, type Faction, type MapSize, type Side, type Team } from '../config';
 import type { AI } from '../game/ai';
-import { createAI } from '../game/brutal';
+import { createAI } from '../game/hard-ai';
 import type { Difficulty, Game } from '../game/game';
 import { Lockstep, TICK, type RecordedCommand } from './lockstep';
 
@@ -13,7 +13,8 @@ export const REPLAY_HASH_EVERY = 200;
  * commands at all.
  */
 export interface Replay {
-  v: 1;
+  /** 2 since the difficulties were renamed (1: normal, hard, brutal). */
+  v: 2;
   seed: number;
   size: MapSize;
   factions: Faction[];
@@ -121,7 +122,7 @@ export class Match {
   replay(names: string[]): Replay {
     const g = this.game;
     return {
-      v: 1, seed: g.map.seed, size: g.map.size as MapSize, factions: g.teams.map((t) => t.faction), sides: g.teams.map((t) => t.side), ai: this.ai,
+      v: 2, seed: g.map.seed, size: g.map.size as MapSize, factions: g.teams.map((t) => t.faction), sides: g.teams.map((t) => t.side), ai: this.ai,
       takeovers: this.takeovers.filter((k) => k.tick < (this.endedAt ?? Infinity)), names,
       commands: this.lockstep.record.filter((c) => c.tick < (this.endedAt ?? Infinity)), hashes: this.hashes, ticks: this.endedAt ?? g.ticks, winner: g.winner, surrendered: g.surrendered,
       date: new Date().toISOString(),
@@ -142,9 +143,14 @@ export class Match {
 /** Reads a replay file, or throws with what's wrong with it. */
 export function parseReplay(text: string): Replay {
   const r = JSON.parse(text) as Replay;
-  const ok = r && r.v === 1 && Number.isInteger(r.seed) && (MAP_SIZES as readonly number[]).includes(r.size)
+  if (r && (r.v as number) === 1 && Array.isArray(r.ai)) {
+    const old: Record<string, Difficulty> = { normal: 'easy', hard: 'medium', brutal: 'hard' };
+    r.ai = r.ai.map((d) => (d === null ? null : old[d] ?? d));
+    r.v = 2;
+  }
+  const ok = r && r.v === 2 && Number.isInteger(r.seed) && (MAP_SIZES as readonly number[]).includes(r.size)
     && Array.isArray(r.factions) && (r.factions.length === 2 || r.factions.length === 4) && r.factions.every((f) => FACTION_LIST.includes(f))
-    && Array.isArray(r.ai) && r.ai.length === r.factions.length && r.ai.every((d) => d === null || d === 'normal' || d === 'hard' || d === 'brutal')
+    && Array.isArray(r.ai) && r.ai.length === r.factions.length && r.ai.every((d) => d === null || d === 'easy' || d === 'medium' || d === 'hard')
     && (r.sides === undefined || (Array.isArray(r.sides) && r.sides.length === r.factions.length && r.sides.every((s) => s === 0 || s === 1)))
     && Array.isArray(r.commands) && Array.isArray(r.hashes) && Number.isInteger(r.ticks);
   if (!ok) throw new Error('Not a replay file');
