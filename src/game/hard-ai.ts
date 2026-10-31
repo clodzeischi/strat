@@ -329,7 +329,7 @@ export class HardAI extends AI {
   private canRotate(u: Unit, army: Unit[]): boolean {
     const g = this.game;
     for (const e of g.units) {
-      if (e.team === this.team || e.dead || e.carrier || !e.def.weapon || !g.sees(this.team, e)) continue;
+      if (!g.hostile(e.team, this.team) || e.dead || e.carrier || !e.def.weapon || !g.sees(this.team, e)) continue;
       const w = g.weaponFor(e, u);
       if (w && distTo(u, e.x, e.z) < g.rangeFor(e, w, u) + 4 * TILE && e.speed(g) > u.speed(g) * 1.1) return false;
     }
@@ -352,7 +352,7 @@ export class HardAI extends AI {
       let ours = 0;
       for (const u of g.units) {
         if (u.dead || u.carrier || !u.def.weapon || hypot(u.x - h.x, u.z - h.z) > 12 * TILE) continue;
-        if (u.team === this.team) ours += power(u);
+        if (g.allied(u.team, this.team)) ours += power(u);
         else if (g.sees(this.team, u)) theirs += power(u);
       }
       if (theirs > ours) h.retreat(g);
@@ -834,7 +834,7 @@ export class HardAI extends AI {
     const g = this.game;
     let p = 0;
     for (const e of g.units) {
-      if (e.team === this.team || e.dead || e.carrier || !e.def.weapon || !g.sees(this.team, e)) continue;
+      if (!g.hostile(e.team, this.team) || e.dead || e.carrier || !e.def.weapon || !g.sees(this.team, e)) continue;
       const near = cargo.some((u) => {
         const w = g.weaponFor(e, u);
         return !!w && distTo(u, e.x, e.z) < g.rangeFor(e, w, u) + e.speed(g) * margin + 2;

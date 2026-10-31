@@ -24,7 +24,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   tank: {
     name: 'Tank', producer: 'factory', cost: 425, buildTime: 9, hp: 725, armor: 3, speed: 3.5, turnRate: 2.5, radius: 1.1, sight: 13,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory'],
-    weapon: { range: 9, minRange: 0, damage: 22, bonus: { mechanical: 22 }, cooldown: 1.4, projectile: 'bullet', speed: 0, splash: 0, cannon: true, sound: 'single_shot' },
+    weapon: { range: 9, minRange: 0, damage: 22, bonus: { mechanical: 22 }, cooldown: 1.4, projectile: 'shell', speed: 0, splash: 0, cannon: true, sound: 'single_shot' },
     lift: 6,
     desc: 'Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.',
   },
@@ -70,7 +70,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   devastator: {
     name: 'Devastator', producer: 'fab', cost: 800, buildTime: 16, hp: 720, shields: 320, armor: 3, speed: 2.5, turnRate: 1.6, radius: 1.4, sight: 12,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu', 'fab2'],
-    weapon: { range: 10, minRange: 0, damage: 60, bonus: { armored: 40 }, cooldown: 2, projectile: 'shell', speed: 28, splash: 1.5, sound: 'heavy_laser' },
+    weapon: { range: 10, minRange: 0, damage: 60, bonus: { armored: 40 }, cooldown: 2, projectile: 'shell', speed: 0, splash: 1.5, cannon: true, sound: 'heavy_laser' },
     holdFire: true,
     secondary: { range: 9, minRange: 0, damage: 8, bonus: { biological: 4 }, cooldown: 0.2, projectile: 'bullet', speed: 0, splash: 0, sound: 'devastator_coax' },
     detonate: { delay: 2.5, weapon: { range: 0, minRange: 0, damage: 500, bonus: { structure: 300 }, step: 0, cooldown: 0, projectile: 'shell', speed: 0, splash: 9 } },
@@ -89,7 +89,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   artillery: {
     name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 200, shields: 110, armor: 2, speed: 2.5, turnRate: 2, radius: 1.1, sight: 12,
     turret: true, holdFire: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['tleilaxu'],
-    weapon: { range: 8, minRange: 0, damage: 14, bonus: { structure: 12 }, cooldown: 1.5, projectile: 'shell', speed: 26, splash: 0, sound: 'single_shot' },
+    weapon: { range: 8, minRange: 0, damage: 14, bonus: { structure: 12 }, cooldown: 1.5, projectile: 'shell', speed: 0, splash: 0, cannon: true, sound: 'single_shot' },
     deploy: {
       time: 3,
       weapon: { range: 26, minRange: 8, damage: 70, bonus: { structure: 110 }, cooldown: 4.5, projectile: 'shell', speed: 13, splash: 4, unguided: true, sound: 'launch_large' },

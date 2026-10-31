@@ -47,7 +47,7 @@ export interface WeaponDef {
   airDamage?: number;
   cooldown: number; // seconds between shots
   projectile: ProjectileKind;
-  speed: number; // projectile speed (ignored for bullets, which hit instantly)
+  speed: number; // projectile speed (ignored for bullets and cannons, which hit instantly)
   splash: number; // splash radius, 0 = single target
   /** Can hit aircraft. Weapons without it only hit ground targets. */
   air?: boolean;
@@ -57,7 +57,7 @@ export interface WeaponDef {
   cone?: number;
   /** Can only hit targets with one of these tags (the Sandrider's crysknife: infantry). */
   only?: Tag[];
-  /** A gun that hits at once like a bullet but draws no tracer: a muzzle flash, then a burst where it hits. */
+  /** A gun whose shell isn't drawn: it lands the moment it's fired (a muzzle flash, then the burst at the target). */
   cannon?: boolean;
   /** Passes straight through shields to health (sound: the Fedaykin's weirding modules; a slow blade). */
   pierce?: boolean;

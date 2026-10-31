@@ -1062,7 +1062,7 @@ export class AI {
     }
     // An enemy's rider we can see, up on its worm: shoot it off from the rock.
     for (const w of g.ridden) {
-      if (w.team === this.team || !g.sees(this.team, w.rider)) continue;
+      if (!g.hostile(w.team, this.team) || !g.sees(this.team, w.rider)) continue;
       for (const u of g.units) {
         if (u.team !== this.team || u.dead || u.carrier || onSand(u) || u.order.kind === 'attack' || !g.weaponFor(u, w.rider)) continue;
         if (hypot(u.x - w.x, u.z - w.z) <= (u.def.weapon?.range ?? 0) + 4) u.command(g, { kind: 'attack', target: w.rider });
@@ -1070,7 +1070,7 @@ export class AI {
     }
     // Enemy Thumpers in sight near our structures or units: kill them in time.
     for (const b of g.buildings) {
-      if (b.type !== 'thumper' || b.team === this.team || b.dead || !g.sees(this.team, b)) continue;
+      if (b.type !== 'thumper' || !g.hostile(b.team, this.team) || b.dead || !g.sees(this.team, b)) continue;
       const hunters = g.units.filter((u) => u.team === this.team && !u.dead && !u.carrier && u.def.weapon && !this.fled.has(u)
         && u.order.kind !== 'attack' && hypot(u.x - b.x, u.z - b.z) < 20 * TILE && ['home', 'defend', 'wave'].includes(this.roles.get(u) ?? '') && g.weaponFor(u, b));
       hunters.sort((a, c) => hypot(a.x - b.x, a.z - b.z) - hypot(c.x - b.x, c.z - b.z));
@@ -1274,7 +1274,7 @@ export class AI {
     const near = (e: Entity, list: Entity[], r: number) => list.some((o) => hypot(o.x - e.x, o.z - e.z) < r);
     const groups: { units: Unit[]; x: number; z: number; base: boolean }[] = [];
     for (const e of g.units) {
-      if (e.team === this.team || e.dead || e.carrier || !e.def.weapon || !g.sees(this.team, e)) continue;
+      if (!g.hostile(e.team, this.team) || e.dead || e.carrier || !e.def.weapon || !g.sees(this.team, e)) continue;
       const base = near(e, buildings, BASE_RADIUS);
       if (!base && !near(e, harvesters, HARVESTER_RADIUS)) continue;
       let group = groups.find((c) => hypot(c.x - e.x, c.z - e.z) < CLUSTER_RADIUS);

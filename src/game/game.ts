@@ -1113,14 +1113,15 @@ export class Game {
       this.flame(u, target, w, mult, from);
       return;
     }
-    this.effects.flash(from, w.projectile === 'bullet' && !w.cannon ? 0.15 : 0.35);
+    this.effects.flash(from, w.projectile === 'bullet' ? 0.15 : 0.35);
+    if (w.cannon) {
+      this.impact(w.projectile, to, target.x, target.z, target, w, mult, u, false);
+      return;
+    }
     if (w.projectile === 'bullet') {
       to.x += (Math.random() - 0.5) * 0.5;
       to.z += (Math.random() - 0.5) * 0.5;
-      if (w.cannon) {
-        this.effects.explosion(to, 0.6);
-        this.onSound('explosion_small', to.x, to.z);
-      } else this.effects.tracer(from, to);
+      this.effects.tracer(from, to);
       this.damage(target, w, mult, u);
       return;
     }
@@ -1192,29 +1193,36 @@ export class Game {
         }
       }
       if (p.t >= 1) {
-        const splash = p.weapon.splash;
-        this.effects.explosion(p.end, splash > 0 ? 1.3 : p.kind === 'rocket' ? 0.8 : 0.6);
-        this.onSound(splash > 0 ? 'explosion_med' : 'explosion_small', p.end.x, p.end.z);
-        if (unguided) {
-          // Falls where it was aimed. Shells: whoever is in the blast takes full damage at its center, half at its
-          // edge. Rockets: a direct hit takes the full rocket and the rest of the blast half, as guided ones do.
-          this.blast(p.x, p.z, p.weapon, p.mult, p.owner, p.owner.team, p.kind === 'rocket' ? DIRECT_HIT : undefined);
-        } else if (splash > 0) {
-          // The target takes the full hit; anything else in the blast takes half, fading toward the edge, so one
-          // rocket into a tight group doesn't do full damage to every unit in it.
-          const victims = [...this.units, ...this.buildings].filter(
-            (e) => this.hostile(e.team, p.owner.team) && !e.dead && distTo(e, p.x, p.z) <= splash,
-          );
-          for (const v of victims) {
-            const share = v === p.target ? 1 : SPLASH_SHARE * (1 - distTo(v, p.x, p.z) / splash / 2);
-            this.damage(v, p.weapon, p.mult * share, p.owner);
-          }
-        } else if (!p.target.dead) {
-          this.damage(p.target, p.weapon, p.mult, p.owner);
-        }
+        this.impact(p.kind, p.end, p.x, p.z, p.target, p.weapon, p.mult, p.owner, unguided);
         this.scene.remove(p.mesh);
         this.projectiles.splice(i, 1);
       }
+    }
+  }
+
+  /** A shell or rocket landing at `at` (drawn) / (x, z) (where it hits): the burst, then the damage. */
+  private impact(
+    kind: ProjectileKind, at: THREE.Vector3, x: number, z: number, target: Entity, w: WeaponDef, mult: number, owner: Shooter, unguided: boolean,
+  ): void {
+    const splash = w.splash;
+    this.effects.explosion(at, splash > 0 ? 1.3 : kind === 'rocket' ? 0.8 : 0.6);
+    this.onSound(splash > 0 ? 'explosion_med' : 'explosion_small', at.x, at.z);
+    if (unguided) {
+      // Falls where it was aimed. Shells: whoever is in the blast takes full damage at its center, half at its
+      // edge. Rockets: a direct hit takes the full rocket and the rest of the blast half, as guided ones do.
+      this.blast(x, z, w, mult, owner, owner.team, kind === 'rocket' ? DIRECT_HIT : undefined);
+    } else if (splash > 0) {
+      // The target takes the full hit; anything else in the blast takes half, fading toward the edge, so one
+      // rocket into a tight group doesn't do full damage to every unit in it.
+      const victims = [...this.units, ...this.buildings].filter(
+        (e) => this.hostile(e.team, owner.team) && !e.dead && distTo(e, x, z) <= splash,
+      );
+      for (const v of victims) {
+        const share = v === target ? 1 : SPLASH_SHARE * (1 - distTo(v, x, z) / splash / 2);
+        this.damage(v, w, mult * share, owner);
+      }
+    } else if (!target.dead) {
+      this.damage(target, w, mult, owner);
     }
   }
 
