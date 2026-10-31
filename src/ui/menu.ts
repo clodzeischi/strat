@@ -410,7 +410,6 @@ export class Menus {
 
   /** In a room being filled (hosting it or joined): who's in, and for the host of a 2v2, the Start button. */
   showRoom(room: { code: string; mode: '1v1' | '2v2'; slots: (SlotInfo | null)[]; you: number; host: boolean }): void {
-    document.getElementById('mp-code')!.textContent = room.code;
     const team = room.mode === '2v2';
     document.getElementById('mp-wait-head')!.textContent = team ? 'Gathering players' : 'Waiting for an opponent';
     document.getElementById('mp-wait-note')!.innerHTML = !room.host
@@ -437,7 +436,9 @@ export class Menus {
 
   /** Hosting: waiting for someone to join. */
   showHosting(code: string): void {
-    document.getElementById('mp-code')!.textContent = code;
+    // (Gone once a room update has rewritten the note, which names the code itself.)
+    const el = document.getElementById('mp-code');
+    if (el) el.textContent = code;
     this.page('hosting');
   }
 

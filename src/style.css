@@ -580,7 +580,8 @@ body.in-menu #hud {
 }
 
 .screen[hidden],
-.menu-page[hidden] {
+.menu-page[hidden],
+.mbtn[hidden] {
   display: none;
 }
 
