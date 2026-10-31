@@ -28,7 +28,8 @@ for (const [size, seed, factions] of games) {
   let friendly = 0;
   const dmg = g.damage.bind(g);
   (g as { damage: Game['damage'] }).damage = (t, w, mult, by) => {
-    if (by && by.team !== t.team && g.allied(by.team, t.team)) friendly++;
+    // Area damage hits allies too (game.blast); a direct-fire hit on an ally would mean someone aimed at them.
+    if (by && by.team !== t.team && g.allied(by.team, t.team) && w.splash === 0) friendly++;
     dmg(t, w, mult, by);
   };
   const offers: Team[] = [];
@@ -54,7 +55,7 @@ for (const [size, seed, factions] of games) {
       if (together) g.acceptSurrender(t);
     }
   }
-  check(friendly === 0, `${label}: allies never hurt each other (${friendly} hits)`);
+  check(friendly === 0, `${label}: allies never shoot each other (${friendly} direct hits)`);
   check(sharedSight, `${label}: allies share their sight`);
   const lost = g.winner === null ? -1 : 1 - g.winner;
   const beaten = g.teams.filter((t) => t.side === lost).every((t) => g.surrendered !== null || (!g.units.some((u) => u.team === t.team) && !g.buildings.some((b) => b.team === t.team)));

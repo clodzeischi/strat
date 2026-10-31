@@ -1,5 +1,5 @@
 // Checks a shot-down Carryall's crash: it flies on in a straight line, sinking, and blows up where it hits the ground,
-// hurting enemies there (not ones further off, and never its own side); a vehicle it carried goes down with it. One
+// hurting everyone there, its own side too (not ones further off); a vehicle it carried goes down with it. One
 // killed on the ground just blows up.
 // Usage: npx tsx sim/crash-check.ts
 import * as THREE from 'three';
@@ -67,7 +67,7 @@ const SHOT: WeaponDef = { range: 0, minRange: 0, damage: 0, airDamage: 99999, bo
   check('and lands about when and where it should', Math.abs(steps * 0.05 - fall) < 0.2, `${(steps * 0.05).toFixed(2)} s vs ${fall.toFixed(2)} s`);
   check('the enemy it lands on is hurt', under.hp < under.maxHp || under.dead, `${under.hp}/${under.maxHp}`);
   check('one further off is not', far.hp === far.maxHp);
-  check('nor its own side', own.hp === own.maxHp);
+  check('its own side under it is hurt too', own.hp < own.maxHp || own.dead);
 }
 
 // Hit while sitting on the ground (low for a pickup): no crash, it just blows up.

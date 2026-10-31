@@ -503,7 +503,7 @@ export class CommandCard {
         use: () => input.toggleDeploy(),
       },
       detonate: command('detonate', 'Self-Destruct',
-        'Selected Devastators blow up after a short delay, wrecking every enemy around them. The enemy is warned if they can see it.',
+        'Selected Devastators blow up after a short delay, wrecking everything around them, your own units too. The enemy is warned if they can see it.',
         () => input.ownUnits().some((u) => !!u.def.detonate && u.detonateAt === null), () => false, () => input.detonate()),
       lock: {
         icon: () => 'lock',

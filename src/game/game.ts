@@ -1161,7 +1161,10 @@ export class Game {
     });
   }
 
-  /** Flamethrower (or weirding module): hits every enemy within reach inside the cone around the aim (the target always). */
+  /**
+   * Flamethrower (or weirding module): hits every enemy within reach inside the cone around the aim (the target always).
+   * The one area attack that spares allies: every other blast hits friend and foe alike (blast, impact, riddenBite).
+   */
   private flame(u: Shooter, target: Entity, w: WeaponDef, mult: number, from: THREE.Vector3): void {
     const aim = dm.atan2(target.z - u.z, target.x - u.x);
     const reach = this.rangeFor(u, w, target) + 0.3;
@@ -1228,12 +1231,12 @@ export class Game {
     if (unguided) {
       // Falls where it was aimed. Shells: whoever is in the blast takes full damage at its center, half at its
       // edge. Rockets: a direct hit takes the full rocket and the rest of the blast half, as guided ones do.
-      this.blast(x, z, w, mult, owner, owner.team, kind === 'rocket' ? DIRECT_HIT : undefined);
+      this.blast(x, z, w, mult, owner, kind === 'rocket' ? DIRECT_HIT : undefined);
     } else if (splash > 0) {
-      // The target takes the full hit; anything else in the blast takes half, fading toward the edge, so one
-      // rocket into a tight group doesn't do full damage to every unit in it.
+      // The target takes the full hit; anything else in the blast, friend or foe, takes half, fading toward the edge,
+      // so one rocket into a tight group doesn't do full damage to every unit in it.
       const victims = [...this.units, ...this.buildings].filter(
-        (e) => this.hostile(e.team, owner.team) && !e.dead && distTo(e, x, z) <= splash,
+        (e) => e !== owner && !e.dead && !(e instanceof Unit && e.carrier) && distTo(e, x, z) <= splash,
       );
       for (const v of victims) {
         const share = v === target ? 1 : SPLASH_SHARE * (1 - distTo(v, x, z) / splash / 2);
@@ -1264,23 +1267,25 @@ export class Game {
       dmg = Math.max(MIN_HIT, dmg - armor);
     }
     target.hp -= dmg;
+    // Caught in our own side's blast: nobody turns on the ally who fired, and it isn't an attack to warn about.
+    const friendly = attacker !== null && !this.hostile(attacker.team, target.team);
     if (target instanceof Unit) {
-      target.onDamaged(attacker);
+      target.onDamaged(friendly ? null : attacker);
       // A harvester under fire calls its Carryall to fly it home.
       if (target.type === 'harvester') this.ferryFor(target)?.rescue(this, target);
     }
     // Something hitting us (not a worm's bite, which has its own warnings).
-    if (!this.wormBiting) this.attackAlert(target);
+    if (!this.wormBiting && !friendly) this.attackAlert(target);
     if (target.hp <= 0) this.kill(target, attacker);
   }
 
   /**
-   * An explosion on the ground at (x, z): every enemy of `owner`'s side within the weapon's splash takes its damage,
-   * full at the center and half at the edge. Aircraft are above it.
+   * An explosion on the ground at (x, z): everything within the weapon's splash takes its damage, friend or foe (but
+   * not `owner` itself), full at the center and half at the edge. Aircraft are above it.
    */
-  blast(x: number, z: number, w: WeaponDef, mult: number, owner: Shooter | null, team: Team = owner!.team, direct?: number): void {
+  blast(x: number, z: number, w: WeaponDef, mult: number, owner: Shooter | null, direct?: number): void {
     const victims = [...this.units, ...this.buildings].filter(
-      (e) => this.hostile(e.team, team) && !e.dead && !e.tags.includes('air') && !(e instanceof Unit && (e.carrier || e.falling)) && distTo(e, x, z) <= w.splash,
+      (e) => e !== owner && !e.dead && !e.tags.includes('air') && !(e instanceof Unit && (e.carrier || e.falling)) && distTo(e, x, z) <= w.splash,
     );
     // With `direct`: the one thing nearest the impact, if within it, takes the full hit; the rest of the blast the
     // splash share (as a guided rocket's target and bystanders do).
@@ -1508,7 +1513,7 @@ export class Game {
       c.to.set(c.x, c.y, c.z);
       const ground = this.map.surfaceAt(c.x, c.z);
       if (c.y > ground + 0.4) return true;
-      this.blast(c.x, c.z, CRASH.weapon, 1, null, c.c.team);
+      this.blast(c.x, c.z, CRASH.weapon, 1, null);
       const at = new THREE.Vector3(c.x, ground + 0.5, c.z);
       this.effects.explosion(at, 2.6);
       for (let k = 0; k < 4; k++) {
@@ -1572,7 +1577,7 @@ export class Game {
       this.removeMine(m);
       this.effects.explosion(new THREE.Vector3(m.x, this.map.surfaceAt(m.x, m.z) + 0.4, m.z), 1.4);
       this.onSound('explosion_med', m.x, m.z);
-      this.blast(m.x, m.z, m.weapon, 1, null, m.team);
+      this.blast(m.x, m.z, m.weapon, 1, null);
     }
   }
 
@@ -2501,10 +2506,10 @@ export class Game {
     }
   }
 
-  /** The ridden worm's maw: every enemy on the sand within WORM.bite of its head, every WORM.biteEvery s. */
+  /** The ridden worm's maw: everything on the sand within WORM.bite of its head, friend or foe, every WORM.biteEvery s. */
   private riddenBite(w: RiddenWorm): void {
     if (this.time < w.nextBite) return;
-    const near = (e: Entity) => !e.dead && this.hostile(e.team, w.team) && distTo(e, w.x, w.z) <= WORM.bite;
+    const near = (e: Entity) => !e.dead && e !== w.rider && distTo(e, w.x, w.z) <= WORM.bite;
     const victims: Entity[] = [
       ...this.units.filter((u) => near(u) && !u.def.air && !u.carrier && !u.falling && !u.mount && !u.hidden && this.onWormGround(u.x, u.z)),
       ...this.buildings.filter((b) => near(b) && this.onSandFootprint(b)),
@@ -2516,7 +2521,7 @@ export class Game {
       this.wormBiting = true;
       this.damage(v, WORM.weapon, 1, w.rider);
       this.wormBiting = false;
-      if (v.dead) w.eatenEnemy += v instanceof Unit ? v.def.cost : BUILDINGS[(v as Building).type].cost;
+      if (v.dead && this.hostile(v.team, w.team)) w.eatenEnemy += v instanceof Unit ? v.def.cost : BUILDINGS[(v as Building).type].cost;
     }
     const ground = this.map.surfaceAt(w.x, w.z);
     for (let k = 0; k < 4; k++) {

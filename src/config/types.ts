@@ -53,7 +53,7 @@ export interface WeaponDef {
   air?: boolean;
   /** Shells aimed at the ground where the target stood when fired; anything that moves out of the blast is safe. */
   unguided?: boolean;
-  /** Flamethrower or weirding module: hits every enemy within range inside this half-angle (radians) around the aim. */
+  /** Flamethrower or weirding module: hits every enemy within range inside this half-angle (radians) around the aim. The only area attack that spares allies: splash hits friend and foe. */
   cone?: number;
   /** Can only hit targets with one of these tags (the Sandrider's crysknife: infantry). */
   only?: Tag[];
