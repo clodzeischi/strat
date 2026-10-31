@@ -15,7 +15,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Cheap rifle squad. Strong vs infantry. With Infantry Rockets, devastating vs armor. Can shoot at aircraft.',
   },
   trike: {
-    name: 'Trike', producer: 'factory', cost: 110, buildTime: 4.5, hp: 200, armor: 1, speed: 7.5, turnRate: 6, radius: 0.8, sight: 12,
+    name: 'Trike', producer: 'factory', cost: 110, buildTime: 4.5, hp: 200, armor: 1, speed: 7.5, turnRate: 6, radius: 1.0, sight: 12,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['factory'],
     weapon: { range: 7, minRange: 0, damage: 5, bonus: { light: 3 }, cooldown: 0.3, projectile: 'bullet', speed: 0, splash: 0, sound: 'heavy_mg' },
     lift: 3,

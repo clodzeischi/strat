@@ -32,7 +32,7 @@ How to build a unit or building model in Blender so it drops into the game as a 
 | Type | Unit | Faction | Radius | Turret | Upgrade parts | Notes |
 |---|---|---|---|---|---|---|
 | `infantry` | Infantry | Atreides | 0.45 | | weapons, armor, rockets | animated; ~1.8 m tall, at the size it's drawn (Harkonnen ~2.2 m, Sardaukar ~2.0 m) |
-| `trike` | Trike | Atreides | 0.8 | | weapons, armor, nitro | ~2.0 m long, low wedge; every weapon tier is the roof gun |
+| `trike` | Trike | Atreides | 1.0 | | weapons, armor, nitro | ~2.0 m long, low wedge; every weapon tier is the roof gun |
 | `tank` | Tank | Atreides | 1.1 | yes | weapons, armor | |
 | `rocket` | MLRS | Atreides | 1.0 | yes | weapons, armor | |
 | `harvester` | Harvester | Atreides, Corrino | 1.1 | | armor, harvest | |
