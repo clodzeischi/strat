@@ -22,6 +22,8 @@ const FILES = [
 const scenes = new Map<string, THREE.Object3D>();
 /** Animated (skinned) models' actions by name: `idle`, `walk`, `shoot`, `die`. */
 const clips = new Map<string, THREE.AnimationClip[]>();
+/** How fast each walk's planted foot slides back at normal playback (m/s), so the game can match it to the ground. */
+const strides = new Map<string, number>();
 let paletteMat: THREE.MeshLambertMaterial | null = null;
 let palette2Mat: THREE.MeshLambertMaterial | null = null;
 const teamMats = new Map<number, THREE.MeshLambertMaterial>();
@@ -71,6 +73,9 @@ export async function loadModels(): Promise<void> {
           c.resetDuration();
         }
         if (gltf.animations.length) clips.set(f, gltf.animations);
+        const walk = gltf.animations.find((c) => c.name === 'walk');
+        const stride = walk && strideSpeed(gltf.scene, walk);
+        if (stride) strides.set(f, stride);
       } catch (e) {
         console.warn(`model ${f} failed to load`, e);
       }
@@ -221,7 +226,7 @@ export function cloneUnitModel(type: UnitType, faction: Faction, color: number):
   const deployClip = all.find((c) => c.name === 'deploy');
   const actions = all.filter((c) => c !== deployClip);
   // An animated model plays its `deploy` in its own animator (two mixers would fight over the same bones).
-  const anim = actions.length ? animator(model, all) : undefined;
+  const anim = actions.length ? animator(model, all, strides.get(`units/${type}.${faction}`)) : undefined;
   return {
     body, turret, muzzle, showUpgrades,
     crow: model.getObjectByName('crow') ?? undefined,
@@ -240,6 +245,37 @@ function named(model: THREE.Object3D, prefix: string): THREE.Object3D[] | undefi
   const found: THREE.Object3D[] = [];
   model.traverse((o) => { if (o.name.startsWith(prefix)) found.push(o); });
   return found.length ? found.sort((a, b) => a.name.localeCompare(b.name)) : undefined;
+}
+
+/**
+ * The speed a walk carries its body at: how fast the planted foot (the lower one, while on the ground) typically
+ * moves back, at normal playback. Measured on a copy, so the loaded scene keeps its rest pose. Null without both feet.
+ */
+function strideSpeed(scene: THREE.Object3D, walk: THREE.AnimationClip): number | null {
+  const copy = cloneSkinned(scene);
+  const feet = ['footL', 'footR'].map((n) => copy.getObjectByName(n));
+  if (!feet[0] || !feet[1]) return null;
+  const mixer = new THREE.AnimationMixer(copy);
+  mixer.clipAction(walk).play();
+  const n = 60;
+  const dt = walk.duration / n;
+  const at = new THREE.Vector3();
+  const pos: { x: number; y: number }[][] = [];
+  for (let i = 0; i <= n; i++) {
+    mixer.setTime(i * dt);
+    copy.updateMatrixWorld(true);
+    pos.push(feet.map((f) => (f!.getWorldPosition(at), { x: at.x, y: at.y })));
+  }
+  // The median, not the mean: the samples as a foot lands or lifts off still count as on the ground but barely move.
+  const ground = Math.min(...pos.flat().map((p) => p.y)) + 0.02;
+  const speeds: number[] = [];
+  for (let i = 0; i < n; i++) {
+    const k = pos[i][0].y <= pos[i][1].y ? 0 : 1;
+    if (pos[i][k].y <= ground && pos[i + 1][k].y <= ground) speeds.push((pos[i][k].x - pos[i + 1][k].x) / dt);
+  }
+  speeds.sort((p, q) => p - q);
+  const mid = speeds[Math.floor(speeds.length / 2)];
+  return mid > 0 ? mid : null;
 }
 
 /** The `spade` empties on a deploying model's legs, and when they touch down (`plant` on `body`, 0-1). */
@@ -273,7 +309,7 @@ function deployPose(model: THREE.Object3D, clip: THREE.AnimationClip): (t: numbe
  * Plays a skinned model's actions: one looping state at a time, cross-faded, and a one-off death. A model that sets
  * up (a Fremen Mortar) also has `deploy`, held at how far it's set up, and may have `idle_set` and `shoot_set`.
  */
-function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnimator {
+function animator(model: THREE.Object3D, list: THREE.AnimationClip[], stride?: number): UnitAnimator {
   const mixer = new THREE.AnimationMixer(model);
   const act = (name: string) => {
     const clip = list.find((c) => c.name === name);
@@ -317,6 +353,7 @@ function animator(model: THREE.Object3D, list: THREE.AnimationClip[]): UnitAnima
     return idleSet ?? deploy;
   };
   return {
+    stride,
     set(next, fired, rate = 1) {
       wanted = next;
       const a = pick(next);

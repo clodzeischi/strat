@@ -29,6 +29,8 @@ export interface UnitModel {
 export type AnimState = 'idle' | 'walk' | 'shoot' | 'ride';
 
 export interface UnitAnimator {
+  /** How fast the walk carries the body at normal playback (m/s): `walk` plays at speed / stride, so feet don't slide. */
+  readonly stride?: number;
   /** Plays a looping action (`rate` scales its speed); `fired` restarts `shoot` so each shot gets its kick. */
   set(state: AnimState, fired: boolean, rate?: number): void;
   /** Advances the animation by a drawn frame. */

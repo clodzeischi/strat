@@ -335,7 +335,8 @@ export class Unit extends Entity {
     const speed = dt > 0 ? moved / dt : 0;
     // On his worm a Sandrider rides, however fast it carries him.
     if (this.mount) this.anim!.set('ride', false);
-    else if (speed > 0.3) this.anim!.set('walk', false, THREE.MathUtils.clamp(speed / this.def.speed, 0.6, 1.4));
+    // The walk plays at the pace that keeps the planted foot still on the ground (on sand, upgraded or charging too).
+    else if (speed > 0.3) this.anim!.set('walk', false, THREE.MathUtils.clamp(speed / (this.anim!.stride ?? this.def.speed), 0.4, 2.5));
     else if (a.shooting > 0) this.anim!.set('shoot', fired);
     else this.anim!.set('idle', false);
   }

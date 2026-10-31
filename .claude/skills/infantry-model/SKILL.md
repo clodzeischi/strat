@@ -77,7 +77,7 @@ The game's rules for actions:
 | shoot | "Torso slightly turned clockwise, weapon shouldered, left hand supporting the front, wider bracing stance" | Hips −12°, shoulders −24°, head counter-yawed onto the target. Cycle = weapon cooldown (0.75 s = 11 frames): kick on frame 2, settled by frame 7. |
 | die | "Fall to his knees, lean on his weapon, pause, collapse" | 31 frames, played once: hit, knees, gun planted muzzle-down with the left hand on the knee, ~0.8 s sagging pause, topple, prone. |
 
-**Walk cadence:** fast units slip. Distance covered per cycle = 4 × stride reach, compared with `speed` × cycle time. At the old draw size the Sardaukar (speed 2.6) covered about 70% of the ground at 8 frames and about 92% at 6 frames; at today's size, 8 frames covers about 104%. Give the user the numbers and let them choose; they took 8.
+**Walk cadence:** the game plays `walk` at whatever rate keeps the planted foot still: the loader measures how fast it slides back at normal playback (`strideSpeed` in `src/models/gltf.ts`) and the unit plays it at its actual speed divided by that, on sand, upgraded or charging too. So the stride length and cycle only set the cadence (steps per second); what has to be right is that the planted foot moves back at a constant speed in a straight line. Key the legs with `walk_legs.py` (in the Trooper's and the Atreides Infantry's .blend: straight-line feet at a fixed width, a planted foot sliding at `speed`).
 
 ## 3. Check, export, playtest
 
