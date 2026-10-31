@@ -340,7 +340,7 @@ check(amb > plain * 1.3, 'Ambush adds damage to shots out of hiding');
   // Moving it somewhere: it goes, and wanders round there after.
   const far = pt(pick(-12));
   applyCommand(t, F, { c: 'go', units: [r.id], x: far.x, z: far.z, target: null, attack: false });
-  tick(6);
+  tick(8);
   check(hypot(w.x - far.x, w.z - far.z) < 8, 'sent somewhere on the sand, it goes there');
   const trail: number[] = [];
   for (let k = 0; k < 20; k++) { tick(0.5); trail.push(hypot(w.x - w.lairX, w.z - w.lairZ)); }

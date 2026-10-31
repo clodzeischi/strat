@@ -100,7 +100,7 @@ export const THUMPER = { cost: 250, cooldown: 60, delay: 8, hear: 30, revealEver
  * shows; to bite, its first `rear` pieces burst up, the head `rearHeight` out of the sand.
  */
 export const WORM = {
-  range: 15, bite: 4, hunt: 20, biteEvery: 2.5, speed: 9, reach: 2.5,
+  range: 15, bite: 4, hunt: 20, biteEvery: 2.5, speed: 7, reach: 2.5,
   sink: 0.88, rear: 5, rearHeight: 4.5,
   weapon: { range: 0, minRange: 0, damage: 400, bonus: { mechanical: 400 }, step: 0, cooldown: 0, projectile: 'bullet', speed: 0, splash: 4, pierce: true } as WeaponDef,
 };
