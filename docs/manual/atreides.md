@@ -155,7 +155,7 @@ Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing 
 <tr><th align="left">Health</th><td>725</td></tr>
 <tr><th align="left">Armor</th><td>3</td></tr>
 <tr><th align="left">Attributes</th><td>Mechanical, Armored</td></tr>
-<tr><th align="left">Speed</th><td>1.9 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.75 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>6.5 tiles</td></tr>
 <tr><th align="left">Carryall space</th><td>6 of 6</td></tr>
 </table>
@@ -189,7 +189,7 @@ Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with I
 <tr><th align="left">Health</th><td>265</td></tr>
 <tr><th align="left">Armor</th><td>1</td></tr>
 <tr><th align="left">Attributes</th><td>Mechanical, Light</td></tr>
-<tr><th align="left">Speed</th><td>1.7 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.75 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>9 tiles</td></tr>
 <tr><th align="left">Carryall space</th><td>6 of 6</td></tr>
 </table>
@@ -255,7 +255,7 @@ Collects spice and brings it to a Refinery.
 <tr><th align="left">Health</th><td>300</td></tr>
 <tr><th align="left">Armor</th><td>1</td></tr>
 <tr><th align="left">Attributes</th><td>Mechanical, Light</td></tr>
-<tr><th align="left">Speed</th><td>2.1 tiles/s</td></tr>
+<tr><th align="left">Speed</th><td>1.75 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>5 tiles</td></tr>
 <tr><th align="left">Carryall space</th><td>6 of 6</td></tr>
 </table>

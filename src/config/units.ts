@@ -22,14 +22,14 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing harvesters. With Trike Nitro, faster still and firing faster.',
   },
   tank: {
-    name: 'Tank', producer: 'factory', cost: 425, buildTime: 9, hp: 725, armor: 3, speed: 3.8, turnRate: 2.5, radius: 1.1, sight: 13,
+    name: 'Tank', producer: 'factory', cost: 425, buildTime: 9, hp: 725, armor: 3, speed: 3.5, turnRate: 2.5, radius: 1.1, sight: 13,
     turret: true, infantry: false, tags: ['mechanical', 'armored'], requires: ['factory'],
     weapon: { range: 9, minRange: 0, damage: 22, bonus: { mechanical: 22 }, cooldown: 1.4, projectile: 'shell', speed: 32, splash: 0, sound: 'single_shot' },
     lift: 6,
     desc: 'Main battle tank. Crushes vehicles, decent vs buildings, weak vs infantry with Infantry Rockets.',
   },
   rocket: {
-    name: 'MLRS', producer: 'factory', cost: 510, buildTime: 13, hp: 265, armor: 1, speed: 3.4, turnRate: 2.5, radius: 1.0, sight: 18,
+    name: 'MLRS', producer: 'factory', cost: 510, buildTime: 13, hp: 265, armor: 1, speed: 3.5, turnRate: 2.5, radius: 1.0, sight: 18,
     turret: true, infantry: false, tags: ['mechanical', 'light'], requires: ['factory2'],
     weapon: { range: 15, minRange: 6, damage: 44, bonus: { structure: 30 }, airDamage: 60, cooldown: 2.8, projectile: 'rocket', speed: 15, splash: 4, air: true, unguided: true, sound: 'launch_large' },
     lockOn: { duration: 8, cooldown: 20 },
@@ -37,7 +37,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     desc: 'Long-range rocket artillery with a wide blast. Devastating vs massed troops and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Lightly armored and can\'t fire up close: trikes that get in tear it apart.',
   },
   repair: {
-    name: 'Repair Vehicle', producer: 'factory', cost: 450, buildTime: 8, hp: 300, armor: 1, speed: 4.2, turnRate: 3.5, radius: 0.9, sight: 10,
+    name: 'Repair Vehicle', producer: 'factory', cost: 450, buildTime: 8, hp: 300, armor: 1, speed: 3.5, turnRate: 3.5, radius: 0.9, sight: 10,
     turret: false, infantry: false, tags: ['mechanical', 'light'], weapon: null, requires: ['factory'], lift: 6,
     repair: { rate: 30, range: 2.5 },
     desc: 'Repairs vehicles, aircraft and buildings for credits. Right-click something damaged; repairs anything nearby when idle.',
