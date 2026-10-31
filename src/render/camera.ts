@@ -8,7 +8,7 @@ export class RTSCamera {
   readonly camera: THREE.PerspectiveCamera;
   readonly target = new THREE.Vector3();
   private readonly pitch = 1.12;
-  private readonly dist = 66;
+  private readonly dist = 59.4;
 
   constructor(private worldSize: number) {
     this.camera = new THREE.PerspectiveCamera(30, 1, 1, 600);

@@ -221,7 +221,7 @@ export class Carryall extends Unit {
     const a = dm.atan2(this.z - z, this.x - x);
     const far = hypot(this.x - x, this.z - z) > CARRYALL.orbit * 2;
     const p = this.inside(game, far ? x : x + dm.cos(a + 0.7) * CARRYALL.orbit, far ? z : z + dm.sin(a + 0.7) * CARRYALL.orbit);
-    this.fly(game, p.x, p.z, dt, { cruise: this.def.speed * (far ? 1 : 0.45) });
+    this.fly(game, p.x, p.z, dt, { cruise: this.def.speed * (far ? 1 : CARRYALL.orbitSpeed) });
   }
 
   /**

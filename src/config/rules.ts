@@ -124,7 +124,8 @@ export const CARRYALL = {
   capacity: 6, // lift space: infantry take 1, trikes 3, heavy vehicles 6
   altitude: 8, // cruising height above y = 0
   clearance: 4.2, // least height over the ground under and just ahead (climbs over cliffs with a vehicle hanging)
-  orbit: 11, // radius of the holding circle
+  orbit: 9.9, // radius of the holding circle
+  orbitSpeed: 0.405, // share of top speed while circling
   ferryMin: 6, // tiles: harvester trips shorter than this aren't worth a lift
   rescueAt: 0.67, // a ferried harvester hit below this share of its health is flown out of the fight
 };
