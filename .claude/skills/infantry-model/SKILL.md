@@ -98,6 +98,7 @@ The game's rules for actions:
 
 ## Pitfalls hit so far
 
+- **Skating feet:** a walk keyed by rotating thighs (FK), with a big hip twist, swings each foot out in an arc at the front and back of the step; it reads as ice skating (the Harkonnen Trooper's, fixed 2026-10-30 by `walk_legs.py` in his .blend). Solve the legs with `leg_reach` to feet running in straight lines at a fixed width, the planted one sliding back at the unit's `speed`, every frame keyed.
 - **Weights wiped:** clearing vertex groups *after* `bm.to_mesh` wipes the weights. Create the groups first (`build_object` does).
 - **Material indices reset:** clearing materials after `to_mesh` resets every face's material index.
 - **Mirror test:** decide a shell's side by its centroid, not its minimum y (a leg's inner edge crosses y=0).

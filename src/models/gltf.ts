@@ -57,10 +57,19 @@ export async function loadModels(): Promise<void> {
           o.userData.palette2 = (o.material as THREE.Material).name === 'palette2';
           o.castShadow = true;
           o.receiveShadow = true;
-          // Skinned parts move far from their rest pose (lying down when dying): cull them by a generous sphere.
-          if (o instanceof THREE.SkinnedMesh) o.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.3, 0), 0.9);
+          // Skinned parts move far from their rest pose (lying down when dying): cull them by a generous sphere
+          // (infantry are up to ~2.3 m tall, and as long lying down).
+          if (o instanceof THREE.SkinnedMesh) o.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.9, 0), 2);
         });
         scenes.set(f, gltf.scene);
+        // Actions are keyed from frame 1, so a clip's first key is at 1/15 s: start them at 0, or every loop would
+        // hold its first pose a frame.
+        for (const c of gltf.animations) {
+          const t0 = Math.min(...c.tracks.map((t) => t.times[0] ?? 0));
+          // (Tracks can share one times array, so each gets its own shifted copy rather than shift() in place.)
+          if (t0 > 0) for (const t of c.tracks) t.times = t.times.map((x) => x - t0);
+          c.resetDuration();
+        }
         if (gltf.animations.length) clips.set(f, gltf.animations);
       } catch (e) {
         console.warn(`model ${f} failed to load`, e);
