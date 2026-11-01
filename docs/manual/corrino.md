@@ -107,11 +107,11 @@ Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehi
 
 | Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
 |---|---|---|---|---|---|
-| Main | 10 (+10 vs armored) | 0.7 | 14.29 | 4.5 | hits aircraft for 10 |
+| Main | 10 (+10 vs mechanical) | 0.7 | 14.29 | 4.5 | hits aircraft for 10 |
 
 **Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider)
 
-**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](#soulcrusher) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
+**Weak against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](atreides.md#infantry) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](#soulcrusher) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
 
 ---
 
@@ -194,7 +194,7 @@ Fast, low half-track with a flamethrower that burns every enemy in front of it. 
 <tr><th align="left">Build time</th><td>16 s</td></tr>
 <tr><th align="left">Made at</th><td>Fab</td></tr>
 <tr><th align="left">Requires</th><td>Tleilaxu Research, Fab Level 2</td></tr>
-<tr><th align="left">Health</th><td>720</td></tr>
+<tr><th align="left">Health</th><td>1000</td></tr>
 <tr><th align="left">Shields</th><td>320</td></tr>
 <tr><th align="left">Armor</th><td>3</td></tr>
 <tr><th align="left">Attributes</th><td>Mechanical, Armored</td></tr>
@@ -216,7 +216,7 @@ Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, bu
 | Machine gun | 8 (+4 vs biological) | 0.2 | 40 | 3 | ground only |
 | Self-destruct | 500 (+300 vs structure) | – | – | – | ground only; splash 4.5 tiles; Weapons upgrades don't change it |
 
-**Strong against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](#soulcrusher) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+**Strong against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](#soulcrusher) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](fremen.md#fremen-mortar)
 
 **Weak against:** <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider)
 
