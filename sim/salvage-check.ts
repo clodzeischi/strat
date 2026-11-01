@@ -30,12 +30,15 @@ function place(team: Team, type: BuildingType): Building {
 const A: Team = 0;
 const F: Team = 1;
 
+const crew = (team: Team, type: string) => g.units.filter((u) => u.team === team && u.type === type && !u.dead).length;
 const barracks = place(A, 'barracks');
 let before = g.teams[A].credits;
+let inf = crew(A, 'infantry');
 applyCommand(g, A, { c: 'salvage', buildings: [barracks.id] });
 run(SALVAGE.time + 0.5);
 check(barracks.dead && !g.buildings.includes(barracks), 'a Barracks can be salvaged');
 check(Math.abs(g.teams[A].credits - before - BUILDINGS.barracks.cost * SALVAGE.refund) < 1, `for ${SALVAGE.refund * 100}% of its price`);
+check(crew(A, 'infantry') === inf + SALVAGE.crew, `and a crew of ${SALVAGE.crew} walks out of a small structure`);
 check(g.canPlace('barracks', A, barracks.cx, barracks.cz), 'and its spot can be built on again');
 
 const bunker = place(A, 'bunker');
@@ -48,13 +51,21 @@ check(Math.abs(g.teams[A].credits - before - BUILDINGS.bunker.cost * SALVAGE.bun
 const harvesters = () => g.units.filter((u) => u.team === A && u.type === 'harvester' && !u.dead).length;
 const refinery = place(A, 'refinery');
 const kept = harvesters();
+inf = crew(A, 'infantry');
 before = g.teams[A].credits;
 applyCommand(g, A, { c: 'salvage', buildings: [refinery.id] });
 run(SALVAGE.time + 0.5);
 const back = g.teams[A].credits - before;
 check(refinery.dead && harvesters() === kept, 'a Refinery can be salvaged, and its Harvester stays');
+check(crew(A, 'infantry') === inf + SALVAGE.crewLarge, `a crew of ${SALVAGE.crewLarge} walks out of a large one`);
 check(Math.abs(back - (BUILDINGS.refinery.cost - UNITS.harvester.cost) * SALVAGE.refund) < 1, `for ${SALVAGE.refund * 100}% of its price less the Harvester (${back})`);
-check(BUILDINGS.refinery.cost - back > UNITS.harvester.cost, 'so building and salvaging one costs more than buying a Harvester');
+check(BUILDINGS.refinery.cost - back > UNITS.harvester.cost + SALVAGE.crewLarge * UNITS.infantry.cost, 'so building and salvaging one costs more than its Harvester and crew');
+// Each faction's crew is its basic infantry: Fremen get Warriors.
+const perch = place(F, 'perch');
+const w = crew(F, 'warrior');
+applyCommand(g, F, { c: 'salvage', buildings: [perch.id] });
+run(SALVAGE.time + 0.5);
+check(perch.dead && crew(F, 'warrior') === w + 1, 'a Fremen crew is a Warrior');
 
 const yard = g.buildings.find((b) => b.team === A && b.type === 'conyard')!;
 applyCommand(g, A, { c: 'salvage', buildings: [yard.id] });

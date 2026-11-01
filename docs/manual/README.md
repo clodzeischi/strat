@@ -25,7 +25,7 @@ The credits readout estimates your income. Repairing costs credits too: 40% of t
 
 The hub (Construction Yard or Sietch) builds structures one at a time. When one is ready, its button waits until you place it on rock near your base. Fremen can also build on open sand. Lose every hub and you can't build any more.
 
-Each structure unlocks more of the tech tree, and some level up in place to unlock more again (HQ Level 2, Factory Level 2, Great Sietch, and so on). Any structure but your last hub can be **salvaged** for half its price back (Bunkers: 75%; a Refinery: half its price less the Harvester that came with it, so 200).
+Each structure unlocks more of the tech tree, and some level up in place to unlock more again (HQ Level 2, Factory Level 2, Great Sietch, and so on). Any structure but your last hub can be **salvaged** for half its price back (Bunkers: 75%; a Refinery: half its price less the Harvester that came with it, so 200), and its crew walks out: one of your basic infantry from a small structure, two from a large one.
 
 ## Units
 

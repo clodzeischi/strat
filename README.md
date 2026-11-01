@@ -94,7 +94,7 @@ It prints addresses like `http://192.168.1.20:8080`. Both players open that addr
 | **D** (Command tab) | The unit's ability: Carryall drop, Deploy / Pack Up, Lock On (MLRS), Lay Mine (Sky Raider), Set Up Camp (Spice Crew), Plant Thumper |
 | **F** (Command tab) | Hold Position (Bunker: Unload) |
 | **V** (Command tab) | Self-destruct (Devastator), Dig In (Fremen); salvage a Bunker |
-| **C** (Command tab, a structure selected) | Salvage it for half its price |
+| **C** (Command tab, a structure selected) | Salvage it for half its price; a crew of infantry walks out |
 | **V** (Train tab) | Rally All: set every production building's rally point, keeping your selection |
 | IDLE button (top right) | Select the next idle harvester or Spice Crew (Shift: all of them) |
 | Minimap | Left click to look there; right click to send the selection there; attack-move, drop and rally clicks work on it too |

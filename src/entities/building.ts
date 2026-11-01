@@ -14,7 +14,9 @@ import * as dm from '../game/dmath';
 export type Facing = 'south' | 'east' | 'north' | 'west';
 
 /** Seconds a structure takes to salvage, and the share of its price that comes back (`bunker`: for buildings that hold infantry). */
-export const SALVAGE = { time: 5, refund: 0.5, bunker: 0.75 }; // bunkers: cheap to put up at the front and take down again
+// bunkers: cheap to put up at the front and take down again. crew: basic infantry that walk out of a salvaged structure,
+// one from a small one (1-2 tiles), two from a large one (3 tiles), as in C&C.
+export const SALVAGE = { time: 5, refund: 0.5, bunker: 0.75, crew: 1, crewLarge: 2 };
 
 /**
  * The side facing the point (x, z), in world units, from a building centered at (bx, bz). Exact diagonals pick the

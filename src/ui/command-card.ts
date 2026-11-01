@@ -563,7 +563,7 @@ export class CommandCard {
           const lead = input.ownBuildings()[0];
           const block = lead && lead.salvage === null ? this.game.salvageBlock(lead) : null;
           if (block && !input.canSalvage()) return block;
-          return `Tear down the selected structures for ${SALVAGE.refund * 100}% of their price (bunkers ${SALVAGE.bunker * 100}%; a Refinery's price less its free Harvester). Takes ${SALVAGE.time} s; infantry inside come out. Right-click to cancel.`;
+          return `Tear down the selected structures for ${SALVAGE.refund * 100}% of their price (bunkers ${SALVAGE.bunker * 100}%; a Refinery's price less its free Harvester), and a crew of infantry walks out (two from a large structure). Takes ${SALVAGE.time} s; infantry inside come out. Right-click to cancel.`;
         },
         view: () => {
           const p = input.salvageProgress();

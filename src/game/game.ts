@@ -840,6 +840,22 @@ export class Game {
     return Math.max(0, price) * (b.def.garrison ? SALVAGE.bunker : SALVAGE.refund);
   }
 
+  /**
+   * The crew that walks out of a salvaged structure: the faction's basic infantry (first on its roster), side by side
+   * outside the door, so the plot is free to build on again.
+   */
+  private salvageCrew(b: Building): void {
+    const type = FACTIONS[this.teams[b.team].faction].train[0] as UnitType;
+    const n = b.size >= 3 ? SALVAGE.crewLarge : SALVAGE.crew;
+    const d = b.doorStep();
+    const m = this.map;
+    for (let k = 0; k < n; k++) {
+      const side = (k - (n - 1) / 2) * TILE;
+      const c = this.exitCell(b, b.x + d.dx * b.size * TILE - d.dz * side, b.z + d.dz * b.size * TILE + d.dx * side, 'foot');
+      this.spawnUnit(type, b.team, m.center(c.cx), m.center(c.cz), b.doorHeading());
+    }
+  }
+
   private updateSalvage(dt: number): void {
     for (const b of this.buildings) {
       if (b.salvage === null || b.dead) continue;
@@ -850,6 +866,7 @@ export class Game {
       b.setSelected(false);
       this.scene.remove(b.root);
       this.clearFootprint(b);
+      this.salvageCrew(b);
       this.effects.puff(new THREE.Vector3(b.x, b.y + 0.8, b.z), 0xd8c49a);
       this.notifyTeam(b.team, `${b.name} salvaged.`, null);
     }
