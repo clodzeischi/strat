@@ -7,6 +7,6 @@ track01.mp3, track02.mp3, track03.mp3, track04.mp3
   Used unchanged.
 
 menu.mp3
-  By Eitan Epstein Music - https://www.youtube.com/channel/UCsqtmlVpv6jxZzUo3n89J_w
+  A Creative Commons track from a free asset library. Source and author still to be identified and credited.
 
 The music is not covered by the game code's MIT license.
