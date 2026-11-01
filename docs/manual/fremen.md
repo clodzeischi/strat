@@ -99,9 +99,9 @@ Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infant
 |---|---|---|---|---|---|
 | Main | 7 (+3 vs biological) | 0.55 | 12.73 | 2.5 | hits aircraft |
 
-**Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider)
+**Strong against:** <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider)
 
-**Weak against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](corrino.md#soulcrusher) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](#fremen-mortar)
+**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/razor.png" width="32" align="absmiddle" alt=""> [Razor](corrino.md#razor) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](#fedaykin)
 
 ---
 
@@ -199,7 +199,7 @@ Elite fighters with weirding modules: sonic blasts that hit everything in a narr
 
 **Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](atreides.md#infantry) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](#fremen-warrior)
 
-**Weak against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](corrino.md#soulcrusher) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](#fremen-mortar)
+**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](corrino.md#soulcrusher) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](#fremen-mortar)
 
 ---
 
@@ -236,7 +236,7 @@ A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the
 
 **Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](atreides.md#infantry) &nbsp; <img src="img/corrino/trooper.png" width="32" align="absmiddle" alt=""> [Harkonnen Trooper](corrino.md#harkonnen-trooper) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](#fremen-warrior)
 
-**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider)
+**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/devastator.png" width="32" align="absmiddle" alt=""> [Devastator](corrino.md#devastator) &nbsp; <img src="img/fremen/sandrider.png" width="32" align="absmiddle" alt=""> [Sandrider](#sandrider)
 
 ---
 
@@ -260,7 +260,7 @@ A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the
 </td>
 </tr></table>
 
-A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls until you let it go: the worm goes where you send it and swallows the enemy on the sand (vehicles most of all), never your own. On foot, a zealot: rushes the most valuable enemy infantry about and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can't hurt vehicles, structures or aircraft on foot.
+A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls until you let it go: the worm goes where you send it and swallows everything on the sand it bites, your own side too, so keep your army clear (vehicles go down most of all). On foot, a zealot: rushes the most valuable enemy infantry about and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can't hurt vehicles, structures or aircraft on foot.
 
 - **Rite:** a Fedaykin becomes one in 10 s for 220 credits (one way).
 - **Charge:** closing on a target within 3 tiles, it runs 2× as fast.
@@ -271,9 +271,9 @@ A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls
 |---|---|---|---|---|---|
 | Main | 400 | 1.6 | 250 | 0.45 | ground only; ignores shields; only hits biological targets; Weapons upgrades don't change it |
 
-**Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) (its worm) &nbsp; <img src="img/corrino/devastator.png" width="32" align="absmiddle" alt=""> [Devastator](corrino.md#devastator) (its worm)
+**Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) (its worm) &nbsp; <img src="img/corrino/devastator.png" width="32" align="absmiddle" alt=""> [Devastator](corrino.md#devastator) (its worm) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](#fremen-mortar)
 
-**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](#fremen-warrior)
+**Weak against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](#fremen-warrior)
 
 ## Structures
 

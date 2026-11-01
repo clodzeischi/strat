@@ -45,7 +45,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
   carryall: {
     name: 'Carryall', producer: 'hitech', cost: 400, buildTime: 8, hp: 380, armor: 1, speed: 9, turnRate: 2.2, radius: 1.4, sight: 12,
     turret: false, infantry: false, tags: ['mechanical', 'air'], weapon: null, requires: ['hitech'], air: true,
-    desc: 'Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, D to drop. Assigned to a harvester, it ferries it between spice and refinery.',
+    desc: 'Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, D to drop. Assigned to a harvester, it ferries it between spice and refinery. Shot down in flight, it crashes and blows up where it hits the ground.',
   },
 
   // ---- Corrino: health alone beats the Atreides counterpart's, and shields come on top ----
@@ -65,7 +65,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     name: 'Razor', producer: 'fab', cost: 250, buildTime: 7, hp: 135, shields: 80, armor: 1, speed: 6, turnRate: 5, radius: 0.95, sight: 11,
     turret: false, infantry: false, tags: ['mechanical', 'light'], requires: ['fab'],
     weapon: { range: 4, minRange: 0, damage: 10, bonus: { biological: 12 }, cooldown: 0.6, projectile: 'bullet', speed: 0, splash: 0, cone: 0.35, sound: 'flame' },
-    desc: 'Dune buggy with a flamethrower that burns everything in front of it. Shreds infantry. Weak vs tanks.',
+    desc: 'Fast, low half-track with a flamethrower that burns every enemy in front of it. Shreds infantry. Weak vs tanks.',
   },
   devastator: {
     name: 'Devastator', producer: 'fab', cost: 800, buildTime: 16, hp: 720, shields: 320, armor: 3, speed: 2.5, turnRate: 1.6, radius: 1.4, sight: 12,
@@ -74,7 +74,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     holdFire: true,
     secondary: { range: 6, minRange: 0, damage: 8, bonus: { biological: 4 }, cooldown: 0.2, projectile: 'bullet', speed: 0, splash: 0, sound: 'devastator_coax' },
     detonate: { delay: 2.5, weapon: { range: 0, minRange: 0, damage: 500, bonus: { structure: 300 }, step: 0, cooldown: 0, projectile: 'shell', speed: 0, splash: 9 } },
-    desc: "Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, but only fires standing still; its machine gun cuts down infantry, even on the move. Can self-destruct in a huge blast. Weak vs aircraft, MLRS and massed troopers.",
+    desc: "Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, but only fires standing still; its machine gun cuts down infantry, even on the move. Can self-destruct in a huge blast that wrecks your own units too. Weak vs aircraft, MLRS and massed troopers.",
   },
   raider: {
     name: 'Sky Raider', producer: 'fab', cost: 600, buildTime: 13, hp: 200, shields: 100, armor: 1, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
@@ -133,7 +133,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     rite: { from: 'fedaykin', cost: 220, time: 10 },
     weapon: { range: 0.9, minRange: 0, damage: 400, bonus: {}, step: 0, cooldown: 1.6, projectile: 'bullet', speed: 0, splash: 0, only: ['biological'], pierce: true },
     charge: { range: 6, speed: 2 },
-    desc: 'A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls until you let it go: the worm goes where you send it and swallows the enemy on the sand (vehicles most of all), never your own. On foot, a zealot: rushes the most valuable enemy infantry about and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can\'t hurt vehicles, structures or aircraft on foot.',
+    desc: 'A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls until you let it go: the worm goes where you send it and swallows everything on the sand it bites, your own side too, so keep your army clear (vehicles go down most of all). On foot, a zealot: rushes the most valuable enemy infantry about and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can\'t hurt vehicles, structures or aircraft on foot.',
   },
   glider: {
     name: 'Wind Glider', producer: 'perch', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,

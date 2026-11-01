@@ -47,7 +47,9 @@ Other things that matter:
 
 - **Anti-air.** Aircraft can only be hit by weapons that shoot at aircraft (marked in the faction pages). Some weapons hit aircraft for a different amount than ground targets.
 - **High ground.** Units only reach high ground by ramps. Shooting down reaches 10% further, shooting up 10% less far.
-- **Splash and cones.** MLRS rockets, Soulcrusher shells and Mortar rockets hit everything in a blast. Unguided shells land where the target was when fired, so moving units can dodge them. Flamethrowers and weirding modules hit everything in a cone in front of them.
+- **Splash and friendly fire.** Area damage hits everyone in the blast, your own side and your ally's included: MLRS rockets, Soulcrusher shells, Mortar rockets, the Devastator's heavy gun and self-destruct, Sky Raider mines, a ridden worm's bite and a crashing Carryall. Only the unit that fired is spared. Don't shell a melee your own troops are in, and keep your army out of the worm's way. Unguided shells land where the target was when fired, so moving units can dodge them.
+- **Cones.** The Razor's flamethrower and the Fedaykin's weirding modules hit every enemy in a cone in front of them, and never your own side.
+- **Carryall crashes.** A Carryall shot down in flight doesn't just vanish: it rolls over, glides down in a straight line and blows up where it hits the ground, along with anything it was carrying.
 - **Fog of war.** You only see what your units and structures see. Low ground can't see up onto high ground, and mesas block the view. Anything that shoots at you shows itself for a moment.
 - **Healing.** Each faction heals differently: Atreides infantry heal on their own and Repair Vehicles mend the rest; Corrino units heal only at a Repair Pad, while their structures can repair themselves; Fremen heal on their own, faster near a High Perch.
 
@@ -60,7 +62,7 @@ The Upgrade tab researches one thing at a time: building level-ups, Weapons and 
 Sandworms live under the sand and can't cross rock. Fremen Sandriders call them with Thumpers.
 
 - A Thumper drums for a few seconds, and anyone near hears it. Destroy it in time and no worm comes.
-- If the Sandrider is close when the worm surfaces, they ride it until you let it go or they're shot off. A ridden worm goes where you send it and swallows enemies on the sand, never its own side.
+- If the Sandrider is close when the worm surfaces, they ride it until you let it go or they're shot off. A ridden worm goes where you send it and swallows everything on the sand it bites, your own side too.
 - Otherwise the worm is wild: for a while it swallows anything on the sand around the Thumper, whoever it belongs to.
 
 Once a worm is up, the only safe ground is rock. Fremen units dug into the sand are never heard.

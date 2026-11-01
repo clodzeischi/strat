@@ -143,9 +143,9 @@ The Emperor's elite. Close-quarters fighters: tear through infantry and shoot do
 |---|---|---|---|---|---|
 | Main | 18 (+18 vs biological) | 0.75 | 24 | 2.5 | hits aircraft for 24 |
 
-**Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+**Strong against:** <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
-**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/devastator.png" width="32" align="absmiddle" alt=""> [Devastator](#devastator) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
+**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/razor.png" width="32" align="absmiddle" alt=""> [Razor](#razor) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
 
 ---
 
@@ -171,13 +171,13 @@ The Emperor's elite. Close-quarters fighters: tear through infantry and shoot do
 </td>
 </tr></table>
 
-Dune buggy with a flamethrower that burns everything in front of it. Shreds infantry. Weak vs tanks.
+Fast, low half-track with a flamethrower that burns every enemy in front of it. Shreds infantry. Weak vs tanks.
 
 | Weapon | Damage | Cooldown (s) | DPS | Range (tiles) | Notes |
 |---|---|---|---|---|---|
 | Main | 10 (+12 vs biological) | 0.6 | 16.67 | 2 | ground only; cone ±20° |
 
-**Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](atreides.md#infantry) &nbsp; <img src="img/corrino/sardaukar.png" width="32" align="absmiddle" alt=""> [Sardaukar](#sardaukar) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+**Strong against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/sardaukar.png" width="32" align="absmiddle" alt=""> [Sardaukar](#sardaukar) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
 **Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
 
@@ -205,7 +205,7 @@ Dune buggy with a flamethrower that burns everything in front of it. Shreds infa
 </td>
 </tr></table>
 
-Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, but only fires standing still; its machine gun cuts down infantry, even on the move. Can self-destruct in a huge blast. Weak vs aircraft, MLRS and massed troopers.
+Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, but only fires standing still; its machine gun cuts down infantry, even on the move. Can self-destruct in a huge blast that wrecks your own units too. Weak vs aircraft, MLRS and massed troopers.
 
 - The main gun only fires standing still; the machine gun fires on the move.
 - **Self-destruct** (V): blows up 2.5 s after the order.
@@ -216,9 +216,9 @@ Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, bu
 | Machine gun | 8 (+4 vs biological) | 0.2 | 40 | 3 | ground only |
 | Self-destruct | 500 (+300 vs structure) | – | – | – | ground only; splash 4.5 tiles; Weapons upgrades don't change it |
 
-**Strong against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/sardaukar.png" width="32" align="absmiddle" alt=""> [Sardaukar](#sardaukar) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+**Strong against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](#soulcrusher) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
-**Weak against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](atreides.md#infantry) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider)
+**Weak against:** <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider)
 
 ---
 
@@ -284,7 +284,7 @@ Light ornithopter for scouting and raids. Rockets strong vs armor. Lays mines th
 | Main | 16 (+20 vs armored) | 1.2 | 13.33 | 2.5 | ground only |
 | Mine | 40 (+60 vs biological) | – | – | – | ground only; splash 2 tiles |
 
-**Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](#soulcrusher) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](fremen.md#fremen-mortar)
+**Strong against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](#soulcrusher) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](fremen.md#fremen-mortar)
 
 **Weak against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](atreides.md#infantry) &nbsp; <img src="img/corrino/trooper.png" width="32" align="absmiddle" alt=""> [Harkonnen Trooper](#harkonnen-trooper) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
 
@@ -322,7 +322,7 @@ Self-propelled howitzer with a short gun, and can't fire on the move. Deployed, 
 | Mobile | 14 (+12 vs structure) | 1.5 | 9.33 | 4 | ground only |
 | Set up | 70 (+110 vs structure) | 4.5 | 15.56 | 4–13 | ground only; splash 2 tiles; unguided: falls where the target stood |
 
-**Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](atreides.md#infantry) &nbsp; <img src="img/corrino/razor.png" width="32" align="absmiddle" alt=""> [Razor](#razor) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+**Strong against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](atreides.md#mlrs) &nbsp; <img src="img/corrino/trooper.png" width="32" align="absmiddle" alt=""> [Harkonnen Trooper](#harkonnen-trooper) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
 **Weak against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](atreides.md#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](#sky-raider)
 

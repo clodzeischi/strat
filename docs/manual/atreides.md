@@ -103,7 +103,7 @@ Cheap rifle squad. Strong vs infantry. With Infantry Rockets, devastating vs arm
 
 **Strong against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
-**Weak against:** <img src="img/atreides/rocket.png" width="32" align="absmiddle" alt=""> [MLRS](#mlrs) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](corrino.md#soulcrusher) &nbsp; <img src="img/fremen/mortar.png" width="32" align="absmiddle" alt=""> [Fremen Mortar](fremen.md#fremen-mortar)
+**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](#trike) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](corrino.md#soulcrusher) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
 
 ---
 
@@ -135,7 +135,7 @@ Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing 
 |---|---|---|---|---|---|
 | Main | 5 (+3 vs light) | 0.3 | 16.67 | 3.5 | ground only |
 
-**Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](#infantry) &nbsp; <img src="img/corrino/sardaukar.png" width="32" align="absmiddle" alt=""> [Sardaukar](corrino.md#sardaukar) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+**Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](#infantry) &nbsp; <img src="img/corrino/razor.png" width="32" align="absmiddle" alt=""> [Razor](corrino.md#razor) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
 **Weak against:** <img src="img/atreides/tank.png" width="32" align="absmiddle" alt=""> [Tank](#tank) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider)
 
@@ -207,7 +207,7 @@ Long-range rocket artillery with a wide blast. Devastating vs massed troops and 
 
 **Strong against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](#infantry) &nbsp; <img src="img/corrino/raider.png" width="32" align="absmiddle" alt=""> [Sky Raider](corrino.md#sky-raider) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
 
-**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](#trike) &nbsp; <img src="img/corrino/artillery.png" width="32" align="absmiddle" alt=""> [Soulcrusher](corrino.md#soulcrusher)
+**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](#trike) &nbsp; <img src="img/corrino/devastator.png" width="32" align="absmiddle" alt=""> [Devastator](corrino.md#devastator)
 
 ---
 
@@ -294,7 +294,7 @@ Repairs vehicles, aircraft and buildings for credits. Right-click something dama
 </td>
 </tr></table>
 
-Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, D to drop. Assigned to a harvester, it ferries it between spice and refinery.
+Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, D to drop. Assigned to a harvester, it ferries it between spice and refinery. Shot down in flight, it crashes and blows up where it hits the ground.
 
 - **Flies:** crosses any terrain; only anti-air weapons can hit it.
 

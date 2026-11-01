@@ -1,6 +1,6 @@
 # Strat
 
-A Dune-style real-time strategy game in the browser, built with Three.js and TypeScript. Harvest spice, build a base, and fight a computer opponent (or a friend, online) across a randomly generated desert as one of three factions: the mobile Atreides, the shielded Corrino, or the Fremen, who hide in the sand and call down Sandworms.
+A Dune-style real-time strategy game in the browser, built with Three.js and TypeScript. Harvest spice, build a base, and fight computer opponents or friends online, 1v1 or 2v2, across a randomly generated desert as one of three factions: the mobile Atreides, the shielded Corrino, or the Fremen, who hide in the sand and call down Sandworms.
 
 ![A Fremen Sandrider's worm tearing into an Atreides army beside the Atreides base](docs/screenshots/worm.jpg)
 
@@ -28,7 +28,8 @@ A Dune-style real-time strategy game in the browser, built with Three.js and Typ
 - **Sound and music.** An announcer, unit acknowledgements, weapon and explosion sounds heard where you can see them, and music on the title screen and in matches. Separate volume sliders for effects, units, announcer and music, in Settings and in the in-game menu.
 - **Alerts and quality of life.** Located alerts ping the minimap ("Harvester under attack!", "Thumper detected!"), and Space jumps to the latest one. Shift queues orders, Rally All points every production building at once, the IDLE button finds idle harvesters and Spice Crews, and the credits readout estimates your income.
 - **Replays.** Every game is kept to watch again (title screen, Replays), and the end screen saves it as a small file to share. Watch at up to 16× speed, jump to any moment, and see the battle through either side's fog of war with both sides' numbers alongside. Two Hard-vs-Hard games, Fremen beating Corrino, come with the game.
-- **Online 1v1.** Host a game on your own server (a Raspberry Pi is plenty) and play a friend on your network. See [Multiplayer](#multiplayer).
+- **1v1 and 2v2.** Play 1v1, or 2v2 with a computer ally against two computer opponents (Mode and Ally in the skirmish menu; 2v2 needs a Medium or Large map). Allies share their sight and win or lose together. Online, host a game on your own server (a Raspberry Pi is plenty) and play friends on your network. See [Multiplayer](#multiplayer).
+- **Friendly fire.** Area damage (MLRS, Soulcrushers, Mortars, Devastators, mines, a ridden worm, a crashing Carryall) hits your own side too, so splash units need careful handling. Only the Razor's flamethrower and the Fedaykin's weirding modules spare allies.
 - **A computer opponent** that plays any of the three factions (pick one, or Random) under the same fog of war as you, with no map knowledge: it scouts to find your base and see what you're building, and plans only from what it has seen. It defends in proportion to the attack, rebuilds its economy after losses, and offers to surrender when it's beaten (you can refuse and keep playing). On Medium it runs a bigger economy, attacks when it's stronger, raids your harvesters, repairs its vehicles after defending and pulls back from fights it's losing. It uses its faction's tricks: Corrino deploys Soulcrushers and drops pods, Fremen hide, set up camps and call Sandworms. On Hard its units kite and focus fire, pull badly hurt units out of fights, and march in formation; it splits its attacks, raids more, and late in the game Atreides drop MLRS and paratroopers on your harvesters by Carryall, lifting them out again before you can catch them. End-of-game stats screen.
 
 ## Manual
@@ -41,8 +42,8 @@ The [manual](docs/manual/README.md) covers how the game plays, and has a page pe
 |---|---|
 | ![A Carryall paradropping Atreides infantry onto a spice field](docs/screenshots/airdrop.jpg) | ![An Atreides base on a rock shelf, its army selected below it](docs/screenshots/atreides.jpg) |
 | A Carryall paradrops Atreides infantry onto a contested spice field. | An Atreides base on a rock shelf, its army selected and fighting at the ramp. |
-| ![Corrino Devastators and infantry clashing with Atreides tanks and MLRS](docs/screenshots/battle.jpg) | ![A Corrino base on a rock shelf, Devastators and a Razor selected](docs/screenshots/corrino.jpg) |
-| Corrino Devastators and infantry meet an Atreides tank and MLRS column. | A Corrino base, with Devastators and a Razor selected. |
+| ![Corrino Devastators and infantry clashing with Atreides tanks and MLRS](docs/screenshots/battle.jpg) | ![A Corrino base on a rock shelf, Devastators and Razors selected](docs/screenshots/corrino.jpg) |
+| Corrino Devastators and infantry meet an Atreides tank and MLRS column. | A Corrino base, with Devastators and Razors selected. |
 | ![A Fremen Sietch base with Fedaykin, Warriors and a Mortar selected](docs/screenshots/fremen.jpg) | ![Fremen Warriors and Fedaykin storming an Atreides base, a ridden worm behind them](docs/screenshots/assault.jpg) |
 | A Fremen base around its Sietch, with Fedaykin, Warriors and a Mortar selected. | Fremen storm an Atreides base, a Sandrider's worm coming up behind them. |
 
@@ -59,7 +60,7 @@ Then open the address Vite prints (usually http://localhost:5173). `npm run buil
 
 ## Multiplayer
 
-Online games are 1v1 between two browsers, through a small game server you run yourself. The server only pairs players and passes their commands along. Each browser runs the whole game, in lockstep (see [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md)), so the server needs almost no CPU. The simulation does its own trigonometry rather than use the browser's, so it plays out bit for bit the same in Chrome, Firefox and Safari.
+Online games are 1v1 or 2v2 between browsers, through a small game server you run yourself. The server only pairs players and passes their commands along. Each browser runs the whole game, in lockstep (see [docs/MULTIPLAYER.md](docs/MULTIPLAYER.md)), so the server needs almost no CPU. The simulation does its own trigonometry rather than use the browser's, so it plays out bit for bit the same in Chrome, Firefox and Safari.
 
 On the machine that will host (your PC, or a Raspberry Pi):
 
@@ -69,7 +70,7 @@ npm run build
 npm run serve
 ```
 
-It prints addresses like `http://192.168.1.20:8080`. Both players open that address, pick **Multiplayer**, enter a name and choose a faction. One clicks **Host game**, and the other clicks the game under **Open games**.
+It prints addresses like `http://192.168.1.20:8080`. Both players open that address, pick **Multiplayer**, enter a name and choose a faction. One clicks **Host game**, and the others click the game under **Open games**. In a 2v2 room of four, each player joins with or against the host, the host starts the game, and computer players fill any empty seats. If someone leaves mid-game, the computer takes over their base.
 
 - `PORT=9000 npm run serve` uses another port.
 - During development, run `npm run serve` and `npm run dev` side by side. The dev page reaches the server through Vite.
@@ -149,7 +150,7 @@ Units and structures have shields that recharge out of combat. Structures can re
 |---|---|
 | Harkonnen Trooper | Shoulder rockets: strong against vehicles. |
 | Sardaukar | Elite close-quarters infantry. Tear through infantry and shoot down aircraft. |
-| Razor | Flame-throwing dune buggy that burns everything in front of it. |
+| Razor | Fast flame-throwing half-track that burns every enemy in front of it. |
 | Devastator | Slow heavy tank with a machine gun for infantry. Can self-destruct in a huge blast. |
 | Sky Raider | Ornithopter for scouting and raids. Lays mines. |
 | Soulcrusher | Deploys to shell anything your side can see at long range. Brutal on buildings. |
