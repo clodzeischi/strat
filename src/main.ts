@@ -138,8 +138,8 @@ const voice = new Voice(audio);
 const sounds = new Sounds(audio, rts.camera);
 void audio.fetch('effects/click');
 // The title screen's music (not when the page loads straight into a match), and the match's.
-const menuMusic = new Music(['music/menu'], 0.5);
-const gameMusic = new Music(['music/track01', 'music/track02', 'music/track03', 'music/track04'], 0.3);
+const menuMusic = new Music(['music/track01'], 0.5);
+const gameMusic = new Music(['music/track02', 'music/track03', 'music/track04'], 0.3);
 if (!match && !autostart && !watch) menuMusic.play();
 // Buttons click: the menus' and the command card's.
 document.addEventListener('click', (e) => {
