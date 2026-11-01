@@ -2745,7 +2745,7 @@ export class Game {
     this.updatePads(dt);
     this.updateSelfRepair(dt);
     this.updateSalvage(dt);
-    this.separate();
+    this.separate(dt);
     for (const u of this.units) if (!u.carrier) u.syncVisual(this, dt);
     this.updateProjectiles(dt);
     this.units = this.units.filter((u) => !u.dead);
@@ -2845,7 +2845,7 @@ export class Game {
   }
 
   /** Pushes overlapping units apart, never into blocked cells. */
-  private separate(): void {
+  private separate(dt: number): void {
     const us = this.units.filter((u) => !u.def.air && !u.carrier && !u.falling);
     for (let i = 0; i < us.length; i++) {
       const a = us[i];
@@ -2859,8 +2859,16 @@ export class Game {
         const minD = a.radius + b.radius;
         let dx = b.x - a.x;
         let dz = b.z - a.z;
-        if (Math.abs(dx) > minD || Math.abs(dz) > minD) continue;
+        const reach = minD + SIDESTEP_AHEAD;
+        if (Math.abs(dx) > reach || Math.abs(dz) > reach) continue;
         let d2 = dx * dx + dz * dz;
+        if (d2 >= reach * reach) continue;
+        if (this.headOn(a, b)) {
+          // About to meet head-on, both moving: each steps to its own right, so they slide past like traffic instead
+          // of pushing nose to nose.
+          this.sidestep(a, dt);
+          this.sidestep(b, dt);
+        }
         if (d2 >= minD * minD) continue;
         if (d2 < 1e-6) {
           dx = this.random() - 0.5;
@@ -2880,6 +2888,30 @@ export class Game {
     }
   }
 
+  /** Two moving units heading at each other: their next waypoints point roughly opposite ways, and each is ahead of the other. */
+  private headOn(a: Unit, b: Unit): boolean {
+    if (!a.path.length || !b.path.length) return false;
+    const da = this.moveDir(a);
+    const db = this.moveDir(b);
+    if (!da || !db || da.x * db.x + da.z * db.z > -0.5) return false;
+    return (b.x - a.x) * da.x + (b.z - a.z) * da.z > 0 && (a.x - b.x) * db.x + (a.z - b.z) * db.z > 0;
+  }
+
+  /** Unit direction toward a moving unit's next waypoint, or null if it's there. */
+  private moveDir(u: Unit): { x: number; z: number } | null {
+    const p = u.path[0];
+    const dx = p.x - u.x;
+    const dz = p.z - u.z;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    return d < 1e-3 ? null : { x: dx / d, z: dz / d };
+  }
+
+  /** A small step to the unit's right of where it's heading, at SIDESTEP m/s. */
+  private sidestep(u: Unit, dt: number): void {
+    const d = this.moveDir(u);
+    if (d) this.nudge(u, -d.z * SIDESTEP * dt, d.x * SIDESTEP * dt);
+  }
+
   /** Moves a unit by a push, axis by axis, unless that would put it somewhere it can't walk (or off a level edge). */
   private nudge(u: Unit, dx: number, dz: number): void {
     const m = this.map;
@@ -2895,12 +2927,17 @@ export class Game {
 
 }
 
+/** How fast two units meeting head-on step aside (m/s), each to its own right, and how far apart (m) they start to. */
+const SIDESTEP = 1.5;
+const SIDESTEP_AHEAD = 1.5;
+
 /**
- * "Mineral walk": a harvester at work drives through its own side's other units, so an army parked on the route
- * can't jam the economy. Harvesters still bump each other, and anyone on the other side.
+ * "Mineral walk", as StarCraft's workers do: a harvester at work drives through its own side's other units, other
+ * harvesters included, so neither an army parked on the route nor two harvesters meeting at a turn can jam the economy.
+ * It still bumps anyone on the other side.
  */
-function walksThrough(h: Unit, other: Unit): boolean {
-  return h.type === 'harvester' && h.order.kind === 'harvest' && other.type !== 'harvester';
+function walksThrough(h: Unit, _other: Unit): boolean {
+  return h.type === 'harvester' && h.order.kind === 'harvest';
 }
 
 /** Base damage plus the weapon's bonus for each of the target's tags, before upgrades. */

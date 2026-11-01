@@ -49,14 +49,19 @@ const goal = at(0, 10);
 applyCommand(g, A, { c: 'go', units: [...group, mech].map((u) => u.id), x: goal.x, z: goal.z, target: null, attack: true });
 check(mech.order.kind === 'escort', 'a Repair Vehicle in an attack-move escorts the group');
 
-// The enemy line is along +z; "closer to the fight" is a larger z.
+// While the MLRS is shooting, "ahead of it" means closer to what it's shooting at (it may fire across the field, not
+// straight up the map, when the group keeps its shape).
 let aheadOfLead = 0;
 let samples = 0;
 for (let t = 0; t < 90 && enemies.some((e) => !e.dead) && group.some((u) => !u.dead); t += 0.05) {
   g.update(0.05);
-  if (!mlrs.dead && !mech.dead && g.ticks % 10 === 0) {
+  const tg = mlrs.target;
+  if (!mlrs.dead && !mech.dead && tg && !tg.dead && g.ticks % 10 === 0) {
     samples++;
-    if (mech.z > mlrs.z + 0.5) aheadOfLead++;
+    const dx = tg.x - mlrs.x;
+    const dz = tg.z - mlrs.z;
+    const len = Math.hypot(dx, dz) || 1;
+    if (((mech.x - mlrs.x) * dx + (mech.z - mlrs.z) * dz) / len > 0.5) aheadOfLead++;
   }
 }
 check(!mech.dead, 'it survives the fight');

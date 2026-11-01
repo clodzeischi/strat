@@ -225,11 +225,8 @@ function queueGo(game: Game, units: Unit[], x: number, z: number, target: Entity
     z = target.z;
   }
   const kind = attack ? 'amove' : 'move';
-  const cells = rest.length > 1 ? cellsAround(game.map, game.map.cellOf(x), game.map.cellOf(z), rest.length) : [];
-  rest.forEach((u, i) => {
-    const c = cells[i];
-    u.queue.push(c ? { kind, x: game.map.center(c.cx), z: game.map.center(c.cz) } : { kind, x, z });
-  });
+  const spots = formationSpots(game, rest, x, z);
+  rest.forEach((u, i) => u.queue.push({ kind, ...spots[i] }));
 }
 
 /** Right click with units selected (see the `go` command). */
@@ -342,17 +339,57 @@ function commandCarryalls(game: Game, carryalls: Carryall[], target: Entity | nu
 
 /** Each unit gets its own nearby cell so groups don't pile onto one point. */
 function formationMove(game: Game, units: Unit[], x: number, z: number, attackMove: boolean): void {
-  if (!units.length) return;
   const kind = attackMove ? 'amove' : 'move';
-  if (units.length === 1) {
-    units[0].command(game, { kind, x, z });
-    return;
+  const spots = formationSpots(game, units, x, z);
+  units.forEach((u, i) => u.command(game, { kind, ...spots[i] }));
+}
+
+/** A group wider than this (m) gathers at the point instead of keeping its shape. */
+const MAGIC_BOX = 24;
+
+/**
+ * Where each unit of a group move goes, in the order given. StarCraft's "magic box": clicked outside the box around
+ * the group, every unit keeps its place relative to the others, so the group arrives in the shape it left in; clicked
+ * inside it, or with the group spread wider than MAGIC_BOX, they gather on open cells around the point, the nearest
+ * unit to the nearest cell. A unit whose kept place is blocked, on another level or taken joins the gathering.
+ */
+function formationSpots(game: Game, units: Unit[], x: number, z: number): { x: number; z: number }[] {
+  const m = game.map;
+  const spots: { x: number; z: number }[] = units.map(() => ({ x, z }));
+  if (units.length <= 1) return spots;
+  let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity, sx = 0, sz = 0;
+  for (const u of units) {
+    minX = Math.min(minX, u.x); maxX = Math.max(maxX, u.x); minZ = Math.min(minZ, u.z); maxZ = Math.max(maxZ, u.z);
+    sx += u.x; sz += u.z;
   }
-  const cells = cellsAround(game.map, game.map.cellOf(x), game.map.cellOf(z), units.length);
-  const sorted = [...units].sort((a, b) => hypot(a.x - x, a.z - z) - hypot(b.x - x, b.z - z));
-  sorted.forEach((u, i) => {
-    const c = cells[i];
-    if (c) u.command(game, { kind, x: game.map.center(c.cx), z: game.map.center(c.cz) });
-    else u.command(game, { kind, x, z });
-  });
+  const inside = x >= minX - TILE && x <= maxX + TILE && z >= minZ - TILE && z <= maxZ + TILE;
+  const spread = Math.max(maxX - minX, maxZ - minZ) > MAGIC_BOX;
+  const used = new Set<number>();
+  let gather = units.map((_, i) => i);
+  const goal = { cx: m.cellOf(x), cz: m.cellOf(z) };
+  if (!inside && !spread && m.inBounds(goal.cx, goal.cz)) {
+    const cx = sx / units.length;
+    const cz = sz / units.length;
+    const level = m.level[m.idx(goal.cx, goal.cz)];
+    gather = [];
+    units.forEach((u, i) => {
+      const tx = x + (u.x - cx);
+      const tz = z + (u.z - cz);
+      const c = { cx: m.cellOf(tx), cz: m.cellOf(tz) };
+      const k = m.inBounds(c.cx, c.cz) ? m.idx(c.cx, c.cz) : -1;
+      if (k >= 0 && m.canEnter(c.cx, c.cz, u.moveClass) && m.level[k] === level && !used.has(k)) {
+        used.add(k);
+        spots[i] = { x: tx, z: tz };
+      } else gather.push(i);
+    });
+  }
+  if (gather.length) {
+    const cells = cellsAround(m, goal.cx, goal.cz, gather.length + used.size).filter((c) => !used.has(m.idx(c.cx, c.cz)));
+    gather.sort((a, b) => hypot(units[a].x - x, units[a].z - z) - hypot(units[b].x - x, units[b].z - z));
+    gather.forEach((i, n) => {
+      const c = cells[n];
+      if (c) spots[i] = { x: m.center(c.cx), z: m.center(c.cz) };
+    });
+  }
+  return spots;
 }
