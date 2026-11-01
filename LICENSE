@@ -19,3 +19,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+This license covers the code only. The music in src/public/audio/music is not covered by it: tracks track01-track04
+are "The Legend of Relic" by Insydnis (https://insydnis.itch.io/the-legend-of-relic), licensed under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/); see src/public/audio/music/CREDITS.txt.

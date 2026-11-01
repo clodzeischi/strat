@@ -199,8 +199,9 @@ No harvesters or refineries: Spice Crews set up Spice Camps on the fields. Units
 
 ## Credits
 
-Music by [Eitan Epstein Music](https://www.youtube.com/channel/UCsqtmlVpv6jxZzUo3n89J_w).
+- Match music: from [The Legend of Relic](https://insydnis.itch.io/the-legend-of-relic) by [Insydnis](https://insydnis.itch.io/), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (`src/public/audio/music/track01`–`track04.mp3`, used unchanged).
+- Title screen music: by [Eitan Epstein Music](https://www.youtube.com/channel/UCsqtmlVpv6jxZzUo3n89J_w).
 
 ## License
 
-[MIT](LICENSE) for the code. The music belongs to its composer (see [Credits](#credits)) and isn't covered by this license.
+[MIT](LICENSE) for the code. The music belongs to its composers (see [Credits](#credits)) and isn't covered by this license (Insydnis's tracks are under CC BY 4.0).

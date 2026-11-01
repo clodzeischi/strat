@@ -1,0 +1,12 @@
+Music credits
+
+track01.mp3, track02.mp3, track03.mp3, track04.mp3
+  From "The Legend of Relic" by Insydnis - https://insydnis.itch.io/the-legend-of-relic
+  Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0):
+  https://creativecommons.org/licenses/by/4.0/
+  Used unchanged.
+
+menu.mp3
+  By Eitan Epstein Music - https://www.youtube.com/channel/UCsqtmlVpv6jxZzUo3n89J_w
+
+The music is not covered by the game code's MIT license.
