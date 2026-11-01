@@ -3,7 +3,7 @@ import type { UnitDef, UnitType } from './types';
 export const UNITS: Record<UnitType, UnitDef> = {
   harvester: {
     name: 'Harvester', producer: 'factory', cost: 800, buildTime: 10, hp: 600, armor: 2, speed: 3, turnRate: 3, radius: 1.1, sight: 8,
-    turret: false, infantry: false, tags: ['mechanical', 'light'], weapon: null, requires: ['factory', 'refinery'], lift: 6,
+    turret: false, infantry: false, tags: ['mechanical', 'armored'], weapon: null, requires: ['factory', 'refinery'], lift: 6,
     desc: 'Collects spice and brings it to a Refinery.',
   },
   infantry: {

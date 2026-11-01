@@ -45,8 +45,6 @@ export const FACTIONS: Record<Faction, FactionDef> = {
     start: ['trike', 'infantry', 'infantry', 'infantry'],
     shields: false,
     selfRepair: false,
-    // Atreides Harvesters are armored (Corrino's and the shared default are light).
-    units: { harvester: { tags: ['mechanical', 'armored'] } },
   },
   corrino: {
     name: 'Corrino',

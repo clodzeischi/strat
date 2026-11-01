@@ -236,7 +236,7 @@ Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, bu
 <tr><th align="left">Health</th><td>600</td></tr>
 <tr><th align="left">Shields</th><td>300</td></tr>
 <tr><th align="left">Armor</th><td>2</td></tr>
-<tr><th align="left">Attributes</th><td>Mechanical, Light</td></tr>
+<tr><th align="left">Attributes</th><td>Mechanical, Armored</td></tr>
 <tr><th align="left">Speed</th><td>1.5 tiles/s</td></tr>
 <tr><th align="left">Sight</th><td>4 tiles</td></tr>
 </table>
@@ -248,7 +248,7 @@ Collects spice and brings it to a Refinery.
 
 **Strong against:** –
 
-**Weak against:** <img src="img/atreides/trike.png" width="32" align="absmiddle" alt=""> [Trike](atreides.md#trike) &nbsp; <img src="img/corrino/trooper.png" width="32" align="absmiddle" alt=""> [Harkonnen Trooper](#harkonnen-trooper) &nbsp; <img src="img/fremen/warrior.png" width="32" align="absmiddle" alt=""> [Fremen Warrior](fremen.md#fremen-warrior)
+**Weak against:** <img src="img/atreides/infantry.png" width="32" align="absmiddle" alt=""> [Infantry](atreides.md#infantry) &nbsp; <img src="img/corrino/trooper.png" width="32" align="absmiddle" alt=""> [Harkonnen Trooper](#harkonnen-trooper) &nbsp; <img src="img/fremen/fedaykin.png" width="32" align="absmiddle" alt=""> [Fedaykin](fremen.md#fedaykin)
 
 ---
 
