@@ -39,6 +39,9 @@ for (let k = 0; k < games; k++) {
   let deploys = 0, detonations = 0, mines = 0, pods = 0, padHeal = 0, mends = 0, camps = 0, hiddenSeconds = 0;
   const campIds = new Set<number>();
   const wasDeployed = new Set<number>();
+  // Spice harvested by both sides at these minutes (missing once the game is over), to compare the economies early on.
+  const marks = [3, 5, 8, 12];
+  const spiceAt: number[][] = [];
   const startDet = g.startDetonation.bind(g);
   g.startDetonation = (u) => { if (u.detonateAt === null) detonations++; startDet(u); };
   const lay = g.layMine.bind(g);
@@ -62,6 +65,8 @@ for (let k = 0; k < games; k++) {
     for (const u of g.units) if (u.team === corrino && u.hidden) hiddenSeconds += 0.05;
     for (const b of g.buildings) if (b.team === corrino && b.patients.length) padHeal += 0.05;
     void before;
+    if (spiceAt.length < marks.length && g.time >= marks[spiceAt.length] * 60)
+      spiceAt.push([corrino, 1 - corrino].map((t) => Math.round(g.teams[t].stats.spiceHarvested)));
   }
   const s = g.teams[corrino].stats;
   // Sandworms this side called (ridden ones still up included), and the value of what they ate: the enemy's, and its own.
@@ -71,6 +76,6 @@ for (let k = 0; k < games; k++) {
     killed: s.unitsKilled, lost: s.unitsLost, spice: Math.round(s.spiceHarvested), oppSpice: Math.round(g.teams[1 - corrino].stats.spiceHarvested),
     built, deploys, detonations, mines, pods, padSeconds: Math.round(padHeal), selfRepairSeconds: Math.round(mends),
     camps, hiddenSeconds: Math.round(hiddenSeconds), worms: worms.length, wormEnemy: worms.reduce((a, w) => a + w.eatenEnemy, 0),
-    wormOwn: worms.reduce((a, w) => a + w.eatenOwn, 0), factions: `${mine}-${theirs}`, variant: process.env.FREMEN_VARIANT ?? 'swarm',
+    wormOwn: worms.reduce((a, w) => a + w.eatenOwn, 0), spiceAt, factions: `${mine}-${theirs}`, variant: process.env.FREMEN_VARIANT ?? 'swarm',
   }));
 }
