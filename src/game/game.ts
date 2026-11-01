@@ -830,12 +830,22 @@ export class Game {
     b.salvage = null;
   }
 
+  /**
+   * Credits back for salvaging a structure: a share of its price. A Refinery's price includes the Harvester that comes
+   * with it, which the team keeps, so only the rest counts (or building and salvaging Refineries would be a cheap way
+   * to get Harvesters).
+   */
+  salvageValue(b: Building): number {
+    const price = BUILDINGS[b.type].cost - (b.type === 'refinery' ? unitDef(this.teams[b.team].faction, 'harvester').cost : 0);
+    return Math.max(0, price) * (b.def.garrison ? SALVAGE.bunker : SALVAGE.refund);
+  }
+
   private updateSalvage(dt: number): void {
     for (const b of this.buildings) {
       if (b.salvage === null || b.dead) continue;
       b.salvage += dt / SALVAGE.time;
       if (b.salvage < 1) continue;
-      this.teams[b.team].credits += BUILDINGS[b.type].cost * (b.def.garrison ? SALVAGE.bunker : SALVAGE.refund);
+      this.teams[b.team].credits += this.salvageValue(b);
       b.dead = true;
       b.setSelected(false);
       this.scene.remove(b.root);

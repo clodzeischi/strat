@@ -1,10 +1,11 @@
-// Checks salvaging: any structure can be torn down for part of its price (bunkers for more), its cells free up
+// Checks salvaging: any structure can be torn down for part of its price (bunkers for more, a Refinery less its
+// Harvester), its cells free up
 // again, and a side can't salvage its last hub, not even two at once.
 // Usage: npx tsx sim/salvage-check.ts
 import * as THREE from 'three';
 import { Game } from '../src/game/game';
 import { applyCommand } from '../src/game/commands';
-import { BUILDINGS, FACTIONS, type BuildingType, type Team } from '../src/config';
+import { BUILDINGS, FACTIONS, UNITS, type BuildingType, type Team } from '../src/config';
 import { SALVAGE, type Building } from '../src/entities';
 
 let failures = 0;
@@ -42,6 +43,18 @@ before = g.teams[A].credits;
 applyCommand(g, A, { c: 'salvage', buildings: [bunker.id] });
 run(SALVAGE.time + 0.5);
 check(Math.abs(g.teams[A].credits - before - BUILDINGS.bunker.cost * SALVAGE.bunker) < 1, `a bunker gives back ${SALVAGE.bunker * 100}%`);
+
+// A Refinery comes with a Harvester, which stays: only the rest of its price counts, so Refineries aren't cheap Harvesters.
+const harvesters = () => g.units.filter((u) => u.team === A && u.type === 'harvester' && !u.dead).length;
+const refinery = place(A, 'refinery');
+const kept = harvesters();
+before = g.teams[A].credits;
+applyCommand(g, A, { c: 'salvage', buildings: [refinery.id] });
+run(SALVAGE.time + 0.5);
+const back = g.teams[A].credits - before;
+check(refinery.dead && harvesters() === kept, 'a Refinery can be salvaged, and its Harvester stays');
+check(Math.abs(back - (BUILDINGS.refinery.cost - UNITS.harvester.cost) * SALVAGE.refund) < 1, `for ${SALVAGE.refund * 100}% of its price less the Harvester (${back})`);
+check(BUILDINGS.refinery.cost - back > UNITS.harvester.cost, 'so building and salvaging one costs more than buying a Harvester');
 
 const yard = g.buildings.find((b) => b.team === A && b.type === 'conyard')!;
 applyCommand(g, A, { c: 'salvage', buildings: [yard.id] });
