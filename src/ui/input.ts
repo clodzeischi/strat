@@ -696,9 +696,11 @@ export class Input {
       const s = this.toScreen(u.x, u.y + 0.5, u.z);
       return s.x >= x0 && s.x <= x1 && s.y >= y0 && s.y <= y1;
     });
+    // A box over nothing keeps the selection, as in StarCraft: a slip of the mouse never drops an army.
+    if (!hits.length) return;
     if (add) {
       this.setSelection([...new Set([...this.ownUnits(), ...hits])]);
-      if (hits.length) this.onAck('select');
+      this.onAck('select');
     } else this.select(hits);
   }
 
@@ -716,10 +718,8 @@ export class Input {
       return;
     }
     this.lastClick = { time: now, id: e?.id ?? -1 };
-    if (!e) {
-      if (!add) this.select([]);
-      return;
-    }
+    // A click on empty ground keeps the selection (see boxSelect).
+    if (!e) return;
     if (add && e instanceof Unit && e.team === this.team) {
       const own = this.ownUnits();
       this.setSelection(own.includes(e) ? own.filter((u) => u !== e) : [...own, e]);
