@@ -674,13 +674,17 @@ export class Unit extends Entity {
           }
           break;
         case 'enter': {
-          // Walk to the bunker and get in, if there's still room when we arrive.
+          // Walk to the bunker and get in, if there's still room when we arrive: as in StarCraft, on reaching it from
+          // any side (a corner too), or wherever the path ends close by (others crowding the walls).
           const b = this.order.target;
           if (b.dead || b.room <= 0 || b.team !== this.team) {
             this.order = { kind: 'idle' };
             this.path = [];
-          } else if (distTo(b, this.x, this.z) < TILE * 0.75) game.enterBunker(this, b);
-          else if (this.followPath(game, dt)) this.setPath(game, b.x, b.z);
+          } else if (distTo(b, this.x, this.z) < TILE) game.enterBunker(this, b);
+          else if (this.followPath(game, dt)) {
+            if (distTo(b, this.x, this.z) < TILE * 2) game.enterBunker(this, b);
+            else this.setPath(game, b.x, b.z);
+          }
           break;
         }
         case 'idle':

@@ -90,5 +90,20 @@ function run(g: Game, seconds: number, until?: () => boolean): void {
   check(bunker.dead && squad.every((u) => !u.dead && !u.carrier), 'the bunker falls; its infantry get out alive');
 }
 
+// Walking in from every side: they get in on reaching the walls, corners too (they used to stop by a corner 0.8
+// tiles out, short of the 0.75 needed, and stand there for good).
+{
+  const missed: number[] = [];
+  for (let dir = 0; dir < 16; dir++) {
+    const { g, bunker } = setup();
+    const a = (dir / 16) * Math.PI * 2;
+    const squad = [0, 1, 2].map((k) => spawn(g, 'infantry', 0, bunker.x + Math.cos(a) * 6 * TILE + k * 0.8, bunker.z + Math.sin(a) * 6 * TILE));
+    for (const u of squad) u.command(g, { kind: 'enter', target: bunker });
+    run(g, 30, () => squad.every((u) => u.carrier));
+    if (!squad.every((u) => u.carrier)) missed.push(dir);
+  }
+  check(missed.length === 0, 'three infantry sent in from each of 16 directions all get in', missed.length ? `stuck from ${missed.join(', ')}` : '');
+}
+
 console.log(failures ? `\n${failures} check(s) failed` : '\nall checks passed');
 process.exitCode = failures ? 1 : 0;
