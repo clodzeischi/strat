@@ -20,7 +20,7 @@ export const START_CREDITS = 2500;
 export const BUILD_RANGE = 4;
 
 export const PRODUCERS: Producer[] = ['barracks', 'factory', 'hitech', 'fab', 'perch'];
-export const QUEUE_MAX = 5; // per producer type
+export const QUEUE_MAX = 5; // per producer building: two Barracks queue 10 infantry
 export const LEVEL_UP_ORDER: LevelUpType[] = ['conyard', 'factory', 'barracks', 'fab', 'sietch'];
 
 /** Upgrade effects. */

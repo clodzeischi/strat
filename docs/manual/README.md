@@ -29,7 +29,7 @@ Each structure unlocks more of the tech tree, and some level up in place to unlo
 
 ## Units
 
-Production buildings train units. Each building of a type adds a production line, so two Barracks train two infantry at once, and each type queues up to five. New units go to the building's **rally point**. Set it on the ground, or on one of your units to have new units follow that unit.
+Production buildings train units. Each building of a type adds a production line, so two Barracks train two infantry at once, and each building adds five places in its type's queue (two Barracks queue ten). A card under each building shows the unit it's making. New units go to the building's **rally point**. Set it on the ground, or on one of your units to have new units follow that unit.
 
 Right-click to move and attack. Right-clicking one of your own units makes the selection follow it. Attack-move (A) fights everything on the way; Hold Position (F) stands and only shoots what comes within reach; Shift queues orders.
 

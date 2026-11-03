@@ -216,6 +216,13 @@ export class Input {
     return this.raycaster.ray.intersectPlane(this.ground, new THREE.Vector3());
   }
 
+  /** The ground under a resting cursor (not dragging, placing or picking a target), with the cursor's canvas position. */
+  hoverPoint(): { x: number; z: number; sx: number; sy: number } | null {
+    if (!this.mouse.inside || this.dragging || this.grab || this.armed) return null;
+    const p = this.groundPoint(this.mouse.x, this.mouse.y);
+    return p && { x: p.x, z: p.z, sx: this.mouse.x, sy: this.mouse.y };
+  }
+
   private toScreen(x: number, y: number, z: number): { x: number; y: number; visible: boolean } {
     const v = new THREE.Vector3(x, y, z).project(this.cam.camera);
     return {

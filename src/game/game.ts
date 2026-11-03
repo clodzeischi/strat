@@ -62,13 +62,16 @@ export interface TeamState {
   upgrades: Set<UpgradeType>;
   /** The one structure being built at the Construction Yard. */
   building: { type: BuildingType; progress: number; ready: boolean } | null;
-  /** One queue per producer type. The first N items build in parallel, N = buildings of that type. */
-  queues: Record<Producer, { type: UnitType; progress: number }[]>;
+  /**
+   * One queue per producer type. The first N items build in parallel, N = buildings of that type, each at its own
+   * `site` (kept until it's done, so the screen can show what each building is making).
+   */
+  queues: Record<Producer, { type: UnitType; progress: number; site?: Building | null }[]>;
   research: { type: UpgradeType; progress: number } | null;
   /** Building being upgraded to level 2, per upgradable type. */
   /** Level-ups under way, each taking one building up to `level`. */
   levelUps: Partial<Record<LevelUpType, { building: Building; level: number; progress: number }>>;
-  /** Round-robin counter so units leave from each building of a type in turn. */
+  /** Round-robin counter so queue items take each building of a type in turn. */
   spawnTurn: Record<Producer, number>;
 }
 
@@ -726,12 +729,12 @@ export class Game {
     return b;
   }
 
-  private spawnFromProducer(team: Team, type: UnitType): void {
+  private spawnFromProducer(team: Team, type: UnitType, at?: Building | null): void {
     const producer = this.unitDef(team, type).producer;
     const sites = this.buildings.filter((b) => b.team === team && b.type === producer && !b.dead);
     if (sites.length === 0) return;
     const ts = this.teams[team];
-    const site = sites[ts.spawnTurn[producer]++ % sites.length];
+    const site = at && !at.dead ? at : sites[ts.spawnTurn[producer]++ % sites.length];
     ts.stats.unitsBuilt++;
     if (type === 'carryall') {
       // Lifts off the pad and holds over the rally point, or over its factory.
@@ -885,6 +888,22 @@ export class Game {
     return this.count(team, p);
   }
 
+  /**
+   * Gives each queue item that's building a building of its own to build at, taking free ones in turn; an item keeps
+   * its building until it's done or the building is lost. Items still waiting hold none.
+   */
+  private assignSites(ts: TeamState, p: Producer, lines: number): void {
+    const queue = ts.queues[p];
+    for (let i = lines; i < queue.length; i++) queue[i].site = null;
+    const active = queue.slice(0, lines);
+    if (active.every((q) => q.site && !q.site.dead)) return;
+    const free = this.buildings.filter((b) => b.team === ts.team && b.type === p && !b.dead && !active.some((q) => q.site === b));
+    for (const q of active) {
+      if (q.site && !q.site.dead) continue;
+      q.site = free.length ? free.splice(ts.spawnTurn[p]++ % free.length, 1)[0] : null;
+    }
+  }
+
   private spend(ts: TeamState, amount: number): void {
     ts.credits -= amount;
     ts.stats.creditsSpent += amount;
@@ -1012,7 +1031,7 @@ export class Game {
     const ts = this.teams[team];
     const queue = ts.queues[this.unitDef(team, type).producer];
     if (!this.canTrain(team, type)) return false;
-    if (queue.length >= QUEUE_MAX) {
+    if (queue.length >= QUEUE_MAX * Math.max(1, this.activeLines(team, this.unitDef(team, type).producer))) {
       this.notifyTeam(team, 'Production queue full.', 'production_queue_full');
       return false;
     }
@@ -1094,13 +1113,14 @@ export class Game {
     for (const p of PRODUCERS) {
       const queue = ts.queues[p];
       const lines = this.activeLines(ts.team, p);
+      this.assignSites(ts, p, lines);
       for (let i = 0; i < queue.length && i < lines; i++) {
         const q = queue[i];
         if (!this.canTrain(ts.team, q.type)) continue;
         q.progress += dt / UNITS[q.type].buildTime;
         if (q.progress >= 1) {
           queue.splice(i--, 1);
-          this.spawnFromProducer(ts.team, q.type);
+          this.spawnFromProducer(ts.team, q.type, q.site);
           this.notifyTeam(ts.team, `${UNITS[q.type].name} ready.`, 'unit_ready');
         }
       }

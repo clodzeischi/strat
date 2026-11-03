@@ -10,6 +10,7 @@ import { ViewShadows } from './render/shadows';
 import { CommandCard } from './ui/command-card';
 import { renderModelIcons } from './ui/model-icons';
 import { Hud } from './ui/hud';
+import { WorldTags } from './ui/world-tags';
 import { AudioBank } from './ui/audio';
 import { Music } from './ui/music';
 import { Sounds } from './ui/sounds';
@@ -130,6 +131,7 @@ const shadows = new ViewShadows(sun);
 const input = new Input(game, rts, canvas, document.getElementById('selbox')!, document.getElementById('info')!);
 const hud = new Hud(game, rts);
 const card = new CommandCard(game, input, document.getElementById('command-card')!);
+const worldTags = new WorldTags(game, rts.camera, input, document.getElementById('world-tags')!);
 hud.onClick = (x, z, button) => input.minimapClick(x, z, button);
 hud.onIdle = (list, all) => input.selectIdle(list, all);
 input.idleWorkers = () => hud.idleWorkers();
@@ -662,6 +664,7 @@ function frame(now: number): void {
     }
     game.frame(dt, alpha);
     hud.update(dt);
+    worldTags.update(dt);
     card.update();
     shadows.fit(rts.camera, gameFog.far);
     renderer.render(scene, rts.camera);

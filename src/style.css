@@ -149,6 +149,67 @@ body {
   }
 }
 
+/* Under the health bars of your and your allies' buildings: the unit being made, the infantry in a bunker. */
+#world-tags {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.world-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  translate: -50% 0;
+}
+
+.world-tag .card {
+  position: relative;
+  width: calc(24px * var(--ui, 1));
+  height: calc(24px * var(--ui, 1));
+  background: var(--bar-panel);
+  border: 1px solid var(--bar-edge);
+}
+
+.world-tag .card svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.world-tag .card.empty {
+  opacity: 0.5;
+}
+
+.world-tag .card i {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--accent);
+}
+
+/* Hovering a spice field: the spice left in it. */
+.spice-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  background: rgba(20, 16, 12, 0.95);
+  border: 1px solid var(--bar-edge);
+  border-left: 3px solid var(--accent);
+  padding: 3px 8px;
+  font-size: calc(12px * var(--ui, 1));
+  white-space: nowrap;
+}
+
+.spice-tip[hidden] {
+  display: none;
+}
+
 /* Hovering the credits: the income estimate. */
 #income-tip {
   position: absolute;
