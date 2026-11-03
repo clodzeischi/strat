@@ -577,6 +577,18 @@ game.onSurrenderOffer = (team) => {
 fpsEl.hidden = !menus.showFps;
 input.onMenu = () => setPaused(mode === 'playing');
 document.getElementById('menu-btn')!.addEventListener('click', () => setPaused(true));
+// Full screen: the browser's toolbar no longer slides down at the top edge, so all four edges scroll. In Chrome the
+// game keeps Esc (holding it leaves full screen); elsewhere Esc leaves full screen and the button is the way back.
+const fullBtn = document.getElementById('full-btn')!;
+fullBtn.addEventListener('click', () => {
+  fullBtn.blur(); // so Space and Enter go to the game, not the button
+  if (document.fullscreenElement) void document.exitFullscreen();
+  else {
+    const keyboard = (navigator as Navigator & { keyboard?: { lock?: (keys: string[]) => Promise<void> } }).keyboard;
+    document.documentElement.requestFullscreen().then(() => keyboard?.lock?.(['Escape'])).catch(() => {});
+  }
+});
+document.addEventListener('fullscreenchange', () => (fullBtn.textContent = document.fullscreenElement ? 'WINDOW' : 'FULL SCREEN'));
 window.addEventListener('keydown', (e) => {
   // Esc closes the menu (opening it goes through Input so Esc still cancels placement first).
   if (e.key === 'Escape' && mode === 'paused') {
