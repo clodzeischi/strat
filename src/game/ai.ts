@@ -144,13 +144,16 @@ export const EASY_PROFILE: AIProfile = {
 };
 
 /**
- * Medium: twice Easy's harvesters with both refineries early, attacks whenever its army at home is clearly stronger
- * than the enemy's (going for the economy), harasses harvesters with hit-and-run trike raids, and keeps its army
- * alive: Repair Vehicles at home, badly hurt units pulled out to be mended, and waves that pull back when outmatched. Tuned with `MAPS=random sim/run.sh`; see docs/PLAN.md.
+ * Medium: an extra harvester bought right away and both refineries early, attacks whenever its army at home is clearly
+ * stronger than the enemy's (going for the economy), harasses harvesters with hit-and-run trike raids, and keeps its
+ * army alive: Repair Vehicles at home, badly hurt units pulled out to be mended, and waves that pull back when
+ * outmatched. Unit picks follow counters as loosely as Easy's. Softened 2026-11-03: with 6 harvesters and counterFocus 8
+ * (now Hard's) it out-produced and out-countered people and beat Easy 100%; now 75%. Tuned with `MAPS=random
+ * sim/run.sh`; see docs/PLAN.md.
  */
 export const MEDIUM_PROFILE: AIProfile = {
-  ...EASY_PROFILE, harvesters: 6, extraRefinery: 'always', saveForOpening: true,
-  initiative: 1.2, waveRetreat: 0.5, waveGate: 0.9, counterFocus: 8, goodLinesOnly: true, bunkers: 2, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
+  ...EASY_PROFILE, harvesters: 2, extraRefinery: 'always', saveForOpening: true,
+  initiative: 1.2, waveRetreat: 0.5, waveGate: 0.9, counterFocus: 3, goodLinesOnly: true, bunkers: 2, raids: { trikes: 3, start: 150, interval: 60, hunt: true },
   sustain: { repairPer: 6, maxRepair: 3, outmatched: 1.3 }, scout: { first: 40, interval: 75 }, watch: true,
 };
 

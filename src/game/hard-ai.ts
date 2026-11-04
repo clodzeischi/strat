@@ -18,6 +18,8 @@ import * as dm from './dmath';
  */
 export const HARD_PROFILE: AIProfile = {
   ...MEDIUM_PROFILE,
+  // The economy and counter-picking Medium had before it was softened.
+  harvesters: 6, counterFocus: 8,
   raids: { trikes: 4, start: 120, interval: 45, hunt: true },
   sustain: { repairPer: 5, maxRepair: 3, outmatched: 1.3 },
   // Gathers further out (the army at home stays out of the harvesters' way) and adds a second factory sooner.

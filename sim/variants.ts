@@ -41,4 +41,7 @@ export const VARIANTS: Record<string, Partial<AIProfile>> = {
   'hard-repair': { ...MEDIUM_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 0 } },
   'hard-outmatch': { ...MEDIUM_PROFILE, sustain: { repairPer: 0, maxRepair: 0, outmatched: 1.3 } },
   'hard-sustain-2': { ...MEDIUM_PROFILE, sustain: { repairPer: 6, maxRepair: 3, outmatched: 2 } },
+  // Softer Medium (2026-11-03): 2 harvesters and counterFocus 3 instead of 6 and 8. Against Easy (MAPS=random, 200
+  // games): 75%; with counterFocus 4 / 5, 79% / 82%; 3 harvesters 95-99%; 4-6 harvesters 100%; one per refinery 51%.
+  medium: MEDIUM_PROFILE,
 };

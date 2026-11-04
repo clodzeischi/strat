@@ -6,7 +6,7 @@ import type { Team, UnitType } from '../src/config';
 import type { Game } from '../src/game/game';
 
 /** Bots never surrender, and keep Medium's economy unless they say otherwise. */
-const BASE: AIProfile = { ...MEDIUM_PROFILE, surrender: false, initiative: 0, raids: { ...EASY_PROFILE.raids, start: Infinity }, sustain: EASY_PROFILE.sustain };
+const BASE: AIProfile = { ...MEDIUM_PROFILE, harvesters: 6, counterFocus: 8, surrender: false, initiative: 0, raids: { ...EASY_PROFILE.raids, start: Infinity }, sustain: EASY_PROFILE.sustain };
 
 abstract class Bot extends AI {
   /** Attackers that got where they were sent push on to the next building. */
