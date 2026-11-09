@@ -49,14 +49,56 @@ The [manual](docs/manual/README.md) covers how the game plays, and has a page pe
 
 ## Getting started
 
-You need [Node.js](https://nodejs.org/) 20.19 or newer (or 22.12+).
+The game runs in your web browser, but you start it on your own computer with a small program, the game server. One command downloads the game, sets up everything it needs, starts it and opens it in your browser. The first run takes a few minutes; after that it starts in seconds.
+
+### Windows
+
+1. Open the Start menu, type **PowerShell** and open **Windows PowerShell**.
+2. Copy this line, paste it into the blue window (right-click pastes) and press Enter:
+
+   ```powershell
+   irm https://raw.githubusercontent.com/clodzeischi/strat/main/play.ps1 | iex
+   ```
+
+3. If Windows asks whether Node.js may use the network, click **Allow**. It's only needed to play with others on your network.
+
+To play again later, open the `strat` folder in your user folder (`C:\Users\<you>\strat`) and double-click **play.bat**, or paste the same line again. Either way it updates the game first.
+
+### macOS and Linux
+
+1. Open a terminal: on a Mac, press Cmd+Space, type **Terminal** and press Enter. On Linux, it's usually Ctrl+Alt+T.
+2. Copy this line, paste it into the terminal and press Enter:
+
+   ```sh
+   curl -fsSL https://raw.githubusercontent.com/clodzeischi/strat/main/play.sh | bash
+   ```
+
+To play again later, run the same line again, or `~/strat/play.sh`. Either way it updates the game first.
+
+### What the script does
+
+- **Downloads the game** into a `strat` folder in your home folder: with git if you have it, otherwise as an archive. If the folder's already there, it updates it.
+- **Checks for Node.js** 20.19 or newer (or 22.12+), which the game needs. If yours is missing or too old, it downloads Node.js 22 into a `.strat` folder in your home folder. You don't need admin rights, and the rest of your system isn't changed.
+- **Installs the game's packages and builds the game** when something changed since the last run.
+- **Starts the game server** on port 8080 and **opens http://localhost:8080** in your browser.
+
+Leave the terminal window open while you play. To quit, close the browser tab, then press Ctrl+C in the terminal or just close the window. To put the game somewhere else or use another port, set `STRAT_DIR` or `PORT` first, for example `PORT=9000 ~/strat/play.sh` (in PowerShell, `$env:PORT=9000` before the command). To uninstall, delete the `strat` and `.strat` folders in your home folder.
+
+The game works in Chrome, Edge, Firefox and Safari. Once it's running, the [manual](docs/manual/README.md) explains how to play, and [Controls](#controls) lists the keys. Friends on the same network can join you at the other addresses the server prints (see [Multiplayer](#multiplayer)).
+
+### By hand
+
+If you'd rather set things up yourself, install [Node.js](https://nodejs.org/) 20.19 or newer (or 22.12+) and [git](https://git-scm.com/), then:
 
 ```sh
+git clone https://github.com/clodzeischi/strat.git
+cd strat
 npm install
-npm run dev
+npm run build
+npm run serve
 ```
 
-Then open the address Vite prints (usually http://localhost:5173). `npm run build` makes a production build in `dist/`. `npm run check` runs the typechecks and every check script in `sim/` (about 40 seconds).
+and open http://localhost:8080. For development, `npm run dev` serves the game with live reloading at the address Vite prints (usually http://localhost:5173). `npm run check` runs the typechecks and every check script in `sim/` (about 40 seconds).
 
 ## Multiplayer
 
