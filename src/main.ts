@@ -372,7 +372,7 @@ function watchReplay(replay: Replay, seek = 0): void {
     menus.setReplayStatus('This browser blocks session storage, which replays need.');
     return;
   }
-  location.reload();
+  reloadPage();
 }
 
 /** The replays on the Replays page: the last game played here, and the ones that ship with the game. */
@@ -451,7 +451,7 @@ function reload(next: Autostart | null): void {
   } catch {
     // Without session storage, Restart falls back to the title screen.
   }
-  location.reload();
+  reloadPage();
 }
 
 function setPaused(paused: boolean): void {
@@ -475,7 +475,7 @@ function lobbyMessage(msg: ServerMsg): void {
       menus.setLobbyStatus('This browser blocks session storage, which online games need.');
       return;
     }
-    location.reload();
+    reloadPage();
   }
 }
 
@@ -581,19 +581,52 @@ document.getElementById('menu-btn')!.addEventListener('click', () => setPaused(t
 // longer slides down at the top edge, so all four edges scroll. In Chrome the game keeps Esc (holding it leaves full
 // screen); elsewhere Esc leaves full screen and the menu button is the way back.
 const fullBtns = document.querySelectorAll<HTMLButtonElement>('[data-action="fullscreen"]');
+function enterFullscreen(): void {
+  const keyboard = (navigator as Navigator & { keyboard?: { lock?: (keys: string[]) => Promise<void> } }).keyboard;
+  document.documentElement.requestFullscreen().then(() => keyboard?.lock?.(['Escape'])).catch(() => {});
+}
 for (const btn of fullBtns) {
   btn.addEventListener('click', () => {
     btn.blur(); // so Space and Enter go to the game, not the button
     if (document.fullscreenElement) void document.exitFullscreen();
-    else {
-      const keyboard = (navigator as Navigator & { keyboard?: { lock?: (keys: string[]) => Promise<void> } }).keyboard;
-      document.documentElement.requestFullscreen().then(() => keyboard?.lock?.(['Escape'])).catch(() => {});
-    }
+    else enterFullscreen();
   });
 }
 document.addEventListener('fullscreenchange', () => {
   for (const btn of fullBtns) btn.textContent = document.fullscreenElement ? 'Window' : 'Full screen';
 });
+
+/**
+ * Starting, restarting or leaving a match reloads the page, and the browser leaves full screen on a reload. A page
+ * may only go full screen on a click or key press, so full screen comes back on the first one after the reload (which
+ * still does what it would have done).
+ */
+const FULLSCREEN_KEY = 'strat.fullscreen';
+function reloadPage(): void {
+  try {
+    if (document.fullscreenElement) sessionStorage.setItem(FULLSCREEN_KEY, '1');
+  } catch {
+    // Without session storage the next page starts windowed.
+  }
+  location.reload();
+}
+let wasFullscreen = false;
+try {
+  wasFullscreen = sessionStorage.getItem(FULLSCREEN_KEY) === '1';
+  sessionStorage.removeItem(FULLSCREEN_KEY);
+} catch {
+  // As above.
+}
+if (wasFullscreen) {
+  const restore = (e: Event) => {
+    if (e instanceof KeyboardEvent && e.key === 'Escape') return; // Esc doesn't count as a gesture for full screen
+    window.removeEventListener('pointerdown', restore, true);
+    window.removeEventListener('keydown', restore, true);
+    if (!document.fullscreenElement) enterFullscreen();
+  };
+  window.addEventListener('pointerdown', restore, true);
+  window.addEventListener('keydown', restore, true);
+}
 window.addEventListener('keydown', (e) => {
   // Esc closes the menu (opening it goes through Input so Esc still cancels placement first).
   if (e.key === 'Escape' && mode === 'paused') {
