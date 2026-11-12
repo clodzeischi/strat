@@ -256,8 +256,7 @@ body {
   color: var(--accent);
 }
 
-#menu-btn,
-#full-btn {
+#menu-btn {
   align-self: center;
   background: var(--bar-panel);
   color: var(--muted);
@@ -269,8 +268,7 @@ body {
   cursor: pointer;
 }
 
-#menu-btn:hover,
-#full-btn:hover {
+#menu-btn:hover {
   color: var(--text);
   border-color: var(--accent);
 }

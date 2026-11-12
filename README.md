@@ -147,7 +147,7 @@ It prints addresses like `http://192.168.1.20:8080`. Both players open that addr
 | **P** | Pause (not in online games; in a replay, pauses playback) |
 | Arrow keys, screen edges, middle-drag | Pan the camera |
 | **Esc** | Cancel, or open the menu |
-| **FULL SCREEN** button (top right) | Full screen, so the top edge scrolls too; in Chrome hold Esc to leave it |
+| **Full screen** (title menu, or MENU in a match) | Full screen, so the top edge scrolls too; in Chrome hold Esc to leave it |
 
 Hotkeys all sit under the left hand, as in Stormgate. The command card in the bottom left is a 4×3 grid: the top row picks a tab, and the two rows below hold that tab's buttons, always in the same places. Keys go by position, so on Colemak the same grid is Q W F P, A R S T and Z X C V (Chrome and Edge print your layout's letters on the buttons). Selecting units opens the Command tab, so A is always attack-move with an army selected; the other tabs stay a key away on the top row.
 

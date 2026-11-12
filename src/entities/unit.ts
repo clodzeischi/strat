@@ -925,7 +925,10 @@ export class Unit extends Entity {
       return false;
     }
     if (d <= game.rangeFor(this, w, target)) {
+      // Stops to shoot. Its path is dropped, so an attack-move re-paths to its destination once the fight is over
+      // (without this, the empty path read as arrived and the unit stopped where it made the kill).
       this.path = [];
+      this.chasing = true;
       let aligned: boolean;
       if (this.turret) {
         this.turretHeading = this.rotateToward(this.turretHeading, angle, 4 * dt);
