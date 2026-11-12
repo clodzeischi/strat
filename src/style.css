@@ -556,13 +556,13 @@ body {
   position: absolute;
   left: 0;
   bottom: calc(100% + 6px);
-  width: 290px;
-  background: rgba(20, 16, 12, 0.95);
+  width: 240px;
+  background: rgba(20, 16, 12, 0.96);
   border: 1px solid var(--bar-edge);
   border-left: 3px solid var(--accent);
-  padding: 7px 10px;
-  font-size: 12px;
-  line-height: 1.4;
+  padding: 6px 9px 7px;
+  font-size: 11px;
+  line-height: 1.35;
   pointer-events: none;
 }
 
@@ -570,46 +570,83 @@ body {
   display: none;
 }
 
+/* Name, hotkey, then price and time on the right. */
 .tip-head {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: baseline;
-  margin-bottom: 3px;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--bar-edge);
 }
 
 .tip-name {
   font-weight: bold;
-  font-size: 13px;
+  font-size: 12px;
+  color: var(--text);
 }
 
 .tip-key {
-  font: bold 10px ui-monospace, Menlo, monospace;
+  font: bold 9px ui-monospace, Menlo, monospace;
   border: 1px solid var(--muted);
   color: var(--muted);
-  padding: 0 4px;
+  padding: 0 3px;
+}
+
+.tip-price {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  font: 11px ui-monospace, Menlo, monospace;
+  white-space: nowrap;
 }
 
 .tip-cost {
-  margin-left: auto;
-  font-family: ui-monospace, Menlo, monospace;
   color: var(--accent);
 }
 
 .tip-time {
-  font-family: ui-monospace, Menlo, monospace;
   color: var(--muted);
 }
 
-.tip-locked {
-  color: #d05a4a;
-  font-size: 11px;
-  font-weight: bold;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
+/* What it is: the line to read. */
 .tip-body {
   white-space: pre-line;
+  color: var(--text);
+  opacity: 0.88;
+}
+
+/* Numbers, in small print for those who want them: a three-column grid, then bonuses one to a line. */
+.tip-stats {
+  margin-top: 5px;
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  justify-content: start;
+  column-gap: 12px;
+  font: 10px/1.5 ui-monospace, Menlo, monospace;
+  color: var(--text);
+}
+
+.tip-stats i {
+  font-style: normal;
+  color: var(--muted);
+}
+
+.tip-notes {
+  font: 10px/1.5 ui-monospace, Menlo, monospace;
+  color: var(--muted);
+}
+
+.tip-needs {
+  margin-top: 5px;
+  color: #d05a4a;
+  font-weight: bold;
+}
+
+.tip-hint {
+  margin-top: 4px;
+  font-size: 10px;
+  font-style: italic;
   color: var(--muted);
 }
 

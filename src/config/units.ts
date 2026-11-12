@@ -20,6 +20,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     weapon: { range: 7, minRange: 0, damage: 5, bonus: { light: 3 }, cooldown: 0.3, projectile: 'bullet', speed: 0, splash: 0, sound: 'heavy_mg' },
     lift: 3,
     desc: 'Fast raider with a machine gun. Strong vs infantry and MLRS, good for harassing harvesters. With Trike Nitro, faster still and firing faster.',
+    brief: 'Fast raider. Strong vs infantry and MLRS, harasses harvesters.',
   },
   tank: {
     name: 'Tank', producer: 'factory', cost: 425, buildTime: 9, hp: 725, armor: 3, speed: 3.5, turnRate: 2.5, radius: 1.1, sight: 13,
@@ -35,6 +36,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     lockOn: { duration: 8, cooldown: 20 },
     lift: 6,
     desc: 'Long-range rocket artillery with a wide blast. Devastating vs massed troops and buildings, and shoots down aircraft. Rockets fly at where the target was, so moving units can dodge them; Lock On (D) makes them home in on one target for a while. Lightly armored and can\'t fire up close: trikes that get in tear it apart.',
+    brief: 'Long-range rockets with a wide blast. Wrecks troops and buildings, hits aircraft. Weak up close.',
   },
   repair: {
     name: 'Repair Vehicle', producer: 'factory', cost: 450, buildTime: 8, hp: 300, armor: 1, speed: 3.5, turnRate: 3.5, radius: 0.9, sight: 10,
@@ -46,6 +48,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     name: 'Carryall', producer: 'hitech', cost: 400, buildTime: 8, hp: 380, armor: 1, speed: 9, turnRate: 2.2, radius: 1.4, sight: 12,
     turret: false, infantry: false, tags: ['mechanical', 'air'], weapon: null, requires: ['hitech'], air: true,
     desc: 'Airlifts a heavy vehicle, two trikes or six infantry. Right-click a unit to pick it up, D to drop. Assigned to a harvester, it ferries it between spice and refinery. Shot down in flight, it crashes and blows up where it hits the ground.',
+    brief: 'Airlifts vehicles or infantry: right-click a unit, D to drop. Ferries an assigned harvester.',
   },
 
   // ---- Corrino: health alone beats the Atreides counterpart's, and shields come on top ----
@@ -54,6 +57,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'],
     weapon: { range: 9, minRange: 0, damage: 10, bonus: { mechanical: 10 }, airDamage: 10, cooldown: 0.7, projectile: 'rocket', speed: 20, splash: 0, air: true, sound: 'launch_small' },
     desc: 'Imperial levy raised from the beaten Harkonnen. Shoulder rockets: strong vs vehicles, beats trikes by numbers, and shoots at aircraft. Weak vs MLRS.',
+    brief: 'Shoulder rockets: strong vs vehicles, shoots at aircraft. Weak vs MLRS.',
   },
   sardaukar: {
     name: 'Sardaukar', producer: 'barracks', cost: 260, buildTime: 9, hp: 180, shields: 100, armor: 1, speed: 3.15, turnRate: 12, radius: 0.5, sight: 10,
@@ -75,6 +79,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     secondary: { range: 6, minRange: 0, damage: 8, bonus: { biological: 4 }, cooldown: 0.2, projectile: 'bullet', speed: 0, splash: 0, sound: 'devastator_coax' },
     detonate: { delay: 2.5, weapon: { range: 0, minRange: 0, damage: 500, bonus: { structure: 300 }, step: 0, cooldown: 0, projectile: 'shell', speed: 0, splash: 9 } },
     desc: "Slow heavy tank. Its heavy gun hits anything on the ground and crushes armor, but only fires standing still; its machine gun cuts down infantry, even on the move. Can self-destruct in a huge blast that wrecks your own units too. Weak vs aircraft, MLRS and massed troopers.",
+    brief: 'Slow heavy tank: crushes armor standing still, guns down infantry on the move. Can self-destruct.',
   },
   raider: {
     name: 'Sky Raider', producer: 'fab', cost: 600, buildTime: 13, hp: 200, shields: 100, armor: 1, speed: 9, turnRate: 3, radius: 1.0, sight: 14,
@@ -85,6 +90,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
       weapon: { range: 0, minRange: 0, damage: 40, bonus: { biological: 60 }, cooldown: 0, projectile: 'shell', speed: 0, splash: 4 },
     },
     desc: 'Light ornithopter for scouting and raids. Rockets strong vs armor. Lays mines that wreck infantry and wear down harvesters. Weak vs anti-air.',
+    brief: 'Light ornithopter. Rockets vs armor, lays mines. Weak vs anti-air.',
   },
   artillery: {
     name: 'Soulcrusher', producer: 'fab', cost: 650, buildTime: 13, hp: 200, shields: 110, armor: 2, speed: 2.5, turnRate: 2, radius: 1.1, sight: 12,
@@ -95,6 +101,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
       weapon: { range: 26, minRange: 8, damage: 70, bonus: { structure: 110 }, cooldown: 4.5, projectile: 'shell', speed: 13, splash: 4, unguided: true, sound: 'launch_large' },
     },
     desc: "Self-propelled howitzer with a short gun, and can't fire on the move. Deployed, it shells anything your side can see at long range; the shells are slow and fall where the target was. Brutal on buildings and defenses. Weak vs tanks.",
+    brief: 'Deploys to shell anything in sight at long range. Brutal on buildings. Weak vs tanks.',
   },
 
   // ---- Fremen: cheap, fast infantry that dig into the sand (`hides`), and call wild Sandworms with Thumpers ----
@@ -103,6 +110,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
     turret: false, infantry: true, tags: ['biological', 'light'], requires: ['barracks'], hides: true,
     weapon: { range: 5, minRange: 0, damage: 7, bonus: { biological: 3 }, cooldown: 0.55, projectile: 'bullet', speed: 0, splash: 0, air: true, sound: 'light_mg' },
     desc: 'Cheap, fast desert fighter with a maula pistol and a crysknife. Strong vs infantry, can shoot at aircraft. Weak vs vehicles, flamers and structures. Goes through rites to become a Fedaykin or a Fremen Mortar.',
+    brief: 'Cheap, fast fighter. Strong vs infantry, hits aircraft, weak vs vehicles. Rites to Fedaykin or Mortar.',
   },
   fedaykin: {
     name: 'Fedaykin', producer: 'barracks', cost: 200, buildTime: 7, hp: 230, armor: 1, speed: 3.15, turnRate: 12, radius: 0.5, sight: 11,
@@ -110,11 +118,13 @@ export const UNITS: Record<UnitType, UnitDef> = {
     rite: { from: 'warrior', cost: 115, time: 6.5 },
     weapon: { range: 7, minRange: 0, damage: 14, bonus: { armored: 12 }, cooldown: 1, projectile: 'bullet', speed: 0, splash: 0, cone: 0.25, air: true, pierce: true, sound: 'small_laser' },
     desc: 'Elite fighters with weirding modules: sonic blasts that hit everything in a narrow cone, crack armor and pass straight through shields. Strong vs tanks and massed infantry, fair vs light vehicles, can shoot at aircraft. Weak vs Sandriders and slow against structures. With Sietch III, can go through the rite of the Sandrider.',
+    brief: 'Elite Fremen. Sonic blasts crack armor and pass shields. Strong vs tanks and massed infantry.',
   },
   crew: {
     name: 'Spice Crew', producer: 'barracks', cost: 450, buildTime: 12, hp: 120, speed: 3.15, turnRate: 12, radius: 0.45, sight: 9,
     turret: false, infantry: true, tags: ['biological', 'light'], weapon: null, requires: ['barracks'], hides: true, camp: 'camp',
     desc: 'Unarmed spice hunters. Walk them onto a spice field and Set Up Camp (D): the Spice Camp turns the spice around it into credits. Pack it up again when the spice runs out.',
+    brief: 'Walk onto spice and Set Up Camp (D) to turn the spice around it into credits.',
   },
   mortar: {
     name: 'Fremen Mortar', producer: 'barracks', cost: 250, buildTime: 9, hp: 120, speed: 3.15, turnRate: 12, radius: 0.5, sight: 12,
@@ -126,6 +136,7 @@ export const UNITS: Record<UnitType, UnitDef> = {
       weapon: { range: 12, minRange: 4, damage: 28, bonus: { structure: 26 }, cooldown: 1.4, projectile: 'rocket', speed: 16, splash: 3, sound: 'launch_small' },
     },
     desc: 'A Fremen with a heavy rocket mortar on his back and a pistol in his belt. On the move he barely fights; set up (D, 1.5 s), he lobs guided rockets at anything your side can see out to 6 tiles: strong vs vehicles, structures and packed infantry. Can\'t fire up close, and in the sand he digs in like any Fremen.',
+    brief: 'Set up (D) to lob guided rockets at vehicles, structures and infantry. Barely fights on the move.',
   },
   sandrider: {
     name: 'Sandrider', producer: 'barracks', cost: 500, buildTime: 12, hp: 280, armor: 1, speed: 3.15, turnRate: 12, radius: 0.5, sight: 11,
@@ -134,10 +145,12 @@ export const UNITS: Record<UnitType, UnitDef> = {
     weapon: { range: 0.9, minRange: 0, damage: 400, bonus: {}, step: 0, cooldown: 1.6, projectile: 'bullet', speed: 0, splash: 0, only: ['biological'], pierce: true },
     charge: { range: 6, speed: 2 },
     desc: 'A Fremen who has ridden Shai-Hulud. Plants a Thumper and rides the worm it calls until you let it go: the worm goes where you send it and swallows everything on the sand it bites, your own side too, so keep your army clear (vehicles go down most of all). On foot, a zealot: rushes the most valuable enemy infantry about and kills it with one stroke of the crysknife, a slow blade that passes any shield. Can\'t hurt vehicles, structures or aircraft on foot.',
+    brief: 'Calls and rides a Sandworm that eats everything on the sand, yours too. On foot, a crysknife assassin.',
   },
   glider: {
     name: 'Wind Glider', producer: 'perch', cost: 100, buildTime: 6, hp: 60, speed: 10, turnRate: 2.2, radius: 0.9, sight: 16,
     turret: false, infantry: false, tags: ['light', 'air'], weapon: null, requires: ['perch'], air: true, glides: { orbit: 12 },
     desc: 'A Fremen rider on a cloth wing, riding the desert winds. The fastest thing in the sky and sees far, but unarmed and frail. It can\'t hover: with nowhere to go, it circles.',
+    brief: 'The fastest thing in the sky, and sees far. Unarmed and frail.',
   },
 };

@@ -17,11 +17,13 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
     levels: [{
       name: 'Imperial Barracks', short: 'Imperial Bks', cost: 800, time: 40, requires: ['tleilaxu'],
       desc: 'Upgrades a Barracks. Unlocks Sardaukar and drop pods: new infantry land by pod at the rally point, anywhere you can see.',
+      brief: 'Unlocks Sardaukar and drop pods: new infantry land at the rally point.',
     }],
   },
   bunker: {
     name: 'Bunker', short: 'Bunker', cost: 400, buildTime: 10, hp: 1400, size: 2, requires: ['barracks'], garrison: 3,
     desc: 'Holds three infantry, who shoot from it and can\'t be hurt while inside. Right-click it with infantry selected; Unload on the command card lets them out.',
+    brief: 'Holds three infantry, who shoot from it unharmed. Right-click it with infantry.',
   },
   factory: {
     name: 'Factory', short: 'Factory', cost: 1000, buildTime: 14, hp: 1100, size: 3, requires: ['refinery', 'barracks'],
@@ -46,6 +48,7 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   pad: {
     name: 'Repair Pad', short: 'Repair Pad', cost: 700, buildTime: 12, hp: 900, size: 2, requires: ['fab'], pad: { slots: 2, rate: 25, range: 2.5 },
     desc: "Restores the health of units parked next to it, two at a time, for credits. Right-click it with units selected. Corrino units don't heal anywhere else.",
+    brief: 'Repairs two units parked beside it, for credits. Corrino units heal nowhere else.',
   },
   turret: {
     name: 'Auto Turret', short: 'Turret', cost: 350, buildTime: 9, hp: 700, size: 1, requires: ['barracks'],
@@ -68,14 +71,17 @@ export const BUILDINGS: Record<BuildingType, BuildingDef> = {
   perch: {
     name: 'High Perch', short: 'High Perch', cost: 600, buildTime: 12, hp: 700, size: 2, requires: [], heals: { radius: 10, rate: 2 },
     desc: 'A glider roost on a rock spur: Fremen engineers build and launch Wind Gliders here (each High Perch adds a production line). Its cisterns water the troops: Fremen units and structures near it heal twice as fast.',
+    brief: 'Builds Wind Gliders. Fremen units and structures near it heal twice as fast.',
   },
   thumper: {
     name: 'Thumper', short: 'Thumper', cost: 250, buildTime: 0, hp: 150, size: 1, requires: ['sietch2'], onSand: true, deployed: true,
     desc: 'Planted in the sand by a Sandrider, it drums until a Sandworm comes: the Sandrider climbs on if it is close by; otherwise the worm comes wild and swallows anything on the sand around it, whoever it belongs to. Destroy it before then and no worm comes.',
+    brief: 'Calls a Sandworm: a Sandrider close by rides it, else it eats anything on the sand around.',
   },
   camp: {
     name: 'Spice Camp', short: 'Spice Camp', cost: 450, buildTime: 0, hp: 500, size: 2, requires: [], deployed: true, extract: { rate: 7.2, radius: 7 },
     desc: 'Set up by a Spice Crew on a spice field: turns the spice around it into credits. Packs up into a crew again (D) when the field runs dry.',
+    brief: 'Turns the spice around it into credits. Packs up (D) when the field runs dry.',
   },
 };
 

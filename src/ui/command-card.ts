@@ -1,6 +1,6 @@
 import {
   BUILDINGS, CAMP_SEARCH, FACTIONS, PRODUCERS, RIDE, SELF_REPAIR_RATE, THUMPER, TILE, UNITS, UPGRADES, levelDef, maxLevel, reqName, shieldsFor,
-  type BuildingType, type LevelUpType, type Req, type ResearchSlot, type UnitType, type UpgradeType, type WeaponDef,
+  type BuildingType, type Faction, type LevelUpType, type Req, type ResearchSlot, type UnitDef, type UnitType, type UpgradeType, type WeaponDef,
 } from '../config';
 import { Building, SALVAGE, Unit } from '../entities';
 import type { Game } from '../game/game';
@@ -11,13 +11,33 @@ import { GRID_KEYS, keyLabel, onKeyLabels, type GridKey } from './keys';
 const cap = (t: string) => t[0].toUpperCase() + t.slice(1);
 const reqList = (reqs: Req[]) => reqs.map(reqName).join(', ');
 
-function weaponLine(w: WeaponDef): string {
-  const extras = [
-    ...Object.entries(w.bonus).map(([t, v]) => `+${v} vs ${cap(t)}`),
-    ...(w.airDamage !== undefined ? [`${w.airDamage} vs Air`] : []),
-  ].join(', ');
-  const range = w.minRange ? `${w.minRange / TILE}-${w.range / TILE}` : `${w.range / TILE}`;
-  return `Damage ${w.damage}${extras ? ` (${extras})` : ''}  Range ${range} tiles${w.pierce ? '  Ignores shields' : ''}`;
+/** Tooltip numbers: [label, value] cells in a grid, then notes (bonuses) one to a line. */
+interface Stats {
+  cells: [string, string][];
+  notes: string[];
+}
+
+/** Toughness (HP, shields, armor, speed for units) and a weapon's damage, range and bonuses. */
+function stats(hp: number, shields: number, armor: number | undefined, speed: number | undefined, w: WeaponDef | null | undefined): Stats {
+  const cells: [string, string][] = [['HP', `${hp}`]];
+  if (shields) cells.push(['Shields', `${shields}`]);
+  if (armor) cells.push(['Armor', `${armor}`]);
+  if (speed) cells.push(['Speed', `${speed}`]);
+  const notes: string[] = [];
+  if (w) {
+    cells.push(['Damage', `${w.damage}`], ['Range', w.minRange ? `${w.minRange / TILE}-${w.range / TILE}` : `${w.range / TILE}`]);
+    notes.push(...weaponNotes(w));
+  }
+  return { cells, notes };
+}
+
+function weaponNotes(w: WeaponDef): string[] {
+  const n = [...Object.entries(w.bonus).map(([t, v]) => `+${v} vs ${cap(t)}`), ...(w.airDamage !== undefined ? [`${w.airDamage} vs Air`] : [])];
+  return [...(n.length ? [n.join(' · ')] : []), ...(w.pierce ? ['Ignores shields'] : [])];
+}
+
+function unitStats(d: UnitDef, faction: Faction): Stats {
+  return stats(d.hp, shieldsFor(faction, d), d.armor, d.speed, d.weapon);
 }
 
 type Tab = 'build' | 'train' | 'research' | 'command';
@@ -53,7 +73,14 @@ interface Slot {
   cost: () => number;
   /** Seconds it takes (shown beside the price); absent for commands. */
   time?: () => number;
+  /** What it is or does, in a line or two. */
   tip: () => string;
+  /** Numbers (HP, armor, weapon), in small print under the text. */
+  stats?: () => Stats;
+  /** What's still missing before it can be used (shown in red), or ''. */
+  needs?: () => string;
+  /** What right-click does, shown while it's queued, building or researching. */
+  hint?: string;
   view: () => SlotView;
   /** Left click or hotkey. */
   use: () => void;
@@ -241,11 +268,14 @@ export class CommandCard {
       name: () => `Rite: ${d.name}`,
       cost: () => r.cost,
       time: () => r.time,
-      tip: () => {
+      tip: () => `${d.brief ?? d.desc}\nA ${UNITS[r.from].name} on sand turns into one for good. Moving or Stop calls it off, refunded.`,
+      stats: () => unitStats(d, this.faction),
+      needs: () => {
+        const missing = this.missing(d.requires);
+        if (missing) return missing;
         const sel = from().find((u) => !u.rite);
         const why = sel ? g.riteBlocked(sel, to) : null;
-        return `${d.desc}\nA ${UNITS[r.from].name} digs into the sand where it stands and comes out as a ${d.name}, for good: rites can't be undone. ` +
-          `Only on sand; moving or Stop calls it off and refunds it.${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}${why && why !== 'Busy.' && !why.startsWith('Needs') ? `\n${why}` : ''}`;
+        return why && why !== 'Busy.' && !why.startsWith('Needs') ? why : '';
       },
       view: () => {
         const b = busy();
@@ -278,6 +308,13 @@ export class CommandCard {
     return this.ts.faction;
   }
 
+  /** "Needs …" naming the requirements not met yet, or '' when all are. */
+  private missing(reqs: Req[]): string {
+    const g = this.game;
+    const left = reqs.filter((r) => !g.requirementsMet(g.localTeam, [r]));
+    return left.length ? `Needs ${reqList(left)}` : '';
+  }
+
   private buildSlots(): (Slot | null)[] {
     const slot = (t: BuildingType): Slot => {
       const d = BUILDINGS[t];
@@ -286,11 +323,10 @@ export class CommandCard {
         name: () => d.name,
         cost: () => d.cost,
         time: () => d.buildTime,
-        tip: () => {
-          const sh = shieldsFor(this.faction, d);
-          const gun = d.weapon ? `\n${weaponLine(d.weapon)}` : '';
-          return `${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}${d.armor ? `  Armor ${d.armor}` : ''}${gun}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to cancel.`;
-        },
+        tip: () => d.brief ?? d.desc,
+        stats: () => stats(d.hp, shieldsFor(this.faction, d), d.armor, undefined, d.weapon),
+        needs: () => this.missing(d.requires),
+        hint: 'Right-click to cancel.',
         view: () => {
           const g = this.game;
           const b = this.ts.building;
@@ -329,18 +365,21 @@ export class CommandCard {
   private trainSlots(): (Slot | null)[] {
     const slot = (t: UnitType): Slot => {
       const d = this.game.unitDef(this.game.localTeam, t);
-      const sh = shieldsFor(this.faction, d);
       return {
         icon: () => t,
         name: () => d.name,
         cost: () => d.cost,
         time: () => UNITS[t].buildTime,
-        tip: () => {
-          const w = d.weapon ? `\n${weaponLine(d.weapon)}` : '';
-          const anti = d.antiArmor ? `\nRockets (upgrade): ${weaponLine(d.antiArmor)}` : '';
-          return `${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}${d.armor ? `  Armor ${d.armor}` : ''}  Speed ${d.speed}${w}${anti}\nBuilt at: ${BUILDINGS[d.producer].name}${
-            d.requires.length > 1 ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to remove from the queue.`;
+        tip: () => d.brief ?? d.desc,
+        // The anti-armor rockets show once Infantry Rockets is done.
+        stats: () => {
+          const s = unitStats(d, this.faction);
+          const r = d.antiArmor;
+          if (r && this.ts.upgrades.has('rockets')) s.notes.push(`Rockets vs Armored: Damage ${r.damage} · Range ${r.range / TILE}`, ...weaponNotes(r));
+          return s;
         },
+        needs: () => this.missing(d.requires),
+        hint: 'Right-click to remove one from the queue.',
         view: () => {
           const g = this.game;
           const queue = this.ts.queues[d.producer];
@@ -387,7 +426,9 @@ export class CommandCard {
         name: () => d().name,
         cost: () => d().cost,
         time: () => d().time,
-        tip: () => `${d().desc}${d().requires?.length ? `\nRequires: ${reqList(d().requires!)}` : ''}\nRight-click to cancel.`,
+        tip: () => d().brief ?? d().desc,
+        needs: () => (this.ts.levelUps[t] ? '' : this.missing([t, ...(d().requires ?? [])])),
+        hint: 'Right-click to cancel.',
         view: () => {
           const l = this.ts.levelUps[t];
           const done = !l && g.techLevel(g.localTeam, t) >= top;
@@ -414,10 +455,15 @@ export class CommandCard {
         name: () => UPGRADES[pick()].name,
         cost: () => UPGRADES[pick()].cost,
         time: () => UPGRADES[pick()].time,
-        tip: () => {
+        tip: () => UPGRADES[pick()].desc,
+        needs: () => {
           const d = UPGRADES[pick()];
-          return `${d.desc}\nRequires: ${reqList(d.requires)}${d.after ? `, ${UPGRADES[d.after].name}` : ''}\nRight-click to cancel.`;
+          if (this.ts.upgrades.has(pick())) return '';
+          const after = d.after && !this.ts.upgrades.has(d.after) ? UPGRADES[d.after].name : '';
+          const missing = this.missing(d.requires);
+          return after ? (missing ? `${missing}, ${after}` : `Needs ${after}`) : missing;
         },
+        hint: 'Right-click to cancel.',
         view: () => {
           const { t, r, mine, done, g } = state();
           return {
@@ -682,14 +728,23 @@ export class CommandCard {
     const cost = s.cost();
     const v = s.view();
     const time = s.time?.();
-    const head = `${s.name()}|${key}|${cost}|${time}|${s.tip()}|${!!v.locked}`;
+    const st = s.stats?.();
+    // In red: what's missing, else just "Locked". The right-click hint only while there's something to cancel.
+    const needs = s.needs?.() || (v.locked ? 'Locked' : '');
+    const hint = s.hint && (v.progress != null || !!v.badge || (!!v.status && !v.done)) ? s.hint : '';
+    const head = `${s.name()}|${key}|${cost}|${time}|${s.tip()}|${JSON.stringify(st)}|${needs}|${hint}`;
     this.tipEl.hidden = false;
     if (head === this.tipText) return;
     this.tipText = head;
     const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+    const price = [cost ? `<span class="tip-cost">$${cost}</span>` : '', time ? `<span class="tip-time">${time} s</span>` : ''].join('');
     this.tipEl.innerHTML =
       `<div class="tip-head"><span class="tip-name">${esc(s.name())}</span><span class="tip-key">${esc(key)}</span>` +
-      `${cost ? `<span class="tip-cost">$${cost}</span>` : ''}${time ? `<span class="tip-time">${time} s</span>` : ''}</div>` +
-      `${v.locked ? '<div class="tip-locked">Locked</div>' : ''}<div class="tip-body">${esc(s.tip())}</div>`;
+      `${price ? `<span class="tip-price">${price}</span>` : ''}</div>` +
+      `<div class="tip-body">${esc(s.tip())}</div>` +
+      `${st ? `<div class="tip-stats">${st.cells.map(([k, v]) => `<span><i>${esc(k)}</i> ${esc(v)}</span>`).join('')}</div>` : ''}` +
+      `${st?.notes.length ? `<div class="tip-notes">${st.notes.map((l) => `<div>${esc(l)}</div>`).join('')}</div>` : ''}` +
+      `${needs ? `<div class="tip-needs">${esc(needs)}</div>` : ''}` +
+      `${hint ? `<div class="tip-hint">${esc(hint)}</div>` : ''}`;
   }
 }

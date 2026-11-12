@@ -85,6 +85,8 @@ export interface UnitDef {
   antiArmor?: WeaponDef;
   requires: Req[];
   desc: string;
+  /** Shorter text for the command card tooltip, where `desc` (also in the manual) runs long. */
+  brief?: string;
   /** Flies: ignores terrain and can only be hit by anti-air weapons. */
   air?: boolean;
   /** Carryall space this unit takes (capacity CARRYALL.capacity); units without it can't be lifted. */
@@ -133,6 +135,8 @@ export interface BuildingDef {
   size: number; // footprint in tiles (square)
   requires: Req[];
   desc: string;
+  /** Shorter text for the command card tooltip, where `desc` (also in the manual) runs long. */
+  brief?: string;
   /** The steps up: `levels[0]` to level 2, `levels[1]` (the Sietch) to level 3. */
   levels?: LevelDef[];
   /** Infantry it can hold (a bunker); they shoot from it and can't be hit while inside. */
@@ -158,6 +162,8 @@ export interface LevelDef {
   cost: number;
   time: number;
   desc: string;
+  /** Shorter text for the command card tooltip, where `desc` (also in the manual) runs long. */
+  brief?: string;
   requires?: Req[];
 }
 
@@ -171,4 +177,6 @@ export interface UpgradeDef {
   /** The level it adds to (weapons, armor, shields, harvesting). */
   line?: UpgradeLine;
   desc: string;
+  /** Shorter text for the command card tooltip, where `desc` (also in the manual) runs long. */
+  brief?: string;
 }
