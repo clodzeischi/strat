@@ -595,6 +595,11 @@ body {
   color: var(--accent);
 }
 
+.tip-time {
+  font-family: ui-monospace, Menlo, monospace;
+  color: var(--muted);
+}
+
 .tip-locked {
   color: #d05a4a;
   font-size: 11px;

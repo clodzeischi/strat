@@ -51,6 +51,8 @@ interface Slot {
   name: () => string;
   /** Price in credits; 0 for commands. */
   cost: () => number;
+  /** Seconds it takes (shown beside the price); absent for commands. */
+  time?: () => number;
   tip: () => string;
   view: () => SlotView;
   /** Left click or hotkey. */
@@ -238,11 +240,12 @@ export class CommandCard {
       icon: () => to,
       name: () => `Rite: ${d.name}`,
       cost: () => r.cost,
+      time: () => r.time,
       tip: () => {
         const sel = from().find((u) => !u.rite);
         const why = sel ? g.riteBlocked(sel, to) : null;
-        return `${UNITS[r.from].name} digs into the sand where it stands and comes out ${r.time} s later as a ${d.name} (for good: rites can't be undone). ` +
-          `Only on sand; moving or Stop calls it off and refunds it.\n${d.desc}${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}${why && why !== 'Busy.' && !why.startsWith('Needs') ? `\n${why}` : ''}`;
+        return `${d.desc}\nA ${UNITS[r.from].name} digs into the sand where it stands and comes out as a ${d.name}, for good: rites can't be undone. ` +
+          `Only on sand; moving or Stop calls it off and refunds it.${d.requires.length ? `\nRequires: ${reqList(d.requires)}` : ''}${why && why !== 'Busy.' && !why.startsWith('Needs') ? `\n${why}` : ''}`;
       },
       view: () => {
         const b = busy();
@@ -282,6 +285,7 @@ export class CommandCard {
         icon: () => t,
         name: () => d.name,
         cost: () => d.cost,
+        time: () => d.buildTime,
         tip: () => {
           const sh = shieldsFor(this.faction, d);
           const gun = d.weapon ? `\n${weaponLine(d.weapon)}` : '';
@@ -330,10 +334,11 @@ export class CommandCard {
         icon: () => t,
         name: () => d.name,
         cost: () => d.cost,
+        time: () => UNITS[t].buildTime,
         tip: () => {
           const w = d.weapon ? `\n${weaponLine(d.weapon)}` : '';
           const anti = d.antiArmor ? `\nRockets (upgrade): ${weaponLine(d.antiArmor)}` : '';
-          return `[${d.tags.map(cap).join(', ')}]\n${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}${d.armor ? `  Armor ${d.armor}` : ''}  Speed ${d.speed}${w}${anti}\nBuilt at: ${BUILDINGS[d.producer].name}${
+          return `${d.desc}\nHP ${d.hp}${sh ? `  Shields ${sh}` : ''}${d.armor ? `  Armor ${d.armor}` : ''}  Speed ${d.speed}${w}${anti}\nBuilt at: ${BUILDINGS[d.producer].name}${
             d.requires.length > 1 ? `\nRequires: ${reqList(d.requires)}` : ''}\nRight-click to remove from the queue.`;
         },
         view: () => {
@@ -381,7 +386,8 @@ export class CommandCard {
         icon: () => `${t}${next()}` as IconKey,
         name: () => d().name,
         cost: () => d().cost,
-        tip: () => `${d().desc}\nTakes ${d().time} s.${d().requires?.length ? `\nRequires: ${reqList(d().requires!)}` : ''}\nRight-click to cancel.`,
+        time: () => d().time,
+        tip: () => `${d().desc}${d().requires?.length ? `\nRequires: ${reqList(d().requires!)}` : ''}\nRight-click to cancel.`,
         view: () => {
           const l = this.ts.levelUps[t];
           const done = !l && g.techLevel(g.localTeam, t) >= top;
@@ -407,6 +413,7 @@ export class CommandCard {
         icon: () => pick(),
         name: () => UPGRADES[pick()].name,
         cost: () => UPGRADES[pick()].cost,
+        time: () => UPGRADES[pick()].time,
         tip: () => {
           const d = UPGRADES[pick()];
           return `${d.desc}\nRequires: ${reqList(d.requires)}${d.after ? `, ${UPGRADES[d.after].name}` : ''}\nRight-click to cancel.`;
@@ -662,7 +669,7 @@ export class CommandCard {
     c.status.style.display = v.status ? 'block' : 'none';
   }
 
-  /** The hovered button's name, hotkey, price and details, above the card. */
+  /** The hovered button's name, hotkey, price and time, and its details, above the card. */
   private drawTip(): void {
     const s = this.hovered === null ? null : this.slot(this.hovered);
     if (!s) {
@@ -674,14 +681,15 @@ export class CommandCard {
     const key = keyLabel(GRID_KEYS[1 + Math.floor(i / 4)][i % 4]);
     const cost = s.cost();
     const v = s.view();
-    const head = `${s.name()}|${key}|${cost}|${s.tip()}|${!!v.locked}`;
+    const time = s.time?.();
+    const head = `${s.name()}|${key}|${cost}|${time}|${s.tip()}|${!!v.locked}`;
     this.tipEl.hidden = false;
     if (head === this.tipText) return;
     this.tipText = head;
     const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
     this.tipEl.innerHTML =
       `<div class="tip-head"><span class="tip-name">${esc(s.name())}</span><span class="tip-key">${esc(key)}</span>` +
-      `${cost ? `<span class="tip-cost">$${cost}</span>` : ''}</div>` +
+      `${cost ? `<span class="tip-cost">$${cost}</span>` : ''}${time ? `<span class="tip-time">${time} s</span>` : ''}</div>` +
       `${v.locked ? '<div class="tip-locked">Locked</div>' : ''}<div class="tip-body">${esc(s.tip())}</div>`;
   }
 }
